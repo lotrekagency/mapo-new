@@ -20,7 +20,7 @@ export function useCanAccessRoute(meta: RouteMeta): boolean {
 
   // roles middleware
   if (middleware.includes("roles")) {
-    const required = meta.roles;
+    const required = meta.roles as string[] | undefined;
     if (required?.length && !auth.info?.is_superuser) {
       const userGroups = auth.info?.groups ?? [];
       if (!required.some((r: string) => userGroups.includes(r))) return false;
@@ -29,7 +29,7 @@ export function useCanAccessRoute(meta: RouteMeta): boolean {
 
   // permissions middleware
   if (middleware.includes("permissions")) {
-    const perms = meta.permissions;
+    const perms = meta.permissions as RoutePermissions | undefined;
     if (perms && !auth.info?.is_superuser) {
       if (Array.isArray(perms)) {
         if (!perms.every((p) => auth.rawPermissions.includes(p))) return false;
