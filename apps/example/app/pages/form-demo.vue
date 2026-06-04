@@ -201,10 +201,10 @@ async function save() {
   await form.submit(async (data, isNew) => {
     // Qui andresti a chiamare useCrud().create() o .partialUpdate()
     await new Promise((r) => setTimeout(r, 600));
-    useSnackStore().open({
-      message: `Salvato! (patch: ${JSON.stringify(data)})`,
-      color: "success",
-    });
+    useSnackStore().show(
+      `Salvato! (patch: ${JSON.stringify(data)})`,
+      "success",
+    );
   });
 }
 

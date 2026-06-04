@@ -53,13 +53,10 @@ const form = useMapoForm({
   immediate: true,
 });
 
-// provideContext() per rendere MapoFormField utilizzabile manualmente
-form.provideContext();
-
 async function save() {
   await form.submit(async (data) => {
     await new Promise((r) => setTimeout(r, 400));
-    useSnackStore().open({ message: "Utente salvato", color: "success" });
+    useSnackStore().show("Utente salvato", "success");
   });
 }
 </script>
@@ -75,7 +72,7 @@ async function save() {
 
     <!-- Layout a due colonne custom -->
     <div class="grid grid-cols-2 gap-4 rounded-lg border border-gray-200 p-6">
-      <!-- Ogni MapoFormField si auto-inietta il context da form.provideContext() -->
+      <!-- Ogni MapoFormField si auto-inietta il context fornito da useMapoForm() -->
       <div class="col-span-2">
         <MapoFormField :descriptor="fields[0]" />
       </div>

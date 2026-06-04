@@ -107,7 +107,6 @@ const form = useMapoForm({
   errors,
   registry: $mapoFormRegistry,
 });
-form.provideContext();
 
 const snack = ref<{ show: boolean; color: string; text: string }>({
   show: false,
@@ -156,7 +155,7 @@ async function destroy() {
   <v-row align="center" class="mb-2">
     <v-col>
       <div class="text-caption text-medium-emphasis">
-        <NuxtLink to="/news">News</NuxtLink> /
+        <NuxtLink to="/news"> News </NuxtLink> /
         {{ isNew ? "new" : `#${idParam}` }}
       </div>
       <h1 class="text-h5">
@@ -203,7 +202,7 @@ async function destroy() {
 
     <v-col cols="12" md="4">
       <v-card>
-        <v-card-title class="text-subtitle-1">Status</v-card-title>
+        <v-card-title class="text-subtitle-1"> Status </v-card-title>
         <v-card-text>
           <div class="d-flex flex-column ga-4">
             <MapoFormField
