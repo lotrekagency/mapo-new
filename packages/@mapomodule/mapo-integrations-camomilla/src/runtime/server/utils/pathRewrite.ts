@@ -10,6 +10,12 @@ import {
   MAPO_USER_INFO_PATH,
 } from "../../constants";
 
+/**
+ * Builds built-in API rewrite rules used by the Camomilla proxy.
+ *
+ * @param base Optional app base path prefix.
+ * @returns Default regex rewrite map applied before custom overrides.
+ */
 export function buildDefaultRewrites(base: string): CamomillaPathRewrite {
   const b = base
     ? (base.startsWith("/") ? base : "/" + base).replace(/\/+$/, "")
@@ -25,6 +31,17 @@ export function buildDefaultRewrites(base: string): CamomillaPathRewrite {
   };
 }
 
+/**
+ * Rewrites a request pathname according to default and user-defined rules.
+ *
+ * Custom rewrites take precedence over built-in rewrites. The output path is
+ * normalized to avoid accidental duplicated slashes.
+ *
+ * @param pathname Incoming request pathname.
+ * @param base Optional app base path prefix.
+ * @param customRewrites User-provided rewrite map.
+ * @returns Rewritten path (or original path when no rule matches).
+ */
 export function applyPathRewrite(
   pathname: string,
   base: string,

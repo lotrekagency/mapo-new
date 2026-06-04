@@ -2,8 +2,16 @@ import { defineNuxtModule, addServerHandler, createResolver } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { CamomillaOptions } from "./types";
 
+/** Public module option type export. */
 export type { CamomillaOptions } from "./types";
 
+/**
+ * Nuxt module that proxies Mapo API requests to a Camomilla backend.
+ *
+ * It stores private runtime configuration under `runtimeConfig.camomilla`
+ * and registers a server middleware that intercepts `/api/*` calls, applies
+ * path rewrites, forwards headers/cookies, and returns proxied responses.
+ */
 export default defineNuxtModule<CamomillaOptions>({
   meta: {
     name: "mapo-integrations-camomilla",

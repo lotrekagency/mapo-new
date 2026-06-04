@@ -18,6 +18,10 @@ import {
 import type { CamomillaRuntimeConfig } from "../../../types";
 import { CAMOMILLA_AUTH_PATHS } from "../../constants";
 
+/**
+ * Incoming headers not forwarded to upstream because they are hop-by-hop
+ * or recalculated by `fetch` for the outgoing proxied request.
+ */
 const SKIP_REQUEST_HEADERS = new Set([
   "host",
   "connection",
@@ -25,6 +29,17 @@ const SKIP_REQUEST_HEADERS = new Set([
   "content-length",
 ]);
 
+/**
+ * API proxy middleware for Camomilla integration.
+ *
+ * Flow overview:
+ * - Intercepts eligible `/api/*` requests.
+ * - Rewrites path according to built-in and custom rules.
+ * - Forwards request headers/body and normalized cookies.
+ * - Proxies to configured Camomilla backend.
+ * - Rewrites/aliases Set-Cookie headers on auth paths.
+ * - Returns backend status, headers, and raw response body.
+ */
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event).camomilla as CamomillaRuntimeConfig;
   const {

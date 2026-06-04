@@ -1,3 +1,7 @@
+/**
+ * Path rewrite rules where key is a regex pattern string and value is the
+ * replacement path applied by the proxy middleware.
+ */
 export interface CamomillaPathRewrite {
   [pattern: string]: string;
 }

@@ -7,6 +7,12 @@ declare module "h3" {
   }
 }
 
+/**
+ * Nitro plugin that attaches Camomilla runtime config to request context.
+ *
+ * This allows server middleware to read integration settings from
+ * `event.context.camomillaConfig` during request handling.
+ */
 export default defineNitroPlugin((nitro) => {
   nitro.hooks.hook("request", (event) => {
     // useRuntimeConfig is available at Nitro request time via the global
