@@ -47,6 +47,7 @@ const descColor = computed(() => {
 });
 
 // useRequestURL() works both in SSR and client-side environments (unlike window.location).
+// @ts-expect-error — Nuxt auto-import, resolved at app build time
 const requestUrl = useRequestURL();
 const displayUrl = computed(() => value.value.permalink || requestUrl.host);
 </script>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch, onBeforeUnmount } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
+import type { AnyExtension } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
@@ -17,7 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
 const extraExtensions =
-  (props.descriptor.attrs?.extensions as unknown[] | undefined) ?? [];
+  (props.descriptor.attrs?.extensions as AnyExtension[] | undefined) ?? [];
 
 // Protocol allowlist for user-entered links. Without this,
 // `<a href="javascript:...">` would be accepted, leading to XSS when content is
@@ -85,7 +86,7 @@ const editor = useEditor({
     }),
     Underline,
     ...extraExtensions,
-  ] as unknown[],
+  ] as AnyExtension[],
   onUpdate: ({ editor: e }) => {
     emit("update:modelValue", e.getHTML());
   },

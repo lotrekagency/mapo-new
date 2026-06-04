@@ -40,7 +40,7 @@ async function fetchItems(query: string) {
     const url = query
       ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}search=${encodeURIComponent(query)}`
       : endpoint;
-    const data = await ($mapoFetch ?? $fetch)<unknown>(url);
+    const data = await ($mapoFetch ?? $fetch)(url);
     // Supports both a plain array and a paginated DRF response { results: [] }.
     const raw = Array.isArray(data)
       ? data

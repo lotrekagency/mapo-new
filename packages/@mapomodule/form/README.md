@@ -12,7 +12,8 @@ Form engine for Mapo v2 — descriptor-driven, typesafe, headless-ready admin fo
 - **JSON Schema bridge**: `useFormFromSchema()` generates descriptors from Pydantic v2 / DRF-spectacular schemas
 - **Multilingual fields**: `translatable: true` writes to `model.translations[lang].field` automatically
 - **Client validation**: `validate(value, ctx)` per descriptor + `required` shorthand
-- **Tab/group layout**: declare `tab` and `group` per field — tabs render automatically, groups are collapsible
+- **Tab/group layout**: declare `tab` and `group` per field — tabs render automatically (incl. nested tabs), groups are collapsible. Tab panels expose `tab.<name>.before/after`, full override, `.label` and `tab-bar-end` slots
+- **Consistent repeater items**: `MapoRepeater` drives each item through `useMapoForm`, so nested-path keys, `translatable`, accessors, `descriptor.is` overrides and **client validation** behave identically inside a repeater
 - **Draft persistence**: `draftKey` option on `useMapoForm()` auto-saves to localStorage every 2 s; `checkDraft()` / `draftBanner` offer restore/discard; clears on successful `submit()`
 - **Fail-soft**: unknown field types render a non-destructive placeholder, never crash the form
 
@@ -98,7 +99,6 @@ const fields = useFormFromSchema(schema, {
 
 ```ts
 const form = useMapoForm({ model, fields, registry: $mapoFormRegistry });
-form.provideContext();
 
 // form.isDirty, form.isLoading, form.getPatch(), form.submit(handler)
 ```

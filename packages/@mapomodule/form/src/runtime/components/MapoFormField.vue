@@ -13,7 +13,7 @@ import MapoUnknownField from "./MapoUnknownField.vue";
 
 const props = defineProps<{ descriptor: FieldDescriptor }>();
 
-const form = injectMapoForm()!;
+const form = injectMapoForm<Record<string, unknown>>()!;
 
 const registry = form.registry;
 const currentLang = form.currentLang;

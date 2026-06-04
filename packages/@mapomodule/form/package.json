@@ -20,7 +20,7 @@
     "dev": "nuxt-module-build build --stub --watch",
     "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run --passWithNoTests"
   },

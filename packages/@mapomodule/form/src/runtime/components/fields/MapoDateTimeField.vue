@@ -162,7 +162,9 @@ function clear() {
               min="0"
               max="23"
               class="w-14 text-center"
-              @update:model-value="(v) => onTimeChange('hour', String(v))"
+              @update:model-value="
+                (v: unknown) => onTimeChange('hour', String(v))
+              "
             />
             <span class="text-gray-500 font-medium">:</span>
             <UInput
@@ -171,7 +173,9 @@ function clear() {
               min="0"
               max="59"
               class="w-14 text-center"
-              @update:model-value="(v) => onTimeChange('minute', String(v))"
+              @update:model-value="
+                (v: unknown) => onTimeChange('minute', String(v))
+              "
             />
           </div>
           <UButton

@@ -19,8 +19,8 @@ const props = defineProps<{
   initialExpanded?: boolean;
 }>();
 
-// @ts-expect-error — typed by module augmentation at app build time
 const globalExpanded: boolean =
+  // @ts-expect-error — typed by module augmentation at app build time
   useRuntimeConfig().public.mapoForm?.groups?.expanded ?? true;
 const expanded = ref(props.initialExpanded ?? globalExpanded);
 
