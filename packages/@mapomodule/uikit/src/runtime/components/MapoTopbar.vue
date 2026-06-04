@@ -2,9 +2,9 @@
 import { useSidebarStore } from "@mapomodule/store/runtime/stores/sidebar";
 
 defineSlots<{
-  left(): unknown;
-  default(): unknown;
-  right(): unknown;
+  left(): void;
+  default(): void;
+  right(): void;
 }>();
 
 const sidebar = useSidebarStore();

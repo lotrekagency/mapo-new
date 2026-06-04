@@ -59,15 +59,15 @@ When installed via `mapomodule`, configure under `mapo.uikit` instead.
 
 #### List engine
 
-| Component           | Description                                                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MapoList`          | Full list shell: composes head, filters, actions, tabs, table, and quick-edit. URL state (page, sort, search, filters, tab) synced automatically. |
-| `MapoListHead`      | Title, search bar, and primary action button row                                                                                                  |
-| `MapoListFilters`   | Filter panel driven by `FieldDescriptor[]` from `@mapomodule/form`                                                                                |
-| `MapoListActions`   | Bulk-action toolbar (delete, reorder) — appears on selection                                                                                      |
-| `MapoListTabs`      | Tabbed status filter via `meta.tabs`                                                                                                              |
-| `MapoListTable`     | Data table with server-side pagination, sort, selection, and drag reorder. Pass `permissionModel` to gate edit/delete row actions.                |
-| `MapoListQuickEdit` | Quick-edit modal driven by the same `FieldDescriptor[]` as the detail form                                                                        |
+| Component           | Description                                                                                                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoList`          | Full list shell: composes head, filters, actions, tabs, table, and quick-edit. URL state (page, sort, search, filters, tab) synced automatically.                                                              |
+| `MapoListHead`      | Title, search bar, and primary action button row                                                                                                                                                               |
+| `MapoListFilters`   | Filter panel driven by `FilterDescriptor[]`. v1 backend contract (`key=v1,v2`); per-filter override slots (`filter.{value}` / `.title` / `.content` / `.icon`)                                                 |
+| `MapoListActions`   | Bulk-action toolbar (delete, reorder) — appears on selection                                                                                                                                                   |
+| `MapoListTabs`      | Tabbed status filter via `meta.tabs`                                                                                                                                                                           |
+| `MapoListTable`     | Data table with server-side pagination, sort, selection, and whole-row drag reorder (drop-line feedback; auto-disabled while a search/sort is active). Pass `permissionModel` to gate edit/delete row actions. |
+| `MapoListQuickEdit` | Quick-edit modal driven by the same `FieldDescriptor[]` as the detail form                                                                                                                                     |
 
 #### Detail shell
 

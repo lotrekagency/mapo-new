@@ -16,10 +16,10 @@ export interface MapoUikitOptions {
    * Use it to override Tailwind theme tokens or add global styles.
    *
    * @example
-   * // nuxt.config.ts
+   *  nuxt.config.ts
    * mapoUikit: { css: '~/assets/css/theme.css' }
    *
-   * // assets/css/theme.css
+   *  assets/css/theme.css
    * @import "@nuxt/ui";
    * :root {
    *   --color-primary-500: oklch(0.7 0.2 240);
