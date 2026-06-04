@@ -12,6 +12,17 @@ import { useSidebarStore } from "@mapomodule/store/runtime/stores/sidebar";
 import type { MapoUser } from "@mapomodule/store/runtime/types";
 import { CoreCookieEnum } from "../types";
 
+/**
+ * Performs server-side bootstrap of Mapo runtime stores.
+ *
+ * On each SSR request, this plugin:
+ * - Activates the request Pinia instance and initializes auth/sidebar stores.
+ * - Restores sidebar UI state from cookies.
+ * - If the HttpOnly session cookie is present, calls the configured `userInfoApi`
+ *   (forwarding request cookies) to restore the authenticated user in the auth store.
+ *
+ * On session restore failure, it resets auth state and clears the session cookie.
+ */
 export default defineNuxtPlugin({
   name: "mapo-core:init",
   async setup(nuxtApp) {

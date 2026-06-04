@@ -8,6 +8,18 @@ import {
 import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 
+/**
+ * Registers the global Mapo fetch client and loading state.
+ *
+ * The plugin provides:
+ * - `$mapoFetch`: a shared `$fetch` instance with centralized request/response hooks.
+ * - `$mapoFetchLoading`: a computed boolean based on a global pending-request counter.
+ *
+ * Error handling behavior:
+ * - `401` (except logout calls): reset auth state and, on client, redirect to login
+ *   with the current route encoded in a `redirect` query parameter.
+ * - `403`: show a global "Permission denied" error snackbar.
+ */
 export default defineNuxtPlugin({
   name: "mapo-core:fetch",
   enforce: "pre",

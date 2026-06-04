@@ -9,16 +9,49 @@ import type {
   CrudRepository,
 } from "../types";
 
+/**
+ * Creates a typed CRUD repository bound to a resource endpoint.
+ *
+ * The returned repository exposes common operations (`list`, `detail`, `create`,
+ * `update`, `partialUpdate`, `delete`) plus utility actions (`updateOrCreate`,
+ * `updateOrder`). Requests are executed through the shared Mapo fetch client.
+ *
+ * Configuration precedence:
+ * - `higherConf` defines repository-level default request options.
+ * - Per-call config arguments override repository-level defaults.
+ *
+ * Multipart handling:
+ * - Write methods pass payloads through `applyMultipartPolicy`, using
+ *   `MultipartPolicyEnum.Auto` unless overridden in `CrudOptions`.
+ *
+ * @typeParam T Entity type handled by the repository.
+ * @param endpoint Resource endpoint (normalized to a trailing-slash base path).
+ * @param higherConf Optional repository-level fetch configuration defaults.
+ * @returns A typed `CrudRepository<T>` for the specified endpoint.
+ */
 export function useCrud<T>(
   endpoint: string,
   higherConf?: CrudConfig,
 ): CrudRepository<T> {
   const base = normalizeEndpoint(endpoint);
 
+  /**
+   * Merges higher-level CRUD config with per-call config.
+   *
+   * Per-call options take precedence over defaults provided at repository
+   * creation time.
+   */
   function merged(local?: CrudConfig): Record<string, unknown> {
     return { ...higherConf, ...local };
   }
 
+  /**
+   * Executes a typed request through the shared Mapo fetch client.
+   *
+   * @param path Target URL path.
+   * @param options Request options passed to `$mapoFetch`.
+   * @returns A promise resolving to the typed response payload.
+   */
   function fetch<R>(
     path: string,
     options: Record<string, unknown>,
