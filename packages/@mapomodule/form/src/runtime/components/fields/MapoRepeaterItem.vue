@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, inject, provide, watch } from "vue";
+import { ref, computed, watch, watchEffect } from "vue";
 import type {
   FieldDescriptor,
   FieldRegistry,
   RepeaterDescriptor,
 } from "../../types/index.js";
-import {
-  FORM_KEY,
-  type MapoFormContext,
-} from "../../composables/useMapoForm.js";
+import { useMapoForm, injectMapoForm } from "../../composables/useMapoForm.js";
 import { useFocusMode } from "../../composables/useFocusMode.js";
 import MapoFormField from "../MapoFormField.vue";
 
@@ -82,12 +79,6 @@ watch(
   { deep: true },
 );
 
-// Propagate changes back to the parent repeater.
-function setFieldValue(key: string, val: unknown) {
-  localModel.value = { ...localModel.value, [key]: val };
-  emit("update:item", localModel.value);
-}
-
 // Filter parent errors down to this item: "blocks.0.title" → "title".
 const itemErrors = computed<Record<string, string[]>>(() => {
   const result: Record<string, string[]> = {};
@@ -100,30 +91,35 @@ const itemErrors = computed<Record<string, string[]>>(() => {
 
 const hasErrors = computed(() => Object.keys(itemErrors.value).length > 0);
 
-// ─── Form context for child fields ───────────────────────────────────────────
-
-const parentCtx = inject<MapoFormContext<Record<string, unknown>>>(FORM_KEY);
+// ─── Sub-form context for child fields ───────────────────────────────────────
+// Reuse the full form engine (useMapoForm) instead of a hand-rolled context, so the
+// item's fields get correct nested-path / translatable / synci18n / accessor / onChange
+// handling and real client-side validation — not a stripped-down reimplementation.
 
 const currentLangRef = computed(() => props.currentLang);
 const readonly = computed(() => props.readonly);
 
-provide(FORM_KEY, {
+// Capture the parent context BEFORE useMapoForm provides a new one for this subtree.
+const parentCtx = injectMapoForm<Record<string, unknown>>();
+
+// `notifyErrors: false` so each item does not duplicate the root form's error toast.
+const form = useMapoForm<Record<string, unknown>>({
   model: localModel,
   fields: computed(() => props.fields),
   errors: itemErrors,
   languages: props.languages,
   currentLang: currentLangRef,
-  readonly,
   immediate: parentCtx?.immediate ?? false,
   debounce: parentCtx?.debounce ?? 300,
+  notifyErrors: false,
   registry: props.registry,
-  setFieldValue,
-  getClientError: () => null,
-  // Sub-form: delegate touched/submitted tracking to the parent so the
-  // "no-anxiety" gating stays consistent across the whole root form.
-  markTouched: parentCtx?.markTouched ?? (() => {}),
-  isTouched: parentCtx?.isTouched ?? (() => true),
-  submitted: parentCtx?.submitted ?? ref(false),
+});
+
+// Inherit readonly + submitted from the root form so its submit() reveals item-level
+// validation errors (mirrors MapoForm's nested-form behavior).
+watchEffect(() => {
+  form.readonly.value = props.readonly;
+  if (parentCtx) form.ctx.submitted.value = parentCtx.submitted.value;
 });
 
 // ─── Preview label ────────────────────────────────────────────────────────────

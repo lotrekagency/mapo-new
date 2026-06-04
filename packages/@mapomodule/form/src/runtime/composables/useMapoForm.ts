@@ -31,6 +31,12 @@ export interface UseMapoFormOptions<T extends object> {
   immediate?: boolean;
   /** Global debounce in milliseconds. Override per field with `descriptor.debounce`. Default: `300`. */
   debounce?: number;
+  /**
+   * When `false`, suppresses the toast that lists server-side field errors.
+   * Set this for sub-forms (e.g. each repeater item) so they don't duplicate the
+   * root form's error toast. Default: `true`.
+   */
+  notifyErrors?: boolean;
   registry: FieldRegistry;
   /**
    * When set, enables automatic draft persistence to localStorage.
@@ -83,8 +89,11 @@ function safeClone<X>(v: X): X {
 /** Injection key for the current Mapo form context. */
 export const FORM_KEY = Symbol("mapoForm");
 
-/** Provides the current form context to descendant field components. */
-export function provideMapoForm<T extends object>(ctx: MapoFormContext<T>) {
+/**
+ * Provides the current form context to descendant field components.
+ * Internal: `useMapoForm` calls it automatically; consumers use `injectMapoForm`.
+ */
+function provideMapoForm<T extends object>(ctx: MapoFormContext<T>) {
   provide(FORM_KEY, ctx);
 }
 
@@ -106,6 +115,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     currentLang: currentLangProp,
     immediate = false,
     debounce: debounceMs = 300,
+    notifyErrors = true,
     registry,
   } = options;
 
@@ -120,18 +130,21 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   const submitted = ref(false);
 
   // Show a toast listing field-level BE errors whenever the server populates `errors`.
-  watch(
-    errors,
-    (val) => {
-      const entries = Object.entries(val);
-      if (!entries.length) return;
-      const lines = entries
-        .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
-        .join("\n");
-      snack.show(lines, "error");
-    },
-    { deep: true },
-  );
+  // Skipped for sub-forms (notifyErrors=false) so repeater items don't duplicate it.
+  if (notifyErrors) {
+    watch(
+      errors,
+      (val) => {
+        const entries = Object.entries(val);
+        if (!entries.length) return;
+        const lines = entries
+          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
+          .join("\n");
+        snack.show(lines, "error");
+      },
+      { deep: true },
+    );
+  }
 
   // Incremental dirty tracking: updated in setFieldValue to avoid
   // a JSON.stringify(objectDiff(...)) on every computed read.
@@ -381,6 +394,16 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     }
   }
 
+  // O(1) key→descriptor lookup. Rebuilt only when the field list itself changes,
+  // not on every model edit — this keeps per-field error/value resolution O(1)
+  // instead of O(fields), avoiding O(fields²) work across a large form on each keystroke.
+  const fieldIndex = computed(() => {
+    const map = new Map<string, FieldDescriptor<T>>();
+    for (const f of toValue(fields)) map.set(f.key as string, f);
+    return map;
+  });
+  const findDescriptor = (key: string) => fieldIndex.value.get(key);
+
   const ctx: MapoFormContext<T> = {
     model,
     fields,
@@ -392,13 +415,11 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     debounce: debounceMs,
     registry,
     setFieldValue: (key: string, val: unknown) => {
-      const fs = toValue(fields);
-      const descriptor = fs.find((f) => f.key === key);
+      const descriptor = findDescriptor(key);
       if (descriptor) setFieldValue(descriptor, val);
     },
     getClientError: (key: string) => {
-      const fs = toValue(fields);
-      const descriptor = fs.find((f) => f.key === key);
+      const descriptor = findDescriptor(key);
       return descriptor ? getClientError(descriptor) : null;
     },
     markTouched,
@@ -413,8 +434,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     val: unknown,
   ) {
     if (typeof keyOrDescriptor === "string") {
-      const fs = toValue(fields);
-      const descriptor = fs.find((f) => (f.key as string) === keyOrDescriptor);
+      const descriptor = findDescriptor(keyOrDescriptor);
       if (descriptor) setFieldValue(descriptor, val);
       return;
     }
@@ -425,15 +445,14 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     keyOrDescriptor: string | FieldDescriptor<T>,
   ): string | null {
     if (typeof keyOrDescriptor === "string") {
-      const fs = toValue(fields);
-      const descriptor = fs.find((f) => (f.key as string) === keyOrDescriptor);
+      const descriptor = findDescriptor(keyOrDescriptor);
       return descriptor ? getClientError(descriptor) : null;
     }
     return getClientError(keyOrDescriptor);
   }
 
-  // Automatically provide context so descendant MapoForm components can
-  // inherit submitted/readonly state without an explicit provideContext() call.
+  // Automatically provide the context so descendant MapoForm / MapoFormField
+  // components inherit submitted/readonly state with no explicit wiring.
   provideMapoForm(ctx);
 
   return {
