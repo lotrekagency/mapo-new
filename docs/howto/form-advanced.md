@@ -260,9 +260,6 @@ const form = useMapoForm({
   immediate: true, // start dirty tracking immediately (not just after first change)
 });
 
-// Required when placing <MapoFormField> outside of <MapoForm>
-form.provideContext();
-
 const snack = useSnackStore();
 
 async function save() {
@@ -321,7 +318,6 @@ async function save() {
 | `form.validateClient()` | Runs all sync validators, returns `{ valid, errors }`                    |
 | `form.submit(handler)`  | Validates → sets `isLoading` → calls handler with patch → `resetDirty()` |
 | `form.resetDirty()`     | Updates the snapshot — marks current state as "clean"                    |
-| `form.provideContext()` | Injects context into child `<MapoFormField>` components                  |
 
 ## Form from JSON Schema
 

@@ -27,6 +27,22 @@ normalizeEndpoint("/api/articles/?ordering=-date"); // '/api/articles/?ordering=
 
 ---
 
+## `splitEndpointParams(endpoint)`
+
+Splits an endpoint string into its clean `path` and the parsed query `params`. Useful when an endpoint carries baked-in params (e.g. `?fields=id,title`) that must be merged into request params while CRUD mutations target the bare path. Used by `MapoListTable` to keep the list endpoint and mutation endpoints in sync.
+
+```ts
+import { splitEndpointParams } from "@mapomodule/utils";
+
+splitEndpointParams("/api/articles/?fields=id,title");
+// → { path: '/api/articles/', params: { fields: 'id,title' } }
+
+splitEndpointParams("/api/articles/");
+// → { path: '/api/articles/', params: {} }
+```
+
+---
+
 ## `deepMerge(target, source)`
 
 Recursively merges two plain objects. Arrays and primitives in `source` overwrite those in `target`; nested objects are merged recursively.

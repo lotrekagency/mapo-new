@@ -167,17 +167,17 @@ async function remove(article: Article) {
 
 ## Using the facade
 
-`useMapo()` aggregates both stores with a shorter API:
+`useMapo()` aggregates the stores; they are exposed as `$snack` and `$confirm`:
 
 ```ts
-const { snack, confirm } = useMapo();
+const { $snack, $confirm } = useMapo();
 
-snack.success("Saved!");
-snack.error("Failed.");
-snack.info("Loading…");
-snack.warning("Check your input.");
+$snack.show("Saved!", "success");
+$snack.show("Failed.", "error");
+$snack.show("Loading…", "info");
+$snack.show("Check your input.", "warning");
 
-const ok = await confirm.open({
+const ok = await $confirm.ask({
   title: "Are you sure?",
   message: "This cannot be undone.",
 });

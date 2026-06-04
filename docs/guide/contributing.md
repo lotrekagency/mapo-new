@@ -82,6 +82,23 @@ pnpm --filter @mapomodule/utils exec vitest
 
 ---
 
+## Type checking
+
+```bash
+# All packages (via Turborepo)
+pnpm typecheck
+
+# Single package
+pnpm --filter @mapomodule/uikit typecheck
+```
+
+Pure-TypeScript packages (`core`, `store`, `utils`) type-check with `tsc --noEmit`.
+The packages that ship Vue SFCs (`uikit`, `form`) type-check with **`vue-tsc --noEmit`**, so
+`.vue` single-file components — including `<script setup>` and template bindings — are part
+of the gate. Run `pnpm typecheck` before pushing; the CI `typecheck` job runs the same thing.
+
+---
+
 ## Building
 
 ```bash

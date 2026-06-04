@@ -106,13 +106,13 @@ snack.messages; // SnackMessage[] — full queue
 snack.current; // SnackMessage | null — last message (getter, for backward compat)
 ```
 
-You can also call this through the `useMapo()` facade:
+You can also reach the store through the `useMapo()` facade (exposed as `$snack`):
 
 ```ts
-const { snack } = useMapo();
-snack.success("Saved!");
-snack.error("Could not save");
-snack.info("Loading...");
+const { $snack } = useMapo();
+$snack.show("Saved!", "success");
+$snack.show("Could not save", "error");
+$snack.show("Loading...", "info");
 ```
 
 > **Note**: `useSnackStore().show(message, type, duration?)` takes positional arguments, not an object.
@@ -126,11 +126,12 @@ Programmatic confirm dialog.
 ```ts
 const confirm = useConfirmStore();
 
-const ok = await confirm.open({
+const ok = await confirm.ask({
   title: "Delete item?",
   message: "This action cannot be undone.",
   confirmText: "Delete",
   cancelText: "Cancel",
+  dangerous: true,
 });
 
 if (ok) {
@@ -138,11 +139,16 @@ if (ok) {
 }
 ```
 
-Or via facade:
+`ConfirmOptions`: `{ title?, message, confirmText?, cancelText?, dangerous? }` — `message` is required; `dangerous: true` renders the confirm button in the error color.
+
+Or via facade (exposed as `$confirm`):
 
 ```ts
-const { confirm } = useMapo();
-const ok = await confirm.open({ title: "Sure?" });
+const { $confirm } = useMapo();
+const ok = await $confirm.ask({
+  title: "Sure?",
+  message: "Confirm this action?",
+});
 ```
 
 ---

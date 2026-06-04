@@ -214,9 +214,15 @@ State is read from the URL once on mount and written back via `router.replace` (
 
 ### Filter URL encoding
 
-- **Choice filter** — `?f_status=published` (single) or `?f_status=draft,published` (multi)
-- **Datepicker range** — `?f_published_at=2024-01-01,2024-12-31`; expanded to `published_at__gte=2024-01-01&published_at__lte=2024-12-31` when sent to the backend
-- **Dotted-path key** — `filter.value = "category.slug"` is rewritten to `category__slug` in backend params (Django double-underscore notation)
+The `f_` prefix is used **only** for URL persistence, to avoid collisions with the table's
+own params (`page` / `search` / `ordering` / `tab`). Towards the backend, filters use the
+bare `filter.value` key with comma-joined values — identical to the Mapo v1 contract.
+
+- **Choice filter** — URL `?f_status=published` (single) or `?f_status=draft,published` (multi); sent to the backend as `status=draft,published`.
+- **Datepicker range** — URL `?f_published_at=2024-01-01,2024-12-31`; sent to the backend as `published_at=2024-01-01,2024-12-31` (one comma-joined value, **not** split into `__gte`/`__lte`).
+
+In **offline / hybrid** mode the same comma-joined values are matched in memory: multiple
+values become an inclusion check, and two ISO dates become an inclusive `[start, end]` range.
 
 ---
 
@@ -243,6 +249,25 @@ const filters: FilterDescriptor[] = [
 ```
 
 Filters are sent as request parameters — never concatenated into the endpoint string. Selecting a filter triggers a refetch via `crud.list(params)`.
+
+### Customize a filter panel (slots)
+
+Each filter exposes nested override slots (named by `filter.value`). They mirror Mapo v1:
+
+| Slot                      | Overrides                                          | Bindings                                                   |
+| ------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| `#filter.{value}`         | the whole filter panel (default = title + content) | `filter`, `toggleChoice`, `removeFilter`, `isChoiceActive` |
+| `#filter.{value}.title`   | just the panel title                               | `filter`                                                   |
+| `#filter.{value}.content` | the choices / datepicker body                      | `filter`, `toggleChoice`, `removeFilter`, `isChoiceActive` |
+| `#filter.{value}.icon`    | the icon next to each choice                       | `filter`, `choice`                                         |
+
+```vue
+<MapoList :filters="filters" …>
+  <template #filter.status.icon="{ choice }">
+    <UIcon :name="choice.value === 'published' ? 'i-lucide-globe' : 'i-lucide-edit'" />
+  </template>
+</MapoList>
+```
 
 ## How to: add bulk actions
 
@@ -321,6 +346,10 @@ A pencil icon now appears on every row. Click it → the modal renders a `<MapoF
 ```
 
 The drag uses `crud.updateOrder(movedId, targetId)` — a single request. The backend (e.g. Camomilla) recomputes positions; the client does not fire one PATCH per moved item, avoiding race conditions and order inversions.
+
+**Drop area & feedback.** The drop target is the **whole row**, not just the grip handle: drag events are delegated on the table wrapper (UTable owns the `<tr>`). While dragging, the source row dims and the row under the cursor shows a top/bottom drop line.
+
+**When it's disabled.** Reorder only makes sense in the natural order, so it is automatically disabled while a **search or column sort** is active (the grip turns non-draggable with an explanatory tooltip). Clear the search/sort to reorder again.
 
 ## How to: configure pagination
 

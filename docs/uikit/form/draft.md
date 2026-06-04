@@ -149,7 +149,7 @@ useFormDraft({
 
 ## Pitfalls
 
-- **Persists when `isDirty` is true** — make sure the dirty state actually flips. If you build a form with `useMapoForm({ immediate: true })` but never `provideContext()`, dirty tracking can be skipped.
+- **Persists when `isDirty` is true** — make sure the dirty state actually flips. Use `useMapoForm({ immediate: true })` if you want dirty tracking to start before the first edit.
 - **Per-tab isolation does not exist** — two tabs editing the same record will overwrite each other's drafts. If multi-tab editing matters, consider `BroadcastChannel` to coordinate.
 - **`localStorage` is synchronous** — large models (50+ kB) can stutter on slow devices. Strip large blobs (file inputs, base64 images) before storing.
 - **Drafts survive logout** — they are tied to the browser, not the user session. If users share a device, scope `key` with a user identifier.

@@ -206,12 +206,12 @@ After step 2, `auth.isAuthenticated` is `true`. There is no token to read from t
 Facade that aggregates the most common Mapo composables in one call.
 
 ```ts
-const { snack, confirm } = useMapo();
+const { $snack, $confirm } = useMapo();
 
-snack.success("Saved!");
-snack.error("Something went wrong");
+$snack.show("Saved!", "success");
+$snack.show("Something went wrong", "error");
 
-const confirmed = await confirm.open({
+const confirmed = await $confirm.ask({
   title: "Delete?",
   message: "This cannot be undone.",
 });

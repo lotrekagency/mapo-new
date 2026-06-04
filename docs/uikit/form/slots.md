@@ -196,11 +196,39 @@ For every named group (set via `field.group`), two surrounding slots are availab
 
 > `group.*` slots are forwarded from `MapoForm → MapoFormTabs` but are **not** passed into `MapoFormGroup` itself — they wrap the group from the outside.
 
+## Per-tab slots
+
+When fields declare a `tab` (see [tabs & nested tabs](./index)), each tab panel exposes slots
+addressed by the tab `name`. They work both in a standalone `<MapoForm>` and inside
+`<MapoDetail>`, and propagate into **nested** tabs (addressed by their leaf name).
+
+| Slot                 | Position                                                 | Bindings |
+| -------------------- | -------------------------------------------------------- | -------- |
+| `#tab.<name>.before` | Top of the tab panel, before its groups                  | `tab`    |
+| `#tab.<name>.after`  | Bottom of the tab panel, after its groups                | `tab`    |
+| `#tab.<name>`        | Replaces the panel's content entirely (default = groups) | `tab`    |
+| `#tab.<name>.label`  | The tab button label                                     | `tab`    |
+| `#tab-bar-end`       | Extra content appended to the tab bar (actions, badges)  | —        |
+
+```vue
+<MapoDetail :fields="fields" …>
+  <!-- Intro banner at the top of the "seo" tab -->
+  <template #tab.seo.before>
+    <UAlert color="info" title="Search-engine metadata" />
+  </template>
+
+  <!-- A custom action in the tab bar -->
+  <template #tab-bar-end>
+    <UButton size="xs" variant="ghost" icon="i-lucide-sparkles">Auto-fill</UButton>
+  </template>
+</MapoDetail>
+```
+
 ## Automatic propagation
 
-Slots cascade through the hierarchy `MapoForm → MapoFormGroup → MapoFormField`. You **do not** need to redeclare them at each level — drop them on `<MapoForm>` and they reach the right field.
+Slots cascade through the hierarchy `MapoForm → MapoFormTabs → MapoFormGroup → MapoFormField`. You **do not** need to redeclare them at each level — drop them on `<MapoForm>` (or `<MapoDetail>`) and they reach the right field, group, or tab.
 
-The propagation is whitelisted to `field.*` and `group.*` slots only, so host slots (`#header`, `#footer`, `#actions`) are never injected into intermediate layers.
+The propagation is whitelisted to `field.*`, `group.*`, `tab.*` and `tab-bar-end` slots only, so host slots (`#header`, `#footer`, `#actions`) are never injected into intermediate layers.
 
 ## How to: combine slots with `descriptor.is`
 

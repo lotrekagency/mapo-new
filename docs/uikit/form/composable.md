@@ -13,6 +13,7 @@ const form = useMapoForm<T>({
   currentLang?: Ref<string>,
   immediate?:   boolean,        // true = no debounce
   debounce?:    number,         // ms, default 300
+  notifyErrors?: boolean,       // default true; false = no toast for server errors
   registry:     FieldRegistry,
   draftKey?:    MaybeRef<string | undefined>,    // enable draft persistence
 })
@@ -36,10 +37,13 @@ const form = useMapoForm<T>({
 | `resetDirty()`              | `void`                                                          | Clears the backup (after a successful save)                                  |
 | `getPatch()`                | `Partial<T>`                                                    | Diff model vs backup — for differential PATCH                                |
 | `submit(handler, isNew?)`   | `Promise<void>`                                                 | Validate, call handler, manage loading state, clear draft on success         |
-| `provideContext()`          | `void`                                                          | Inject the context for nested `<MapoFormField>`                              |
+| `ctx`                       | `MapoFormContext<T>`                                            | The reactive context object provided to descendant fields                    |
 | `draftBanner`               | `Ref<{ savedAt, restore, discard } \| null>`                    | Populated after `checkDraft()` when a pending draft is found in localStorage |
 | `checkDraft()`              | `void`                                                          | Read localStorage for a pending draft; call after the model is fetched       |
 | `clearDraft()`              | `void`                                                          | Remove the draft from localStorage                                           |
+
+> `useMapoForm()` provides its context to descendant fields **automatically** — you can
+> render `<MapoFormField>` anywhere inside the same setup without any extra wiring.
 
 ## Headless usage
 
@@ -62,9 +66,6 @@ const form = useMapoForm({
   registry: $mapoFormRegistry,
   immediate: true,
 });
-
-// REQUIRED if you render individual <MapoFormField> without <MapoForm>
-form.provideContext();
 
 async function save() {
   await form.submit(async (patch) => {
@@ -147,9 +148,27 @@ onMounted(async () => {
 
 > When using `<MapoDetail>` with `:draft="true"`, all of this is handled automatically — you do not need `useMapoForm` draft options.
 
+## Sub-forms (repeater items)
+
+`MapoRepeater` does **not** reimplement form logic: each repeater item drives its fields
+through its own `useMapoForm` instance. This is why nested-path keys, `translatable`,
+`synci18n`, custom accessors, `onChange` and **client-side validation** all behave inside a
+repeater exactly as they do at the top level — and why a field overridden via
+`descriptor.is` (or a custom registry `type`) renders correctly inside an item too.
+
+Each item passes `notifyErrors: false` so it doesn't duplicate the root form's error toast,
+and inherits `submitted` / `readonly` from the parent so the root `submit()` reveals
+item-level validation errors.
+
+> **Performance note.** One `useMapoForm` instance is created per repeater item. This is a
+> few refs + computeds per item (no extra watchers — draft and the error toast are off), so
+> it's cheap for typical repeaters. For very large repeaters (hundreds of simultaneously
+> mounted items) keep an eye on it; collapsing items still mounts the item shell but not the
+> fields.
+
 ## `MapoFormContext` (inject in child fields)
 
-Every component inside a `<MapoForm>` (or after a `provideContext()` call) can read the context:
+Every component inside a `<MapoForm>` (or any `useMapoForm()` setup) can read the context:
 
 ```ts
 const form = injectMapoForm<Article>();
