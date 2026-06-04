@@ -46,6 +46,8 @@ export default tseslint.config(
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         Event: 'readonly',
+        EventTarget: 'readonly',
+        BeforeUnloadEvent: 'readonly',
         DragEvent: 'readonly',
         KeyboardEvent: 'readonly',
         MouseEvent: 'readonly',
