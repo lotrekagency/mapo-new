@@ -3,6 +3,7 @@ import { computed, useSlots, watchEffect, inject, onUnmounted } from "vue";
 import type { Ref } from "vue";
 import { useNuxtApp } from "#app";
 import type { FieldDescriptor, FieldRegistry } from "../types/index.js";
+import type { GroupEntry, TabEntry } from "../types/layout.js";
 import { useMapoForm, injectMapoForm } from "../composables/useMapoForm.js";
 import { provideCurrentLang } from "../composables/useCurrentLang.js";
 import MapoFormGroup from "./MapoFormGroup.vue";
@@ -51,9 +52,9 @@ const injectedRegistry = computed<FieldRegistry>(() => {
 
 const emit = defineEmits<{ "update:modelValue": [value: T] }>();
 
-defineSlots<
-  Record<string, (props: { field: FieldDescriptor<T> }) => unknown>
->();
+// Slots are forwarded generically to inner layers; props vary per slot
+// (field.* carry a descriptor, group.* carry none), so they are loosely typed.
+defineSlots<Record<string, (props?: Record<string, unknown>) => unknown>>();
 
 // ─── Setup form ──────────────────────────────────────────────────────────────
 
@@ -80,8 +81,8 @@ const form = useMapoForm({
   registry: injectedRegistry.value,
 });
 
-// If a parent useMapoForm called provideContext(), inherit its submitted state
-// so that form.submit() on the parent automatically shows errors in this MapoForm.
+// Inherit the parent form's submitted state (provided automatically by useMapoForm)
+// so that form.submit() on the parent also shows errors in this nested MapoForm.
 const parentCtx = injectMapoForm();
 watchEffect(() => {
   form.readonly.value = props.readonly;
@@ -116,24 +117,16 @@ if (registerValidator) {
 const slots = useSlots();
 const fieldSlotNames = computed(() =>
   Object.keys(slots).filter(
-    (name) => name.startsWith("field.") || name.startsWith("group."),
+    (name) =>
+      name.startsWith("field.") ||
+      name.startsWith("group.") ||
+      name.startsWith("tab.") ||
+      name === "tab-bar-end",
   ),
 );
 provideCurrentLang(currentLangRef);
 
 // ─── Group fields by tab/group ───────────────────────────────────────────────
-
-interface GroupEntry {
-  label?: string;
-  fields: FieldDescriptor<T>[];
-  subtabs: Map<string, FieldDescriptor<T>[]>;
-}
-interface TabEntry {
-  name: string;
-  label?: string;
-  groups: Map<string, GroupEntry>;
-  children: Map<string, TabEntry>;
-}
 
 function getOrCreateTab(map: Map<string, TabEntry>, name: string): TabEntry {
   if (!map.has(name)) {
@@ -145,7 +138,9 @@ function getOrCreateTab(map: Map<string, TabEntry>, name: string): TabEntry {
 const grouped = computed<Map<string, TabEntry>>(() => {
   const tabs = new Map<string, TabEntry>();
 
-  for (const field of props.fields) {
+  // The layout tree is type-agnostic: cast the generic descriptors to the bare
+  // FieldDescriptor used by the (non-generic) MapoFormGroup/Tabs/FlatSection layers.
+  for (const field of props.fields as FieldDescriptor[]) {
     // Normalise: 'a/b', ['a','b'], or 'a' all become a string[]
     const rawTab = field.tab;
     const tabPath: string[] = !rawTab

@@ -1,22 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import type { FieldDescriptor } from "../types/index.js";
+import type { TabEntry } from "../types/layout.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import MapoFormGroup from "./MapoFormGroup.vue";
 import MapoFormFlatSection from "./MapoFormFlatSection.vue";
-
-interface GroupEntry {
-  label?: string;
-  fields: FieldDescriptor[];
-  subtabs: Map<string, FieldDescriptor[]>;
-}
-
-interface TabEntry {
-  name: string;
-  label?: string;
-  groups: Map<string, GroupEntry>;
-  children: Map<string, TabEntry>;
-}
 
 const props = defineProps<{ tabs: TabEntry[] }>();
 
@@ -61,13 +48,17 @@ const tabsWithErrors = computed(() => {
         ]"
         @click="activeTab = tab.name"
       >
-        {{ tab.label ?? tab.name }}
+        <slot :name="`tab.${tab.name}.label`" :tab="tab">
+          {{ tab.label ?? tab.name }}
+        </slot>
         <span
           v-if="tabsWithErrors.has(tab.name)"
           class="inline-block h-1.5 w-1.5 rounded-full bg-red-500"
           aria-label="This tab contains errors"
         />
       </button>
+      <!-- Extra content appended to the tab bar (actions, badges, …). -->
+      <slot name="tab-bar-end" />
     </div>
 
     <!-- Tab content -->
@@ -77,39 +68,49 @@ const tabsWithErrors = computed(() => {
       :key="tab.name"
       class="space-y-5 pt-5"
     >
-      <!-- Direct groups at this level -->
-      <template v-for="[groupName, group] of tab.groups" :key="groupName">
-        <template v-if="groupName !== '__flat__'">
-          <slot :name="`group.${groupName}.before`" />
-          <MapoFormGroup
-            :name="groupName"
-            :label="group.label"
-            :fields="group.fields"
-            :subtabs="group.subtabs"
-          >
+      <!-- Full panel override: `tab.{name}` replaces this tab's content entirely. -->
+      <slot
+        v-if="$slots[`tab.${tab.name}`]"
+        :name="`tab.${tab.name}`"
+        :tab="tab"
+      />
+      <template v-else>
+        <slot :name="`tab.${tab.name}.before`" :tab="tab" />
+        <!-- Direct groups at this level -->
+        <template v-for="[groupName, group] of tab.groups" :key="groupName">
+          <template v-if="groupName !== '__flat__'">
+            <slot :name="`group.${groupName}.before`" />
+            <MapoFormGroup
+              :name="groupName"
+              :label="group.label"
+              :fields="group.fields"
+              :subtabs="group.subtabs"
+            >
+              <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
+                <slot :name="slotName" v-bind="slotProps ?? {}" />
+              </template>
+            </MapoFormGroup>
+            <slot :name="`group.${groupName}.after`" />
+          </template>
+
+          <MapoFormFlatSection v-else :fields="group.fields">
             <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
               <slot :name="slotName" v-bind="slotProps ?? {}" />
             </template>
-          </MapoFormGroup>
-          <slot :name="`group.${groupName}.after`" />
+          </MapoFormFlatSection>
         </template>
 
-        <MapoFormFlatSection v-else :fields="group.fields">
+        <!-- Nested sub-tabs (recursive) -->
+        <MapoFormTabs
+          v-if="tab.children.size > 0"
+          :tabs="[...tab.children.values()]"
+        >
           <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
             <slot :name="slotName" v-bind="slotProps ?? {}" />
           </template>
-        </MapoFormFlatSection>
+        </MapoFormTabs>
+        <slot :name="`tab.${tab.name}.after`" :tab="tab" />
       </template>
-
-      <!-- Nested sub-tabs (recursive) -->
-      <MapoFormTabs
-        v-if="tab.children.size > 0"
-        :tabs="[...tab.children.values()]"
-      >
-        <template v-for="(_, slotName) in $slots" #[slotName]="slotProps">
-          <slot :name="slotName" v-bind="slotProps ?? {}" />
-        </template>
-      </MapoFormTabs>
     </div>
   </div>
 </template>
