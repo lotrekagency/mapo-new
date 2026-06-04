@@ -13,7 +13,7 @@
       "types": "./dist/index.d.mts"
     },
     "./runtime/*": {
-      "types": "./src/runtime/*",
+      "types": "./src/runtime/*.ts",
       "import": "./dist/runtime/*.js",
       "default": "./src/runtime/*"
     }
