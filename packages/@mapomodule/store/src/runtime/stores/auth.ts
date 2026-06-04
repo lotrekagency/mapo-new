@@ -1,6 +1,15 @@
 import { defineStore } from "pinia";
 import type { MapoUser, ModelPermissions } from "../types";
 
+/**
+ * Builds model-level permission flags from raw codename permissions.
+ *
+ * Expected codename format: `<action>_<model>`, where action is one of
+ * `view`, `add`, `change`, or `delete`.
+ *
+ * @param raw Raw permission codenames.
+ * @returns Model-keyed permission map with CRUD booleans.
+ */
 function buildModelPermissions(
   raw: string[],
 ): Record<string, ModelPermissions> {
@@ -19,6 +28,14 @@ function buildModelPermissions(
 // The session credential is an HttpOnly cookie managed by the backend/proxy
 // and is intentionally not stored in the client state. Authentication is
 // derived from the presence of a loaded user info object.
+/**
+ * Authentication store for user identity and permission state.
+ *
+ * It keeps normalized permission representations used by guards and middleware:
+ * - `rawPermissions`: backend codenames (for example, `view_article`).
+ * - `modelPermissions`: CRUD flags grouped per model.
+ * - `pagePermissions`: route-scoped action lists resolved at runtime.
+ */
 export const useAuthStore = defineStore("mapo-auth", {
   state: () => ({
     info: null as MapoUser | null,
@@ -36,6 +53,11 @@ export const useAuthStore = defineStore("mapo-auth", {
   },
 
   actions: {
+    /**
+     * Hydrates auth state from a resolved user profile.
+     *
+     * @param user Authenticated user payload.
+     */
     setUser(user: MapoUser) {
       this.info = user;
       const perms = user.all_permissions ?? user.user_permissions ?? [];
@@ -43,6 +65,9 @@ export const useAuthStore = defineStore("mapo-auth", {
       this.modelPermissions = buildModelPermissions(perms);
     },
 
+    /**
+     * Clears all auth and permission state.
+     */
     reset() {
       this.info = null;
       this.rawPermissions = [];
