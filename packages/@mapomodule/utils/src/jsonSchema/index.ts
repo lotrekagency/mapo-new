@@ -9,7 +9,7 @@
  * - {@link extractDefs}        — extract the `$defs` / `definitions` map
  * - {@link getDefaultForSchema} — derive a zero/empty default value from a schema
  */
-export type { JSONSchema } from "./conditionals.js";
+export type { JSONSchema } from "./types.js";
 export {
   matchesSchema,
   applyConditionals,

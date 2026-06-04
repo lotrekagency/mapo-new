@@ -2,7 +2,7 @@
 // Source: https://github.com/bnznamco/structured-widget-editor/blob/main/src/SchemaForm.vue (resolveSchema method)
 // Modifications: extracted as standalone function, converted to TypeScript.
 
-import type { JSONSchema } from "./conditionals.js";
+import type { JSONSchema } from "./types.js";
 
 /** Maximum recursion depth allowed when resolving nested schema references. */
 const MAX_RESOLVE_DEPTH = 32;

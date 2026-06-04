@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeEndpoint } from "../normalizeEndpoint";
+import { normalizeEndpoint, splitEndpointParams } from "../normalizeEndpoint";
 
 describe("normalizeEndpoint", () => {
   it("adds leading and trailing slash to a bare path", () => {
@@ -44,5 +44,39 @@ describe("normalizeEndpoint", () => {
 
   it("adds leading slash when path with query string has no leading slash", () => {
     expect(normalizeEndpoint("api/articles/?q=1")).toBe("/api/articles/?q=1");
+  });
+});
+
+describe("splitEndpointParams", () => {
+  it("returns empty params when there is no query string", () => {
+    expect(splitEndpointParams("/api/articles/")).toEqual({
+      path: "/api/articles/",
+      params: {},
+    });
+  });
+
+  it("splits path and parses a single query param", () => {
+    expect(splitEndpointParams("/api/articles/?fields=id,title")).toEqual({
+      path: "/api/articles/",
+      params: { fields: "id,title" },
+    });
+  });
+
+  it("parses multiple query params", () => {
+    expect(splitEndpointParams("/api/articles/?page=2&page_size=50")).toEqual({
+      path: "/api/articles/",
+      params: { page: "2", page_size: "50" },
+    });
+  });
+
+  it("handles an empty endpoint", () => {
+    expect(splitEndpointParams("")).toEqual({ path: "", params: {} });
+  });
+
+  it("returns an empty params object when the query string is empty", () => {
+    expect(splitEndpointParams("/api/articles/?")).toEqual({
+      path: "/api/articles/",
+      params: {},
+    });
   });
 });

@@ -2,43 +2,14 @@
 // Source: https://github.com/bnznamco/structured-widget-editor/blob/main/src/conditionals.js
 // Modifications: converted to TypeScript, added type annotations.
 
+import type { JSONSchema } from "./types.js";
+
 /**
- * Subset of the JSON Schema specification used throughout the Mapo form engine.
- * Covers validation keywords, combination keywords, and custom extensions.
+ * Maximum number of resolution passes for cascading conditionals: a merged branch
+ * may introduce new `if` rules, so we iterate until the schema stabilises or this
+ * cap is hit (whichever comes first).
  */
-export interface JSONSchema {
-  type?: string | string[];
-  properties?: Record<string, JSONSchema>;
-  required?: string[];
-  items?: JSONSchema;
-  const?: unknown;
-  enum?: unknown[];
-  not?: JSONSchema;
-  allOf?: JSONSchema[];
-  anyOf?: JSONSchema[];
-  oneOf?: JSONSchema[];
-  if?: JSONSchema;
-  then?: JSONSchema;
-  else?: JSONSchema;
-  dependentSchemas?: Record<string, JSONSchema>;
-  dependentRequired?: Record<string, string[]>;
-  minimum?: number;
-  maximum?: number;
-  exclusiveMinimum?: number;
-  exclusiveMaximum?: number;
-  multipleOf?: number;
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
-  $ref?: string;
-  $defs?: Record<string, JSONSchema>;
-  definitions?: Record<string, JSONSchema>;
-  discriminator?: { propertyName: string };
-  title?: string;
-  default?: unknown;
-  _nullable?: boolean;
-  [key: string]: unknown;
-}
+const MAX_CONDITIONAL_PASSES = 8;
 
 /**
  * Returns `true` if `value` is a non-null object that contains `key` with a
@@ -266,9 +237,9 @@ function mergeBranch(
  * - `if / then / else` (top-level and inside `allOf`)
  * - `dependentSchemas` / `dependentRequired`
  *
- * Iteration is repeated up to 8 times to handle cascading conditionals where
- * a merged branch introduces new `if` rules. Stops early when the schema
- * stabilises between iterations.
+ * Iteration is repeated up to {@link MAX_CONDITIONAL_PASSES} times to handle cascading
+ * conditionals where a merged branch introduces new `if` rules. Stops early when the
+ * schema stabilises between iterations.
  *
  * @param schema   - The base schema to evaluate.
  * @param value    - The current form data used to resolve conditionals.
@@ -337,7 +308,7 @@ export function applyConditionals(
     }
   }
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < MAX_CONDITIONAL_PASSES; i++) {
     const before = JSON.stringify({
       p: effective.properties,
       r: effective.required,

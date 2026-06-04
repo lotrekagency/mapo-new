@@ -16,3 +16,26 @@ export function normalizeEndpoint(endpoint: string): string {
   const stripped = path.replace(/^\/+|\/+$/g, "");
   return `/${stripped}/${query}`;
 }
+
+/**
+ * Splits an endpoint string into its clean path and parsed query params.
+ * Useful when an endpoint carries baked-in params (e.g. `?fields=id,title`) that
+ * must be merged into request params while CRUD mutations target the bare path.
+ *
+ * @example
+ * splitEndpointParams('/api/articles/?fields=id,title')
+ *  { path: '/api/articles/', params: { fields: 'id,title' } }
+ * splitEndpointParams('/api/articles/')
+ *  { path: '/api/articles/', params: {} }
+ */
+export function splitEndpointParams(endpoint: string): {
+  path: string;
+  params: Record<string, string>;
+} {
+  const qIdx = endpoint.indexOf("?");
+  if (qIdx < 0) return { path: endpoint, params: {} };
+  return {
+    path: endpoint.slice(0, qIdx),
+    params: Object.fromEntries(new URLSearchParams(endpoint.slice(qIdx + 1))),
+  };
+}
