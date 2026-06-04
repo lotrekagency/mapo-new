@@ -22,6 +22,15 @@ export function calcMaxMenuNestDepth(nodes: MenuNode[], depth = 1): number {
   return max;
 }
 
+/**
+ * Builds a hierarchical menu tree from flat route records.
+ *
+ * Routes are included only when they define a `meta.label` and are not marked
+ * as hidden. Parent-child relationships are resolved through `meta.parent`.
+ *
+ * @param routes Flat list of normalized router records.
+ * @returns Root menu nodes with nested children.
+ */
 export function buildRouteTree(routes: RouteRecordNormalized[]): MenuNode[] {
   const nodeMap = new Map<string, MenuNode>();
 
