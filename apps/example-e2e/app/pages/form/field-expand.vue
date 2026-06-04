@@ -92,9 +92,9 @@ const fields: FieldDescriptor<Model>[] = [
       >
         Inject server error on description
       </UButton>
-      <UButton variant="outline" color="neutral" size="sm" @click="errors = {}"
-        >Clear</UButton
-      >
+      <UButton variant="outline" color="neutral" size="sm" @click="errors = {}">
+        Clear
+      </UButton>
     </div>
 
     <!-- Live model -->

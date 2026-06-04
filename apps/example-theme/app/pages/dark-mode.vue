@@ -70,11 +70,11 @@ function set(mode: "light" | "dark" | "system") {
       <h2 class="font-semibold text-highlighted">Components in current mode</h2>
       <div class="flex flex-wrap gap-3 items-center">
         <UButton>Primary</UButton>
-        <UButton color="success" variant="soft">Success</UButton>
-        <UButton color="error" variant="outline">Error</UButton>
+        <UButton color="success" variant="soft"> Success </UButton>
+        <UButton color="error" variant="outline"> Error </UButton>
         <UInput placeholder="Input field" class="w-40" />
-        <UBadge color="primary">Badge</UBadge>
-        <UBadge color="warning" variant="soft">Warning</UBadge>
+        <UBadge color="primary"> Badge </UBadge>
+        <UBadge color="warning" variant="soft"> Warning </UBadge>
       </div>
       <UCard>
         <p class="text-muted text-sm">
@@ -85,7 +85,7 @@ function set(mode: "light" | "dark" | "system") {
     </section>
 
     <UAlert color="info" variant="soft" icon="i-lucide-info">
-      <template #title>Dark mode toggle location</template>
+      <template #title> Dark mode toggle location </template>
       <template #description>
         The dark-mode toggle button lives in the custom
         <strong>MapoOverride/MapoTopbar.vue</strong> (top-right corner of the

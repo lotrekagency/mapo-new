@@ -36,9 +36,9 @@ definePageMeta({
 
       <div class="mt-4">
         <NuxtLink to="/sidebar-parent">
-          <UButton variant="ghost" size="sm" leading-icon="i-lucide-arrow-left"
-            >Back to parent</UButton
-          >
+          <UButton variant="ghost" size="sm" leading-icon="i-lucide-arrow-left">
+            Back to parent
+          </UButton>
         </NuxtLink>
       </div>
     </UCard>

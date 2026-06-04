@@ -188,8 +188,8 @@ const sidebarFields: FieldDescriptor<Article>[] = flattenFieldGroups<Article>([
 <template>
   <div class="p-6">
     <MapoDetail
-      endpoint="/api/mock/articles"
       :id="id"
+      endpoint="/api/mock/articles"
       :fields="mainFields"
       :sidebar-fields="sidebarFields"
       :languages="['it', 'en']"

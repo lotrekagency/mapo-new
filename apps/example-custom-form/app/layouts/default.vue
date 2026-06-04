@@ -38,7 +38,9 @@ async function logout() {
       <div class="pa-3">
         <template v-if="user">
           <div class="text-caption text-medium-emphasis">Logged in as</div>
-          <div class="text-body-2 mb-2">{{ user.username || user.email }}</div>
+          <div class="text-body-2 mb-2">
+            {{ user.username || user.email }}
+          </div>
           <v-btn
             block
             size="small"

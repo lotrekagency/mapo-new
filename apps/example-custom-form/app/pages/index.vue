@@ -20,7 +20,7 @@ definePageMeta({ middleware: ["auth"] });
           <code>useMapoForm</code> + <code>&lt;MapoFormField&gt;</code>.
         </v-card-text>
         <v-card-actions>
-          <v-btn color="primary" variant="tonal" to="/news">Open</v-btn>
+          <v-btn color="primary" variant="tonal" to="/news"> Open </v-btn>
         </v-card-actions>
       </v-card>
     </v-col>

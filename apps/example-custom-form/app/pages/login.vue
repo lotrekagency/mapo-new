@@ -54,9 +54,9 @@ async function submit() {
               >
                 {{ error }}
               </v-alert>
-              <v-btn type="submit" color="primary" block :loading="loading"
-                >Login</v-btn
-              >
+              <v-btn type="submit" color="primary" block :loading="loading">
+                Login
+              </v-btn>
             </v-form>
           </v-card-text>
         </v-card>

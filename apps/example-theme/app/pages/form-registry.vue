@@ -211,9 +211,9 @@ const form = useMapoForm({
     </UCard>
 
     <UCard>
-      <template #header
-        ><span class="text-sm font-medium">Model corrente</span></template
-      >
+      <template #header>
+        <span class="text-sm font-medium">Model corrente</span>
+      </template>
       <pre class="text-xs">{{ JSON.stringify(model, null, 2) }}</pre>
     </UCard>
   </div>

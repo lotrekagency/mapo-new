@@ -77,10 +77,14 @@ const total = computed(() => data.value?.count ?? 0);
 
 <template>
   <v-row align="center" class="mb-2">
-    <v-col><h1 class="text-h5">News</h1></v-col>
+    <v-col>
+      <h1 class="text-h5">News</h1>
+    </v-col>
     <v-col cols="auto">
       <v-btn variant="text" icon="mdi-refresh" @click="refresh()" />
-      <v-btn color="primary" prepend-icon="mdi-plus" to="/news/new">New</v-btn>
+      <v-btn color="primary" prepend-icon="mdi-plus" to="/news/new">
+        New
+      </v-btn>
     </v-col>
   </v-row>
 

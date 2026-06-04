@@ -402,7 +402,6 @@ const form = useMapoForm({
   fields: mainFields,
   registry: $mapoFormRegistry,
 });
-form.provideContext();
 
 const { clearDraft } = useFormDraft({
   model,

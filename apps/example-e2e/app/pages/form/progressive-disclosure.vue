@@ -231,9 +231,9 @@ async function testHiddenRequired() {
         :registry="$mapoFormRegistry"
       />
       <div class="mt-3 flex gap-2">
-        <UButton size="sm" @click="testHiddenRequired"
-          >Submit (should pass if address hidden)</UButton
-        >
+        <UButton size="sm" @click="testHiddenRequired">
+          Submit (should pass if address hidden)
+        </UButton>
       </div>
       <div
         v-if="hiddenReqResult"

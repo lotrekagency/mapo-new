@@ -37,9 +37,9 @@ definePageMeta({
     </div>
 
     <UCard>
-      <template #header
-        ><span class="font-semibold">mapo-default slot API</span></template
-      >
+      <template #header>
+        <span class="font-semibold">mapo-default slot API</span>
+      </template>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -52,8 +52,12 @@ definePageMeta({
           </thead>
           <tbody class="divide-y divide-default">
             <tr v-for="slot in slots" :key="slot.name">
-              <td class="py-2 font-mono text-primary">{{ slot.name }}</td>
-              <td class="py-2 text-muted pl-4">{{ slot.desc }}</td>
+              <td class="py-2 font-mono text-primary">
+                {{ slot.name }}
+              </td>
+              <td class="py-2 text-muted pl-4">
+                {{ slot.desc }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -61,16 +65,16 @@ definePageMeta({
     </UCard>
 
     <UCard>
-      <template #header
-        ><span class="font-semibold">Usage example (app.vue)</span></template
-      >
+      <template #header>
+        <span class="font-semibold">Usage example (app.vue)</span>
+      </template>
       <pre
         class="text-xs text-muted overflow-x-auto p-2 bg-elevated rounded"
       ><code>{{ usageExample }}</code></pre>
     </UCard>
 
     <UAlert color="info" variant="soft" icon="i-lucide-lightbulb">
-      <template #title>Tip</template>
+      <template #title> Tip </template>
       <template #description>
         Slot overrides apply to a single page. For app-wide changes use
         <strong>MapoOverride</strong> (whole component replacement) or
