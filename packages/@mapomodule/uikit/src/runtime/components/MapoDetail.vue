@@ -10,7 +10,7 @@ import {
   provide,
   type VNode,
 } from "vue";
-import { objectDiff, debounce } from "@mapomodule/utils";
+import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
 import {
   useRouter,
   onBeforeRouteLeave,
@@ -123,21 +123,6 @@ const emit = defineEmits<{
     discard: () => void,
   ): void;
 }>();
-
-// ─── Utilities ──────────────────────────────────────────────────────────────
-
-const deepClone = (obj: unknown): unknown => {
-  // toRaw is required: structuredClone cannot clone Vue reactive proxies
-  const raw = toRaw(obj as object);
-  if (typeof globalThis !== "undefined" && "structuredClone" in globalThis) {
-    try {
-      return structuredClone(raw);
-    } catch {
-      /* fall through to JSON */
-    }
-  }
-  return JSON.parse(JSON.stringify(raw));
-};
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -448,9 +433,10 @@ function getPatch(): Partial<T> {
 async function deleteItem() {
   const ok = await confirm.ask({
     title: "Delete",
-    question:
+    message:
       "Are you sure you want to delete this item? This action cannot be undone.",
-    approveButton: { text: "Delete", attrs: { color: "red" } },
+    confirmText: "Delete",
+    dangerous: true,
   });
   if (!ok) return;
   isDeleting.value = true;
@@ -479,8 +465,9 @@ async function guardUnsaved(): Promise<boolean> {
   if (!isDirty.value) return true;
   return confirm.ask({
     title: "Unsaved changes",
-    question: "You have unsaved changes. Do you want to leave without saving?",
-    approveButton: { text: "Leave", attrs: { color: "red" } },
+    message: "You have unsaved changes. Do you want to leave without saving?",
+    confirmText: "Leave",
+    dangerous: true,
   });
 }
 
@@ -523,13 +510,17 @@ onBeforeUnmount(() => {
 
 // ─── Slot bindings ───────────────────────────────────────────────────────────
 
-// Forward field-level (`field.*`) and group-level (`group.*`) slots to MapoForm.
-// Host-level slots (title, body, side-buttons, etc.) must not be injected into
-// MapoForm to prevent duplicate or recursive rendering.
+// Forward field-level (`field.*`), group-level (`group.*`) and tab-level (`tab.*`,
+// `tab-bar-end`) slots to MapoForm. Host-level slots (title, body, side-buttons, etc.)
+// must not be injected into MapoForm to prevent duplicate or recursive rendering.
 const slots = useSlots();
 const formSlotNames = computed(() =>
   Object.keys(slots).filter(
-    (name) => name.startsWith("field.") || name.startsWith("group."),
+    (name) =>
+      name.startsWith("field.") ||
+      name.startsWith("group.") ||
+      name.startsWith("tab.") ||
+      name === "tab-bar-end",
   ),
 );
 
@@ -613,6 +604,8 @@ defineSlots<{
   [K: `field.${string}`]: (props: { model: T; currentLang: string }) => VNode[];
   /** Per-group slot. Slot name: `group.{name}.before`, `group.{name}.after`. */
   [K: `group.${string}`]: (props: Record<string, never>) => VNode[];
+  /** Catch-all for slots forwarded dynamically to the inner MapoForm. */
+  [K: string]: (...args: any[]) => any;
 }>();
 </script>
 
