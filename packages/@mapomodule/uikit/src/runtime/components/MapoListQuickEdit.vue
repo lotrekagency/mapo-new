@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
 import { ref, computed, watch } from "vue";
-import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form";
+import type { Ref } from "vue";
+import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 
@@ -47,7 +48,9 @@ defineSlots<{
 const snack = useSnackStore();
 const crud = useCrud<T>(props.endpoint);
 
-const model = ref<T>({} as T);
+// Typed as Ref<T> (not Ref<UnwrapRef<T>>) so the template unwrap stays exactly T,
+// which keeps the `extra` slot's `:model` binding type-correct for the generic T.
+const model = ref({} as T) as Ref<T>;
 const loading = ref(false);
 const saving = ref(false);
 const isOpen = computed({

@@ -1,5 +1,13 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { ref, computed, watch, h, resolveComponent, useSlots } from "vue";
+import {
+  ref,
+  shallowRef,
+  computed,
+  watch,
+  h,
+  resolveComponent,
+  useSlots,
+} from "vue";
 import type { Ref } from "vue";
 import type { TableColumn } from "@nuxt/ui";
 import type { SortingState, PaginationState } from "@tanstack/vue-table";
@@ -9,7 +17,7 @@ import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
-import { debounce } from "@mapomodule/utils";
+import { debounce, splitEndpointParams } from "@mapomodule/utils";
 import {
   useRoute,
   useRouter,
@@ -119,6 +127,8 @@ defineSlots<{
    * Receives `{ item: T, value: T[keyof T] }`.
    */
   [K: `cell.${string}`]: (props: { item: T; value: T[keyof T] }) => any;
+  /** Catch-all for slots forwarded dynamically (e.g. `qedit.*`). */
+  [K: string]: (...args: any[]) => any;
 }>();
 
 const slots = useSlots();
@@ -134,7 +144,8 @@ const router = useRouter();
 // It strips any query string from `endpoint` so mutations are never sent to a
 // URL like `/api/case/?fields=id,title/1/`.
 const crudBase =
-  props.crudEndpoint ?? (props.endpoint.split("?")[0] || props.endpoint);
+  props.crudEndpoint ??
+  (splitEndpointParams(props.endpoint).path || props.endpoint);
 const crud = useCrud<T>(crudBase);
 
 // --- Permissions ---
@@ -150,10 +161,14 @@ const canDeleteRow = computed(
 // `rows` holds the slice currently rendered (post search/filter/sort/pagination).
 // In offline mode, the parent's full array lives in `props.items` and is the
 // source of truth; this ref always holds the displayed page.
-const rows = ref<T[]>([]) as Ref<T[]>;
+// shallowRef: rows are always reassigned wholesale (never mutated in place), so
+// deep reactivity would only add per-cell Proxy overhead with no benefit.
+const rows = shallowRef<T[]>([]) as Ref<T[]>;
 // `fullDataset` caches the full server response in hybrid mode. Refilled on
 // endpoint change or after a mutation; reused for every filter/sort/page change.
-const fullDataset = ref<T[]>([]) as Ref<T[]>;
+// shallowRef for the same reason — it holds a potentially large dataset that is
+// only ever replaced as a whole by `fetchAll`.
+const fullDataset = shallowRef<T[]>([]) as Ref<T[]>;
 const hybridLoaded = ref(false);
 const total = ref(0);
 const loading = ref(false);
@@ -188,14 +203,12 @@ const sorting = ref<SortingState>(
 // --- Search (restored from URL) ---
 const search = ref(route.query.search ? String(route.query.search) : "");
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-function onSearchInput(val: string) {
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    search.value = val;
-    pagination.value = { ...pagination.value, pageIndex: 0 };
-  }, 350);
-}
+// Debounce the search input through the shared util (same mechanism as writeUrlState),
+// resetting to the first page so results aren't hidden on a stale page index.
+const onSearchInput = debounce((val: unknown) => {
+  search.value = String(val ?? "");
+  pagination.value = { ...pagination.value, pageIndex: 0 };
+}, 350);
 
 // Write pagination / sorting / search to the URL (debounced to avoid history spam).
 const writeUrlState = debounce(() => {
@@ -308,10 +321,11 @@ const quickEditLocalItem = computed<T | null>(() => {
 
 // --- Delete ---
 async function deleteRow(item: T) {
-  const ok = await confirm.open({
+  const ok = await confirm.ask({
     title: "Delete item",
-    question: "Are you sure you want to delete this item?",
-    approveButton: { text: "Delete", attrs: { color: "error" } },
+    message: "Are you sure you want to delete this item?",
+    confirmText: "Delete",
+    dangerous: true,
   });
   if (!ok) return;
   if (offlineMode.value) {
@@ -333,24 +347,82 @@ async function deleteRow(item: T) {
 }
 
 // --- Drag reorder ---
+// Reorder is only meaningful in the natural order, so it is disabled while a search or
+// column sort is active (the displayed order would not match the persisted one).
+const canReorder = computed(
+  () => props.draggable && !search.value && sorting.value.length === 0,
+);
+
+const tableWrapper = ref<HTMLElement | null>(null);
 const dragFrom = ref<number | null>(null);
+const dragOverIndex = ref<number | null>(null);
+
+function rowElements(): HTMLElement[] {
+  return tableWrapper.value
+    ? Array.from(tableWrapper.value.querySelectorAll<HTMLElement>("tbody tr"))
+    : [];
+}
+
+function clearRowClasses() {
+  for (const el of rowElements())
+    el.classList.remove(
+      "mapo-drop-before",
+      "mapo-drop-after",
+      "mapo-drag-source",
+    );
+}
+
+function clearDragState() {
+  clearRowClasses();
+  dragFrom.value = null;
+  dragOverIndex.value = null;
+}
 
 function onDragStart(idx: number) {
+  if (!canReorder.value) return;
   dragFrom.value = idx;
 }
-function onDragOver(e: DragEvent) {
-  e.preventDefault();
+
+// Drop area = the whole row. UTable owns the <tr>, so drag events are delegated on the
+// wrapper and the target row is resolved from the event target.
+function onRowDragOver(e: DragEvent) {
+  if (dragFrom.value === null) return;
+  e.preventDefault(); // required to allow a drop
+  const tr = (e.target as HTMLElement | null)?.closest(
+    "tbody tr",
+  ) as HTMLElement | null;
+  if (!tr) return;
+  const els = rowElements();
+  const idx = els.indexOf(tr);
+  if (idx < 0) return;
+  const rect = tr.getBoundingClientRect();
+  const before = e.clientY < rect.top + rect.height / 2;
+  clearRowClasses();
+  tr.classList.add(before ? "mapo-drop-before" : "mapo-drop-after");
+  els[dragFrom.value]?.classList.add("mapo-drag-source");
+  dragOverIndex.value = idx;
 }
-async function onDrop(toIdx: number) {
-  if (dragFrom.value === null || dragFrom.value === toIdx) return;
-  const fromIdx = dragFrom.value;
+
+function onRowDrop(e: DragEvent) {
+  e.preventDefault();
+  const from = dragFrom.value;
+  const to = dragOverIndex.value;
+  clearDragState();
+  if (from !== null && to !== null) void onDrop(from, to);
+}
+
+function onDragEnd() {
+  clearDragState();
+}
+
+async function onDrop(fromIdx: number, toIdx: number) {
+  if (fromIdx === toIdx) return;
   const arr = [...rows.value];
   const moved = arr[fromIdx]!;
   const target = arr[toIdx]!;
   arr.splice(fromIdx, 1);
   arr.splice(toIdx, 0, moved);
   rows.value = arr as T[];
-  dragFrom.value = null;
   if (offlineMode.value) {
     // Reorder against the parent's full array (rows is only the current page).
     const lk = props.lookup;
@@ -398,27 +470,28 @@ function applyOffline(source: T[]) {
     );
   }
 
-  // Filters + tab (filterParams): supports __gte / __lte ranges, arrays
-  // (multi-value → includes), and plain equality.
-  for (const [rawKey, rawVal] of Object.entries(props.filterParams ?? {})) {
+  // Filters + tab (filterParams): values use the v1 comma-joined format.
+  // - two ISO dates  → inclusive [start, end] range (datepicker filter)
+  // - multiple values → set inclusion (multi-choice filter)
+  // - single value    → equality
+  for (const [key, rawVal] of Object.entries(props.filterParams ?? {})) {
     if (rawVal == null || rawVal === "") continue;
-    const rangeMatch = rawKey.match(/^(.+)__(gte|lte)$/);
-    if (rangeMatch) {
-      const [, field, op] = rangeMatch;
+    const parts = String(rawVal).split(",");
+    const isDateRange =
+      parts.length === 2 && parts.every((p) => !Number.isNaN(Date.parse(p)));
+    if (isDateRange) {
+      const [start, end] = parts;
       arr = arr.filter((row) => {
-        const v = row[field!];
+        const v = row[key];
         if (v == null) return false;
-        return op === "gte"
-          ? (v as unknown as number | string) >=
-              (rawVal as unknown as number | string)
-          : (v as unknown as number | string) <=
-              (rawVal as unknown as number | string);
+        const s = String(v);
+        return s >= start! && s <= end!;
       });
-    } else if (Array.isArray(rawVal)) {
-      const set = new Set(rawVal.map(String));
-      arr = arr.filter((row) => set.has(String(row[rawKey])));
+    } else if (parts.length > 1) {
+      const set = new Set(parts);
+      arr = arr.filter((row) => set.has(String(row[key])));
     } else {
-      arr = arr.filter((row) => String(row[rawKey]) === String(rawVal));
+      arr = arr.filter((row) => String(row[key]) === parts[0]);
     }
   }
 
@@ -457,13 +530,7 @@ function applyOffline(source: T[]) {
 async function fetchAll() {
   loading.value = true;
   try {
-    const qIdx = props.endpoint.indexOf("?");
-    const endpointParams =
-      qIdx >= 0
-        ? Object.fromEntries(
-            new URLSearchParams(props.endpoint.slice(qIdx + 1)),
-          )
-        : {};
+    const endpointParams = splitEndpointParams(props.endpoint).params;
     const res = await crud.list(endpointParams as Record<string, string>);
     let nextItems: T[] = [];
     if (props.responseAdapter) {
@@ -496,13 +563,7 @@ async function refresh() {
   loading.value = true;
   try {
     // Extract any query params the caller baked into the endpoint (e.g. ?fields=id,title).
-    const qIdx = props.endpoint.indexOf("?");
-    const endpointParams =
-      qIdx >= 0
-        ? Object.fromEntries(
-            new URLSearchParams(props.endpoint.slice(qIdx + 1)),
-          )
-        : {};
+    const endpointParams = splitEndpointParams(props.endpoint).params;
 
     const pageState = {
       page: pagination.value.pageIndex + 1,
@@ -632,11 +693,17 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
         h(
           "span",
           {
-            class: "cursor-grab text-muted",
-            draggable: true,
-            onDragstart: () => onDragStart(row.index),
-            onDragover: onDragOver,
-            onDrop: () => onDrop(row.index),
+            class: canReorder.value
+              ? "cursor-grab text-muted"
+              : "cursor-not-allowed text-muted opacity-30",
+            draggable: canReorder.value,
+            title: canReorder.value
+              ? "Drag to reorder"
+              : "Clear search & sorting to reorder",
+            onDragstart: (e: DragEvent) => {
+              e.dataTransfer?.setData("text/plain", "");
+              onDragStart(row.index);
+            },
           },
           h(UIcon, { name: "i-lucide-grip-vertical", class: "h-4 w-4" }),
         ),
@@ -741,39 +808,46 @@ const sortingOptions = computed(() => ({
       <slot name="dtable.toolbar" />
     </div>
 
-    <!-- Table -->
-    <UTable
-      :data="rows"
-      :columns="tableColumns"
-      :loading="loading"
-      :pagination="pagination"
-      :pagination-options="paginationOptions"
-      :sorting="sorting"
-      :sorting-options="sortingOptions"
-      empty="Nessun elemento trovato"
-      @update:pagination="pagination = $event"
-      @update:sorting="sorting = $event"
+    <!-- Table — the drop area spans the whole row via delegated DnD on this wrapper. -->
+    <div
+      ref="tableWrapper"
+      @dragover="onRowDragOver"
+      @drop="onRowDrop"
+      @dragend="onDragEnd"
     >
-      <template #empty>
-        <slot name="dtable.empty">
-          <div class="flex flex-col items-center gap-2 py-8 text-muted">
-            <UIcon name="i-lucide-inbox" class="h-8 w-8" />
-            <span class="text-sm">No items found</span>
-          </div>
-        </slot>
-      </template>
+      <UTable
+        :data="rows"
+        :columns="tableColumns"
+        :loading="loading"
+        :pagination="pagination"
+        :pagination-options="paginationOptions"
+        :sorting="sorting"
+        :sorting-options="sortingOptions"
+        empty="Nessun elemento trovato"
+        @update:pagination="pagination = $event"
+        @update:sorting="sorting = $event"
+      >
+        <template #empty>
+          <slot name="dtable.empty">
+            <div class="flex flex-col items-center gap-2 py-8 text-muted">
+              <UIcon name="i-lucide-inbox" class="h-8 w-8" />
+              <span class="text-sm">No items found</span>
+            </div>
+          </slot>
+        </template>
 
-      <template #loading>
-        <slot name="dtable.loading">
-          <div class="flex justify-center py-8">
-            <UIcon
-              name="i-lucide-loader-circle"
-              class="h-6 w-6 animate-spin text-muted"
-            />
-          </div>
-        </slot>
-      </template>
-    </UTable>
+        <template #loading>
+          <slot name="dtable.loading">
+            <div class="flex justify-center py-8">
+              <UIcon
+                name="i-lucide-loader-circle"
+                class="h-6 w-6 animate-spin text-muted"
+              />
+            </div>
+          </slot>
+        </template>
+      </UTable>
+    </div>
 
     <!-- Pagination controls -->
     <div class="flex items-center justify-between text-sm text-muted">
@@ -820,3 +894,17 @@ const sortingOptions = computed(() => ({
     </MapoListQuickEdit>
   </div>
 </template>
+
+<style scoped>
+/* Drag-reorder visual feedback. Classes are toggled imperatively on UTable's <tr>
+   elements (UTable owns that DOM), so :deep() is required to reach them. */
+.mapo-list-table :deep(tbody tr.mapo-drag-source) {
+  opacity: 0.4;
+}
+.mapo-list-table :deep(tbody tr.mapo-drop-before > td) {
+  box-shadow: inset 0 2px 0 0 var(--ui-primary, #3b82f6);
+}
+.mapo-list-table :deep(tbody tr.mapo-drop-after > td) {
+  box-shadow: inset 0 -2px 0 0 var(--ui-primary, #3b82f6);
+}
+</style>

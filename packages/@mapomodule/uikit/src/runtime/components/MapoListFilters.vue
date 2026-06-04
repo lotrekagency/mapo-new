@@ -16,14 +16,21 @@ const emit = defineEmits<{ "update:modelValue": [value: ActiveFilter[]] }>();
 
 defineSlots<{
   /**
-   * Custom content for a specific filter panel.
-   * Slot name: `filter.{filter.value}`.
-   * Receives `{ filter, toggleChoice, removeFilter }`.
+   * Per-filter override slots. Bindings vary by slot; `filter` is always provided:
+   * - `filter.{value}`         — full override (default = title + content)
+   * - `filter.{value}.title`   — title override
+   * - `filter.{value}.content` — content override (choices / datepicker)
+   * - `filter.{value}.icon`    — per-choice icon override (also receives `choice`)
    */
   [K: `filter.${string}`]: (props: {
     filter: FilterDescriptor & { dates?: string[] };
-    toggleChoice: (filter: FilterDescriptor, choice: FilterChoice) => void;
-    removeFilter: (filter: FilterDescriptor) => void;
+    choice?: FilterChoice;
+    toggleChoice?: (filter: FilterDescriptor, choice: FilterChoice) => void;
+    removeFilter?: (filter: FilterDescriptor) => void;
+    isChoiceActive?: (
+      filter: FilterDescriptor,
+      choice: FilterChoice,
+    ) => boolean;
   }) => any;
 }>();
 
@@ -206,65 +213,80 @@ const isOpen = ref(false);
       <template #content>
         <div class="w-64 p-2 space-y-1">
           <div v-for="filter in localFilters" :key="filter.value">
-            <!-- Datepicker filter -->
-            <template v-if="filter.datepicker">
-              <p
-                class="px-2 py-1 text-xs font-semibold text-muted uppercase tracking-wide"
-              >
-                {{ filter.text }}
-              </p>
-              <UCalendar
-                v-model="(filter as any).dates"
-                range
-                class="w-full"
-                @update:model-value="handleDateFilter(filter as any)"
-              />
-            </template>
-
-            <!-- Choices filter -->
-            <template v-else-if="filter.choices?.length">
-              <p
-                class="px-2 py-1 text-xs font-semibold text-muted uppercase tracking-wide"
-              >
-                {{ filter.text }}
-              </p>
-              <button
-                v-for="choice in filter.choices"
-                :key="String(choice.value)"
-                class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-elevated"
-                :class="
-                  isChoiceActive(filter, choice)
-                    ? 'text-primary font-medium'
-                    : 'text-default'
-                "
-                @click="toggleChoice(filter, choice)"
-              >
-                <UIcon
-                  v-if="choice.icon"
-                  :name="choice.icon"
-                  class="h-4 w-4 shrink-0"
-                />
-                <UIcon
-                  v-else
-                  name="i-lucide-circle-small"
-                  class="h-4 w-4 shrink-0 opacity-40"
-                />
-                <span>{{ choice.text }}</span>
-                <UIcon
-                  v-if="isChoiceActive(filter, choice)"
-                  name="i-lucide-check"
-                  class="ml-auto h-3.5 w-3.5"
-                />
-              </button>
-            </template>
-
-            <!-- Slot override per filter custom -->
+            <!-- Full per-filter override (`filter.{value}`); default = title + content. -->
             <slot
               :name="`filter.${filter.value}`"
               :filter="filter"
               :toggle-choice="toggleChoice"
               :remove-filter="removeFilter"
-            />
+              :is-choice-active="isChoiceActive"
+            >
+              <!-- Title override (`filter.{value}.title`). -->
+              <slot :name="`filter.${filter.value}.title`" :filter="filter">
+                <p
+                  class="px-2 py-1 text-xs font-semibold text-muted uppercase tracking-wide"
+                >
+                  {{ filter.text }}
+                </p>
+              </slot>
+
+              <!-- Content override (`filter.{value}.content`). -->
+              <slot
+                :name="`filter.${filter.value}.content`"
+                :filter="filter"
+                :toggle-choice="toggleChoice"
+                :remove-filter="removeFilter"
+                :is-choice-active="isChoiceActive"
+              >
+                <!-- Datepicker filter -->
+                <UCalendar
+                  v-if="filter.datepicker"
+                  v-model="(filter as any).dates"
+                  range
+                  class="w-full"
+                  @update:model-value="handleDateFilter(filter as any)"
+                />
+
+                <!-- Choices filter -->
+                <template v-else-if="filter.choices?.length">
+                  <button
+                    v-for="choice in filter.choices"
+                    :key="String(choice.value)"
+                    class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-elevated"
+                    :class="
+                      isChoiceActive(filter, choice)
+                        ? 'text-primary font-medium'
+                        : 'text-default'
+                    "
+                    @click="toggleChoice(filter, choice)"
+                  >
+                    <!-- Per-choice icon override (`filter.{value}.icon`). -->
+                    <slot
+                      :name="`filter.${filter.value}.icon`"
+                      :filter="filter"
+                      :choice="choice"
+                    >
+                      <UIcon
+                        v-if="choice.icon"
+                        :name="choice.icon"
+                        class="h-4 w-4 shrink-0"
+                      />
+                      <UIcon
+                        v-else
+                        name="i-lucide-circle-small"
+                        class="h-4 w-4 shrink-0 opacity-40"
+                      />
+                    </slot>
+                    <span>{{ choice.text }}</span>
+                    <UIcon
+                      v-if="isChoiceActive(filter, choice)"
+                      name="i-lucide-check"
+                      class="ml-auto h-3.5 w-3.5"
+                    />
+                  </button>
+                </template>
+              </slot>
+            </slot>
           </div>
         </div>
       </template>

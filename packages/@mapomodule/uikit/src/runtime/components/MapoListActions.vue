@@ -76,13 +76,14 @@ async function runAction() {
   if (!selectedAction.value) return;
   const action = selectedAction.value;
 
-  const ok = await confirm.open({
+  const ok = await confirm.ask({
     title: action.label,
-    question:
+    message:
       props.selection === "all"
         ? "This action will be applied to all items. Do you want to continue?"
         : `This action will be applied to ${(props.selection as T[]).length} item(s). Do you want to continue?`,
-    approveButton: { text: "Confirm", attrs: { color: "error" } },
+    confirmText: "Confirm",
+    dangerous: true,
   });
   if (!ok) return;
 

@@ -173,9 +173,10 @@ const crudEndpoint = computed(
 );
 
 // --- filterParams: active tab + active filters → backend query params. ---
-// 4.3: datepicker range values are expanded into __gte / __lte pairs.
-// 4.6: dotted-path filter keys (e.g. "category.slug") are rewritten to
-//       Django-style double-underscore notation ("category__slug").
+// v1 contract: each filter is sent as `filter.value=v1,v2,...` (bare key, comma-joined
+// values). Datepicker ranges are a single `key=start,end` value (no __gte/__lte split).
+// This keeps the backend contract identical to Mapo v1; the `f_` prefix is used only for
+// URL persistence (see writeUrlState), never towards the backend.
 const filterParams = computed<Record<string, unknown>>(() => {
   const params: Record<string, unknown> = {};
   if (props.tabs.length && activeTab.value) {
@@ -183,17 +184,7 @@ const filterParams = computed<Record<string, unknown>>(() => {
   }
   for (const f of activeFilters.value) {
     if (!f.active.length) continue;
-    const key = f.value.replace(/\./g, "__");
-    if (f.datepicker && f.active.length === 1) {
-      const parts = String(f.active[0]!.value).split(",");
-      if (parts.length === 2) {
-        params[`${key}__gte`] = parts[0];
-        params[`${key}__lte`] = parts[1];
-        continue;
-      }
-    }
-    params[key] =
-      f.active.length === 1 ? f.active[0]!.value : f.active.map((c) => c.value);
+    params[f.value] = f.active.map((c) => String(c.value)).join(",");
   }
   return params;
 });
@@ -235,6 +226,8 @@ defineSlots<{
    * Receives `{ model: T }` — the current reactive form model.
    */
   "qedit.extra": (props: { model: T }) => any;
+  /** Catch-all for slots forwarded dynamically to the inner table/filters. */
+  [K: string]: (...args: any[]) => any;
 }>();
 
 // Reset selection when the active tab or filters change
