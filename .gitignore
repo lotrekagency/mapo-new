@@ -50,3 +50,6 @@ IMPROVE_ROADMAP.md
 BRANCH_DIFF_AUDIT.md
 REFACTOR_WORKLOG.md
 SPLIT_MR_PLAN.md
+
+.gitmodules
+testing/
