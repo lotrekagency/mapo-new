@@ -115,21 +115,26 @@ const emit = defineEmits<{
 
 defineExpose({ refresh });
 
-defineSlots<{
-  /** Extra content rendered alongside the search input in the toolbar. */
-  "dtable.toolbar"(): any;
-  /** Override for the empty state displayed when no rows are found. */
-  "dtable.empty"(): any;
-  /** Override for the loading skeleton displayed while data is being fetched. */
-  "dtable.loading"(): any;
-  /**
-   * Per-column cell override. Slot name: `cell.{column.key}`.
-   * Receives `{ item: T, value: T[keyof T] }`.
-   */
-  [K: `cell.${string}`]: (props: { item: T; value: T[keyof T] }) => any;
-  /** Catch-all for slots forwarded dynamically (e.g. `qedit.*`). */
-  [K: string]: (...args: any[]) => any;
-}>();
+defineSlots<
+  {
+    /** Extra content rendered alongside the search input in the toolbar. */
+    "dtable.toolbar"(): any;
+    /** Override for the empty state displayed when no rows are found. */
+    "dtable.empty"(): any;
+    /** Override for the loading skeleton displayed while data is being fetched. */
+    "dtable.loading"(): any;
+    /** Catch-all for slots forwarded dynamically (e.g. `qedit.*`). */
+    [K: string]: (...args: any[]) => any;
+  } & {
+    /**
+     * Per-column cell override. Slot name: `cell.{column.key}`.
+     */
+    [K in keyof T as `cell.${K & string}`]: (props: {
+      item: T;
+      value: T[K];
+    }) => any;
+  }
+>();
 
 const slots = useSlots();
 

@@ -54,6 +54,12 @@ const props = withDefaults(
     registry?: Partial<FieldRegistry>;
     /** Base path for the detail page link on each row. E.g. "/news" → links to "/news/42". */
     detailBase?: string;
+    /**
+     * Django model label used to gate row-level edit and delete buttons via permissions.
+     * E.g. `"article"` hides the pencil unless the user has `change_article`, and
+     * hides the trash unless the user has `delete_article`. Omit to always show both.
+     */
+    permissionModel?: string;
     // Pagination
     /** Initial page size. Default: 20. */
     defaultPageSize?: number;
@@ -198,37 +204,42 @@ function refresh() {
 
 defineExpose({ refresh });
 
-defineSlots<{
-  /** Content rendered inside the list head area (title, breadcrumbs, action buttons). */
-  head(): any;
-  /** Extra content rendered alongside the search input in the table toolbar. */
-  "dtable.toolbar"(): any;
-  /** Override for the empty state displayed when no rows are found. */
-  "dtable.empty"(): any;
-  /** Override for the loading skeleton displayed while data is being fetched. */
-  "dtable.loading"(): any;
-  /**
-   * Per-column cell override. Slot name: `cell.{column.key}`.
-   * Receives `{ item: T, value: T[keyof T] }`.
-   */
-  [K: `cell.${string}`]: (props: { item: T; value: T[keyof T] }) => any;
-  /**
-   * Per-filter custom panel content. Slot name: `filter.{filter.value}`.
-   * Receives `{ filter, toggleChoice, removeFilter }`.
-   */
-  [K: `filter.${string}`]: (props: {
-    filter: FilterDescriptor & { dates?: string[] };
-    toggleChoice: (filter: FilterDescriptor, choice: FilterChoice) => void;
-    removeFilter: (filter: FilterDescriptor) => void;
-  }) => any;
-  /**
-   * Extra content rendered below the quick-edit form.
-   * Receives `{ model: T }` — the current reactive form model.
-   */
-  "qedit.extra": (props: { model: T }) => any;
-  /** Catch-all for slots forwarded dynamically to the inner table/filters. */
-  [K: string]: (...args: any[]) => any;
-}>();
+defineSlots<
+  {
+    /** Content rendered inside the list head area (title, breadcrumbs, action buttons). */
+    head(): unknown;
+    /** Extra content rendered alongside the search input in the table toolbar. */
+    "dtable.toolbar"(): unknown;
+    /** Override for the empty state displayed when no rows are found. */
+    "dtable.empty"(): unknown;
+    /** Override for the loading skeleton displayed while data is being fetched. */
+    "dtable.loading"(): unknown;
+    /**
+     * Per-filter custom panel content. Slot name: `filter.{filter.value}`.
+     * Receives `{ filter, toggleChoice, removeFilter }`.
+     */
+    [K: `filter.${string}`]: (props: {
+      filter: FilterDescriptor & { dates?: string[] };
+      toggleChoice: (filter: FilterDescriptor, choice: FilterChoice) => void;
+      removeFilter: (filter: FilterDescriptor) => void;
+    }) => unknown;
+    /**
+     * Extra content rendered below the quick-edit form.
+     * Receives `{ model: T }` — the current reactive form model.
+     */
+    "qedit.extra": (props: { model: T }) => unknown;
+    // catch-all required so $slots[dynamicName] in the forwarding templates type-checks
+    [K: string]: (...args: any[]) => unknown;
+  } & {
+    /**
+     * Per-column cell override. Slot name: `cell.{column.key}`.
+     */
+    [K in keyof T as `cell.${K & string}`]: (props: {
+      item: T;
+      value: T[K];
+    }) => unknown;
+  }
+>();
 
 // Reset selection when the active tab or filters change
 watch([activeTab, activeFilters], () => {
@@ -298,6 +309,7 @@ watch([activeTab, activeFilters], () => {
       :page-size-options="pageSizeOptions"
       :response-adapter="responseAdapter"
       :pagination-params="paginationParams"
+      :permission-model="permissionModel"
       @update:selection="selection = $event"
       @update:selection-query="selectionQuery = $event"
       @update:items="emit('update:items', $event)"

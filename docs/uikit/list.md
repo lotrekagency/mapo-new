@@ -13,8 +13,8 @@ import type {
   FilterDescriptor,
   ActionDescriptor,
   ListTabItem,
-} from "@mapomodule/uikit";
-import type { FieldDescriptor } from "@mapomodule/form/types";
+  FieldDescriptor,
+} from "mapomodule/types";
 
 interface News {
   id: number;
@@ -23,7 +23,9 @@ interface News {
   published_at: string;
 }
 
-const columns: ListColumn<News>[] = [
+// Untyped generics (T defaults to Record<string,unknown>) work fine with the component.
+// Use typed generics only when you need compile-time key validation on columns/editFields.
+const columns: ListColumn[] = [
   { key: "title", label: "Title", sortable: true },
   { key: "status", label: "Status" },
   { key: "published_at", label: "Published", sortable: true },
@@ -40,9 +42,14 @@ const filters: FilterDescriptor[] = [
   },
 ];
 
-const quickEdit: FieldDescriptor<News>[] = [
+const quickEdit: FieldDescriptor[] = [
   { key: "status", type: "select", attrs: { options: filters[0].choices } },
 ];
+
+// Typed cast helper — needed because Volar resolves `item` in #cell slots as Record<string,unknown>
+function asNews(row: Record<string, unknown>): News {
+  return row as unknown as News;
+}
 </script>
 
 <template>
@@ -162,10 +169,20 @@ Use the per-cell slot `#cell.<key>` — it receives `{ item, value }`:
 </MapoList>
 ```
 
-| Binding | Type         | Description                                                         |
-| ------- | ------------ | ------------------------------------------------------------------- |
-| `item`  | `T`          | The full row object                                                 |
-| `value` | `T[keyof T]` | The value of `item[column.key]` — a union of all value types of `T` |
+| Binding | Type         | Description                                                                               |
+| ------- | ------------ | ----------------------------------------------------------------------------------------- |
+| `item`  | `T`          | The full row object                                                                       |
+| `value` | `T[keyof T]` | The value of `item[column.key]` — a union of all possible value types of `T` for that key |
+
+> **Type note.** Due to a current Volar limitation with generic SFC inference, `item` and `value` may resolve to `Record<string, unknown>` instead of your model type. The recommended workaround is a typed cast helper in the `<script setup>`:
+>
+> ```ts
+> function asNews(row: Record<string, unknown>): News {
+>   return row as unknown as News;
+> }
+> ```
+>
+> Then in slots: `asNews(item).status`. This is explicit, reusable, and avoids repeated inline casts.
 
 The slot system propagates from `<MapoList>` down to `<MapoListTable>` automatically.
 
@@ -174,11 +191,7 @@ The slot system propagates from `<MapoList>` down to `<MapoListTable>` automatic
 Pass the Django app-model label to hide edit/delete buttons for users who lack the corresponding permissions:
 
 ```vue
-<MapoList
-  endpoint="/api/news/"
-  :columns="columns"
-  permission-model="news.article"
-/>
+<MapoList endpoint="/api/news/" :columns="columns" permission-model="article" />
 ```
 
 The table reads permissions from `usePermissions()` (which proxies `useAuthStore`). For each row:
@@ -188,6 +201,8 @@ The table reads permissions from `usePermissions()` (which proxies `useAuthStore
 - Superusers always see both buttons regardless of the model label.
 
 Omit `permissionModel` to preserve the previous behavior (buttons always visible).
+
+> **Note.** Pass the bare Django model name (e.g. `"article"`), not the app-label–prefixed form (`"news.article"`). The permission check uses `change_<model>` and `delete_<model>` directly.
 
 ---
 
@@ -285,6 +300,14 @@ const actions: ActionDescriptor<News>[] = [
           $fetch(`/api/news/${row.id}/publish/`, { method: "POST" }),
         ),
       );
+    },
+  },
+  {
+    label: "Delete permanently",
+    handleMultiple: true,
+    dangerous: true, // renders Apply + confirm button in error/red color
+    async handler({ selection }) {
+      /* … */
     },
   },
 ];
@@ -427,7 +450,7 @@ A link icon appears on each row pointing at `/news/${row[lookup]}`. Combine with
 | `#dtable.toolbar` | `<MapoListTable>`     | —                                        |
 | `#dtable.empty`   | `<MapoListTable>`     | —                                        |
 | `#dtable.loading` | `<MapoListTable>`     | —                                        |
-| `#cell.<key>`     | `<MapoListTable>`     | `{ item: T, value: unknown }`            |
+| `#cell.<key>`     | `<MapoListTable>`     | `{ item: T, value: T[keyof T] }`         |
 | `#filter.<value>` | `<MapoListFilters>`   | `{ filter, toggleChoice, removeFilter }` |
 | `#qedit.extra`    | `<MapoListQuickEdit>` | `{ model: T }`                           |
 
