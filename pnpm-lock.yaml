@@ -409,6 +409,31 @@ importers:
         specifier: ^3.5.32
         version: 3.5.33(typescript@5.9.3)
 
+  testing/oknoplast-backoffice:
+    dependencies:
+      '@mapomodule/form':
+        specifier: workspace:*
+        version: link:../../packages/@mapomodule/form
+      '@nuxt/ui':
+        specifier: ^4.7.1
+        version: 4.7.1(@tiptap/extensions@3.22.5)(@tiptap/y-tiptap@3.0.3)(embla-carousel@8.6.0)(tailwindcss@4.2.4)(typescript@6.0.3)(vite@7.3.2)(vue-router@5.0.6)(vue@3.5.33)(yjs@13.6.30)
+      mapo-integrations-camomilla:
+        specifier: workspace:*
+        version: link:../../packages/@mapomodule/mapo-integrations-camomilla
+      mapomodule:
+        specifier: workspace:*
+        version: link:../../packages/mapomodule
+      nuxt:
+        specifier: ^4.4.4
+        version: 4.4.4(@babel/core@7.29.0)(@types/node@25.6.0)(eslint@10.2.1)(typescript@6.0.3)(vite@7.3.2)(vue-tsc@2.2.12)
+      vue:
+        specifier: ^3.5.33
+        version: 3.5.33(typescript@6.0.3)
+    devDependencies:
+      '@iconify-json/lucide':
+        specifier: ^1.2.105
+        version: 1.2.111
+
 packages:
 
   /@actions/core@3.0.1:
@@ -2162,6 +2187,12 @@ packages:
     dependencies:
       '@iconify/types': 2.0.0
     dev: false
+
+  /@iconify-json/lucide@1.2.111:
+    resolution: {integrity: sha512-S6oXom2YOKuXFxWofhHa2oq++Z3WeZ78dRFDA7aEEJqyNCJlQd1UGAfN8u2gD2NzvYotmm+j5kH678viWfZbGQ==}
+    dependencies:
+      '@iconify/types': 2.0.0
+    dev: true
 
   /@iconify-json/simple-icons@1.2.80:
     resolution: {integrity: sha512-iglncJJ6X/dVuzFDU32MrHwwo4RBwivGf108dgyYg+HKS78ifx0h7sTenpDZMVT+UhdS6CSgZcvY/SvRXlIEUg==}
