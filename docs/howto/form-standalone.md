@@ -21,7 +21,7 @@ Use `<MapoDetail>` for standard CRUD detail pages. Use `<MapoForm>` standalone w
 
 ```vue
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 
 const model = ref({ title: "", slug: "", is_draft: true });
 const errors = ref<Record<string, string[]>>({});
@@ -56,7 +56,7 @@ This mirrors what the example app uses for `form-demo.vue`.
 
 ```vue
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 
 definePageMeta({ layout: "mapo-default", label: "New article" });
 

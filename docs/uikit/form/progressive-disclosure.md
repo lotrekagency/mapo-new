@@ -5,8 +5,7 @@ A declarative DSL for conditional field visibility — a more readable alternati
 ## TL;DR
 
 ```ts
-import { when, matchesField, isOneOf } from '@mapomodule/form'
-
+// when, matchesField, isOneOf are Nuxt auto-imports — no explicit import needed
 {
   key: 'seo_description',
   visible: when(

@@ -324,7 +324,7 @@ async function save() {
 Generate `FieldDescriptor[]` automatically from a Pydantic or DRF schema:
 
 ```ts
-import { useFormFromSchema } from "@mapomodule/form/types";
+// useFormFromSchema is a Nuxt auto-import — no explicit import needed
 
 // Fetch the schema from your backend
 const schema = await $fetch("/api/articles/schema/");
@@ -363,7 +363,7 @@ Register a custom Vue component as a new field type via a Nuxt plugin:
 
 ```ts
 // plugins/my-fields.ts
-import { defineFormField } from "@mapomodule/form/types";
+// defineFormField is a Nuxt auto-import — no explicit import needed
 import MyColorPickerField from "~/components/fields/MyColorPickerField.vue";
 
 export default defineNuxtPlugin(() => {
@@ -387,11 +387,8 @@ Unknown types show a yellow placeholder in development — so typos are immediat
 When a form has many fields, repeating `group: 'seo'` or `tab: 'content'` on every descriptor becomes noisy. `flattenFieldGroups` lets you author descriptors as a nested tree and flattens them into the `FieldDescriptor[]` array the form engine expects.
 
 ```ts
-import { flattenFieldGroups } from "@mapomodule/form/types";
-import type {
-  FieldGroupDescriptor,
-  FieldDescriptor,
-} from "@mapomodule/form/types";
+import { flattenFieldGroups } from "mapomodule/types";
+import type { FieldGroupDescriptor, FieldDescriptor } from "mapomodule/types";
 import type { Article } from "~/types/api";
 
 const fields: FieldDescriptor<Article>[] = flattenFieldGroups<Article>([
@@ -447,10 +444,12 @@ interface FieldGroupDescriptor<T = Record<string, unknown>> {
 ### Import
 
 ```ts
-import { flattenFieldGroups } from "@mapomodule/form/types";
-import type { FieldGroupDescriptor } from "@mapomodule/form/types";
-// or via the meta-package
+// Recommended: meta-package aggregator
 import { flattenFieldGroups } from "mapomodule/types";
+import type { FieldGroupDescriptor } from "mapomodule/types";
+
+// Alternative: package-specific path
+import { flattenFieldGroups } from "@mapomodule/form/types";
 ```
 
 → See also: [Standalone form](./form-standalone), [Custom fields reference](/uikit/form/custom-fields), [Registry reference](/uikit/form/registry)

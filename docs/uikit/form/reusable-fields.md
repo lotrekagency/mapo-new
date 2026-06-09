@@ -10,7 +10,7 @@ When the field set is always used with the same model, a typed constant is the s
 
 ```ts
 // composables/useArticleFields.ts
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 import type { Article } from "~/types/api";
 
 export const seoFields: FieldDescriptor<Article>[] = [
@@ -46,7 +46,7 @@ export const publishingFields: FieldDescriptor<Article>[] = [
 ```vue
 <script setup lang="ts">
 import { seoFields, publishingFields } from "~/composables/useArticleFields";
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 import type { Article } from "~/types/api";
 
 const fields: FieldDescriptor<Article>[] = [
@@ -68,7 +68,7 @@ When the same field set can apply to different models (e.g., any model that has 
 
 ```ts
 // composables/fieldFactories.ts
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 
 export function createSeoFields<T>(): FieldDescriptor<T>[] {
   return [
@@ -142,7 +142,7 @@ const fields: FieldDescriptor<Article>[] = [
 For maximum flexibility, accept a partial override per field:
 
 ```ts
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 
 export function createPublishingFields<T>(
   overrides: Partial<FieldDescriptor<T>> = {},
@@ -202,11 +202,11 @@ const fields: FieldDescriptor<Article>[] = [
 ## Import reference
 
 ```ts
-// Always import types from the stable subpath — never from internal paths
-import type { FieldDescriptor } from "@mapomodule/form/types";
-
-// Or from the meta-package aggregator
+// Recommended: meta-package aggregator
 import type { FieldDescriptor } from "mapomodule/types";
+
+// Alternative: package-specific path (useful when building a standalone plugin)
+import type { FieldDescriptor } from "@mapomodule/form/types";
 ```
 
 The `@mapomodule/form/types` subpath re-exports every public type from the form package including `FieldDescriptor<T>`, `RepeaterDescriptor<T>`, `SelectDescriptor<T>`, `FieldRegistry`, and more. See the [Form API reference](./api) for the full list.

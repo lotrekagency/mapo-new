@@ -15,7 +15,7 @@ export default defineNuxtConfig({
 
 ```vue
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { FieldDescriptor } from "mapomodule/types";
 
 interface Article {
   title: string;

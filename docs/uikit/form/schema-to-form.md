@@ -5,8 +5,7 @@
 ## TL;DR
 
 ```ts
-import { useFormFromSchema } from "@mapomodule/form/types";
-
+// useFormFromSchema is a Nuxt auto-import — no explicit import needed
 const schema = await $fetch("/api/schema/");
 
 const fields = useFormFromSchema(schema, {

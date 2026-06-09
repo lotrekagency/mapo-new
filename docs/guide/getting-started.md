@@ -47,6 +47,53 @@ export default defineNuxtConfig({
 
 All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration).
 
+## Create app.vue
+
+Nuxt 4 requires an explicit `app.vue`. Mapo needs two wrappers to work correctly:
+
+- **`<UApp>`** — provides Nuxt UI context (design tokens, toast, overlays). Without it theming and Nuxt UI components break.
+- **`<NuxtLayout>`** — activates the layout system. The `mapo-default` layout (sidebar + topbar) is only applied if this wrapper is present.
+
+```vue
+<!-- app/app.vue -->
+<script setup lang="ts"></script>
+
+<template>
+  <UApp>
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
+</template>
+```
+
+### Customizing logo and topbar
+
+Pass content into the layout via named slots on `<NuxtLayout>`. The full slot reference is in [Layout slots](../uikit/layout#slots).
+
+```vue
+<template>
+  <UApp>
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <template #sidebar:logo>
+        <NuxtLink to="/" class="flex items-center gap-2.5 min-w-0">
+          <img src="~/assets/logo.svg" class="h-6" alt="Acme" />
+          <span class="font-semibold text-sm truncate">Acme Admin</span>
+        </NuxtLink>
+      </template>
+
+      <template #topbar:right>
+        <MapoThemeToggle />
+      </template>
+
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
+</template>
+```
+
 ## Use it
 
 Mapo auto-imports its composables and stores. In any Vue component or page:

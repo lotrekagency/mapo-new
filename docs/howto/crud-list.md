@@ -37,8 +37,8 @@ The example below covers everything: typed model, columns, filters, tabs, bulk a
 
 ```vue
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/types";
 import type {
+  FieldDescriptor,
   FilterDescriptor,
   ActionDescriptor,
   ListColumn,
