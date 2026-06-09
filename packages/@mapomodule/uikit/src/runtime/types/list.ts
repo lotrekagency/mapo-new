@@ -52,6 +52,8 @@ export interface ActionDescriptor<T = Record<string, unknown>> {
   handleMultiple?: boolean;
   /** Action is available when the "select all" mode is active. Default: `false`. */
   handleAll?: boolean;
+  /** When true, Apply and confirm buttons are rendered with a destructive/error color. */
+  dangerous?: boolean;
 }
 
 /** A single tab item used in the list tab bar to filter by a fixed value. */

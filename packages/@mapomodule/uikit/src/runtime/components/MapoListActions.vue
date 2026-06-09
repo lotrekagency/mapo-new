@@ -61,6 +61,10 @@ const visibleActions = computed(() =>
   ),
 );
 
+const applyButtonColor = computed(() =>
+  selectedAction.value?.dangerous ? "error" : "primary",
+);
+
 function canRun(action: ActionDescriptor<T>): boolean {
   const perms = action.permissions
     ? Array.isArray(action.permissions)
@@ -83,7 +87,7 @@ async function runAction() {
         ? "This action will be applied to all items. Do you want to continue?"
         : `This action will be applied to ${(props.selection as T[]).length} item(s). Do you want to continue?`,
     confirmText: "Confirm",
-    dangerous: true,
+    dangerous: !!action.dangerous,
   });
   if (!ok) return;
 
@@ -125,7 +129,7 @@ const isActive = computed(
     />
     <UButton
       size="sm"
-      color="primary"
+      :color="applyButtonColor"
       :loading="isRunning"
       :disabled="!selectedAction || !canRun(selectedAction)"
       @click="runAction"
