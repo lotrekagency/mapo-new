@@ -45,6 +45,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Getting Started', link: '/guide/getting-started' },
+          { text: 'Compatibility & Troubleshooting', link: '/guide/compatibility' },
           { text: 'Feature Status', link: '/guide/feature-status' },
           { text: 'Architecture & Flows', link: '/guide/architecture-flows' },
           { text: 'Known Limitations', link: '/guide/known-limitations' },
