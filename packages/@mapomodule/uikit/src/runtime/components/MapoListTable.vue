@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="T extends Record<string, unknown>">
+<script setup lang="ts" generic="T extends object">
 import {
   ref,
   shallowRef,
@@ -138,6 +138,11 @@ defineSlots<
 
 const slots = useSlots();
 
+// T extends object but not Record<string,unknown>, so dynamic key access needs a cast.
+// Casting the key to keyof T returns the union of all property types rather than `unknown`,
+// which is both accurate and avoids any implicit-any errors at the call sites.
+const atKey = (item: T, key: string): T[keyof T] => item[key as keyof T];
+
 const snack = useSnackStore();
 const confirm = useConfirmStore();
 
@@ -242,7 +247,7 @@ watch([pagination, search, sorting], writeUrlState, { deep: true });
 // Selection is keyed by primary key (lookup), not by row index, so pagination/sort/refresh
 // changes do not affect which rows are marked as selected.
 const rowSelection = ref<Record<string, boolean>>({});
-const pkOf = (row: T) => String(row[props.lookup]);
+const pkOf = (row: T) => String(atKey(row, props.lookup));
 const isAllSelected = computed(
   () =>
     rows.value.length > 0 &&
@@ -305,7 +310,7 @@ function onQuickEditSaved(updated: T) {
   if (offlineMode.value) {
     const lk = props.lookup;
     const next = (props.items ?? []).map((r) =>
-      String(r[lk]) === String(updated[lk]) ? updated : r,
+      String(atKey(r, lk)) === String(atKey(updated, lk)) ? updated : r,
     );
     emit("update:items", next);
     return;
@@ -319,7 +324,7 @@ const quickEditLocalItem = computed<T | null>(() => {
   if (!offlineMode.value || quickEditId.value == null) return null;
   return (
     (props.items ?? []).find(
-      (r) => String(r[props.lookup]) === String(quickEditId.value),
+      (r) => String(atKey(r, props.lookup)) === String(quickEditId.value),
     ) ?? null
   );
 });
@@ -335,14 +340,15 @@ async function deleteRow(item: T) {
   if (!ok) return;
   if (offlineMode.value) {
     const next = (props.items ?? []).filter(
-      (r) => String(r[props.lookup]) !== String(item[props.lookup]),
+      (r) =>
+        String(atKey(r, props.lookup)) !== String(atKey(item, props.lookup)),
     );
     emit("update:items", next);
     snack.show("Item deleted", "success");
     return;
   }
   try {
-    await crud.delete(item[props.lookup] as string | number);
+    await crud.delete(atKey(item, props.lookup) as string | number);
     snack.show("Item deleted", "success");
     if (hybridMode.value) hybridLoaded.value = false;
     refresh();
@@ -432,8 +438,12 @@ async function onDrop(fromIdx: number, toIdx: number) {
     // Reorder against the parent's full array (rows is only the current page).
     const lk = props.lookup;
     const full = [...(props.items ?? [])];
-    const fIdx = full.findIndex((r) => String(r[lk]) === String(moved[lk]));
-    const tIdx = full.findIndex((r) => String(r[lk]) === String(target[lk]));
+    const fIdx = full.findIndex(
+      (r) => String(atKey(r, lk)) === String(atKey(moved, lk)),
+    );
+    const tIdx = full.findIndex(
+      (r) => String(atKey(r, lk)) === String(atKey(target, lk)),
+    );
     if (fIdx >= 0 && tIdx >= 0) {
       const [m] = full.splice(fIdx, 1);
       full.splice(tIdx, 0, m!);
@@ -445,8 +455,8 @@ async function onDrop(fromIdx: number, toIdx: number) {
   // recalculates positions server-side, avoiding N parallel PATCHes and race conditions.
   try {
     await crud.updateOrder(
-      moved[props.lookup] as string | number,
-      target[props.lookup] as string | number,
+      atKey(moved, props.lookup) as string | number,
+      atKey(target, props.lookup) as string | number,
     );
     snack.show("Order saved", "success");
     if (hybridMode.value) {
@@ -487,16 +497,16 @@ function applyOffline(source: T[]) {
     if (isDateRange) {
       const [start, end] = parts;
       arr = arr.filter((row) => {
-        const v = row[key];
+        const v = atKey(row, key);
         if (v == null) return false;
         const s = String(v);
         return s >= start! && s <= end!;
       });
     } else if (parts.length > 1) {
       const set = new Set(parts);
-      arr = arr.filter((row) => set.has(String(row[key])));
+      arr = arr.filter((row) => set.has(String(atKey(row, key))));
     } else {
-      arr = arr.filter((row) => String(row[key]) === parts[0]);
+      arr = arr.filter((row) => String(atKey(row, key)) === parts[0]);
     }
   }
 
@@ -506,8 +516,8 @@ function applyOffline(source: T[]) {
     const sortDefs = sorting.value;
     arr.sort((a, b) => {
       for (const s of sortDefs) {
-        const av = a[s.id];
-        const bv = b[s.id];
+        const av = atKey(a, s.id);
+        const bv = atKey(b, s.id);
         if (av == null && bv == null) continue;
         if (av == null) return 1;
         if (bv == null) return -1;
@@ -728,13 +738,16 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
       cell: ({ row }: { row: { original: T } }) => {
         const cellSlot = slots[`cell.${col.key}`];
         if (cellSlot)
-          return cellSlot({ item: row.original, value: row.original[col.key] });
-        const cellVal = row.original[col.key];
+          return cellSlot({
+            item: row.original,
+            value: atKey(row.original, col.key),
+          });
+        const cellVal = atKey(row.original, col.key);
         if (isFirst) {
           return h(
             NuxtLink,
             {
-              to: `${props.detailBase}/${row.original[props.lookup]}`,
+              to: `${props.detailBase}/${atKey(row.original, props.lookup)}`,
               class: "font-medium hover:underline",
             },
             () => String(cellVal ?? "—"),
@@ -760,7 +773,9 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
             color: "neutral",
             icon: "i-lucide-pencil",
             onClick: () =>
-              openQuickEdit(row.original[props.lookup] as string | number),
+              openQuickEdit(
+                atKey(row.original, props.lookup) as string | number,
+              ),
           }),
         );
       }
