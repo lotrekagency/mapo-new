@@ -68,7 +68,7 @@ Add `pinia` to `vite.resolve.dedupe` in your `nuxt.config.ts`. This prevents Vit
 export default defineNuxtConfig({
   vite: {
     resolve: {
-      dedupe: ["vue", "pinia", "#app", "nuxt/app"],
+      dedupe: ["vue", "pinia"],
     },
   },
 });

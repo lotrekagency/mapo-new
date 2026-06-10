@@ -220,11 +220,11 @@ const columns: ListColumn<Article>[] = [
 
 ## Custom cell rendering
 
-Use `#cell.{key}` slots to override how any column renders. The slot receives `{ item, value }` where `item` is the full row object and `value` is the cell value:
+Use ``#[`cell.{key}`]`` slots to override how any column renders. The slot receives `{ item, value }` where `item` is the full row object and `value` is the cell value:
 
 ```vue
 <MapoList endpoint="/api/articles" :columns="columns">
-  <template #cell.status="{ item }">
+  <template #[`cell.status`]="{ item }">
     <UBadge
       :color="item.status === 'published' ? 'success' : item.status === 'archived' ? 'neutral' : 'warning'"
       variant="subtle"
@@ -234,13 +234,15 @@ Use `#cell.{key}` slots to override how any column renders. The slot receives `{
     </UBadge>
   </template>
 
-  <template #cell.published_at="{ item }">
+  <template #[`cell.published_at`]="{ item }">
     <span class="text-sm text-muted">
       {{ item.published_at ? new Date(item.published_at).toLocaleDateString() : '—' }}
     </span>
   </template>
 </MapoList>
 ```
+
+> **Use the bracket form.** Cell slots are declared with a template-literal type ``[`cell.${string}`]`` in `defineSlots`. Write `#[\`cell.key\`]`(dynamic bracket syntax) rather than`#cell.key`(static shorthand) so that Volar can resolve the slot and infer the`item`/`value` types correctly.
 
 ### Row actions via a custom cell
 
@@ -256,7 +258,7 @@ const columns: ListColumn<Article>[] = [
 
 ```vue
 <MapoList endpoint="/api/articles" :columns="columns">
-  <template #cell.actions="{ item }">
+  <template #[`cell.actions`]="{ item }">
     <div class="flex justify-end gap-1">
       <UButton
         size="xs"
@@ -324,13 +326,13 @@ async function afterBulkOperation() {
 
 ## Slots reference
 
-| Slot              | Description                                 |
-| ----------------- | ------------------------------------------- |
-| `#head`           | Above the table — page title, toolbar       |
-| `#dtable.toolbar` | Extra controls next to the search input     |
-| `#dtable.empty`   | Custom empty state                          |
-| `#cell.{key}`     | Override a specific column's cell rendering |
-| `#filter.{value}` | Custom filter UI for a specific filter key  |
+| Slot                | Description                                 |
+| ------------------- | ------------------------------------------- |
+| `#head`             | Above the table — page title, toolbar       |
+| `#dtable.toolbar`   | Extra controls next to the search input     |
+| `#dtable.empty`     | Custom empty state                          |
+| ``#[`cell.{key}`]`` | Override a specific column's cell rendering |
+| `#filter.{value}`   | Custom filter UI for a specific filter key  |
 
 ## Import reference
 

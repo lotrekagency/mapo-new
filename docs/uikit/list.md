@@ -148,26 +148,28 @@ Without the generic (`ListColumn[]`) the key is typed as `string` and any value 
 
 ## How to: customize a cell
 
-Use the per-cell slot `#cell.<key>` — it receives `{ item, value }`:
+Use the per-cell slot `#[\`cell.<key>\`]`— it receives`{ item, value }`:
 
 ```vue
 <MapoList :columns="columns" :endpoint="…">
-  <template #cell.status="{ item, value }">
+  <template #[`cell.status`]="{ item, value }">
     <UBadge :color="value === 'published' ? 'success' : 'neutral'">
       {{ value }}
     </UBadge>
   </template>
 
-  <template #cell.published_at="{ value }">
+  <template #[`cell.published_at`]="{ value }">
     {{ formatDate(value as string) }}
   </template>
 
-  <template #cell.is_featured="{ value }">
+  <template #[`cell.is_featured`]="{ value }">
     <UIcon v-if="value" name="i-lucide-star" class="text-yellow-500" />
     <UIcon v-else name="i-lucide-star-off" class="text-muted" />
   </template>
 </MapoList>
 ```
+
+> **Dynamic slot syntax required.** `MapoList` and `MapoListTable` declare their cell slots with a template-literal type ``[`cell.${string}`]``. Volar resolves and type-checks these slots only when you use the bracket form `#[\`cell.key\`]`. The static shorthand `#cell.key`compiles fine but bypasses slot-prop type inference, so`item`and`value` will be untyped.
 
 | Binding | Type         | Description                                                                               |
 | ------- | ------------ | ----------------------------------------------------------------------------------------- |
@@ -444,15 +446,15 @@ A link icon appears on each row pointing at `/news/${row[lookup]}`. Combine with
 
 ## Slots
 
-| Slot              | Source                | Receives                                 |
-| ----------------- | --------------------- | ---------------------------------------- |
-| `#head`           | `<MapoListHead>`      | —                                        |
-| `#dtable.toolbar` | `<MapoListTable>`     | —                                        |
-| `#dtable.empty`   | `<MapoListTable>`     | —                                        |
-| `#dtable.loading` | `<MapoListTable>`     | —                                        |
-| `#cell.<key>`     | `<MapoListTable>`     | `{ item: T, value: T[keyof T] }`         |
-| `#filter.<value>` | `<MapoListFilters>`   | `{ filter, toggleChoice, removeFilter }` |
-| `#qedit.extra`    | `<MapoListQuickEdit>` | `{ model: T }`                           |
+| Slot                | Source                | Receives                                 |
+| ------------------- | --------------------- | ---------------------------------------- |
+| `#head`             | `<MapoListHead>`      | —                                        |
+| `#dtable.toolbar`   | `<MapoListTable>`     | —                                        |
+| `#dtable.empty`     | `<MapoListTable>`     | —                                        |
+| `#dtable.loading`   | `<MapoListTable>`     | —                                        |
+| ``#[`cell.<key>`]`` | `<MapoListTable>`     | `{ item: T, value: T[keyof T] }`         |
+| `#filter.<value>`   | `<MapoListFilters>`   | `{ filter, toggleChoice, removeFilter }` |
+| `#qedit.extra`      | `<MapoListQuickEdit>` | `{ model: T }`                           |
 
 All slots are forwarded transparently from `<MapoList>` to its sub-components.
 
@@ -475,7 +477,7 @@ const actions: ActionDescriptor<News>[] = [
 ];
 ```
 
-If you need an always-visible inline button on every row regardless of selection, use the `#dtable.toolbar` slot or a custom `#cell.{key}` cell with a `UButton` that reads the `item` binding directly.
+If you need an always-visible inline button on every row regardless of selection, use the `#dtable.toolbar` slot or a custom ``#[`cell.{key}`]`` cell with a `UButton` that reads the `item` binding directly.
 
 ---
 

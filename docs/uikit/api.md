@@ -98,15 +98,15 @@ Paginated, filterable, sortable data table with quick-edit, bulk actions, and ta
 
 ### Slots
 
-| Slot                    | Description                                                                 |
-| ----------------------- | --------------------------------------------------------------------------- |
-| `head`                  | Header area above the table.                                                |
-| `dtable.toolbar`        | Toolbar content inside the table header.                                    |
-| `dtable.empty`          | Custom empty-state content.                                                 |
-| `dtable.loading`        | Custom loading-state content.                                               |
-| `cell.{column.key}`     | Per-column cell override. Receives `{ item, value }`.                       |
-| `filter.{filter.value}` | Per-filter custom panel. Receives `{ filter, toggleChoice, removeFilter }`. |
-| `qedit.extra`           | Extra content inside the quick-edit modal. Receives `{ model }`.            |
+| Slot                       | Description                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `head`                     | Header area above the table.                                                                     |
+| `dtable.toolbar`           | Toolbar content inside the table header.                                                         |
+| `dtable.empty`             | Custom empty-state content.                                                                      |
+| `dtable.loading`           | Custom loading-state content.                                                                    |
+| `` `cell.${column.key}` `` | Per-column cell override. Receives `{ item, value }`. Use `#[\`cell.key\`]` syntax in templates. |
+| `filter.{filter.value}`    | Per-filter custom panel. Receives `{ filter, toggleChoice, removeFilter }`.                      |
+| `qedit.extra`              | Extra content inside the quick-edit modal. Receives `{ model }`.                                 |
 
 ### Exposed Methods
 
@@ -144,12 +144,12 @@ Inner table component used by `MapoList`. Useful if you need the table alone wit
 
 ### Slots
 
-| Slot                | Description                                           |
-| ------------------- | ----------------------------------------------------- |
-| `dtable.toolbar`    | Toolbar content.                                      |
-| `dtable.empty`      | Empty-state content.                                  |
-| `dtable.loading`    | Loading-state content.                                |
-| `cell.{column.key}` | Per-column cell override. Receives `{ item, value }`. |
+| Slot                       | Description                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `dtable.toolbar`           | Toolbar content.                                                                                 |
+| `dtable.empty`             | Empty-state content.                                                                             |
+| `dtable.loading`           | Loading-state content.                                                                           |
+| `` `cell.${column.key}` `` | Per-column cell override. Receives `{ item, value }`. Use `#[\`cell.key\`]` syntax in templates. |
 
 ### Exposed Methods
 
