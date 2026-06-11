@@ -1,7 +1,7 @@
 import { useNuxtApp, navigateTo, useCookie, useRuntimeConfig } from "nuxt/app";
 import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import { CoreCookieEnum } from "../types";
-import type { Credentials } from "../types";
+import type { Credentials, MapoCoreRuntimeConfig } from "../types";
 
 /**
  * Optional endpoint overrides for auth operations.
@@ -25,7 +25,7 @@ type AuthOverrides = {
  * @returns Auth helpers: `login`, `logout`, and `fetchUser`.
  */
 export function useMapoAuth(options?: AuthOverrides) {
-  const rc = useRuntimeConfig().public.mapoCore as Record<string, string>;
+  const rc = useRuntimeConfig().public.mapoCore as MapoCoreRuntimeConfig;
   const authLoginUrl = options?.authLoginUrl ?? rc.authLoginUrl;
   const userInfoApi = options?.userInfoApi ?? rc.userInfoApi;
   const logoutUrl = options?.logoutUrl ?? rc.logoutUrl;

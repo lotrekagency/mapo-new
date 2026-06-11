@@ -11,6 +11,7 @@ import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import { useSidebarStore } from "@mapomodule/store/runtime/stores/sidebar";
 import type { MapoUser } from "@mapomodule/store/runtime/types";
 import { CoreCookieEnum } from "../types";
+import type { MapoCoreRuntimeConfig } from "../types";
 
 /**
  * Performs server-side bootstrap of Mapo runtime stores.
@@ -27,7 +28,7 @@ export default defineNuxtPlugin({
   name: "mapo-core:init",
   async setup(nuxtApp) {
     const runtimeConfig = useRuntimeConfig().public.mapoCore as
-      | Record<string, string>
+      | MapoCoreRuntimeConfig
       | undefined;
     const userInfoApi = runtimeConfig?.userInfoApi ?? "/api/profiles/me/";
 

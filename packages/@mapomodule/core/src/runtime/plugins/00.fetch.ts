@@ -7,6 +7,7 @@ import {
 } from "nuxt/app";
 import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import type { MapoCoreRuntimeConfig } from "../types";
 
 /**
  * Registers the global Mapo fetch client and loading state.
@@ -24,7 +25,7 @@ export default defineNuxtPlugin({
   name: "mapo-core:fetch",
   enforce: "pre",
   setup() {
-    const rc = useRuntimeConfig().public.mapoCore as Record<string, string>;
+    const rc = useRuntimeConfig().public.mapoCore as MapoCoreRuntimeConfig;
     const logoutUrl = rc.logoutUrl;
     const loginUrl = rc.loginUrl;
 

@@ -53,11 +53,11 @@ export default defineNuxtModule<MapoOptions>({
       await installModule("@mapomodule/store");
     }
 
+    // `defaults` guarantees these are set at runtime, but MapoOptions keeps
+    // them optional — spread the defaults so the assignment is fully defined.
     nuxt.options.runtimeConfig.public.mapoCore = {
-      authLoginUrl: options.authLoginUrl,
-      userInfoApi: options.userInfoApi,
-      logoutUrl: options.logoutUrl,
-      loginUrl: options.loginUrl,
+      ...MAPO_DEFAULTS,
+      ...options,
     };
 
     addPlugin({ src: resolver.resolve("./runtime/plugins/00.fetch") });

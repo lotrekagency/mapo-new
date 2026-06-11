@@ -33,24 +33,29 @@ export default defineNuxtModule<MapoModuleOptions>({
       await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
+    // Forward only core options: `uikit` and `form` have their own modules,
+    // and leaking them into `runtimeConfig.public.mapoCore` would change its
+    // generated type per-app.
+    const { uikit, form, ...coreOptions } = options;
+
     if (!hasNuxtModule("@mapomodule/core")) {
       await installModule(
         await resolver.resolvePath("@mapomodule/core"),
-        options as MapoOptions,
+        coreOptions satisfies MapoOptions,
       );
     }
 
     if (!hasNuxtModule("@mapomodule/uikit")) {
       await installModule(
         await resolver.resolvePath("@mapomodule/uikit"),
-        options.uikit ?? {},
+        uikit ?? {},
       );
     }
 
     if (!hasNuxtModule("@mapomodule/form")) {
       await installModule(
         await resolver.resolvePath("@mapomodule/form"),
-        options.form ?? {},
+        form ?? {},
       );
     }
 
