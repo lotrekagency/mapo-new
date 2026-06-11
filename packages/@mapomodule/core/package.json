@@ -5,11 +5,12 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/module.d.mts",
       "import": "./dist/module.mjs"
     },
     "./types": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./runtime/*": {
       "types": "./src/runtime/*.ts",
@@ -18,11 +19,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
-    "build": "nuxt-module-build build",
+    "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
     "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",

@@ -5,18 +5,25 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/module.d.mts",
       "import": "./dist/module.mjs"
     },
     "./types": {
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.mts"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./runtime/*": {
+      "types": "./src/runtime/*.ts",
+      "import": "./dist/runtime/*.js",
+      "default": "./src/runtime/*"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
-    "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
+    "build": "nuxt-module-build build && vue-tsc -p tsconfig.build-types.json && node ../../../scripts/clean-empty-vue-dts.mjs dist",
     "dev": "nuxt-module-build build --stub --watch",
     "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
@@ -26,6 +33,7 @@
   },
   "dependencies": {
     "@internationalized/date": "^3.7.0",
+    "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
     "@tiptap/extension-link": "^2.11.5",
     "@tiptap/extension-underline": "^2.11.5",
@@ -49,7 +57,7 @@
     "vitest": "^3.2.0",
     "vue": "^3.5.32",
     "vue-router": "^5.0.4",
-    "vue-tsc": "^2.2.10",
+    "vue-tsc": "^3.3.4",
     "zod": "^3.23.8"
   }
 }

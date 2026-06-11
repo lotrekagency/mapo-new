@@ -78,6 +78,12 @@ pnpm dev:example-theme
 | `pnpm build`      | Build all packages via Turborepo (respects dependency order) |
 | `pnpm docs:build` | Build the VitePress documentation site                       |
 
+Type declarations during build:
+
+- Packages run a dedicated declarations pass via `tsconfig.build-types.json`.
+- TS-only packages use `tsc`; Vue SFC packages (`@mapomodule/form`, `@mapomodule/uikit`) use `vue-tsc`.
+- SFC packages run `scripts/clean-empty-vue-dts.mjs` to remove empty `.vue.d.ts` stubs in `dist/`.
+
 ### Quality
 
 | Script           | Description                                      |

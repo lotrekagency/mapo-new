@@ -5,8 +5,12 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./jsonSchema": {
+      "types": "./dist/types/jsonSchema/index.d.ts",
+      "import": "./dist/jsonSchema/index.js"
     }
   },
   "main": "./dist/index.js",

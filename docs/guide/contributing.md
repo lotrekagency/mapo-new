@@ -38,7 +38,7 @@ cd apps/example-e2e   # or whichever app you're using
 pnpm nuxt prepare
 ```
 
-> **Note:** if you accidentally run `pnpm build` on a package during development, re-run `dev:prepare` on it and then `nuxt prepare` on the app — the production build produces empty `.d.ts` stubs that break IDE type resolution.
+> **Note:** if you accidentally run `pnpm build` on a package during development, re-run `dev:prepare` on it and then `nuxt prepare` on the app. The production build now includes a dedicated declaration pass (`tsc`/`vue-tsc` via `tsconfig.build-types.json`) and, for SFC packages, a cleanup step that removes zero-byte `.vue.d.ts` stubs.
 
 ---
 
@@ -108,6 +108,13 @@ pnpm build
 # Single package
 pnpm --filter @mapomodule/utils build
 ```
+
+Build pipeline details:
+
+- `nuxt-module-build build` emits runtime artifacts in `dist/`.
+- `tsconfig.build-types.json` runs a declaration-only pass with stable mapping (`src` -> `dist`).
+- TS-only packages use `tsc`; SFC packages (`form`, `uikit`) use `vue-tsc`.
+- SFC packages run `node ../../../scripts/clean-empty-vue-dts.mjs dist` to remove empty `.vue.d.ts` / `.d.vue.ts` files that would degrade consumer typing.
 
 ---
 
