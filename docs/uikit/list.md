@@ -87,7 +87,7 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `positionField`    | `string`                                                 | `'position'`     | Field used for ordering                                                                                                                                                                                                                      |
 | `editFields`       | `FieldDescriptor<T>[]`                                   | `[]`             | Inline quick-edit modal field list                                                                                                                                                                                                           |
 | `languages`        | `string[]`                                               | —                | Languages for translatable quick-edit fields                                                                                                                                                                                                 |
-| `registry`         | `Partial<FieldRegistry>`                                 | —                | Optional registry override (auto-injected otherwise)                                                                                                                                                                                         |
+| `registry`         | `FieldRegistry`                                          | —                | Optional registry override (auto-injected otherwise)                                                                                                                                                                                         |
 | `detailBase`       | `string`                                                 | —                | If set, each row shows a link button → `${detailBase}/${row[lookup]}`                                                                                                                                                                        |
 | `defaultPageSize`  | `number`                                                 | `20`             | Initial page size on mount                                                                                                                                                                                                                   |
 | `pageSizeOptions`  | `number[]`                                               | `[10,20,50,100]` | Options in the per-page selector                                                                                                                                                                                                             |
@@ -148,7 +148,7 @@ Without the generic (`ListColumn[]`) the key is typed as `string` and any value 
 
 ## How to: customize a cell
 
-Use the per-cell slot `#[\`cell.<key>\`]`— it receives`{ item, value }`:
+Use the per-cell slot ``#[`cell.<key>`]`` — it receives `{ item, value }`:
 
 ```vue
 <MapoList :columns="columns" :endpoint="…">

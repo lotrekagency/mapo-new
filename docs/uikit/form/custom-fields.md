@@ -5,7 +5,7 @@ A custom field component must implement a single interface:
 ```ts
 defineProps<{
   modelValue: unknown;
-  descriptor: FieldDescriptor;
+  descriptor: CustomDescriptor; // or the specific built-in descriptor you override
   errors?: string[];
   readonly?: boolean;
   disabled?: boolean;
@@ -15,12 +15,19 @@ defineEmits<{ "update:modelValue": [value: unknown] }>();
 
 Nothing else. Idiomatic Vue.
 
+::: tip Which descriptor type?
+
+- A field with a **new custom `type`** receives a `CustomDescriptor` (open `attrs`).
+- A component that **overrides a built-in type** (e.g. a Vuetify text input replacing `text`) should declare the specific descriptor (`TextDescriptor`, `SelectDescriptor`, …) to get typed `attrs`.
+- Pages that mix custom types into their `fields` array annotate it with `AnyFieldDescriptor<T>` instead of the strict `FieldDescriptor<T>`.
+  :::
+
 ## Example: VideoCutField
 
 ```vue
 <!-- components/admin/VideoCutField.vue -->
 <script setup lang="ts">
-import type { FieldDescriptor } from "mapomodule/types";
+import type { CustomDescriptor } from "mapomodule/types";
 
 interface VideoCut {
   url: string;
@@ -30,7 +37,7 @@ interface VideoCut {
 
 defineProps<{
   modelValue: VideoCut | null;
-  descriptor: FieldDescriptor;
+  descriptor: CustomDescriptor;
   errors?: string[];
   readonly?: boolean;
 }>();

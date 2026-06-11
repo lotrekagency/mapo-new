@@ -63,6 +63,10 @@ Use a package-specific path when:
 - You want explicit coupling to a module for semver reasons
 - You are building a plugin/package that depends on a single module
 
+::: warning Declare the package
+With pnpm's strict dependency layout, a package-specific import (e.g. `@mapomodule/form/types`) resolves **only if that package is declared in your app's `dependencies`** — installing `mapomodule` alone is not enough for direct imports. The `mapomodule/types` aggregator never has this problem. See [Known limitations](./known-limitations#direct-type-imports-require-declaring-the-package-pnpm-strict-mode).
+:::
+
 ```ts
 import type { FieldDescriptor } from "@mapomodule/form/types";
 import type { ListColumn } from "@mapomodule/uikit/types";
@@ -111,7 +115,8 @@ import type { CamomillaPathRewrite } from "mapo-integrations-camomilla/types";
 | `buildRouteTree`                                | utility     | `import { buildRouteTree } from '@mapomodule/utils'`           | —                            |
 | `resolveSchema`                                 | json-schema | `import { resolveSchema } from '@mapomodule/utils/jsonSchema'` | —                            |
 | `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`   | —                            |
-| `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`      | generic preserved            |
+| `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`      | strict built-in union        |
+| `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`   | includes custom field types  |
 | `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`        | —                            |
 | `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`           | generic preserved            |
 | `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`       | —                            |

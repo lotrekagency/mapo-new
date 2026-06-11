@@ -4,27 +4,43 @@ Every field has a `type` that decides which component is rendered. Simple types 
 
 ## Simple types (Nuxt UI direct mapping)
 
-| `type`     | NUI component          | Notes                       |
-| ---------- | ---------------------- | --------------------------- |
-| `text`     | `UInput`               |                             |
-| `textarea` | `UTextarea`            |                             |
-| `number`   | `UInput type="number"` |                             |
-| `boolean`  | `UCheckbox`            |                             |
-| `switch`   | `USwitch`              |                             |
-| `slider`   | `USlider`              | attrs: `min`, `max`, `step` |
-| `color`    | `UInput type="color"`  |                             |
-| `file`     | `UInput type="file"`   | attrs: `accept`             |
-| `select`   | `USelectMenu`          | requires `attrs.options`    |
+| `type`     | NUI component          | Notes                                          |
+| ---------- | ---------------------- | ---------------------------------------------- |
+| `text`     | `UInput`               | attrs: `placeholder`, `maxLength`, `minLength` |
+| `textarea` | `UTextarea`            | attrs: same as `text`, plus `rows`             |
+| `email`    | `UInput type="email"`  | attrs: same as `text`                          |
+| `url`      | `UInput type="url"`    | attrs: same as `text`                          |
+| `number`   | `UInput type="number"` | attrs: `min`, `max`, `step`, `placeholder`     |
+| `boolean`  | `UCheckbox`            |                                                |
+| `switch`   | `USwitch`              |                                                |
+| `slider`   | `USlider`              | attrs: `min`, `max`, `step`                    |
+| `color`    | `UInput type="color"`  |                                                |
+| `file`     | `UInput type="file"`   | attrs: `accept`, `maxSize`                     |
+| `select`   | `USelectMenu`          | requires `attrs` with `items` or `options`     |
 
 ```ts
-// select: options is mandatory (TS error without it)
+// select: provide the choices via `items` (Nuxt UI shape)…
 { key: 'status', type: 'select', attrs: {
-  options: [
-    { text: 'Draft',     value: 'draft' },
-    { text: 'Published', value: 'published' },
+  items: [
+    { label: 'Draft',     value: 'draft' },
+    { label: 'Published', value: 'published' },
   ],
 }}
+
+// …or the legacy v1 `options` shape ({ text, value }); plain string arrays work too.
 ```
+
+::: tip attrs vs passthrough
+`attrs` is the field's **typed configuration** — unknown keys are compile errors (typos included). Anything else the underlying Nuxt UI component accepts (`icon`, `variant`, `color`, `size`…) goes through the open `passthrough` map:
+
+```ts
+{ key: 'title', type: 'text',
+  attrs: { maxLength: 80 },
+  passthrough: { icon: 'i-lucide-type', size: 'lg' } }
+```
+
+Both are merged into the component `v-bind` (after registry defaults; `passthrough` wins on conflicts).
+:::
 
 ## Date and time
 
@@ -126,7 +142,7 @@ With **multiple templates** (heterogeneous items):
 {
   key: 'blocks',
   type: 'repeater',
-  fields: [],                  // ignored when templates is set
+  // `fields` can be omitted when `attrs.templates` is set
   attrs: {
     templates: {
       hero:  [{ key: 'title', type: 'text' }, { key: 'image_url', type: 'text' }],
@@ -146,13 +162,18 @@ The repeater uses stable per-item UIDs (a `WeakMap<item, string>`), so reorderin
 ```ts
 // app/plugins/my-fields.ts
 export default defineNuxtPlugin(() => {
-  defineFormField('video-cut', () => import('~/components/admin/VideoCutField.vue'))
-})
+  defineFormField(
+    "video-cut",
+    () => import("~/components/admin/VideoCutField.vue"),
+  );
+});
 
-// descriptor
-{ key: 'video_cut', type: 'video-cut' }
+// descriptor — custom types live in the wider AnyFieldDescriptor union
+const fields: AnyFieldDescriptor<Video>[] = [
+  { key: "video_cut", type: "video-cut" },
+];
 ```
 
-If the type is not registered, `MapoUnknownField` (yellow placeholder) is rendered instead of breaking the form.
+Arrays that mix in custom types must be annotated with `AnyFieldDescriptor<T>` (the strict `FieldDescriptor<T>` union covers built-in types only). If the type is not registered, `MapoUnknownField` (yellow placeholder) is rendered instead of breaking the form.
 
 → [Full guide to custom fields](./custom-fields)
