@@ -29,10 +29,7 @@
  */
 import { navigateTo } from "#app";
 import { flattenFieldGroups } from "@mapomodule/form/types";
-import type {
-  FieldDescriptor,
-  FieldGroupDescriptor,
-} from "@mapomodule/form/types";
+import type { FieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
   layout: "mapo-default",
@@ -2336,7 +2333,10 @@ const advancedFields: FieldDescriptor<Article>[] = [
           event_type?: string;
           date?: string;
         };
-        const colorMap: Record<string, string> = {
+        const colorMap: Record<
+          string,
+          "success" | "info" | "warning" | "error" | "neutral"
+        > = {
           launch: "success",
           update: "info",
           fix: "warning",
@@ -2512,7 +2512,7 @@ const sidebarFields = flattenFieldGroups<Article>([
     </div>
 
     <MapoDetail
-      :id="route.params.id"
+      :id="String(route.params.id)"
       endpoint="/api/articles"
       model-name="Article"
       :fields="fields"

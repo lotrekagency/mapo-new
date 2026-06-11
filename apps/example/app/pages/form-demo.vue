@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import type { FieldDescriptor } from "@mapomodule/form";
+import type { FieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
   label: "Form Demo",

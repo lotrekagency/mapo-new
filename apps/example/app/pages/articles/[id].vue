@@ -16,6 +16,7 @@
 
 import { flattenFieldGroups } from "@mapomodule/form/types";
 import type {
+  AnyFieldDescriptor,
   FieldDescriptor,
   FieldGroupDescriptor,
 } from "@mapomodule/form/types";
@@ -143,46 +144,47 @@ const mainFields: FieldDescriptor<Article>[] = [
 // flattenFieldGroups trasforma un albero FieldGroupDescriptor in FieldDescriptor[].
 // Il group "visibility" viene propagato a status e is_featured senza ripeterlo
 // su ogni campo. I campi flat (priority, published_at) passano invariati.
-const sidebarFields: FieldDescriptor<Article>[] = flattenFieldGroups<Article>([
-  {
-    group: "visibility",
-    fields: [
-      {
-        key: "status",
-        type: "select",
-        label: "Stato",
-        synci18n: true,
-        attrs: {
-          items: [
-            { label: "Bozza", value: "draft" },
-            { label: "Pubblicato", value: "published" },
-            { label: "Archiviato", value: "archived" },
-          ],
+const sidebarFields: AnyFieldDescriptor<Article>[] =
+  flattenFieldGroups<Article>([
+    {
+      group: "visibility",
+      fields: [
+        {
+          key: "status",
+          type: "select",
+          label: "Stato",
+          synci18n: true,
+          attrs: {
+            items: [
+              { label: "Bozza", value: "draft" },
+              { label: "Pubblicato", value: "published" },
+              { label: "Archiviato", value: "archived" },
+            ],
+          },
         },
-      },
-      {
-        key: "is_featured",
-        type: "switch",
-        label: "In evidenza",
-        synci18n: true,
-      },
-    ],
-  } satisfies FieldGroupDescriptor<Article>,
-  // Campi flat — passano inalterati (nessun group ereditato)
-  {
-    key: "priority",
-    type: "number",
-    label: "Priorità",
-    synci18n: true,
-    attrs: { min: 1, max: 10 },
-  },
-  {
-    key: "published_at",
-    type: "datetime",
-    label: "Data pubblicazione",
-    synci18n: true,
-  },
-]);
+        {
+          key: "is_featured",
+          type: "switch",
+          label: "In evidenza",
+          synci18n: true,
+        },
+      ],
+    } satisfies FieldGroupDescriptor<Article>,
+    // Campi flat — passano inalterati (nessun group ereditato)
+    {
+      key: "priority",
+      type: "number",
+      label: "Priorità",
+      synci18n: true,
+      attrs: { min: 1, max: 10 },
+    },
+    {
+      key: "published_at",
+      type: "datetime",
+      label: "Data pubblicazione",
+      synci18n: true,
+    },
+  ]);
 </script>
 
 <template>

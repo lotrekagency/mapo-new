@@ -3,7 +3,7 @@
 // custom accessor (get/set transformation), lazy loading, unknown type fallback,
 // override: true for re-registration, MapoUnknownField for missing types.
 // E2E plan: e2e/form/custom-fields.md
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { AnyFieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
   layout: "mapo-default",
@@ -25,7 +25,7 @@ const errors = ref<Record<string, string[]>>({});
 
 // Tests 1.2: field with registered type renders custom component
 // Tests 1.3: field with unregistered type renders MapoUnknownField with warning
-const fields: FieldDescriptor<Model>[] = [
+const fields: AnyFieldDescriptor<Model>[] = [
   {
     key: "color",
     type: "color", // registered in apps/example plugin
@@ -46,7 +46,7 @@ const fields: FieldDescriptor<Model>[] = [
 ];
 
 // Tests 2.1: same type without explicit attrs → should use registered defaults
-const fieldsDefaultAttrs: FieldDescriptor<Model>[] = [
+const fieldsDefaultAttrs: AnyFieldDescriptor<Model>[] = [
   {
     key: "color",
     type: "color",
@@ -79,7 +79,7 @@ const fieldsDefaultAttrs: FieldDescriptor<Model>[] = [
       </p>
       <div class="flex flex-wrap gap-1.5">
         <UBadge
-          v-for="type in Object.keys($mapoFormRegistry?.types ?? {})"
+          v-for="type in Object.keys($mapoFormRegistry?.mapping ?? {})"
           :key="type"
           variant="outline"
           color="neutral"

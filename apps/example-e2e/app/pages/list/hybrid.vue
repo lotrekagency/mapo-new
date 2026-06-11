@@ -21,7 +21,7 @@ import type {
   ListColumn,
   FilterDescriptor,
   ListTabItem,
-} from "@mapomodule/uikit";
+} from "@mapomodule/uikit/types";
 import { formatDate } from "@mapomodule/utils";
 
 definePageMeta({

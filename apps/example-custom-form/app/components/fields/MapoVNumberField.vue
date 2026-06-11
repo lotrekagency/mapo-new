@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/runtime/types/index.js";
+import type { NumberDescriptor } from "@mapomodule/form/types";
 defineOptions({ inheritAttrs: false });
 defineProps<{
   modelValue?: unknown;
   errors?: string[];
-  descriptor?: FieldDescriptor;
+  descriptor?: NumberDescriptor;
   disabled?: boolean;
   readonly?: boolean;
 }>();

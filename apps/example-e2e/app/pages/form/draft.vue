@@ -55,10 +55,7 @@ const { clearDraft, getDraft } = useFormDraft({
     draftInfo.value = getDraft();
   },
   onSave: (savedAt) => {
-    snack.addMessage({
-      text: `Draft saved at ${savedAt.toLocaleTimeString()}`,
-      color: "info",
-    });
+    snack.show(`Draft saved at ${savedAt.toLocaleTimeString()}`, "info");
   },
 });
 

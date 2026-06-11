@@ -17,7 +17,7 @@ import type {
   FilterDescriptor,
   ListTabItem,
   ActionDescriptor,
-} from "@mapomodule/uikit";
+} from "@mapomodule/uikit/types";
 import type { FieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
@@ -240,7 +240,6 @@ const quickEditFields: FieldDescriptor<Task>[] = [
 const actions: ActionDescriptor<Task>[] = [
   {
     label: "Mark done",
-    icon: "i-lucide-check",
     handleMultiple: true,
     handleAll: false,
     async handler({ selection }) {

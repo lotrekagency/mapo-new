@@ -777,8 +777,9 @@ for (let i = 0; i < 35; i++) {
   const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
   const randomFeatured = Math.random() > 0.8;
   const randomReadingTime = Math.floor(Math.random() * 20) + 3;
+  // Non-empty literal arrays: indexed picks are always defined.
   const randomCategory =
-    categories[Math.floor(Math.random() * categories.length)];
+    categories[Math.floor(Math.random() * categories.length)]!;
   const randomPublishedAt =
     randomStatus === "published"
       ? new Date(
@@ -806,8 +807,8 @@ for (let i = 0; i < 35; i++) {
     },
     category: randomCategory.id,
     tags: [
-      tags[Math.floor(Math.random() * tags.length)].id,
-      tags[Math.floor(Math.random() * tags.length)].id,
+      tags[Math.floor(Math.random() * tags.length)]!.id,
+      tags[Math.floor(Math.random() * tags.length)]!.id,
     ],
     status: randomStatus,
     featured: randomFeatured,

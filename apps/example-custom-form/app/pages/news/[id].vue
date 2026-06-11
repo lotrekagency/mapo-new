@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FieldDescriptor } from "@mapomodule/form/runtime/types/index.js";
+import type { FieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({ middleware: ["auth"] });
 

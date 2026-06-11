@@ -4,7 +4,7 @@ import type {
   FilterDescriptor,
   ActionDescriptor,
   ListTabItem,
-} from "@mapomodule/uikit";
+} from "@mapomodule/uikit/types";
 import type { FieldDescriptor } from "@mapomodule/form/types";
 import { formatDate } from "@mapomodule/utils";
 
@@ -106,7 +106,7 @@ const quickEditFields: FieldDescriptor<Article>[] = [
     key: "status",
     type: "select",
     attrs: {
-      options: [
+      items: [
         { label: "Draft", value: "draft" },
         { label: "Review", value: "review" },
         { label: "Ready", value: "ready" },
@@ -117,7 +117,7 @@ const quickEditFields: FieldDescriptor<Article>[] = [
   },
   {
     key: "featured",
-    type: "checkbox",
+    type: "boolean",
   },
   {
     key: "reading_time",
@@ -130,7 +130,6 @@ const quickEditFields: FieldDescriptor<Article>[] = [
 const actions: ActionDescriptor<Article>[] = [
   {
     label: "Publish",
-    icon: "i-lucide-globe",
     handleMultiple: true,
     handleAll: true,
     async handler({ selection, selectionQuery }) {
@@ -147,15 +146,11 @@ const actions: ActionDescriptor<Article>[] = [
           }),
         ),
       );
-      useSnackStore().push({
-        type: "success",
-        message: `Published ${ids.length} article(s)`,
-      });
+      useSnackStore().show(`Published ${ids.length} article(s)`, "success");
     },
   },
   {
     label: "Archive",
-    icon: "i-lucide-archive",
     handleMultiple: true,
     handleAll: true,
     async handler({ selection, selectionQuery }) {
@@ -168,15 +163,11 @@ const actions: ActionDescriptor<Article>[] = [
           }),
         ),
       );
-      useSnackStore().push({
-        type: "info",
-        message: `Archived ${ids.length} article(s)`,
-      });
+      useSnackStore().show(`Archived ${ids.length} article(s)`, "info");
     },
   },
   {
     label: "Toggle Featured",
-    icon: "i-lucide-star",
     handleMultiple: true,
     handleAll: false,
     async handler({ selection }) {
@@ -190,37 +181,32 @@ const actions: ActionDescriptor<Article>[] = [
           }),
         ),
       );
-      useSnackStore().push({
-        type: "success",
-        message: `Toggled featured flag on ${ids.length} article(s)`,
-      });
+      useSnackStore().show(
+        `Toggled featured flag on ${ids.length} article(s)`,
+        "success",
+      );
     },
   },
   {
     label: "Delete",
-    icon: "i-lucide-trash-2",
-    color: "red",
+    dangerous: true,
     handleMultiple: true,
     handleAll: false,
     async handler({ selection }) {
       if (!selection) return;
       const ids = selection.map((a) => a.id);
-      const confirmed = await useConfirmStore().show({
+      const confirmed = await useConfirmStore().ask({
         title: "Delete articles?",
         message: `Are you sure you want to delete ${ids.length} article(s)? This cannot be undone.`,
-        actions: [
-          { label: "Cancel", color: "gray" },
-          { label: "Delete", color: "red" },
-        ],
+        confirmText: "Delete",
+        cancelText: "Cancel",
+        dangerous: true,
       });
       if (!confirmed) return;
       await Promise.all(
         ids.map((id) => $fetch(`/api/articles/${id}`, { method: "DELETE" })),
       );
-      useSnackStore().push({
-        type: "success",
-        message: `Deleted ${ids.length} article(s)`,
-      });
+      useSnackStore().show(`Deleted ${ids.length} article(s)`, "success");
     },
   },
 ];

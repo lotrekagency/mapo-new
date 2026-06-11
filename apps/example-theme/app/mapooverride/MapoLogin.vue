@@ -18,7 +18,10 @@ async function submit() {
   loading.value = true;
   error.value = null;
   try {
-    await login(form.value.username, form.value.password);
+    await login({
+      username: form.value.username,
+      password: form.value.password,
+    });
   } catch {
     error.value = "Invalid credentials";
   } finally {

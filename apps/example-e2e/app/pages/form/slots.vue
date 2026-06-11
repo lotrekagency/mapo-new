@@ -31,6 +31,10 @@ interface Model {
 }
 
 const model = ref<Model>({ name: "", email: "", website: "" });
+
+function copyWebsite() {
+  navigator.clipboard?.writeText(model.value.website);
+}
 const errors = ref<Record<string, string[]>>({});
 
 const fields: FieldDescriptor<Model>[] = [
@@ -107,7 +111,7 @@ const fields: FieldDescriptor<Model>[] = [
 
       <MapoForm
         v-model="model"
-        :fields="[fields[2]]"
+        :fields="fields.slice(2, 3)"
         :errors="errors"
         :registry="$mapoFormRegistry"
       >
@@ -142,7 +146,7 @@ const fields: FieldDescriptor<Model>[] = [
             size="xs"
             variant="ghost"
             icon="i-lucide-copy"
-            @click="navigator.clipboard?.writeText(model.website)"
+            @click="copyWebsite"
           />
         </template>
 

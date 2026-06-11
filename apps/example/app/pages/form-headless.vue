@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import type { FieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
   label: "Form Headless",
@@ -7,13 +8,25 @@ definePageMeta({
   layout: "mapo-default",
 });
 
-// useMapoForm senza <MapoForm> — layout completamente custom
+// useMapoForm without <MapoForm> — fully custom layout
 
-const model = ref({ username: "", email: "", role: "editor", notify: true });
+interface Model {
+  username: string;
+  email: string;
+  role: string;
+  notify: boolean;
+}
+
+const model = ref<Model>({
+  username: "",
+  email: "",
+  role: "editor",
+  notify: true,
+});
 const errors = ref<Record<string, string[]>>({});
 const { $mapoFormRegistry } = useNuxtApp();
 
-const fields = ref([
+const fields = ref<FieldDescriptor<Model>[]>([
   {
     key: "username",
     type: "text" as const,
@@ -70,20 +83,20 @@ async function save() {
       field, la validazione e il dirty state vengono tutti dal composable.
     </p>
 
-    <!-- Layout a due colonne custom -->
+    <!-- Custom two-column layout -->
     <div class="grid grid-cols-2 gap-4 rounded-lg border border-gray-200 p-6">
-      <!-- Ogni MapoFormField si auto-inietta il context fornito da useMapoForm() -->
+      <!-- Each MapoFormField injects the context provided by useMapoForm() -->
       <div class="col-span-2">
-        <MapoFormField :descriptor="fields[0]" />
+        <MapoFormField :descriptor="fields[0]!" />
       </div>
       <div class="col-span-2">
-        <MapoFormField :descriptor="fields[1]" />
+        <MapoFormField :descriptor="fields[1]!" />
       </div>
       <div>
-        <MapoFormField :descriptor="fields[2]" />
+        <MapoFormField :descriptor="fields[2]!" />
       </div>
       <div class="flex items-end pb-1">
-        <MapoFormField :descriptor="fields[3]" />
+        <MapoFormField :descriptor="fields[3]!" />
       </div>
     </div>
 

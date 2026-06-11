@@ -215,7 +215,7 @@ function handleReset() {
             type: 'text',
             label: 'Name (required)',
             required: true,
-            validate: (v: string) => (!v ? 'Required.' : null),
+            validate: (v) => (!v ? 'Required.' : null),
           },
         ]"
         :errors="{}"

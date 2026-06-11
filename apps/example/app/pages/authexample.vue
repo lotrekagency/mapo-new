@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-// @ts-expect-error
 import { useAuthStore, useRoute } from "#imports";
 
 definePageMeta({

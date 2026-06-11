@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, defineComponent, h } from "vue";
+import type { AnyFieldDescriptor } from "@mapomodule/form/types";
 
 definePageMeta({
   label: "Form — Customizzazione",
@@ -71,14 +72,20 @@ const customRegistry = {
 
 // ─── 3. Form con registry custom ────────────────────────────────────────────
 
-const model = ref({ title: "", priority: 3, category: "" });
-const errors = ref({});
+interface Model {
+  title: string;
+  priority: number;
+  category: string;
+}
 
-const fields = ref([
-  { key: "title", type: "text" as const, label: "Titolo articolo" },
+const model = ref<Model>({ title: "", priority: 3, category: "" });
+const errors = ref<Record<string, string[]>>({});
+
+const fields = ref<AnyFieldDescriptor<Model>[]>([
+  { key: "title", type: "text", label: "Titolo articolo" },
   {
     key: "priority",
-    type: "star-rating" as any,
+    type: "star-rating",
     label: "Priorità (custom field)",
   },
   {

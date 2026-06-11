@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// @ts-expect-error
 import { useSnackStore, useConfirmStore } from "#imports";
 
 definePageMeta({

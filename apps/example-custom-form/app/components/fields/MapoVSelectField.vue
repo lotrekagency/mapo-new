@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { FieldDescriptor } from "@mapomodule/form/runtime/types/index.js";
+import type { SelectDescriptor } from "@mapomodule/form/types";
 defineOptions({ inheritAttrs: false });
 const props = defineProps<{
   modelValue?: unknown;
   errors?: string[];
-  descriptor?: FieldDescriptor;
+  descriptor?: SelectDescriptor;
   disabled?: boolean;
   readonly?: boolean;
 }>();

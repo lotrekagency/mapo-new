@@ -90,7 +90,7 @@ const fields: FieldDescriptor<Model>[] = [
   },
   {
     key: "agree",
-    type: "checkbox",
+    type: "boolean",
     label: "I agree to the terms (checkbox)",
     cols: 4,
   },

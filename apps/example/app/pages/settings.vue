@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
 import { useMapoAuth } from "#imports";
 
 definePageMeta({

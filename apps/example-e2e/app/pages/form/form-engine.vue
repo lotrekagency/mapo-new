@@ -23,7 +23,9 @@ interface Model {
 const model = ref<Model>({ name: "", email: "", enabled: false });
 const errors = ref<Record<string, string[]>>({});
 const readonly = ref(false);
-const formRef = ref<InstanceType<typeof MapoForm> | null>(null);
+// Template ref kept for e2e inspection; MapoForm is auto-registered so its
+// component type is not importable as a value here.
+const formRef = ref<unknown>(null);
 
 // Tests 1.1: fields rendered in declared order
 // Tests 1.2: cols layout

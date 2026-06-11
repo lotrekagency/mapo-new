@@ -39,6 +39,8 @@ interface Article {
   published_at: string | null;
   priority: number;
   translations: Record<string, { title?: string; body?: string }>;
+  /** Sentinel key for the custom row-actions column (no model field). */
+  actions?: never;
 }
 
 // ─── Columns ──────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ const columns: ListColumn<Article>[] = [
   },
   // Sentinel column for row actions (I1: row actions pattern).
   // No API prop — use #cell.actions slot with custom buttons.
-  { key: "actions" as keyof Article, label: "", class: "w-20" },
+  { key: "actions", label: "", class: "w-20" },
 ];
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
