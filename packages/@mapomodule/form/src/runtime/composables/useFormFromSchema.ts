@@ -1,6 +1,6 @@
 import { resolveSchema, extractDefs, matchesSchema } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
-import type { FieldDescriptor, FieldType } from "../types/index.js";
+import type { AnyFieldDescriptor, FieldType } from "../types/index.js";
 
 // ─── Map JSON Schema types to FieldType ──────────────────────────────────────
 
@@ -146,7 +146,7 @@ function makeVisible(
   };
 }
 
-// ─── Single property → FieldDescriptor ──────────────────────────────────────
+// ─── Single property → AnyFieldDescriptor ──────────────────────────────────────
 
 function propertyToDescriptor(
   key: string,
@@ -154,13 +154,13 @@ function propertyToDescriptor(
   defs: Record<string, JSONSchema>,
   requiredKeys: Set<string>,
   rules: ConditionalRule[],
-): FieldDescriptor {
+): AnyFieldDescriptor {
   const schema = resolveSchema(rawSchema, defs);
   const type = mapType(schema, key);
   const attrs = buildAttrs(schema, type);
 
   // Conditional visibility: if the key only appears in either then or else.
-  let visible: FieldDescriptor["visible"] | undefined;
+  let visible: AnyFieldDescriptor["visible"] | undefined;
 
   for (const rule of rules) {
     if (rule.thenKeys.has(key) && !rule.elseKeys.has(key)) {
@@ -193,7 +193,7 @@ function propertyToDescriptor(
     );
   }
 
-  return base as unknown as FieldDescriptor;
+  return base as unknown as AnyFieldDescriptor;
 }
 
 // ─── Public composable ───────────────────────────────────────────────────────
@@ -203,11 +203,11 @@ export interface UseFormFromSchemaOptions {
   /** Keys to exclude from generation, for example `id` or `created_at`. */
   exclude?: string[];
   /** Per-field overrides that shallow-merge onto the generated descriptor. */
-  overrides?: Record<string, Partial<FieldDescriptor>>;
+  overrides?: Record<string, Partial<AnyFieldDescriptor>>;
 }
 
 /**
- * Builds a `FieldDescriptor[]` array from a JSON Schema.
+ * Builds a `AnyFieldDescriptor[]` array from a JSON Schema.
  * Supports Pydantic v2 (`$defs`, nullable `anyOf`), DRF Spectacular, and `if/then/else` conditionals.
  *
  * @example
@@ -219,7 +219,7 @@ export interface UseFormFromSchemaOptions {
 export function useFormFromSchema(
   schema: JSONSchema,
   options: UseFormFromSchemaOptions = {},
-): FieldDescriptor[] {
+): AnyFieldDescriptor[] {
   const { exclude = [], overrides = {} } = options;
   const defs = extractDefs(schema);
 
@@ -227,7 +227,7 @@ export function useFormFromSchema(
   const requiredKeys = new Set<string>(schema.required ?? []);
   const rules = collectRules(schema);
 
-  const descriptors: FieldDescriptor[] = [];
+  const descriptors: AnyFieldDescriptor[] = [];
 
   for (const [key, rawProp] of Object.entries(properties)) {
     if (exclude.includes(key)) continue;
@@ -243,7 +243,7 @@ export function useFormFromSchema(
     // Apply consumer overrides with a shallow merge.
     const override = overrides[key];
     const final = override
-      ? ({ ...descriptor, ...override } as FieldDescriptor)
+      ? ({ ...descriptor, ...override } as AnyFieldDescriptor)
       : descriptor;
 
     descriptors.push(final);

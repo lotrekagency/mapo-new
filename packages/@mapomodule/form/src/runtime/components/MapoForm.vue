@@ -1,8 +1,12 @@
 <script setup lang="ts" generic="T extends object">
 import { computed, useSlots, watchEffect, inject, onUnmounted } from "vue";
 import type { Ref } from "vue";
-import { useNuxtApp } from "#app";
-import type { FieldDescriptor, FieldRegistry } from "../types/index.js";
+import { useNuxtApp, useRuntimeConfig } from "#app";
+import type {
+  AnyFieldDescriptor,
+  FieldRegistry,
+  MapoFormRuntimeConfig,
+} from "../types/index.js";
 import type { GroupEntry, TabEntry } from "../types/layout.js";
 import { useMapoForm, injectMapoForm } from "../composables/useMapoForm.js";
 import { provideCurrentLang } from "../composables/useCurrentLang.js";
@@ -13,7 +17,7 @@ import MapoFormFlatSection from "./MapoFormFlatSection.vue";
 const props = withDefaults(
   defineProps<{
     modelValue: T;
-    fields: FieldDescriptor<T>[];
+    fields: AnyFieldDescriptor<T>[];
     errors?: Record<string, string[]>;
     languages?: string[];
     currentLang?: string;
@@ -54,7 +58,10 @@ const emit = defineEmits<{ "update:modelValue": [value: T] }>();
 
 // Slots are forwarded generically to inner layers; props vary per slot
 // (field.* carry a descriptor, group.* carry none), so they are loosely typed.
-defineSlots<Record<string, (props?: Record<string, unknown>) => unknown>>();
+// Slot names are dynamic (`field.{key}`, `field.{key}.label`, `group.{name}`…)
+// and each kind carries different bindings, so the props stay loosely typed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+defineSlots<Record<string, (props: Record<string, any>) => unknown>>();
 
 // ─── Setup form ──────────────────────────────────────────────────────────────
 
@@ -67,8 +74,8 @@ const currentLangRef = computed(() => props.currentLang);
 const errorsRef = computed(() => props.errors);
 
 const globalDebounce: number =
-  // @ts-expect-error — typed by module augmentation at app build time
-  useRuntimeConfig().public.mapoForm?.debounce ?? 300;
+  (useRuntimeConfig().public.mapoForm as MapoFormRuntimeConfig | undefined)
+    ?.debounce ?? 300;
 
 const form = useMapoForm({
   model: model as unknown as Ref<T>,
@@ -139,8 +146,8 @@ const grouped = computed<Map<string, TabEntry>>(() => {
   const tabs = new Map<string, TabEntry>();
 
   // The layout tree is type-agnostic: cast the generic descriptors to the bare
-  // FieldDescriptor used by the (non-generic) MapoFormGroup/Tabs/FlatSection layers.
-  for (const field of props.fields as FieldDescriptor[]) {
+  // AnyFieldDescriptor used by the (non-generic) MapoFormGroup/Tabs/FlatSection layers.
+  for (const field of props.fields as AnyFieldDescriptor[]) {
     // Normalise: 'a/b', ['a','b'], or 'a' all become a string[]
     const rawTab = field.tab;
     const tabPath: string[] = !rawTab
@@ -151,12 +158,13 @@ const grouped = computed<Map<string, TabEntry>>(() => {
     const groupName = field.group ?? "__flat__";
 
     // Walk/create the nested TabEntry tree
+    // tabPath always has at least one segment (split never returns []).
     let currentMap = tabs;
     for (let i = 0; i < tabPath.length - 1; i++) {
-      const parent = getOrCreateTab(currentMap, tabPath[i]);
+      const parent = getOrCreateTab(currentMap, tabPath[i]!);
       currentMap = parent.children;
     }
-    const leaf = getOrCreateTab(currentMap, tabPath[tabPath.length - 1]);
+    const leaf = getOrCreateTab(currentMap, tabPath[tabPath.length - 1]!);
     if (!leaf.groups.has(groupName)) {
       leaf.groups.set(groupName, { fields: [], subtabs: new Map() });
     }
@@ -221,7 +229,10 @@ const tabList = computed<TabEntry[]>(() => [...grouped.value.values()]);
           <slot :name="`group.${groupName}.after`" />
         </template>
 
-        <MapoFormFlatSection v-else :fields="group.fields as FieldDescriptor[]">
+        <MapoFormFlatSection
+          v-else
+          :fields="group.fields as AnyFieldDescriptor[]"
+        >
           <template
             v-for="slotName in fieldSlotNames"
             :key="slotName"

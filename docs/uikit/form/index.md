@@ -136,19 +136,39 @@ The layers are **decoupled**: you can use `useMapoForm` without `<MapoForm>`, an
 
 ### The descriptor is the contract
 
-`FieldDescriptor<T>` is a **TypeScript discriminated union**. The `type` field drives the system:
+`FieldDescriptor<T>` is a **strict TypeScript discriminated union** of the built-in field types. The `type` field drives the system, and `attrs` is fully typed per field type:
 
 ```ts
-// ❌ Select WITHOUT options: TypeScript error — caught in the IDE, not at runtime
+// ❌ Select WITHOUT items/options: TypeScript error — caught in the IDE, not at runtime
 { key: 'status', type: 'select' }
 
-// ✅ Select with options: compiles
-{ key: 'status', type: 'select', attrs: { options: [...] } }
+// ✅ Select with items: compiles
+{ key: 'status', type: 'select', attrs: { items: [...] } }
 
-// ✅ Custom type not in the registry: still compiles (escape hatch)
-//    At runtime → yellow placeholder instead of a crash
-{ key: 'widget', type: 'my-unknown-type' }
+// ❌ attrs typo: excess-property error ("Did you mean maxLength?")
+{ key: 'title', type: 'text', attrs: { maxLenght: 80 } }
+
+// ✅ Extra props for the underlying Nuxt UI input go through `passthrough`
+{ key: 'title', type: 'text', passthrough: { icon: 'i-lucide-type' } }
 ```
+
+Custom field types registered via `defineFormField()` are covered by the wider `AnyFieldDescriptor<T>` union (`FieldDescriptor | CustomDescriptor`). Annotate your array with it only when the form actually mixes in custom types — its open `attrs` disables excess-property checking:
+
+```ts
+// ✅ Custom type not in the registry: compiles with AnyFieldDescriptor
+//    At runtime → yellow placeholder if no component is registered
+const fields: AnyFieldDescriptor<Model>[] = [
+  { key: "widget", type: "my-custom-type", attrs: { anything: true } },
+];
+```
+
+Important: `AnyFieldDescriptor` is a typing escape hatch, not a compile-time registry check.
+
+- TypeScript accepts the custom `type` string.
+- The actual component lookup still happens at runtime through the registry.
+- If the type is not registered, Mapo renders `MapoUnknownField` (fail-soft) rather than throwing.
+
+So for built-in-only forms, prefer `FieldDescriptor<T>[]` to keep stricter editor errors.
 
 The generic `<T>` type-checks `key` against your model, but also accepts dotted strings for nested fields (`'blocks.0.title'`) or dynamic models. Typo errors in field names are caught by the IDE, not after deploy.
 
@@ -165,7 +185,7 @@ When `<MapoFormField>` renders a field, it walks this cascade:
 Then for each field:
 
 ```
-final attrs    = registry.attrs.All  ⊕  registry.attrs[type]  ⊕  descriptor.attrs
+final attrs    = registry.attrs.All ⊕ registry.attrs[type] ⊕ descriptor.attrs ⊕ descriptor.passthrough
 accessor       = registry.accessor[type]  ⊕  descriptor.accessor
 value path     = translatable + lang → model.translations[lang][key]
 emit           = debounce(descriptor.debounce ?? form.debounce ?? 300ms)

@@ -8,6 +8,7 @@ export type {
   FieldType,
   FieldAccessor,
   FieldDescriptor,
+  AnyFieldDescriptor,
   TextDescriptor,
   NumberDescriptor,
   BooleanDescriptor,
@@ -35,3 +36,5 @@ export {
   resolveFieldAttrs,
   resolveFieldAccessor,
 } from "./registry.js";
+
+export type { MapoFormRuntimeConfig } from "./registry.js";

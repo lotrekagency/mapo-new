@@ -6,14 +6,20 @@ Complete props, emits, slots, and exposed methods for all Form Engine components
 
 ## MapoForm
 
-The main form renderer. Takes a list of `FieldDescriptor` objects and a model, then renders the appropriate field components.
+The main form renderer. Takes a descriptor array and a model, then renders the appropriate field components.
+
+Descriptor typing guidance:
+
+- Use `FieldDescriptor<T>[]` when the form uses only built-in field types. This keeps strict compile-time checks on `attrs` and catches typos early.
+- Use `AnyFieldDescriptor<T>[]` only when the form includes custom field types.
+- `AnyFieldDescriptor` does **not** prove that a field type is present in the registry. Registry resolution is runtime behavior; unresolved types render `MapoUnknownField` instead of crashing.
 
 ### Props
 
 | Prop          | Type                       | Default        | Description                                                                  |
 | ------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------- |
 | `modelValue`  | `T`                        | — **required** | The form data object (v-model).                                              |
-| `fields`      | `FieldDescriptor<T>[]`     | — **required** | Array of field descriptors defining the form layout.                         |
+| `fields`      | `AnyFieldDescriptor<T>[]`  | — **required** | Array of field descriptors defining the form layout.                         |
 | `errors`      | `Record<string, string[]>` | `{}`           | Server-side validation errors keyed by field path.                           |
 | `languages`   | `string[]`                 | `[]`           | Available language codes for translated fields.                              |
 | `currentLang` | `string`                   | `''`           | Active language code. Controlled externally (by `MapoDetail`).               |
@@ -52,9 +58,9 @@ Low-level wrapper that resolves a `FieldDescriptor` to its registered component,
 
 ### Props
 
-| Prop         | Type              | Default        | Description                     |
-| ------------ | ----------------- | -------------- | ------------------------------- |
-| `descriptor` | `FieldDescriptor` | — **required** | The field configuration object. |
+| Prop         | Type                 | Default        | Description                     |
+| ------------ | -------------------- | -------------- | ------------------------------- |
+| `descriptor` | `AnyFieldDescriptor` | — **required** | The field configuration object. |
 
 ### Slots
 
@@ -288,7 +294,7 @@ Dynamic list field with drag-and-drop reordering, bulk selection, duplication, a
 | Key                 | Type                                                         | Default | Description                                                                  |
 | ------------------- | ------------------------------------------------------------ | ------- | ---------------------------------------------------------------------------- |
 | `templates`         | `Record<string, FieldDescriptor[]>`                          | —       | Named field templates (one per item type).                                   |
-| `previewLabel`      | `(item) => string`                                           | —       | Callback to generate an item's collapsed preview label.                      |
+| `previewLabel`      | `(item, index) => string`                                    | —       | Callback to generate an item's collapsed preview label.                      |
 | `defaultExpanded`   | `boolean`                                                    | `false` | Start all items expanded.                                                    |
 | `allowDuplicate`    | `boolean`                                                    | `true`  | Show the Duplicate action on each item.                                      |
 | `showPositionField` | `boolean`                                                    | `false` | Show a numeric position input in each item's header for explicit reordering. |
@@ -317,7 +323,7 @@ Single item inside a `MapoRepeater`. Handles both full-form and mini-card views.
 | `currentLang`        | `string`                   | — **required** | Active language.                                   |
 | `readonly`           | `boolean`                  | — **required** | Read-only mode.                                    |
 | `registry`           | `FieldRegistry`            | — **required** | Field registry.                                    |
-| `previewLabel`       | `(item) => string`         | —              | Callback to generate the collapsed preview label.  |
+| `previewLabel`       | `(item, index) => string`  | —              | Callback to generate the collapsed preview label.  |
 | `defaultExpanded`    | `boolean`                  | — **required** | Initial expanded state.                            |
 | `allowDuplicate`     | `boolean`                  | —              | Show Duplicate action.                             |
 | `repeaterDescriptor` | `RepeaterDescriptor`       | —              | Parent repeater descriptor (for mini-card config). |
@@ -349,11 +355,11 @@ Single item inside a `MapoRepeater`. Handles both full-form and mini-card views.
 
 Thin wrappers around Nuxt UI primitives that integrate with the form registry system. They inherit all attributes and props from the underlying Nuxt UI component.
 
-| Component       | Wraps         | Registry keys                   | Notes                                                                                                        |
-| --------------- | ------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `NuiInput`      | `UInput`      | `'text'`, `'number'`, `'color'` | `number` adds `type="number"`; `color` adds `type="color"` via registry `attrs`.                             |
-| `NuiTextarea`   | `UTextarea`   | `'textarea'`                    |                                                                                                              |
-| `NuiSlider`     | `USlider`     | `'slider'`                      |                                                                                                              |
-| `NuiCheckbox`   | `UCheckbox`   | `'boolean'`                     |                                                                                                              |
-| `NuiSwitch`     | `USwitch`     | `'switch'`                      |                                                                                                              |
-| `NuiSelectMenu` | `USelectMenu` | `'select'`                      | Registry sets `labelKey: 'text'` / `valueKey: 'value'` to match the `{ text, value }` descriptor convention. |
+| Component       | Wraps         | Registry keys                                       | Notes                                                                                                                       |
+| --------------- | ------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `NuiInput`      | `UInput`      | `'text'`, `'email'`, `'url'`, `'number'`, `'color'` | `number`/`email`/`url`/`color` set the native `type` via registry `attrs`.                                                  |
+| `NuiTextarea`   | `UTextarea`   | `'textarea'`                                        |                                                                                                                             |
+| `NuiSlider`     | `USlider`     | `'slider'`                                          |                                                                                                                             |
+| `NuiCheckbox`   | `UCheckbox`   | `'boolean'`                                         |                                                                                                                             |
+| `NuiSwitch`     | `USwitch`     | `'switch'`                                          |                                                                                                                             |
+| `NuiSelectMenu` | `USelectMenu` | `'select'`                                          | Accepts `items` (`{ label, value }` or strings) and legacy `options` (`{ text, value }`); shapes are normalised internally. |

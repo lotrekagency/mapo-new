@@ -1,5 +1,5 @@
 import type { Component } from "vue";
-import type { FieldDescriptor, FieldAccessor } from "./descriptor.js";
+import type { AnyFieldDescriptor, FieldAccessor } from "./descriptor.js";
 
 /**
  * Accepted values for a registry entry:
@@ -39,12 +39,12 @@ export type PartialFieldRegistry = {
  * Resolves the component entry for a given field descriptor.
  * Returns the `descriptor.is` override if set, otherwise looks up `registry.mapping`.
  */
-// FieldDescriptor<T> is contravariant in T through `validate: (ctx: { model: T })`.
+// AnyFieldDescriptor<T> is contravariant in T through `validate: (ctx: { model: T })`.
 // These functions only read `type`, `is`, `attrs`, and `accessor` — none depends on T —
-// so `any` is the correct way to accept any FieldDescriptor<T> without a type error.
+// so `any` is the correct way to accept any AnyFieldDescriptor<T> without a type error.
 export function resolveFieldComponent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  descriptor: FieldDescriptor<any>,
+  descriptor: AnyFieldDescriptor<any>,
   registry: FieldRegistry,
 ): FieldComponentEntry | null {
   if (descriptor.is) return descriptor.is;
@@ -52,17 +52,27 @@ export function resolveFieldComponent(
 }
 
 /**
- * Merges the registry-level default attrs for a field type with the descriptor's own `attrs`.
- * The `'All'` key in `registry.attrs` is applied first, then the type-specific key.
+ * Merges the registry-level default attrs for a field type with the descriptor's
+ * own typed `attrs` and its open `passthrough` props.
+ * Order: `registry.attrs['All']` → `registry.attrs[type]` → `descriptor.attrs`
+ * → `descriptor.passthrough` (most specific wins).
  */
 export function resolveFieldAttrs(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  descriptor: FieldDescriptor<any>,
+  descriptor: AnyFieldDescriptor<any>,
   registry: FieldRegistry,
 ): Record<string, unknown> {
   const allAttrs = registry.attrs["All"] ?? {};
   const typeAttrs = registry.attrs[descriptor.type] ?? {};
-  return { ...allAttrs, ...typeAttrs, ...(descriptor.attrs ?? {}) };
+  // Not every descriptor in the union declares `attrs`; read it structurally.
+  const ownAttrs =
+    (descriptor as { attrs?: Record<string, unknown> }).attrs ?? {};
+  return {
+    ...allAttrs,
+    ...typeAttrs,
+    ...ownAttrs,
+    ...(descriptor.passthrough ?? {}),
+  };
 }
 
 /**
@@ -70,9 +80,19 @@ export function resolveFieldAttrs(
  */
 export function resolveFieldAccessor(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  descriptor: FieldDescriptor<any>,
+  descriptor: AnyFieldDescriptor<any>,
   registry: FieldRegistry,
 ): FieldAccessor {
   const typeAccessor = registry.accessor[descriptor.type] ?? {};
   return { ...typeAccessor, ...(descriptor.accessor ?? {}) };
+}
+
+/**
+ * Shape of `runtimeConfig.public.mapoForm` as written by the module setup.
+ * `groups` and `debounce` are guaranteed by the module `defaults`.
+ */
+export interface MapoFormRuntimeConfig {
+  groups: { expanded: boolean };
+  debounce: number;
+  fields: { attrs: Record<string, Record<string, unknown>> };
 }

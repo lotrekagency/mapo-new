@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, provide, onMounted, onUnmounted } from "vue";
-import type { FieldDescriptor } from "../types/index.js";
+import type { AnyFieldDescriptor } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import MapoFormField from "./MapoFormField.vue";
 
-const props = defineProps<{ fields: FieldDescriptor[] }>();
+const props = defineProps<{ fields: AnyFieldDescriptor[] }>();
 
 defineSlots<Record<string, unknown>>();
 
@@ -62,7 +62,7 @@ const COL_SPAN: Record<number, string> = {
   11: "col-span-11",
   12: "col-span-12",
 };
-function colClass(cols: FieldDescriptor["cols"]): string {
+function colClass(cols: AnyFieldDescriptor["cols"]): string {
   if (!cols || typeof cols !== "number") return "col-span-12";
   return COL_SPAN[cols] ?? "col-span-12";
 }

@@ -30,6 +30,8 @@ export type DeepKeyOf<T, D extends number = 4> = [D] extends [never]
 export enum KnownFieldType {
   Text = "text",
   Textarea = "textarea",
+  Email = "email",
+  Url = "url",
   Number = "number",
   Boolean = "boolean",
   Switch = "switch",
@@ -151,8 +153,14 @@ interface FieldBase<T> {
   expandable?: boolean;
   /** Debounce delay in milliseconds for the `update:modelValue` emit. Default: `300`. Use `0` for immediate. */
   debounce?: number;
-  /** Extra attributes forwarded to the underlying field component via `v-bind`. */
-  attrs?: Record<string, unknown>;
+  /**
+   * Extra props forwarded verbatim to the underlying input component via `v-bind`
+   * (e.g. Nuxt UI props: `icon`, `variant`, `color`, `size`…).
+   *
+   * Use `attrs` for the field's own typed configuration; `passthrough` is the
+   * escape hatch for anything the wrapped component accepts.
+   */
+  passthrough?: Record<string, unknown>;
   /** Direct component override. Takes priority over `registry.mapping[type]`. */
   is?: Component;
   /**
@@ -164,15 +172,24 @@ interface FieldBase<T> {
 
 // ─── Discriminated union for each KnownFieldType ─────────────────────────────
 
-/** Descriptor for plain text input (`type: 'text'`) and multi-line textarea (`type: 'textarea'`). */
+/**
+ * Descriptor for plain text input (`type: 'text'`), multi-line textarea
+ * (`type: 'textarea'`), and native email / url inputs.
+ */
 export interface TextDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
-  type: `${KnownFieldType.Text}` | `${KnownFieldType.Textarea}`;
-  attrs?: FieldBase<T>["attrs"] & {
+  type:
+    | `${KnownFieldType.Text}`
+    | `${KnownFieldType.Textarea}`
+    | `${KnownFieldType.Email}`
+    | `${KnownFieldType.Url}`;
+  attrs?: {
     placeholder?: string;
     maxLength?: number;
     minLength?: number;
+    /** Visible rows for `type: 'textarea'`. */
+    rows?: number;
   };
 }
 
@@ -181,7 +198,7 @@ export interface NumberDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Number}` | `${KnownFieldType.Slider}`;
-  attrs?: FieldBase<T>["attrs"] & { min?: number; max?: number; step?: number };
+  attrs?: { min?: number; max?: number; step?: number; placeholder?: string };
 }
 
 /** Descriptor for checkbox (`type: 'boolean'`) and toggle switch (`type: 'switch'`). */
@@ -191,15 +208,23 @@ export interface BooleanDescriptor<
   type: `${KnownFieldType.Boolean}` | `${KnownFieldType.Switch}`;
 }
 
-/** Descriptor for a single-value or multi-value select menu. Requires `attrs.options`. */
+/**
+ * Descriptor for a single-value or multi-value select menu.
+ * Provide the choices via `attrs.items` (Nuxt UI shape) or the legacy
+ * `attrs.options` (Mapo v1 shape).
+ */
 export interface SelectDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Select}`;
   attrs: {
-    options: Array<{ text: string; value: unknown }>;
+    /** Choices in Nuxt UI shape (or plain strings) — forwarded to `USelectMenu`. */
+    items?: ReadonlyArray<string | { label: string; value: unknown }>;
+    /** Choices in Mapo v1 shape (`text`/`value`). Used when `items` is absent. */
+    options?: ReadonlyArray<{ text: string; value: unknown }>;
     multiple?: boolean;
-  } & Record<string, unknown>;
+    placeholder?: string;
+  };
 }
 
 /**
@@ -216,7 +241,7 @@ export interface FksDescriptor<
     itemValue?: string;
     returnObject?: boolean;
     multiple?: boolean;
-  } & Record<string, unknown>;
+  };
 }
 
 /** Descriptor for date (`type: 'date'`), time (`type: 'time'`), and datetime (`type: 'datetime'`) pickers. */
@@ -227,10 +252,12 @@ export interface DateDescriptor<
     | `${KnownFieldType.Date}`
     | `${KnownFieldType.Time}`
     | `${KnownFieldType.Datetime}`;
-  attrs?: FieldBase<T>["attrs"] & {
+  attrs?: {
     min?: string;
     max?: string;
     granularity?: string;
+    /** Timezone strategy for datetime parsing/serialisation. Default: `"naive"`. */
+    tz?: "naive" | "utc";
   };
 }
 
@@ -246,7 +273,7 @@ export interface FileDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.File}`;
-  attrs?: FieldBase<T>["attrs"] & { accept?: string; maxSize?: number };
+  attrs?: { accept?: string; maxSize?: number };
 }
 
 /** Descriptor for a Tiptap rich-text editor. */
@@ -254,7 +281,7 @@ export interface EditorDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Editor}`;
-  attrs?: FieldBase<T>["attrs"] & { extensions?: unknown[] };
+  attrs?: { extensions?: unknown[] };
 }
 
 /** Descriptor for the SEO preview field (title + description + live SERP preview). */
@@ -269,7 +296,7 @@ export interface MapDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Map}`;
-  attrs?: FieldBase<T>["attrs"] & {
+  attrs?: {
     defaultLat?: number;
     defaultLng?: number;
     zoom?: number;
@@ -281,13 +308,16 @@ export interface RepeaterDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Repeater}`;
-  /** Field descriptors for each item inside the repeater. */
-  fields: FieldDescriptor[];
-  attrs?: FieldBase<T>["attrs"] & {
+  /**
+   * Field descriptors for each item inside the repeater.
+   * Optional when `attrs.templates` provides per-template fields.
+   */
+  fields?: AnyFieldDescriptor[];
+  attrs?: {
     /** Multiple templates for heterogeneous items (`oneOf` discriminated union). */
-    templates?: Record<string, FieldDescriptor[]>;
-    /** Label shown when an item is collapsed. */
-    previewLabel?: (item: unknown) => string;
+    templates?: Record<string, AnyFieldDescriptor[]>;
+    /** Label shown when an item is collapsed. Receives the item and its index. */
+    previewLabel?: (item: unknown, index: number) => string;
     confirmDelete?: boolean;
     allowDuplicate?: boolean;
     /** Show a numeric position input alongside the reorder buttons. */
@@ -307,7 +337,7 @@ export interface RepeaterDescriptor<
       subtitle?: string;
       /** URL or base64 string for a thumbnail image. */
       thumbnail?: string;
-      statusColor?: "success" | "warning" | "error" | "neutral";
+      statusColor?: "success" | "info" | "warning" | "error" | "neutral";
     };
     /** Minimum item count above which contextual scaling activates. Default: `3`. */
     compressThreshold?: number;
@@ -322,10 +352,14 @@ export interface MediaDescriptor<
     | `${KnownFieldType.Media}`
     | `${KnownFieldType.MediaM2m}`
     | `${KnownFieldType.EnhancedMedia}`;
-  attrs?: FieldBase<T>["attrs"] & { mime?: string; multiple?: boolean };
+  attrs?: { mime?: string; multiple?: boolean };
 }
 
-/** Escape-hatch descriptor for custom field types registered by the consumer. */
+/**
+ * Escape-hatch descriptor for custom field types registered by the consumer.
+ * `attrs` stays fully open here: the wrapped component is user-defined, so its
+ * props cannot be known in advance.
+ */
 export interface CustomDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
@@ -334,8 +368,13 @@ export interface CustomDescriptor<
 }
 
 /**
- * Union of all concrete field descriptor types.
+ * Union of the built-in (known) field descriptor types.
  * Use this as the type for a `fields` array passed to `<MapoForm>` or `useMapoForm()`.
+ *
+ * This union is **strict**: object literals get full excess-property checking
+ * on `attrs` (typos and wrong-type keys are compile errors). If the form mixes
+ * in custom field types registered via `defineFormField()` / the registry,
+ * annotate the array with {@link AnyFieldDescriptor} instead.
  *
  * @example
  * const fields: FieldDescriptor<Article>[] = [
@@ -356,5 +395,17 @@ export type FieldDescriptor<T = Record<string, unknown>> =
   | SeoDescriptor<T>
   | MapDescriptor<T>
   | RepeaterDescriptor<T>
-  | MediaDescriptor<T>
+  | MediaDescriptor<T>;
+
+/**
+ * {@link FieldDescriptor} plus the {@link CustomDescriptor} escape hatch.
+ *
+ * This is what the form engine accepts everywhere (MapoForm, useMapoForm,
+ * MapoDetail / MapoList editFields…). Annotate your `fields` array with this
+ * type when it contains custom field types — note that the open
+ * `CustomDescriptor.attrs` disables excess-property checking on the union, so
+ * prefer the strict {@link FieldDescriptor} when no custom types are used.
+ */
+export type AnyFieldDescriptor<T = Record<string, unknown>> =
+  | FieldDescriptor<T>
   | CustomDescriptor<T>;

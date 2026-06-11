@@ -1,11 +1,11 @@
-import type { FieldDescriptor } from "../types/index.js";
+import type { AnyFieldDescriptor } from "../types/index.js";
 
 /**
  * Hierarchical authoring structure. Lets you group field descriptors under a
  * named group without repeating `group` on every field.
  *
  * Pass an array of these to {@link flattenFieldGroups} to get the flat
- * `FieldDescriptor<T>[]` expected by `<MapoForm>` / `<MapoDetail>`.
+ * `AnyFieldDescriptor<T>[]` expected by `<MapoForm>` / `<MapoDetail>`.
  */
 export interface FieldGroupDescriptor<T = Record<string, unknown>> {
   /** Group name — propagated to every field in `fields`. */
@@ -13,12 +13,12 @@ export interface FieldGroupDescriptor<T = Record<string, unknown>> {
   /** Optional tab — propagated to every field unless the field already has a `tab`. */
   tab?: string | string[];
   /** Fields belonging to this group. May contain nested `FieldGroupDescriptor` objects. */
-  fields: Array<FieldDescriptor<T> | FieldGroupDescriptor<T>>;
+  fields: Array<AnyFieldDescriptor<T> | FieldGroupDescriptor<T>>;
 }
 
-/** Type guard: distinguishes a `FieldGroupDescriptor` from a `FieldDescriptor`. */
+/** Type guard: distinguishes a `FieldGroupDescriptor` from a `AnyFieldDescriptor`. */
 function isGroupDescriptor<T>(
-  item: FieldDescriptor<T> | FieldGroupDescriptor<T>,
+  item: AnyFieldDescriptor<T> | FieldGroupDescriptor<T>,
 ): item is FieldGroupDescriptor<T> {
   return (
     "fields" in item && Array.isArray((item as FieldGroupDescriptor<T>).fields)
@@ -26,15 +26,15 @@ function isGroupDescriptor<T>(
 }
 
 /**
- * Flattens a mixed array of `FieldDescriptor` and `FieldGroupDescriptor` objects
- * into a plain `FieldDescriptor<T>[]` ready to be passed to `<MapoForm>` or `<MapoDetail>`.
+ * Flattens a mixed array of `AnyFieldDescriptor` and `FieldGroupDescriptor` objects
+ * into a plain `AnyFieldDescriptor<T>[]` ready to be passed to `<MapoForm>` or `<MapoDetail>`.
  *
  * Each `FieldGroupDescriptor` propagates its `group` (and optionally `tab`) to
  * every leaf field it contains. Fields that already declare a `group` or `tab`
  * are left unchanged.
  *
  * Groups can be arbitrarily nested — the function recurses until every item is
- * a leaf `FieldDescriptor`.
+ * a leaf `AnyFieldDescriptor`.
  *
  * @example
  * ```ts
@@ -58,11 +58,11 @@ function isGroupDescriptor<T>(
  * ```
  */
 export function flattenFieldGroups<T = Record<string, unknown>>(
-  items: Array<FieldDescriptor<T> | FieldGroupDescriptor<T>>,
+  items: Array<AnyFieldDescriptor<T> | FieldGroupDescriptor<T>>,
   _inheritedGroup?: string,
   _inheritedTab?: string | string[],
-): FieldDescriptor<T>[] {
-  const result: FieldDescriptor<T>[] = [];
+): AnyFieldDescriptor<T>[] {
+  const result: AnyFieldDescriptor<T>[] = [];
 
   for (const item of items) {
     if (isGroupDescriptor(item)) {
@@ -70,8 +70,8 @@ export function flattenFieldGroups<T = Record<string, unknown>>(
       const tab = item.tab ?? _inheritedTab;
       result.push(...flattenFieldGroups(item.fields, group, tab));
     } else {
-      const field = item as FieldDescriptor<T>;
-      const merged: FieldDescriptor<T> = { ...field };
+      const field = item as AnyFieldDescriptor<T>;
+      const merged: AnyFieldDescriptor<T> = { ...field };
       if (_inheritedGroup && !merged.group) {
         Object.assign(merged, { group: _inheritedGroup });
       }

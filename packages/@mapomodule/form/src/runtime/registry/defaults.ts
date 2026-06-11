@@ -9,6 +9,8 @@ export const defaultRegistry: FieldRegistry = {
     // ─── Nuxt UI — thin wrappers that use <UInput> etc. in the template ──────
     text: () => import("../components/fields/nui/NuiInput.vue"),
     textarea: () => import("../components/fields/nui/NuiTextarea.vue"),
+    email: () => import("../components/fields/nui/NuiInput.vue"),
+    url: () => import("../components/fields/nui/NuiInput.vue"),
     number: () => import("../components/fields/nui/NuiInput.vue"),
     boolean: () => import("../components/fields/nui/NuiCheckbox.vue"),
     switch: () => import("../components/fields/nui/NuiSwitch.vue"),
@@ -39,6 +41,12 @@ export const defaultRegistry: FieldRegistry = {
     },
     number: {
       type: "number",
+    },
+    email: {
+      type: "email",
+    },
+    url: {
+      type: "url",
     },
     color: {
       type: "color",

@@ -5,7 +5,10 @@ import {
   resolveFieldAccessor,
 } from "../runtime/types/registry.js";
 import { defaultRegistry } from "../runtime/registry/defaults.js";
-import type { FieldDescriptor } from "../runtime/types/descriptor.js";
+import type {
+  AnyFieldDescriptor,
+  FieldDescriptor,
+} from "../runtime/types/descriptor.js";
 
 describe("resolveFieldComponent", () => {
   it("returns a lazy function for text type", () => {
@@ -35,7 +38,7 @@ describe("resolveFieldComponent", () => {
   });
 
   it("returns null for unknown type", () => {
-    const d = { key: "x", type: "unknown-xyz" } as FieldDescriptor;
+    const d = { key: "x", type: "unknown-xyz" } as AnyFieldDescriptor;
     expect(resolveFieldComponent(d, defaultRegistry)).toBeNull();
   });
 

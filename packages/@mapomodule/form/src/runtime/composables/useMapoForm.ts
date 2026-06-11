@@ -15,16 +15,16 @@ import {
   objectDiff,
   debounce,
 } from "@mapomodule/utils";
-import type { FieldDescriptor, FieldRegistry } from "../types/index.js";
+import type { AnyFieldDescriptor, FieldRegistry } from "../types/index.js";
 import { resolveFieldAccessor } from "../types/index.js";
 import { useCurrentLang } from "./useCurrentLang.js";
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-import { useSnackStore, useAuthStore } from "#imports";
+import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 
 /** Options accepted by `useMapoForm()`. */
 export interface UseMapoFormOptions<T extends object> {
   model: Ref<T>;
-  fields: MaybeRef<FieldDescriptor<T>[]>;
+  fields: MaybeRef<AnyFieldDescriptor<T>[]>;
   errors?: Ref<Record<string, string[]>>;
   languages?: string[];
   currentLang?: Ref<string>;
@@ -57,7 +57,7 @@ export interface MapoDraftBanner {
 /** Reactive context shared with child form fields via provide/inject. */
 export interface MapoFormContext<T extends object> {
   model: Ref<T>;
-  fields: MaybeRef<FieldDescriptor<T>[]>;
+  fields: MaybeRef<AnyFieldDescriptor<T>[]>;
   errors: Ref<Record<string, string[]>>;
   languages: string[];
   currentLang: Ref<string>;
@@ -159,7 +159,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   function _draftStorageKey(): string | null {
     const key = toValue(options.draftKey);
     if (!key) return null;
-    const userId = authStore.user?.id ?? "anonymous";
+    const userId = authStore.info?.id ?? "anonymous";
     return `mapo:draft:${userId}:${key}`;
   }
 
@@ -248,7 +248,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     return merged;
   });
 
-  function resolvePath(descriptor: FieldDescriptor<T>): string {
+  function resolvePath(descriptor: AnyFieldDescriptor<T>): string {
     const lang = currentLang.value;
     if (descriptor.translatable && lang) {
       return `translations.${lang}.${descriptor.key}`;
@@ -263,7 +263,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     if (!translations[lang]) translations[lang] = {};
   }
 
-  function setFieldValue(descriptor: FieldDescriptor<T>, val: unknown) {
+  function setFieldValue(descriptor: AnyFieldDescriptor<T>, val: unknown) {
     const accessor = resolveFieldAccessor(descriptor, registry);
     const setVal = accessor.set
       ? accessor.set({ model: model.value, val, lang: currentLang.value })
@@ -304,7 +304,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     }
   }
 
-  function getFieldValue(descriptor: FieldDescriptor<T>): unknown {
+  function getFieldValue(descriptor: AnyFieldDescriptor<T>): unknown {
     const raw = getNestedValue(model.value, resolvePath(descriptor));
     const accessor = resolveFieldAccessor(descriptor, registry);
     return accessor.get
@@ -313,7 +313,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   }
 
   function checkRequired(
-    descriptor: FieldDescriptor<T>,
+    descriptor: AnyFieldDescriptor<T>,
     val: unknown,
   ): string | null {
     if (!descriptor.required) return null;
@@ -322,7 +322,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     return null;
   }
 
-  function getClientError(descriptor: FieldDescriptor<T>): string | null {
+  function getClientError(descriptor: AnyFieldDescriptor<T>): string | null {
     if (!descriptor.required && !descriptor.validate) return null;
     // "No-anxiety" gate: the error appears only after blur or submit, never on mount.
     // Bypassed when immediate=true so errors show from the very first render.
@@ -398,7 +398,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   // not on every model edit — this keeps per-field error/value resolution O(1)
   // instead of O(fields), avoiding O(fields²) work across a large form on each keystroke.
   const fieldIndex = computed(() => {
-    const map = new Map<string, FieldDescriptor<T>>();
+    const map = new Map<string, AnyFieldDescriptor<T>>();
     for (const f of toValue(fields)) map.set(f.key as string, f);
     return map;
   });
@@ -430,7 +430,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   // Public API: accepts either a string key or a full descriptor, making it ergonomic
   // for external consumers (tests, user code) as well as internal callers.
   function setFieldValuePublic(
-    keyOrDescriptor: string | FieldDescriptor<T>,
+    keyOrDescriptor: string | AnyFieldDescriptor<T>,
     val: unknown,
   ) {
     if (typeof keyOrDescriptor === "string") {
@@ -442,7 +442,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   }
 
   function getClientErrorPublic(
-    keyOrDescriptor: string | FieldDescriptor<T>,
+    keyOrDescriptor: string | AnyFieldDescriptor<T>,
   ): string | null {
     if (typeof keyOrDescriptor === "string") {
       const descriptor = findDescriptor(keyOrDescriptor);

@@ -7,21 +7,25 @@ import {
   onMounted,
   onUnmounted,
 } from "vue";
-import type { FieldDescriptor } from "../types/index.js";
+import { useRuntimeConfig } from "#app";
+import type {
+  AnyFieldDescriptor,
+  MapoFormRuntimeConfig,
+} from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import MapoFormField from "./MapoFormField.vue";
 
 const props = defineProps<{
   name: string;
   label?: string;
-  fields: FieldDescriptor[];
-  subtabs?: Map<string, FieldDescriptor[]>;
+  fields: AnyFieldDescriptor[];
+  subtabs?: Map<string, AnyFieldDescriptor[]>;
   initialExpanded?: boolean;
 }>();
 
 const globalExpanded: boolean =
-  // @ts-expect-error — typed by module augmentation at app build time
-  useRuntimeConfig().public.mapoForm?.groups?.expanded ?? true;
+  (useRuntimeConfig().public.mapoForm as MapoFormRuntimeConfig | undefined)
+    ?.groups?.expanded ?? true;
 const expanded = ref(props.initialExpanded ?? globalExpanded);
 
 // ─── Sub-tabs inside the group ────────────────────────────────────────────────
@@ -30,7 +34,7 @@ const activeSubtab = ref<string>("");
 // Initialise to first subtab when subtabs are provided.
 watchEffect(() => {
   if (props.subtabs && props.subtabs.size > 0 && !activeSubtab.value) {
-    activeSubtab.value = [...props.subtabs.keys()][0];
+    activeSubtab.value = [...props.subtabs.keys()][0] ?? "";
   }
 });
 
@@ -80,7 +84,7 @@ const COL_SPAN: Record<number, string> = {
   11: "col-span-11",
   12: "col-span-12",
 };
-function colClass(cols: FieldDescriptor["cols"]): string {
+function colClass(cols: AnyFieldDescriptor["cols"]): string {
   if (!cols || typeof cols !== "number") return "col-span-12";
   return COL_SPAN[cols] ?? "col-span-12";
 }

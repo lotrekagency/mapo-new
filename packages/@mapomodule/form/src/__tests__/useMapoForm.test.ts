@@ -4,14 +4,12 @@ import { useMapoForm } from "../runtime/composables/useMapoForm.js";
 import { defaultRegistry } from "../runtime/registry/defaults.js";
 import type { FieldDescriptor } from "../runtime/types/descriptor.js";
 
-vi.mock("#imports", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    useAuthStore: () => ({ user: ref({ id: 1, username: "testuser" }) }),
-    useSnackStore: () => ({ add: vi.fn(), show: vi.fn() }),
-  };
-});
+vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
+  useAuthStore: () => ({ info: { id: 1, username: "testuser" } }),
+}));
+vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
+  useSnackStore: () => ({ show: vi.fn() }),
+}));
 
 // provide/inject called outside setup() emits a warning; silence it in tests.
 beforeEach(() => {

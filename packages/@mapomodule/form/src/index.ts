@@ -28,6 +28,7 @@ export type {
   FieldType,
   FieldAccessor,
   FieldDescriptor,
+  AnyFieldDescriptor,
   TextDescriptor,
   NumberDescriptor,
   BooleanDescriptor,

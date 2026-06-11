@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { FieldDescriptor } from "../types/index.js";
+import type { AnyFieldDescriptor } from "../types/index.js";
 
 const props = defineProps<{
   modelValue: unknown;
-  descriptor: FieldDescriptor;
+  descriptor: AnyFieldDescriptor;
   errors?: string[];
   readonly?: boolean;
   disabled?: boolean;

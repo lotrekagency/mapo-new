@@ -27,9 +27,7 @@ const open = ref(false);
 //   - `utc`: the input is interpreted/emitted as ISO with a `Z` suffix.
 //     Explicit local ↔ UTC conversion; the backend stores UTC.
 type TzMode = "naive" | "utc";
-const tzMode = computed<TzMode>(
-  () => (props.descriptor.attrs as { tz?: TzMode } | undefined)?.tz ?? "naive",
-);
+const tzMode = computed<TzMode>(() => props.descriptor.attrs?.tz ?? "naive");
 
 // ISO string → CalendarDateTime
 const calendarValue = computed<CalendarDateTime | undefined>(() => {
@@ -50,10 +48,11 @@ const calendarValue = computed<CalendarDateTime | undefined>(() => {
       );
     }
     // `naive`: strip any stray Z/offset suffix and parse as wall-time.
+    // split() always returns at least one element.
     const clean = v
       .replace(/Z$/, "")
       .replace(/[+-]\d{2}:\d{2}$/, "")
-      .split(".")[0];
+      .split(".")[0]!;
     return parseDateTime(clean);
   } catch {
     return undefined;

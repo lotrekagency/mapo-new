@@ -1,4 +1,4 @@
-import type { FieldDescriptor } from "./index.js";
+import type { AnyFieldDescriptor } from "./index.js";
 
 /**
  * A group of fields rendered inside a single group card.
@@ -9,8 +9,8 @@ import type { FieldDescriptor } from "./index.js";
  */
 export interface GroupEntry {
   label?: string;
-  fields: FieldDescriptor[];
-  subtabs: Map<string, FieldDescriptor[]>;
+  fields: AnyFieldDescriptor[];
+  subtabs: Map<string, AnyFieldDescriptor[]>;
 }
 
 /** A tab panel; may nest further tabs through `children`. */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect } from "vue";
 import type {
-  FieldDescriptor,
+  AnyFieldDescriptor,
   FieldRegistry,
   RepeaterDescriptor,
 } from "../../types/index.js";
@@ -13,7 +13,7 @@ const props = defineProps<{
   /** Stable identity-based UID assigned by the parent repeater. */
   uid?: string;
   item: Record<string, unknown>;
-  fields: FieldDescriptor[];
+  fields: AnyFieldDescriptor[];
   index: number;
   errorPrefix: string;
   parentErrors: Record<string, string[]>;
@@ -21,7 +21,7 @@ const props = defineProps<{
   currentLang: string;
   readonly: boolean;
   registry: FieldRegistry;
-  previewLabel?: (item: unknown) => string;
+  previewLabel?: (item: unknown, index: number) => string;
   defaultExpanded: boolean;
   allowDuplicate?: boolean;
   /** Descriptor of the parent repeater (for miniCard and other attrs). */
@@ -125,7 +125,9 @@ watchEffect(() => {
 // ─── Preview label ────────────────────────────────────────────────────────────
 
 const label = computed(
-  () => props.previewLabel?.(localModel.value) ?? `Elemento ${props.index + 1}`,
+  () =>
+    props.previewLabel?.(localModel.value, props.index) ??
+    `Item ${props.index + 1}`,
 );
 
 // ─── Contextual Scaling (miniCard) ───────────────────────────────────────────
@@ -147,6 +149,7 @@ const statusColorClass = computed(
   () =>
     ({
       success: "bg-green-500",
+      info: "bg-blue-500",
       warning: "bg-yellow-500",
       error: "bg-red-500",
       neutral: "bg-gray-400",
@@ -159,7 +162,7 @@ const focusMode = useFocusMode();
 
 function enterFocusMode() {
   focusMode.enter({
-    descriptor: props.repeaterDescriptor as FieldDescriptor,
+    descriptor: props.repeaterDescriptor as AnyFieldDescriptor,
     fields: props.fields,
     model: { ...localModel.value },
     errors: itemErrors,

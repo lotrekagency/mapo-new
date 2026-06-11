@@ -27,14 +27,21 @@ const calendarValue = computed<CalendarDateTime | undefined>(() => {
   }
 });
 
-function onUpdate(val: CalendarDateTime | null) {
+// UInputDate emits a broad model union (date / datetime / zoned); with
+// `granularity='minute'` the value carries hour and minute, so narrow on those.
+function onUpdate(val: unknown) {
   // Emit only `HH:MM`.
-  if (!val) {
+  const time = val as { hour?: number; minute?: number } | null | undefined;
+  if (
+    !time ||
+    typeof time.hour !== "number" ||
+    typeof time.minute !== "number"
+  ) {
     emit("update:modelValue", null);
     return;
   }
-  const h = String(val.hour).padStart(2, "0");
-  const m = String(val.minute).padStart(2, "0");
+  const h = String(time.hour).padStart(2, "0");
+  const m = String(time.minute).padStart(2, "0");
   emit("update:modelValue", `${h}:${m}`);
 }
 </script>

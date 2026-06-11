@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, inject, ref, watch } from "vue";
 import type { Ref } from "vue";
-import type { FieldDescriptor } from "../types/index.js";
+import type { AnyFieldDescriptor } from "../types/index.js";
 import {
   resolveFieldComponent,
   resolveFieldAttrs,
@@ -11,7 +11,10 @@ import { injectMapoForm } from "../composables/useMapoForm.js";
 import { getNestedValue, debounce } from "@mapomodule/utils";
 import MapoUnknownField from "./MapoUnknownField.vue";
 
-const props = defineProps<{ descriptor: FieldDescriptor }>();
+// `any` accepts descriptors typed against any model (e.g. AnyFieldDescriptor<Article>)
+// in headless usage; the renderer itself only reads model-agnostic metadata.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const props = defineProps<{ descriptor: AnyFieldDescriptor<any> }>();
 
 const form = injectMapoForm<Record<string, unknown>>()!;
 
@@ -164,7 +167,8 @@ function resolveErrors(
   let current = "";
   for (const seg of segments) {
     current = current ? `${current}.${seg}` : seg;
-    if (errorsMap[current]) result.push(...errorsMap[current]);
+    const errs = errorsMap[current];
+    if (errs) result.push(...errs);
   }
   return result;
 }

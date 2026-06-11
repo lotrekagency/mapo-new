@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect } from "vue";
 import { VueDraggable } from "vue-draggable-plus";
+import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import type { RepeaterDescriptor } from "../../types/index.js";
 import { injectMapoForm } from "../../composables/useMapoForm.js";
 import MapoRepeaterItem from "./MapoRepeaterItem.vue";
@@ -78,9 +79,9 @@ watchEffect(() => {
 });
 
 function fieldsForItem(item: Record<string, unknown>) {
-  if (!templates.value) return props.descriptor.fields;
+  if (!templates.value) return props.descriptor.fields ?? [];
   const key = (item._template as string) ?? selectedTemplate.value;
-  return templates.value[key] ?? props.descriptor.fields;
+  return templates.value[key] ?? props.descriptor.fields ?? [];
 }
 
 // ─── Item CRUD ───────────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ async function askConfirm(
   title = "Confirm",
 ): Promise<boolean> {
   try {
-    // @ts-expect-error — Nuxt auto-import, available when @mapomodule/store is installed
+    // Falls back to native confirm when the Pinia store is not registered.
     return await useConfirmStore().ask({ title, message });
   } catch {
     return typeof globalThis.confirm === "function"
@@ -147,8 +148,10 @@ async function deleteItem(index: number) {
 
 function duplicateItem(index: number) {
   if (remainingSlots() < 1) return;
+  const source = items.value[index];
+  if (!source) return;
   pushUndo();
-  const copy = { ...items.value[index] };
+  const copy = { ...source };
   const next = [...items.value];
   next.splice(index + 1, 0, copy);
   emitItems(next);
@@ -156,7 +159,7 @@ function duplicateItem(index: number) {
 
 function updateItem(index: number, val: Record<string, unknown>) {
   const oldItem = items.value[index];
-  if (oldItem !== val) {
+  if (oldItem && oldItem !== val) {
     const existingUid = itemUids.get(oldItem);
     if (existingUid) itemUids.set(val, existingUid);
   }
@@ -166,19 +169,11 @@ function updateItem(index: number, val: Record<string, unknown>) {
 }
 
 function moveUp(index: number) {
-  if (index === 0) return;
-  pushUndo();
-  const next = [...items.value];
-  [next[index - 1], next[index]] = [next[index], next[index - 1]];
-  emitItems(next);
+  moveTo(index, index - 1);
 }
 
 function moveDown(index: number) {
-  if (index >= items.value.length - 1) return;
-  pushUndo();
-  const next = [...items.value];
-  [next[index], next[index + 1]] = [next[index + 1], next[index]];
-  emitItems(next);
+  moveTo(index, index + 1);
 }
 
 function moveTo(from: number, to: number) {
@@ -186,6 +181,7 @@ function moveTo(from: number, to: number) {
   pushUndo();
   const next = [...items.value];
   const [item] = next.splice(from, 1);
+  if (item === undefined) return;
   next.splice(to, 0, item);
   emitItems(next);
 }
@@ -244,7 +240,10 @@ function toggleSelect(uid: string, withShift = false) {
     if (a !== -1 && b !== -1) {
       const [lo, hi] = a < b ? [a, b] : [b, a];
       const next = new Set(selectedUids.value);
-      for (let i = lo; i <= hi; i++) next.add(uids[i]);
+      for (let i = lo; i <= hi; i++) {
+        const uid = uids[i];
+        if (uid) next.add(uid);
+      }
       selectedUids.value = next;
       return;
     }
@@ -303,8 +302,9 @@ function bulkDuplicate() {
   const next = [...items.value];
   const dupSet = new Set(toDup.map(uidFor));
   for (let i = next.length - 1; i >= 0; i--) {
-    if (dupSet.has(uidFor(next[i]))) {
-      next.splice(i + 1, 0, { ...next[i] });
+    const item = next[i];
+    if (item && dupSet.has(uidFor(item))) {
+      next.splice(i + 1, 0, { ...item });
     }
   }
   emitItems(next);

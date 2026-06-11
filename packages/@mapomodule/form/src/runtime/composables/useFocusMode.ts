@@ -6,14 +6,14 @@ import {
   type DeepReadonly,
   type ShallowRef,
 } from "vue";
-import type { FieldDescriptor, FieldRegistry } from "../types/index.js";
+import type { AnyFieldDescriptor, FieldRegistry } from "../types/index.js";
 
 /** Describes the currently focused repeater item in focus mode. */
 export interface FocusTarget {
   /** Descriptor of the repeater field that contains the focused item. */
-  descriptor: FieldDescriptor;
+  descriptor: AnyFieldDescriptor;
   /** Fields for the focused item, resolved from the template when needed. */
-  fields: FieldDescriptor[];
+  fields: AnyFieldDescriptor[];
   /**
    * Initial snapshot of the item model at the time the portal was opened.
    * Stored as a plain object (not a Ref) to avoid Vue's auto-unwrap behaviour

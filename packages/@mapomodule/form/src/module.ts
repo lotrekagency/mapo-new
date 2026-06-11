@@ -36,9 +36,11 @@ export default defineNuxtModule<MapoFormOptions>({
     //   export default defineNuxtPlugin(({ $mapoFormRegistry }) => {
     //     $mapoFormRegistry.mapping['my-type'] = () => import('~/components/MyField.vue')
     //   })
+    // `defaults` guarantees groups/debounce at runtime; fall back explicitly
+    // so the assignment type is fully defined.
     nuxt.options.runtimeConfig.public.mapoForm = {
-      groups: options.groups,
-      debounce: options.debounce,
+      groups: { expanded: options.groups?.expanded ?? true },
+      debounce: options.debounce ?? 300,
       // attrs is JSON-serialisable (plain objects) — merged in the plugin
       fields: { attrs: options.fields?.attrs ?? {} },
     };

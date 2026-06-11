@@ -21,7 +21,8 @@ const calendarValue = computed<CalendarDate | undefined>(() => {
   const v = props.modelValue as string | null | undefined;
   if (!v) return undefined;
   try {
-    return parseDate(String(v).split("T")[0]);
+    // split() always returns at least one element.
+    return parseDate(String(v).split("T")[0]!);
   } catch {
     return undefined;
   }

@@ -1,6 +1,6 @@
 import { defineNuxtPlugin, useRuntimeConfig } from "#app";
 import { defaultRegistry } from "../registry/defaults.js";
-import type { FieldRegistry } from "../types/index.js";
+import type { FieldRegistry, MapoFormRuntimeConfig } from "../types/index.js";
 
 declare module "#app" {
   interface NuxtApp {
@@ -16,11 +16,8 @@ declare module "vue" {
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig();
-  // @ts-expect-error — typed by module augmentation at app build time
-  const userAttrs = (config.public.mapoForm?.fields?.attrs ?? {}) as Record<
-    string,
-    Record<string, unknown>
-  >;
+  const mapoForm = config.public.mapoForm as MapoFormRuntimeConfig | undefined;
+  const userAttrs = mapoForm?.fields?.attrs ?? {};
 
   // Merge user attrs onto defaults: user takes priority per-type, including 'All'
   const mergedAttrs = { ...defaultRegistry.attrs };
