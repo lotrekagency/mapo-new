@@ -16,13 +16,9 @@ import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
-import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { debounce, splitEndpointParams } from "@mapomodule/utils";
-import {
-  useRoute,
-  useRouter,
-  // @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-} from "#imports";
+import { useRoute, useRouter } from "vue-router";
 
 const props = withDefaults(
   defineProps<{
@@ -78,9 +74,9 @@ const props = withDefaults(
     searchable?: boolean;
     draggable?: boolean;
     positionField?: string;
-    editFields?: FieldDescriptor<T>[];
+    editFields?: AnyFieldDescriptor<T>[];
     languages?: string[];
-    registry?: Partial<FieldRegistry>;
+    registry?: FieldRegistry;
     /** Base path for the detail page. If set, each row shows a link button → `${detailBase}/${item[lookup]}`. */
     detailBase?: string;
     /**
@@ -843,9 +839,9 @@ const sortingOptions = computed(() => ({
         :pagination-options="paginationOptions"
         :sorting="sorting"
         :sorting-options="sortingOptions"
-        empty="Nessun elemento trovato"
-        @update:pagination="pagination = $event"
-        @update:sorting="sorting = $event"
+        empty="No items found"
+        @update:pagination="pagination = $event ?? pagination"
+        @update:sorting="sorting = $event ?? sorting"
       >
         <template #empty>
           <slot name="dtable.empty">

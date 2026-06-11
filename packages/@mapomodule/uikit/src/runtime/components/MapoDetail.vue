@@ -8,19 +8,16 @@ import {
   onMounted,
   onBeforeUnmount,
   provide,
+  type Ref,
   type VNode,
 } from "vue";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
+import { useNuxtApp } from "#app";
 import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
-import {
-  useRouter,
-  onBeforeRouteLeave,
-  useCrud,
-  useSnackStore,
-  useConfirmStore,
-  useNuxtApp,
-  // @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-} from "#imports";
-import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
+import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import type { MultipartPolicy } from "@mapomodule/core";
 
@@ -33,9 +30,9 @@ const props = withDefaults(
     /** Record id. Pass `'new'` to create. */
     id: string | number;
     /** Fields for the main body form. */
-    fields: FieldDescriptor<T>[];
+    fields: AnyFieldDescriptor<T>[];
     /** Fields for the sidebar form (optional). */
-    sidebarFields?: FieldDescriptor<T>[];
+    sidebarFields?: AnyFieldDescriptor<T>[];
     /** Translation language codes (e.g. ['it', 'en']). */
     languages?: string[];
     /** Human readable model name shown in the page title. */
@@ -151,7 +148,14 @@ provide("mapoDetailRegisterValidator", (fn: ValidateClientFn) => {
 });
 
 const isNew = computed(() => String(props.id) === "new");
-const model = ref<T>({} as T);
+// Cast keeps the generic exact: `ref<T>` would expose `UnwrapRef<T>`, which
+// TS cannot prove to extend `object` when forwarding to MapoForm.
+const model = ref({} as T) as Ref<T>;
+
+// T is only constrained to `object`; the record id is read structurally.
+function recordId(): string | number {
+  return (model.value as { id?: string | number }).id as string | number;
+}
 const backup = ref<T | null>(null);
 const errors = ref<Record<string, string[]>>({});
 // Start in loading state for existing items so MapoForm is never mounted with
@@ -376,14 +380,14 @@ async function save(andBack = false) {
     } else if (props.usePatch) {
       const patch = getPatch();
       result = await crud.partialUpdate(
-        model.value.id as string | number,
+        recordId(),
         patch,
         undefined,
         multipartOpts,
       );
     } else {
       result = await crud.update(
-        model.value.id as string | number,
+        recordId(),
         model.value,
         undefined,
         multipartOpts,
@@ -441,7 +445,7 @@ async function deleteItem() {
   if (!ok) return;
   isDeleting.value = true;
   try {
-    await crud.delete(model.value.id as string | number);
+    await crud.delete(recordId());
     backup.value = deepClone(model.value) as T; // clear dirty so guard doesn't fire
     snack.show("Deleted successfully", "success");
     emit("deleted");
@@ -601,7 +605,11 @@ defineSlots<{
    */
   "side-danger"(props: SlotBindings): VNode[];
   /** Per-field slot. Slot name: `field.{key}`, `field.{key}.before`, `field.{key}.after`. */
-  [K: `field.${string}`]: (props: { model: T; currentLang: string }) => VNode[];
+  [K: `field.${string}`]: (props: {
+    field: AnyFieldDescriptor<T>;
+    model: T;
+    currentLang: string;
+  }) => VNode[];
   /** Per-group slot. Slot name: `group.{name}.before`, `group.{name}.after`. */
   [K: `group.${string}`]: (props: Record<string, never>) => VNode[];
   /** Catch-all for slots forwarded dynamically to the inner MapoForm. */
@@ -825,7 +833,7 @@ defineSlots<{
     <UModal
       v-if="previewField"
       v-model:open="previewOpen"
-      :ui="{ width: 'max-w-5xl' }"
+      :ui="{ content: 'max-w-5xl' }"
     >
       <template #content>
         <div class="flex flex-col" style="height: 80vh">

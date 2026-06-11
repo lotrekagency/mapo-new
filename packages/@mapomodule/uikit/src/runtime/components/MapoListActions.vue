@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="T extends Record<string, unknown>">
+<script setup lang="ts" generic="T extends object">
 import { ref, computed } from "vue";
 import type { ActionDescriptor } from "../types/list.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
@@ -33,7 +33,6 @@ const snack = useSnackStore();
 const confirm = useConfirmStore();
 const crud = useCrud<T>(props.endpoint);
 
-const selectedAction = ref<ActionDescriptor<T> | null>(null);
 const isRunning = ref(false);
 
 const defaultActions = computed<ActionDescriptor<T>[]>(() => [
@@ -42,7 +41,11 @@ const defaultActions = computed<ActionDescriptor<T>[]>(() => [
     handler: async ({ selection }) => {
       if (!selection) return;
       await Promise.all(
-        selection.map((i) => crud.delete(i[props.lookup] as string | number)),
+        selection.map((i) =>
+          crud.delete(
+            (i as Record<string, unknown>)[props.lookup] as string | number,
+          ),
+        ),
       );
     },
     permissions: "delete",
@@ -59,6 +62,14 @@ const visibleActions = computed(() =>
       ? (a.handleAll ?? false)
       : (a.handleMultiple ?? true),
   ),
+);
+
+// USelect can only model primitive values, so track the selected action by
+// label and resolve the descriptor from the visible list.
+const selectedLabel = ref<string | undefined>(undefined);
+const selectedAction = computed<ActionDescriptor<T> | null>(
+  () =>
+    visibleActions.value.find((a) => a.label === selectedLabel.value) ?? null,
 );
 
 const applyButtonColor = computed(() =>
@@ -100,7 +111,7 @@ async function runAction() {
     });
     snack.show("Action completed", "success");
     emit("actionCompleted");
-    selectedAction.value = null;
+    selectedLabel.value = undefined;
   } catch (err: unknown) {
     const detail = (err as { response?: { data?: { detail?: string } } })
       ?.response?.data?.detail;
@@ -119,9 +130,9 @@ const isActive = computed(
   <div v-if="isActive" class="mapo-list-actions flex items-center gap-2">
     <slot name="prepend" />
     <USelect
-      v-model="selectedAction"
+      v-model="selectedLabel"
       :items="visibleActions"
-      value-key=""
+      value-key="label"
       label-key="label"
       placeholder="Bulk actions..."
       size="sm"

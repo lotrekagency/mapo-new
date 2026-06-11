@@ -1,7 +1,7 @@
-<script setup lang="ts" generic="T extends Record<string, unknown>">
+<script setup lang="ts" generic="T extends object">
 import { ref, computed, watch } from "vue";
 import type { Ref } from "vue";
-import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 
@@ -10,10 +10,10 @@ const props = withDefaults(
     open: boolean;
     endpoint?: string;
     itemId?: string | number | null;
-    editFields?: FieldDescriptor<T>[];
+    editFields?: AnyFieldDescriptor<T>[];
     lookup?: string;
     languages?: string[];
-    registry?: Partial<FieldRegistry>;
+    registry?: FieldRegistry;
     /**
      * Offline mode: skip backend detail/save calls. The form is seeded from
      * `localItem`, and `saved` emits the locally edited model so the parent

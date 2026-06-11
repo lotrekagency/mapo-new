@@ -6,7 +6,14 @@ withDefaults(
     /** Nuxt UI UButton `variant` prop. */
     variant?: "solid" | "outline" | "soft" | "ghost" | "link";
     /** Nuxt UI UButton `color` prop. */
-    color?: string;
+    color?:
+      | "primary"
+      | "secondary"
+      | "neutral"
+      | "info"
+      | "success"
+      | "warning"
+      | "error";
     /** Nuxt UI UButton `size` prop. */
     size?: "xs" | "sm" | "md" | "lg" | "xl";
     /** Show only the icon (no label). */

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-import { useRoute, navigateTo } from "#imports";
+import { useRoute } from "vue-router";
+import { navigateTo } from "#app";
 
 defineSlots<{
   /** Left decorative panel (shown lg+). Replace with your own branding. */

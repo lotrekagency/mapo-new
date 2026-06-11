@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { watch } from "vue";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-import { useToast } from "#imports";
+import { useToast } from "@nuxt/ui/composables/useToast";
 
 const snack = useSnackStore();
 const toast = useToast();
@@ -25,7 +24,11 @@ watch(
         title: msg.message,
         color: msg.type as "success" | "error" | "warning" | "info",
         duration: msg.duration,
-        onClose: () => snack.dismiss(msg.id),
+        // Nuxt UI v4 has no onClose callback: dismissal (user click or
+        // timeout) is signalled through the `update:open` emit.
+        "onUpdate:open": (open: boolean) => {
+          if (!open) snack.dismiss(msg.id);
+        },
       });
     }
   },

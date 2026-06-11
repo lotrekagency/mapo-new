@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, useSlots } from "vue";
 import type { Ref } from "vue";
 import type {
   ListColumn,
@@ -9,13 +9,9 @@ import type {
   ActionDescriptor,
   ListTabItem,
 } from "../types/list.js";
-import type { FieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { debounce } from "@mapomodule/utils";
-import {
-  useRoute,
-  useRouter,
-  // @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-} from "#imports";
+import { useRoute, useRouter } from "vue-router";
 
 const props = withDefaults(
   defineProps<{
@@ -49,9 +45,9 @@ const props = withDefaults(
     draggable?: boolean;
     positionField?: string;
     // Quick edit
-    editFields?: FieldDescriptor<T>[];
+    editFields?: AnyFieldDescriptor<T>[];
     languages?: string[];
-    registry?: Partial<FieldRegistry>;
+    registry?: FieldRegistry;
     /** Base path for the detail page link on each row. E.g. "/news" → links to "/news/42". */
     detailBase?: string;
     /**
@@ -215,21 +211,26 @@ defineSlots<
     /** Override for the loading skeleton displayed while data is being fetched. */
     "dtable.loading"(): unknown;
     /**
-     * Per-filter custom panel content. Slot name: `filter.{filter.value}`.
-     * Receives `{ filter, toggleChoice, removeFilter }`.
+     * Per-filter custom panel content. Slot name: `filter.{filter.value}`
+     * (plus `.title` / `.content` / `.icon` sub-slots).
+     * Bindings mirror MapoListFilters: `filter` is always provided, the rest
+     * varies per sub-slot.
      */
     [K: `filter.${string}`]: (props: {
       filter: FilterDescriptor & { dates?: string[] };
-      toggleChoice: (filter: FilterDescriptor, choice: FilterChoice) => void;
-      removeFilter: (filter: FilterDescriptor) => void;
+      choice?: FilterChoice;
+      toggleChoice?: (filter: FilterDescriptor, choice: FilterChoice) => void;
+      removeFilter?: (filter: FilterDescriptor) => void;
+      isChoiceActive?: (
+        filter: FilterDescriptor,
+        choice: FilterChoice,
+      ) => boolean;
     }) => unknown;
     /**
      * Extra content rendered below the quick-edit form.
      * Receives `{ model: T }` — the current reactive form model.
      */
     "qedit.extra": (props: { model: T }) => unknown;
-    // catch-all required so $slots[dynamicName] in the forwarding templates type-checks
-    [K: string]: (...args: any[]) => unknown;
   } & {
     /**
      * Per-column cell override. Slot name: `cell.{column.key}`.
@@ -240,6 +241,14 @@ defineSlots<
     }) => unknown;
   }
 >();
+
+// Loosely-typed slot names for the dynamic forwarding templates below.
+// A `[K: string]` catch-all in defineSlots would make `$slots[name]` indexable,
+// but it degrades the typed `cell.*` slot props to `any` for consumers —
+// so the forwarding iterates over this untyped name list instead.
+const slots = useSlots();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const forwardedSlotNames = computed(() => Object.keys(slots) as any[]);
 
 // Reset selection when the active tab or filters change
 watch([activeTab, activeFilters], () => {
@@ -271,7 +280,11 @@ watch([activeTab, activeFilters], () => {
         :model-value="activeFilters"
         @update:model-value="activeFilters = $event"
       >
-        <template v-for="(_, name) in $slots" #[name]="slotProps">
+        <template
+          v-for="name in forwardedSlotNames"
+          :key="name"
+          #[name]="slotProps"
+        >
           <slot :name="name" v-bind="slotProps ?? {}" />
         </template>
       </MapoListFilters>
@@ -314,7 +327,11 @@ watch([activeTab, activeFilters], () => {
       @update:selection-query="selectionQuery = $event"
       @update:items="emit('update:items', $event)"
     >
-      <template v-for="(_, name) in $slots" #[name]="slotProps">
+      <template
+        v-for="name in forwardedSlotNames"
+        :key="name"
+        #[name]="slotProps"
+      >
         <slot :name="name" v-bind="slotProps ?? {}" />
       </template>
     </MapoListTable>

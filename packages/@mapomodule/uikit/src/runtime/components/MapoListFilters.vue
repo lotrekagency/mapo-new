@@ -83,30 +83,24 @@ function isChoiceActive(
 
 function toggleChoice(filter: FilterDescriptor, choice: FilterChoice) {
   const idx = activeFilters.value.findIndex((f) => f.value === filter.value);
-  if (idx !== -1) {
-    const ci = activeFilters.value[idx].active.findIndex(
-      (c) => c.value === choice.value,
-    );
+  const current = activeFilters.value[idx];
+  if (current) {
+    const ci = current.active.findIndex((c) => c.value === choice.value);
     if (ci !== -1) {
       // Deactivate the choice
-      const newActive = [...activeFilters.value[idx].active];
+      const newActive = [...current.active];
       newActive.splice(ci, 1);
-      if (!newActive.length) {
-        const list = [...activeFilters.value];
-        list.splice(idx, 1);
-        activeFilters.value = list;
-      } else {
-        const list = [...activeFilters.value];
-        list[idx] = { ...list[idx], active: newActive };
-        activeFilters.value = list;
-      }
+      const list = [...activeFilters.value];
+      if (!newActive.length) list.splice(idx, 1);
+      else list[idx] = { ...current, active: newActive };
+      activeFilters.value = list;
     } else if (filter.multiple) {
       const list = [...activeFilters.value];
-      list[idx] = { ...list[idx], active: [...list[idx].active, choice] };
+      list[idx] = { ...current, active: [...current.active, choice] };
       activeFilters.value = list;
     } else {
       const list = [...activeFilters.value];
-      list[idx] = { ...list[idx], active: [choice] };
+      list[idx] = { ...current, active: [choice] };
       activeFilters.value = list;
     }
   } else {
