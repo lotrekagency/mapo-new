@@ -49,8 +49,8 @@ export function buildRouteTree(routes: RouteRecordNormalized[]): MenuNode[] {
 
   const roots: MenuNode[] = [];
   for (const route of routes) {
-    const { label, parent } = route.meta ?? {};
-    if (!label) continue;
+    const { label, hidden, parent } = route.meta ?? {};
+    if (!label || hidden) continue;
     const node = nodeMap.get(route.path)!;
     if (parent) {
       const parentKey = String(parent).startsWith("/") ? parent : `/${parent}`;
