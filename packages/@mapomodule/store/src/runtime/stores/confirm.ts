@@ -20,6 +20,8 @@ export const useConfirmStore = defineStore("mapo-confirm", () => {
    * @returns Promise resolved with `true` on confirm, `false` on cancel.
    */
   function ask(opts: ConfirmOptions): Promise<boolean> {
+    // Dismiss any dialog still open so its caller does not hang forever.
+    _resolve.value?.(false);
     options.value = opts;
     active.value = true;
     return new Promise<boolean>((resolve) => {
