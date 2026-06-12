@@ -24,7 +24,6 @@ export default defineNuxtModule<CamomillaOptions>({
     syncCamomillaSession: false,
     forwardedHeaders: [],
     pathRewrite: {},
-    changeOrigin: true,
   },
 
   setup(options, nuxt) {
@@ -37,7 +36,6 @@ export default defineNuxtModule<CamomillaOptions>({
       syncCamomillaSession: options.syncCamomillaSession ?? false,
       forwardedHeaders: options.forwardedHeaders ?? [],
       pathRewrite: options.pathRewrite ?? {},
-      changeOrigin: options.changeOrigin ?? true,
     };
 
     // Server middleware: intercepts /api/* and proxies to Camomilla

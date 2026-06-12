@@ -14,7 +14,7 @@ import {
  * Builds built-in API rewrite rules used by the Camomilla proxy.
  *
  * @param base Optional app base path prefix.
- * @returns Default regex rewrite map applied before custom overrides.
+ * @returns Default regex rewrite map applied as fallback for unmatched paths.
  */
 export function buildDefaultRewrites(base: string): CamomillaPathRewrite {
   const b = base
@@ -32,10 +32,11 @@ export function buildDefaultRewrites(base: string): CamomillaPathRewrite {
 }
 
 /**
- * Rewrites a request pathname according to default and user-defined rules.
+ * Rewrites a request pathname according to custom and default rules.
  *
- * Custom rewrites take precedence over built-in rewrites. The output path is
- * normalized to avoid accidental duplicated slashes.
+ * Custom rewrites are evaluated FIRST to take precedence; built-in rewrites
+ * serve as fallback for unmatched paths. The output path is normalized to
+ * avoid accidental duplicated slashes.
  *
  * @param pathname Incoming request pathname.
  * @param base Optional app base path prefix.
@@ -47,15 +48,23 @@ export function applyPathRewrite(
   base: string,
   customRewrites: CamomillaPathRewrite,
 ): string {
-  const rewrites = { ...buildDefaultRewrites(base), ...customRewrites };
-  for (const [pattern, replacement] of Object.entries(rewrites)) {
-    const regex = new RegExp(pattern);
-    if (regex.test(pathname)) {
-      const rewritten = pathname.replace(regex, replacement);
-      // Collapse any accidental double slashes introduced by replacements
-      // that end with '/' applied to a path with a trailing '/'.
-      return rewritten.replace(/([^:]\/)\/+/g, "$1");
+  const normalize = (path: string) => path.replace(/([^:]\/)\/+/g, "$1");
+  const tryRewrite = (rewrites: CamomillaPathRewrite) => {
+    for (const [pattern, replacement] of Object.entries(rewrites)) {
+      const regex = new RegExp(pattern);
+      if (regex.test(pathname)) {
+        return normalize(pathname.replace(regex, replacement));
+      }
     }
-  }
+    return null;
+  };
+
+  // Evaluate custom rules first so they take precedence, including exact-key overrides.
+  const custom = tryRewrite(customRewrites);
+  if (custom) return custom;
+
+  const fallback = tryRewrite(buildDefaultRewrites(base));
+  if (fallback) return fallback;
+
   return pathname;
 }

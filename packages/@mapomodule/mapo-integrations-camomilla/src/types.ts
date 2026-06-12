@@ -17,8 +17,6 @@ export interface CamomillaOptions {
   forwardedHeaders?: string[];
   /** Custom path rewrites merged after the built-in ones. Key = regex string, value = replacement. */
   pathRewrite?: CamomillaPathRewrite;
-  /** Override the Host header sent to the Camomilla backend. Defaults to true. */
-  changeOrigin?: boolean;
 }
 
 /** Shape stored in runtimeConfig (private, server-only). */
