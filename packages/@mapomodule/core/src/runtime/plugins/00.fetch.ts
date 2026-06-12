@@ -29,8 +29,16 @@ export default defineNuxtPlugin({
     const logoutUrl = rc.logoutUrl;
     const loginUrl = rc.loginUrl;
 
+    // Track whether a 401 redirect is already in flight to prevent duplicate redirects.
+    let redirectInFlight = false;
+
     const handle = (status: number, requestUrl: string) => {
-      if (status === 401 && !requestUrl.includes(logoutUrl)) {
+      if (
+        status === 401 &&
+        !requestUrl.includes(logoutUrl) &&
+        !redirectInFlight
+      ) {
+        redirectInFlight = true;
         const auth = useAuthStore();
         auth.reset();
         if (import.meta.client) {
@@ -45,8 +53,8 @@ export default defineNuxtPlugin({
       }
     };
 
-    // Global loading counter — incremented on every request, decremented on
-    // every response (success or error). Exposed as $mapoFetchLoading so any
+    // Global loading counter — incremented on every request, decremented once on every
+    // response (success or error) or request error. Exposed as $mapoFetchLoading so any
     // component can show a spinner without wrapping every fetch call manually.
     const pending = ref(0);
     const mapoFetchLoading = computed(() => pending.value > 0);
@@ -63,6 +71,10 @@ export default defineNuxtPlugin({
         pending.value--;
         handle(response?.status ?? 0, String(request));
         return Promise.reject(error);
+      },
+      onRequestError() {
+        // Decrement counter on network errors (no response received).
+        pending.value--;
       },
     });
 
