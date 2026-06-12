@@ -3,13 +3,12 @@ import { useCookie } from "nuxt/app";
 import { SidebarCookieEnum } from "../types";
 
 /**
- * Sidebar UI state store (drawer, mini, clipped) with cookie persistence.
+ * Sidebar UI state store (drawer, mini) with cookie persistence.
  */
 export const useSidebarStore = defineStore("mapo-sidebar", {
   state: () => ({
     drawer: true,
     mini: false,
-    clipped: false,
   }),
 
   actions: {
@@ -20,10 +19,8 @@ export const useSidebarStore = defineStore("mapo-sidebar", {
     hydrateFromCookies() {
       const drawer = useCookie(SidebarCookieEnum.Drawer);
       const mini = useCookie(SidebarCookieEnum.Mini);
-      const clipped = useCookie(SidebarCookieEnum.Clipped);
       if (drawer.value != null) this.drawer = drawer.value !== "0";
       if (mini.value != null) this.mini = mini.value === "1";
-      if (clipped.value != null) this.clipped = clipped.value === "1";
     },
 
     /** Toggles drawer visibility and persists the new value in cookies. */
@@ -36,12 +33,6 @@ export const useSidebarStore = defineStore("mapo-sidebar", {
     toggleMini() {
       this.mini = !this.mini;
       useCookie(SidebarCookieEnum.Mini).value = this.mini ? "1" : "0";
-    },
-
-    /** Toggles clipped layout mode and persists the new value in cookies. */
-    toggleClipped() {
-      this.clipped = !this.clipped;
-      useCookie(SidebarCookieEnum.Clipped).value = this.clipped ? "1" : "0";
     },
   },
 });

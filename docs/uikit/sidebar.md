@@ -103,11 +103,9 @@ const sidebar = useSidebarStore();
 
 sidebar.drawer; // boolean — sidebar visible or hidden
 sidebar.mini; // boolean — collapsed to icon-only mode
-sidebar.clipped; // boolean — clipped below topbar (reserved)
 
 sidebar.toggleDrawer(); // show/hide sidebar
 sidebar.toggleMini(); // expand/collapse to mini mode
-sidebar.toggleClipped(); // toggle clipped mode
 ```
 
 ### Controlling the sidebar programmatically

@@ -34,7 +34,6 @@ export interface SnackMessage {
 export enum SidebarCookieEnum {
   Drawer = "sidebar_drawer",
   Mini = "sidebar_minivariant",
-  Clipped = "sidebar_clipped",
 }
 
 export interface ConfirmOptions {

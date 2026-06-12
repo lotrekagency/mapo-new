@@ -155,18 +155,16 @@ const ok = await $confirm.ask({
 
 ## `useSidebarStore`
 
-Sidebar open/collapsed/clipped state. Persisted to cookies so it survives page reload and SSR hydration.
+Sidebar open/collapsed state. Persisted to cookies so it survives page reload and SSR hydration.
 
 ```ts
 const sidebar = useSidebarStore();
 
 sidebar.drawer; // boolean — open/closed
 sidebar.mini; // boolean — icon-only mode
-sidebar.clipped; // boolean — clipped to toolbar
 
 sidebar.toggleDrawer();
 sidebar.toggleMini();
-sidebar.toggleClipped();
 ```
 
 On SSR, `hydrateFromCookies()` is called automatically by the `@mapomodule/core` init plugin. Cookie names are defined in `SidebarCookieEnum`.

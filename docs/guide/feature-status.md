@@ -26,7 +26,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `useAuthStore`    | `isAuthenticated`, `username`, `role`, `modelPermissions`, `pagePermissions` (populated by `permissions` middleware when using `{ model }` format) |
 | `useSnackStore`   | `show(message, type, duration)`, `dismiss()`                                                                                                       |
 | `useConfirmStore` | `ask(options): Promise<boolean>`                                                                                                                   |
-| `useSidebarStore` | `drawer`, `mini`, `clipped` — all persisted to cookies, SSR-hydrated                                                                               |
+| `useSidebarStore` | `drawer`, `mini` — both persisted to cookies, SSR-hydrated                                                                                         |
 | `usePermissions`  | `userCan(model, action)` helper                                                                                                                    |
 
 ### UIKit Shell

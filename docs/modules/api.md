@@ -136,11 +136,10 @@ Pinia store for sidebar display state, persisted in cookies.
 
 **State:**
 
-| Field     | Type      | Description                                      |
-| --------- | --------- | ------------------------------------------------ |
-| `drawer`  | `boolean` | Mobile drawer visibility.                        |
-| `mini`    | `boolean` | Mini (icon-only) sidebar mode.                   |
-| `clipped` | `boolean` | Whether the sidebar is clipped under the topbar. |
+| Field    | Type      | Description                    |
+| -------- | --------- | ------------------------------ |
+| `drawer` | `boolean` | Mobile drawer visibility.      |
+| `mini`   | `boolean` | Mini (icon-only) sidebar mode. |
 
 **Actions:**
 
@@ -148,7 +147,6 @@ Pinia store for sidebar display state, persisted in cookies.
 | -------------------- | ------------ | -------------------------------------------------- |
 | `toggleDrawer`       | `() => void` | Toggle `drawer` and persist to cookie.             |
 | `toggleMini`         | `() => void` | Toggle `mini` and persist to cookie.               |
-| `toggleClipped`      | `() => void` | Toggle `clipped` and persist to cookie.            |
 | `hydrateFromCookies` | `() => void` | Restore state from cookies (called by SSR plugin). |
 
 ---
