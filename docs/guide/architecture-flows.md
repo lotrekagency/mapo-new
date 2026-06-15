@@ -16,7 +16,7 @@ mapomodule                          ← real Nuxt module: installs @mapomodule/c
 
 ### Module relationships
 
-`mapomodule` is a thin **meta-module**: it calls `await installModule('@mapomodule/core')` in its `setup()`. It does not re-export anything — it simply ensures the full Mapo stack is registered with a single `modules[]` entry.
+`mapomodule` is a thin **meta-module**: it installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, and `@mapomodule/form` transitively with resolver-based `installModule(...)` calls (pnpm strict compatible). It does not re-export anything — it simply ensures the full Mapo stack is registered with a single `modules[]` entry.
 
 `@mapomodule/core` depends on `@mapomodule/store` at **build time** via package.json `dependencies`. At runtime, stores are accessed through composables (`useAuthStore()`, `useSnackStore()`) which are auto-imported by Nuxt — there is no static import of the module entry from runtime code.
 

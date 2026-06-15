@@ -36,16 +36,45 @@ When installed via `mapomodule`, configure under `mapo.uikit` instead.
 
 ### Components (auto-imported)
 
+#### Layout & navigation
+
 | Component             | Description                                                                  |
 | --------------------- | ---------------------------------------------------------------------------- |
 | `MapoSidebar`         | Collapsible sidebar with mini mode, auto-nav from route meta, footer section |
 | `MapoSidebarList`     | Recursive nav tree built from `route.meta.label` / `meta.parent`             |
 | `MapoSidebarListItem` | Single nav item with permission filtering and nested collapse                |
+| `MapoSidebarProfile`  | User profile row (avatar + username + logout) for the sidebar footer         |
 | `MapoTopbar`          | Top bar with drawer toggle and left/default/right slots                      |
-| `MapoLogin`           | Centered login form with brand slot and footer slot                          |
-| `MapoSnackBar`        | Imperative snackbar driven by `useSnackStore`                                |
-| `MapoConfirmDialog`   | Promise-based confirm dialog driven by `useConfirmStore`                     |
-| `MapoRootComponents`  | Mounts `MapoSnackBar` + `MapoConfirmDialog` in the layout                    |
+| `MapoThemeToggle`     | Dark/light mode toggle via `useColorMode()` — drop-in for any slot           |
+| `MapoLogoutButton`    | Standalone logout button with `variant`, `color`, `size`, `iconOnly` props   |
+
+#### Feedback
+
+| Component            | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| `MapoLogin`          | Split-panel login form; slots: `brand`, `panel`, `footer` |
+| `MapoSnackBar`       | Imperative snackbar driven by `useSnackStore`             |
+| `MapoConfirmDialog`  | Promise-based confirm dialog driven by `useConfirmStore`  |
+| `MapoRootComponents` | Mounts `MapoSnackBar` + `MapoConfirmDialog` in the layout |
+
+#### List engine
+
+| Component           | Description                                                                                                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoList`          | Full list shell: composes head, filters, actions, tabs, table, and quick-edit. URL state (page, sort, search, filters, tab) synced automatically.                                                              |
+| `MapoListHead`      | Title, search bar, and primary action button row                                                                                                                                                               |
+| `MapoListFilters`   | Filter panel driven by `FilterDescriptor[]`. v1 backend contract (`key=v1,v2`); per-filter override slots (`filter.{value}` / `.title` / `.content` / `.icon`)                                                 |
+| `MapoListActions`   | Bulk-action toolbar (delete, reorder) — appears on selection. Supports `ActionDescriptor.dangerous` to render Apply/confirm with error styling for destructive actions.                                        |
+| `MapoListTabs`      | Tabbed status filter via `meta.tabs`                                                                                                                                                                           |
+| `MapoListTable`     | Data table with server-side pagination, sort, selection, and whole-row drag reorder (drop-line feedback; auto-disabled while a search/sort is active). Pass `permissionModel` to gate edit/delete row actions. |
+| `MapoListQuickEdit` | Quick-edit modal driven by the same `FieldDescriptor[]` as the detail form                                                                                                                                     |
+
+#### Detail shell
+
+| Component              | Description                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoDetail`           | Two-column detail shell: `useCrud` lifecycle, differential PATCH, error mapping, draft auto-save (`:draft="true"`). Supports permission gating (`permissionModel`), multipart control (`multipart`), live preview (`previewField`), and backend-derived languages (`forceLanguages`). |
+| `MapoDetailLangSwitch` | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                                                                                                                                          |
 
 ### Layout slots (`mapo-default`)
 
@@ -111,7 +140,7 @@ app/
 
 The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` and swaps the `filePath` — no imports, no registration needed. Keep props and slots compatible with the original.
 
-Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoLogin`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`.
+Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoSidebarProfile`, `MapoLogin`, `MapoLogoutButton`, `MapoThemeToggle`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`, `MapoDetail`, `MapoDetailLangSwitch`, `MapoList`, `MapoListTable`, `MapoListFilters`, `MapoListActions`, `MapoListHead`, `MapoListQuickEdit`.
 
 ## Dev workflow
 

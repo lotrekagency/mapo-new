@@ -38,6 +38,60 @@ describe("deepClone", () => {
     expect(clone).toEqual(arr);
     expect(clone).not.toBe(arr);
   });
+
+  it("unwraps Vue-like reactive wrappers before cloning", () => {
+    const raw = { a: 1, nested: { b: 2 } };
+    const vueLikeProxy = { __v_raw: raw } as unknown;
+
+    const clone = deepClone(vueLikeProxy) as typeof raw;
+    expect(clone).toEqual(raw);
+    expect(clone).not.toBe(raw);
+    expect(clone.nested).not.toBe(raw.nested);
+  });
+
+  it("falls back to recursive clone when structuredClone throws", () => {
+    const original = globalThis.structuredClone;
+    Object.defineProperty(globalThis, "structuredClone", {
+      configurable: true,
+      value: () => {
+        throw new Error("boom");
+      },
+    });
+
+    try {
+      const obj = { a: 1, nested: { b: 2 } };
+      const clone = deepClone(obj);
+      expect(clone).toEqual(obj);
+      expect(clone).not.toBe(obj);
+      expect(clone.nested).not.toBe(obj.nested);
+    } finally {
+      Object.defineProperty(globalThis, "structuredClone", {
+        configurable: true,
+        value: original,
+      });
+    }
+  });
+
+  it("falls back to recursive clone when structuredClone is unavailable", () => {
+    const original = globalThis.structuredClone;
+    Object.defineProperty(globalThis, "structuredClone", {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      const obj = { a: 1, nested: { b: 2 } };
+      const clone = deepClone(obj);
+      expect(clone).toEqual(obj);
+      expect(clone).not.toBe(obj);
+      expect(clone.nested).not.toBe(obj.nested);
+    } finally {
+      Object.defineProperty(globalThis, "structuredClone", {
+        configurable: true,
+        value: original,
+      });
+    }
+  });
 });
 
 describe("isFile / isBlob / isFileOrBlob", () => {

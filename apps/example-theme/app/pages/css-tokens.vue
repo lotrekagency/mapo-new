@@ -49,12 +49,12 @@ const semanticTokens = [
     <section class="space-y-3">
       <h2 class="font-semibold text-highlighted">Status colors</h2>
       <div class="flex gap-3 flex-wrap">
-        <UBadge color="success" variant="solid" size="lg">Success</UBadge>
-        <UBadge color="warning" variant="solid" size="lg">Warning</UBadge>
-        <UBadge color="error" variant="solid" size="lg">Error</UBadge>
-        <UBadge color="info" variant="solid" size="lg">Info</UBadge>
-        <UBadge color="primary" variant="solid" size="lg">Primary</UBadge>
-        <UBadge color="neutral" variant="solid" size="lg">Neutral</UBadge>
+        <UBadge color="success" variant="solid" size="lg"> Success </UBadge>
+        <UBadge color="warning" variant="solid" size="lg"> Warning </UBadge>
+        <UBadge color="error" variant="solid" size="lg"> Error </UBadge>
+        <UBadge color="info" variant="solid" size="lg"> Info </UBadge>
+        <UBadge color="primary" variant="solid" size="lg"> Primary </UBadge>
+        <UBadge color="neutral" variant="solid" size="lg"> Neutral </UBadge>
       </div>
     </section>
 
@@ -91,9 +91,9 @@ const semanticTokens = [
             >ui-radius</span
           >
         </div>
-        <UCard class="w-40 p-3 text-sm text-muted"
-          >Card with overridden radius</UCard
-        >
+        <UCard class="w-40 p-3 text-sm text-muted">
+          Card with overridden radius
+        </UCard>
         <UButton>Button</UButton>
         <UInput placeholder="Input" class="w-36" />
       </div>

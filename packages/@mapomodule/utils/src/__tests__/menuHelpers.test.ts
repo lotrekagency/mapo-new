@@ -73,7 +73,45 @@ describe("buildRouteTree", () => {
     expect(buildRouteTree(routes)[0].sidebarFooter).toBe(true);
   });
 
+  it("nests children when parent is specified without leading slash", () => {
+    const routes = [
+      makeRoute("/users", { label: "Users" }),
+      makeRoute("/users/new", { label: "New User", parent: "users" }),
+    ];
+    const tree = buildRouteTree(routes);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].children).toHaveLength(1);
+    expect(tree[0].children[0].label).toBe("New User");
+  });
+
   it("returns empty array for empty input", () => {
     expect(buildRouteTree([])).toEqual([]);
+  });
+
+  it("skips hidden routes even when they have a label", () => {
+    const routes = [
+      makeRoute("/hidden", { label: "Hidden", hidden: true }),
+      makeRoute("/visible", { label: "Visible" }),
+    ];
+    const tree = buildRouteTree(routes);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].link).toBe("/visible");
+  });
+
+  it("does not push undefined when hidden+label route has no nodeMap entry", () => {
+    const routes = [makeRoute("/secret", { label: "Secret", hidden: true })];
+    const tree = buildRouteTree(routes);
+    expect(tree).toHaveLength(0);
+    expect(tree).not.toContain(undefined);
+  });
+
+  it("falls back to roots when parent is a hidden route", () => {
+    const routes = [
+      makeRoute("/hidden-parent", { label: "Hidden", hidden: true }),
+      makeRoute("/child", { label: "Child", parent: "/hidden-parent" }),
+    ];
+    const tree = buildRouteTree(routes);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].link).toBe("/child");
   });
 });

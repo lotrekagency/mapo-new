@@ -16,10 +16,10 @@ export interface MapoUikitOptions {
    * Use it to override Tailwind theme tokens or add global styles.
    *
    * @example
-   * // nuxt.config.ts
+   *  nuxt.config.ts
    * mapoUikit: { css: '~/assets/css/theme.css' }
    *
-   * // assets/css/theme.css
+   *  assets/css/theme.css
    * @import "@nuxt/ui";
    * :root {
    *   --color-primary-500: oklch(0.7 0.2 240);
@@ -67,6 +67,12 @@ export default defineNuxtModule<MapoUikitOptions>({
     // Base CSS: Tailwind v4 entry + Nuxt UI design tokens
     nuxt.options.css.unshift(resolver.resolve("./runtime/assets/main.css"));
 
+    // Allow Vite to serve files from this package when consumed outside its workspace root
+    nuxt.options.vite.server ??= {};
+    nuxt.options.vite.server.fs ??= {};
+    nuxt.options.vite.server.fs.allow ??= [];
+    nuxt.options.vite.server.fs.allow.push(resolver.resolve("."));
+
     // Custom theme override CSS (injected after base so it wins)
     if (options.css) {
       nuxt.options.css.push(options.css);
@@ -87,7 +93,18 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoSidebar",
       "MapoSidebarList",
       "MapoSidebarListItem",
+      "MapoLogoutButton",
+      "MapoSidebarProfile",
       "MapoTopbar",
+      "MapoDetail",
+      "MapoDetailLangSwitch",
+      "MapoList",
+      "MapoListHead",
+      "MapoListTabs",
+      "MapoListFilters",
+      "MapoListActions",
+      "MapoListQuickEdit",
+      "MapoListTable",
     ];
 
     for (const name of components) {

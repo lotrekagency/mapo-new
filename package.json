@@ -11,12 +11,15 @@
     "docs:build": "turbo run docs:build",
     "dev:example": "pnpm --filter @mapomodule/example dev",
     "dev:example-theme": "pnpm --filter @mapomodule/example-theme dev",
+    "dev:example-form": "pnpm --filter @mapomodule/example-custom-form dev",
+    "dev:example-e2e": "pnpm --filter @mapomodule/example-e2e dev",
     "dev:core": "pnpm --filter @mapomodule/core dev",
     "dev:store": "pnpm --filter @mapomodule/store dev",
     "dev:uikit": "pnpm --filter @mapomodule/uikit dev",
     "dev:utils": "pnpm --filter @mapomodule/utils dev",
     "dev:mapomodule": "pnpm --filter mapomodule dev",
     "dev:camomilla": "pnpm --filter mapo-integrations-camomilla dev",
+    "dev:form": "pnpm --filter @mapomodule/form dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
     "prepare": "husky",
     "release": "pnpm build && multi-semantic-release --extends $PWD/.releaserc.release.json",
@@ -43,7 +46,10 @@
     },
     "ignorePackages": [
       "@mapomodule/docs",
-      "@mapomodule/example"
+      "@mapomodule/example",
+      "@mapomodule/example-theme",
+      "@mapomodule/example-custom-form",
+      "@mapomodule/example-e2e"
     ]
   },
   "devDependencies": {
@@ -55,6 +61,7 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.6",
     "@semantic-release/npm": "^13.1.5",
+    "@vitejs/plugin-vue": "^6.0.6",
     "eslint": "^10.2.1",
     "eslint-plugin-vue": "^10.9.0",
     "husky": "^9.1.7",
@@ -64,6 +71,7 @@
     "turbo": "^2.9.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "vue-tsc": "^3.3.4"
   }
 }

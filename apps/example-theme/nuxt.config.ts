@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   // @nuxt/ui MUST come before mapomodule to avoid SSR Icon loop
-  modules: ["@nuxt/ui", "mapomodule"],
+  modules: ["@nuxt/ui", "mapomodule", "@mapomodule/form"],
 
   mapo: {
     // Fake endpoints — this app doesn't connect to a real backend

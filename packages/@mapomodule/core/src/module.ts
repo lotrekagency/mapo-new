@@ -27,7 +27,6 @@ export type {
 } from "./runtime/types";
 export { MultipartPolicyEnum, CoreCookieEnum } from "./runtime/types";
 export type { MapoFacade, MapoApiLayer } from "./runtime/composables/useMapo";
-export { useCanAccessRoute } from "./runtime/auth/useCanAccessRoute";
 export type { RoutePermissions } from "./runtime/auth/useCanAccessRoute";
 
 export default defineNuxtModule<MapoOptions>({
@@ -54,11 +53,11 @@ export default defineNuxtModule<MapoOptions>({
       await installModule("@mapomodule/store");
     }
 
+    // `defaults` guarantees these are set at runtime, but MapoOptions keeps
+    // them optional — spread the defaults so the assignment is fully defined.
     nuxt.options.runtimeConfig.public.mapoCore = {
-      authLoginUrl: options.authLoginUrl,
-      userInfoApi: options.userInfoApi,
-      logoutUrl: options.logoutUrl,
-      loginUrl: options.loginUrl,
+      ...MAPO_DEFAULTS,
+      ...options,
     };
 
     addPlugin({ src: resolver.resolve("./runtime/plugins/00.fetch") });
@@ -80,6 +79,10 @@ export default defineNuxtModule<MapoOptions>({
       {
         name: "useCanAccessRoute",
         from: resolver.resolve("./runtime/auth/useCanAccessRoute"),
+      },
+      {
+        name: "useMapoFetch",
+        from: resolver.resolve("./runtime/utils/useMapoFetch"),
       },
     ]);
 

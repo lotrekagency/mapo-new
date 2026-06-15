@@ -8,7 +8,9 @@ import {
 } from "../../constants";
 
 export interface RequestCookieResult {
+  /** Serialized Cookie header sent to the proxied backend request. */
   cookieHeader: string;
+  /** CSRF token extracted from cookies for X-CSRFToken header forwarding. */
   csrfToken: string | undefined;
 }
 
@@ -58,12 +60,19 @@ export function buildRequestCookies(
 }
 
 interface ParsedCookie {
+  /** Cookie name. */
   name: string;
+  /** Cookie value. */
   value: string;
+  /** Original Set-Cookie header string. */
   raw: string;
+  /** Raw attributes string (Path, HttpOnly, SameSite, etc.). */
   attributes: string;
 }
 
+/**
+ * Parses a single Set-Cookie header into structured fields.
+ */
 function parseSetCookie(raw: string): ParsedCookie {
   const parts = raw.split(";");
   const [nameValue, ...attrParts] = parts;
@@ -73,6 +82,9 @@ function parseSetCookie(raw: string): ParsedCookie {
   return { name, value, raw, attributes: attrParts.join(";") };
 }
 
+/**
+ * Serializes cookie name/value and attributes to a Set-Cookie header string.
+ */
 function serializeCookie(
   name: string,
   value: string,

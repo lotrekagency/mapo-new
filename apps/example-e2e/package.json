@@ -1,0 +1,22 @@
+{
+  "name": "@mapomodule/example-e2e",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@mapomodule/form": "workspace:*",
+    "@mapomodule/uikit": "workspace:*",
+    "@mapomodule/utils": "workspace:*",
+    "@nuxt/ui": "^4.7.0",
+    "mapomodule": "workspace:*",
+    "nuxt": "^4.4.4",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
+  }
+}

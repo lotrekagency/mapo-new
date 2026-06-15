@@ -1,2 +1,8 @@
+/** Module entrypoint export. */
 export { default } from "./module";
-export type { CamomillaOptions } from "./types";
+/** Public type exports for module configuration and runtime config shape. */
+export type {
+  CamomillaOptions,
+  CamomillaPathRewrite,
+  CamomillaRuntimeConfig,
+} from "./types";

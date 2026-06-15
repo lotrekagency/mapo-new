@@ -7,10 +7,48 @@
 @source "../layouts/**/*.vue";
 @source "../pages/**/*.vue";
 
+/* Scan form package sources (symlinked via pnpm workspace).
+   Path: uikit/src/runtime/assets/ → ../../../../ → @mapomodule/ → form/... */
+@source "../../../../form/src/runtime/components/**/*.vue";
+@source "../../../../form/src/runtime/composables/**/*.ts";
+
+/* Safelist: grid utilities used dynamically by the form engine.
+   Tailwind v4 does not scan template literals — these must be explicit. */
+@source inline("col-span-1 col-span-2 col-span-3 col-span-4 col-span-5 col-span-6 col-span-7 col-span-8 col-span-9 col-span-10 col-span-11 col-span-12");
+@source inline("md:col-span-1 md:col-span-2 md:col-span-3 md:col-span-4 md:col-span-5 md:col-span-6 md:col-span-7 md:col-span-8 md:col-span-9 md:col-span-10 md:col-span-11 md:col-span-12");
+@source inline("grid-cols-12");
+@source inline("flex-1 min-h-0 h-full");
+
+/* Expanded field panel — forces the entire chain to fill the available height */
+.mapo-group-expand-body,
+.mapo-group-expand-body > *,
+.mapo-group-expand-body .mapo-form-field,
+.mapo-group-expand-body .mapo-form-field > div {
+  flex: 1;
+  min-height: 0;
+}
+/* The NuxtUI root wrapper (div root of UTextarea / UInput) must stretch */
+.mapo-group-expand-body textarea,
+.mapo-group-expand-body [contenteditable] {
+  height: 100% !important;
+  overflow-y: auto !important;
+  resize: none !important;
+}
+/* NuxtUI root wrapper (usually .relative or [data-slot]) */
+.mapo-group-expand-body .mapo-form-field > div > * {
+  height: 100%;
+}
+
 @layer base {
   html,
   body {
     height: 100%;
+  }
+
+  :root {
+    /* Height of the topbar — used by MapoDetail sticky sidebar positioning.
+       Override in the consuming app if the topbar height differs from the default. */
+    --mapo-topbar-height: 56px;
   }
 
   /* Extend height chain through #__nuxt and the UApp wrapper div */

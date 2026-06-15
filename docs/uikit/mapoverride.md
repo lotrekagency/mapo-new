@@ -38,8 +38,7 @@ Keep the same slots as the original component or your override may break layouts
 ```vue
 <!-- app/mapooverride/MapoTopbar.vue -->
 <script setup lang="ts">
-import { useSidebarStore } from "@mapomodule/store/runtime/stores/sidebar";
-
+// useSidebarStore and useColorMode are Nuxt auto-imports — no explicit import needed
 defineSlots<{ left(): unknown; default(): unknown; right(): unknown }>();
 
 const sidebar = useSidebarStore();
@@ -81,7 +80,7 @@ const colorMode = useColorMode();
 ```vue
 <!-- app/mapooverride/MapoLogin.vue -->
 <script setup lang="ts">
-import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
+// useMapoAuth is a Nuxt auto-import — no explicit import needed
 const { login } = useMapoAuth();
 // ... your form logic
 </script>

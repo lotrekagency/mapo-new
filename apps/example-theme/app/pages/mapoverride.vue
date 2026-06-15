@@ -84,11 +84,16 @@ const overrides = [
                   color="success"
                   variant="soft"
                   size="xs"
-                  >active</UBadge
                 >
+                  active
+                </UBadge>
               </div>
-              <p class="text-sm text-muted">{{ item.what }}</p>
-              <p class="text-xs text-muted font-mono">{{ item.file }}</p>
+              <p class="text-sm text-muted">
+                {{ item.what }}
+              </p>
+              <p class="text-xs text-muted font-mono">
+                {{ item.file }}
+              </p>
             </div>
             <UIcon
               name="i-lucide-check-circle"

@@ -2,14 +2,14 @@
 defineOptions({ name: "MapoDefaultLayout" });
 
 defineSlots<{
-  default(): unknown;
-  "sidebar:logo"(): unknown;
-  "sidebar:nav-top"(): unknown;
-  "sidebar:nav-bottom"(): unknown;
-  "sidebar:footer"(): unknown;
-  "topbar:left"(): unknown;
-  topbar(): unknown;
-  "topbar:right"(): unknown;
+  default(): void;
+  "sidebar:logo"(): void;
+  "sidebar:nav-top"(): void;
+  "sidebar:nav-bottom"(): void;
+  "sidebar:footer"(): void;
+  "topbar:left"(): void;
+  topbar(): void;
+  "topbar:right"(): void;
 }>();
 </script>
 

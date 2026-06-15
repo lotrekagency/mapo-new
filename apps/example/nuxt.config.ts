@@ -2,7 +2,12 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
 
-  modules: ["@nuxt/ui", "mapomodule", "mapo-integrations-camomilla"],
+  modules: [
+    "@nuxt/ui",
+    "mapomodule",
+    "@mapomodule/form",
+    "mapo-integrations-camomilla",
+  ],
 
   mapo: {
     authLoginUrl: "/api/auth/login",

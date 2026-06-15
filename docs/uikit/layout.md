@@ -72,23 +72,37 @@ The layout forwards named slots to sidebar and topbar with a namespaced prefix. 
 
 ## Customizing from app.vue
 
+Slots are passed from `app.vue` via `<NuxtLayout>`. Note that `<NuxtLayout>` must be wrapped in `<UApp>` — without it Nuxt UI theming and overlays do not work.
+
 ```vue
-<!-- app.vue -->
-<NuxtLayout>
-  <template #sidebar:logo>
-    <NuxtLink to="/" class="flex items-center gap-2">
-      <img src="~/assets/logo.svg" class="h-6" alt="Acme" />
-      <span class="font-semibold">Acme Admin</span>
-    </NuxtLink>
-  </template>
+<!-- app/app.vue -->
+<script setup lang="ts"></script>
 
-  <template #topbar:right>
-    <UButton icon="i-lucide-bell" variant="ghost" color="neutral" />
-    <UButton icon="i-lucide-settings" variant="ghost" color="neutral" to="/settings" />
-  </template>
+<template>
+  <UApp>
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <template #sidebar:logo>
+        <NuxtLink to="/" class="flex items-center gap-2">
+          <img src="~/assets/logo.svg" class="h-6" alt="Acme" />
+          <span class="font-semibold">Acme Admin</span>
+        </NuxtLink>
+      </template>
 
-  <NuxtPage />
-</NuxtLayout>
+      <template #topbar:right>
+        <UButton icon="i-lucide-bell" variant="ghost" color="neutral" />
+        <UButton
+          icon="i-lucide-settings"
+          variant="ghost"
+          color="neutral"
+          to="/settings"
+        />
+      </template>
+
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
+</template>
 ```
 
 ## Customizing from a page

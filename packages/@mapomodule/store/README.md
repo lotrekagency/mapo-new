@@ -24,7 +24,7 @@ The module installs `@pinia/nuxt` automatically if not already present.
 | API                | Purpose                                                             |
 | ------------------ | ------------------------------------------------------------------- |
 | `useAuthStore`     | Authenticated user info, role, permissions, model permissions       |
-| `useSnackStore`    | Imperative snackbar messages (`show`, `dismiss`)                    |
+| `useSnackStore`    | Snackbar message queue (`show`, `dismiss`, `dismissAll`)            |
 | `useConfirmStore`  | Promise-based confirm dialog (`ask` returns `Promise<boolean>`)     |
 | `useSidebarStore`  | Sidebar `drawer` / `mini` / `clipped` state with cookie persistence |
 | `usePermissions()` | Selectors over the auth store: `canView`, `canAdd`, `hasRole`, etc. |

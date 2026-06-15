@@ -31,10 +31,10 @@ definePageMeta({
       </p>
       <div class="flex gap-3 flex-wrap items-center">
         <UButton>Default (primary/solid)</UButton>
-        <UButton color="success">Success override</UButton>
-        <UButton variant="outline">Outline override</UButton>
-        <UButton variant="ghost" color="neutral">Ghost neutral</UButton>
-        <UButton variant="soft" color="error">Soft error</UButton>
+        <UButton color="success"> Success override </UButton>
+        <UButton variant="outline"> Outline override </UButton>
+        <UButton variant="ghost" color="neutral"> Ghost neutral </UButton>
+        <UButton variant="soft" color="error"> Soft error </UButton>
       </div>
     </section>
 
@@ -48,11 +48,15 @@ definePageMeta({
       </p>
       <div class="grid grid-cols-2 gap-4">
         <UCard>
-          <template #header><span class="font-medium">Card A</span></template>
+          <template #header>
+            <span class="font-medium">Card A</span>
+          </template>
           Auto-styled via global ui config
         </UCard>
         <UCard>
-          <template #header><span class="font-medium">Card B</span></template>
+          <template #header>
+            <span class="font-medium">Card B</span>
+          </template>
           Same default everywhere
         </UCard>
       </div>
@@ -71,7 +75,7 @@ definePageMeta({
 
     <!-- How it works note -->
     <UAlert color="info" variant="soft" icon="i-lucide-info">
-      <template #title>How it works</template>
+      <template #title> How it works </template>
       <template #description>
         <code>mapo.uikit.ui</code> is spread onto
         <code>nuxt.options.ui</code> in

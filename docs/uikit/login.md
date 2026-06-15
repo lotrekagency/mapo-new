@@ -21,15 +21,29 @@ The `auth` middleware redirects unauthenticated users to `loginUrl` (default `/l
 
 ## Slots
 
-Both slots are optional. If neither is provided, the default Mapo branding is shown in the header and no footer is rendered.
+All slots are optional. `MapoLogin` renders sensible defaults for everything.
 
-### `header`
+### `panel`
 
-Replaces the default icon + "Sign in" heading:
+Replaces the left decorative panel (shown on `lg+` screens). Use it for custom brand imagery:
 
 ```vue
 <MapoLogin>
-  <template #header>
+  <template #panel>
+    <div class="flex h-full items-center justify-center bg-primary p-12">
+      <img src="~/assets/brand-art.svg" class="max-w-xs" />
+    </div>
+  </template>
+</MapoLogin>
+```
+
+### `brand`
+
+Replaces the logo/title area above the login form:
+
+```vue
+<MapoLogin>
+  <template #brand>
     <div class="flex flex-col items-center gap-3">
       <img src="~/assets/logo.svg" class="h-10" alt="Acme" />
       <h1 class="text-xl font-semibold">Acme Admin</h1>
@@ -38,16 +52,40 @@ Replaces the default icon + "Sign in" heading:
 </MapoLogin>
 ```
 
+### `before-form`
+
+Content injected between the brand area and the login form card — useful for info banners or SSO buttons:
+
+```vue
+<MapoLogin>
+  <template #before-form>
+    <UAlert color="info" title="SSO is available" description="Use your company account." />
+  </template>
+</MapoLogin>
+```
+
+### `after-form`
+
+Content injected between the login form card and the footer — useful for secondary actions:
+
+```vue
+<MapoLogin>
+  <template #after-form>
+    <p class="text-center text-sm text-muted">
+      <a href="/forgot-password" class="underline">Forgot password?</a>
+    </p>
+  </template>
+</MapoLogin>
+```
+
 ### `footer`
 
-Adds content below the sign-in button — useful for links:
+Content below the after-form area — useful for copyright text or links:
 
 ```vue
 <MapoLogin>
   <template #footer>
-    <p class="text-center text-sm text-muted">
-      <a href="https://example.com/reset" class="underline">Forgot password?</a>
-    </p>
+    <p class="text-center text-xs text-muted">© 2025 Acme Inc.</p>
   </template>
 </MapoLogin>
 ```
@@ -98,10 +136,13 @@ async function submit(creds: { username: string; password: string }) {
 
 **Slots:**
 
-| Slot     | Description                                                    |
-| -------- | -------------------------------------------------------------- |
-| `header` | Replaces the icon + title in the `UCard` header                |
-| `footer` | Appended inside the `UCard` footer (only rendered if provided) |
+| Slot          | Description                                                            |
+| ------------- | ---------------------------------------------------------------------- |
+| `panel`       | Left decorative panel (lg+). Replace with custom brand imagery.        |
+| `brand`       | Logo / title area above the form card.                                 |
+| `before-form` | Content between the brand area and the form card (banners, SSO links). |
+| `after-form`  | Content between the form card and the footer (forgot-password link…).  |
+| `footer`      | Content below the after-form area (copyright, external links).         |
 
 **Behavior:**
 

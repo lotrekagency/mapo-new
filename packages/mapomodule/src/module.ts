@@ -7,10 +7,13 @@ import {
 import type { NuxtModule } from "@nuxt/schema";
 import type { MapoOptions } from "@mapomodule/core";
 import type { MapoUikitOptions } from "@mapomodule/uikit";
+import type { MapoFormOptions } from "@mapomodule/form";
 
 interface MapoModuleOptions extends MapoOptions {
   /** Options forwarded to @mapomodule/uikit (CSS override, Nuxt UI defaults). */
   uikit?: MapoUikitOptions;
+  /** Options forwarded to @mapomodule/form (field registry, groups, debounce). */
+  form?: MapoFormOptions;
 }
 
 // Meta-module: installs all @mapomodule/* Nuxt modules with a single registration.
@@ -30,22 +33,33 @@ export default defineNuxtModule<MapoModuleOptions>({
       await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
+    // Forward only core options: `uikit` and `form` have their own modules,
+    // and leaking them into `runtimeConfig.public.mapoCore` would change its
+    // generated type per-app.
+    const { uikit, form, ...coreOptions } = options;
+
     if (!hasNuxtModule("@mapomodule/core")) {
       await installModule(
         await resolver.resolvePath("@mapomodule/core"),
-        options as MapoOptions,
+        coreOptions satisfies MapoOptions,
       );
     }
 
     if (!hasNuxtModule("@mapomodule/uikit")) {
       await installModule(
         await resolver.resolvePath("@mapomodule/uikit"),
-        options.uikit ?? {},
+        uikit ?? {},
+      );
+    }
+
+    if (!hasNuxtModule("@mapomodule/form")) {
+      await installModule(
+        await resolver.resolvePath("@mapomodule/form"),
+        form ?? {},
       );
     }
 
     // TODO: install when implemented as Nuxt modules
-    // if (!hasNuxtModule('@mapomodule/form')) await installModule(await resolver.resolvePath('@mapomodule/form'))
     // if (!hasNuxtModule('@mapomodule/i18n')) await installModule(await resolver.resolvePath('@mapomodule/i18n'))
   },
 }) satisfies NuxtModule<MapoModuleOptions>;

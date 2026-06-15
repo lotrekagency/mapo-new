@@ -1,0 +1,23 @@
+{
+  "name": "@mapomodule/example-custom-form",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3001",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@mapomodule/core": "workspace:*",
+    "@mapomodule/form": "workspace:*",
+    "@mapomodule/store": "workspace:*",
+    "@mapomodule/utils": "workspace:*",
+    "@mdi/font": "^7.4.47",
+    "nuxt": "^4.4.2",
+    "vue": "^3.5.32",
+    "vuetify": "^3.7.0",
+    "vite-plugin-vuetify": "^2.0.4"
+  }
+}

@@ -2,8 +2,16 @@ import { defineNuxtModule, addServerHandler, createResolver } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { CamomillaOptions } from "./types";
 
+/** Public module option type export. */
 export type { CamomillaOptions } from "./types";
 
+/**
+ * Nuxt module that proxies Mapo API requests to a Camomilla backend.
+ *
+ * It stores private runtime configuration under `runtimeConfig.camomilla`
+ * and registers a server middleware that intercepts `/api/*` calls, applies
+ * path rewrites, forwards headers/cookies, and returns proxied responses.
+ */
 export default defineNuxtModule<CamomillaOptions>({
   meta: {
     name: "mapo-integrations-camomilla",
@@ -16,7 +24,6 @@ export default defineNuxtModule<CamomillaOptions>({
     syncCamomillaSession: false,
     forwardedHeaders: [],
     pathRewrite: {},
-    changeOrigin: true,
   },
 
   setup(options, nuxt) {
@@ -29,7 +36,6 @@ export default defineNuxtModule<CamomillaOptions>({
       syncCamomillaSession: options.syncCamomillaSession ?? false,
       forwardedHeaders: options.forwardedHeaders ?? [],
       pathRewrite: options.pathRewrite ?? {},
-      changeOrigin: options.changeOrigin ?? true,
     };
 
     // Server middleware: intercepts /api/* and proxies to Camomilla

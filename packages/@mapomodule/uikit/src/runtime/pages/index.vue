@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { version } from "../../../package.json";
 
-// @ts-expect-error — definePageMeta is a Nuxt compile-time macro, resolved at app build time
 definePageMeta({ layout: "mapo-default" });
 </script>
 

@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.0",
+    "@mapomodule/core": "workspace:*",
+    "@mapomodule/form": "workspace:*",
+    "@mapomodule/store": "workspace:*",
     "@nuxt/ui": "^4.7.0",
     "mapomodule": "workspace:*",
     "nuxt": "^4.4.2",

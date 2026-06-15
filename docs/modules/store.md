@@ -90,23 +90,29 @@ This map is what the `permissions` route middleware reads against `route.meta.pe
 
 ## `useSnackStore`
 
-Global snackbar / toast notification.
+Global snackbar / toast notification queue. Multiple toasts can be active simultaneously — each `show()` call appends to the queue.
 
 ```ts
 const snack = useSnackStore();
 
 snack.show("Saved!", "success");
 snack.show("Error", "error", 5000);
-snack.clear();
+
+snack.dismiss(); // remove the last message
+snack.dismiss(id); // remove a specific message by id
+snack.dismissAll(); // clear all messages
+
+snack.messages; // SnackMessage[] — full queue
+snack.current; // SnackMessage | null — last message (getter, for backward compat)
 ```
 
-You can also call this through the `useMapo()` facade:
+You can also reach the store through the `useMapo()` facade (exposed as `$snack`):
 
 ```ts
-const { snack } = useMapo();
-snack.success("Saved!");
-snack.error("Could not save");
-snack.info("Loading...");
+const { $snack } = useMapo();
+$snack.show("Saved!", "success");
+$snack.show("Could not save", "error");
+$snack.show("Loading...", "info");
 ```
 
 > **Note**: `useSnackStore().show(message, type, duration?)` takes positional arguments, not an object.
@@ -120,11 +126,12 @@ Programmatic confirm dialog.
 ```ts
 const confirm = useConfirmStore();
 
-const ok = await confirm.open({
+const ok = await confirm.ask({
   title: "Delete item?",
   message: "This action cannot be undone.",
   confirmText: "Delete",
   cancelText: "Cancel",
+  dangerous: true,
 });
 
 if (ok) {
@@ -132,29 +139,32 @@ if (ok) {
 }
 ```
 
-Or via facade:
+`ConfirmOptions`: `{ title?, message, confirmText?, cancelText?, dangerous? }` — `message` is required; `dangerous: true` renders the confirm button in the error color.
+
+Or via facade (exposed as `$confirm`):
 
 ```ts
-const { confirm } = useMapo();
-const ok = await confirm.open({ title: "Sure?" });
+const { $confirm } = useMapo();
+const ok = await $confirm.ask({
+  title: "Sure?",
+  message: "Confirm this action?",
+});
 ```
 
 ---
 
 ## `useSidebarStore`
 
-Sidebar open/collapsed/clipped state. Persisted to cookies so it survives page reload and SSR hydration.
+Sidebar open/collapsed state. Persisted to cookies so it survives page reload and SSR hydration.
 
 ```ts
 const sidebar = useSidebarStore();
 
 sidebar.drawer; // boolean — open/closed
 sidebar.mini; // boolean — icon-only mode
-sidebar.clipped; // boolean — clipped to toolbar
 
 sidebar.toggleDrawer();
 sidebar.toggleMini();
-sidebar.toggleClipped();
 ```
 
 On SSR, `hydrateFromCookies()` is called automatically by the `@mapomodule/core` init plugin. Cookie names are defined in `SidebarCookieEnum`.
@@ -178,6 +188,8 @@ hasRole(["editor", "admin"]); // true if user has any of the roles
 
 ## Module internals
 
-`@mapomodule/store/src/module.ts` is a Nuxt module that calls `await installModule('@pinia/nuxt')` to ensure Pinia is available before any store is used. This means adding `@mapomodule/store` (or `@mapomodule/core` / `mapomodule`, which install it transitively) to `modules[]` is sufficient — you do not need to separately add `@pinia/nuxt`.
+`@mapomodule/store/src/module.ts` is a Nuxt module that installs `@pinia/nuxt` in `setup()` to ensure Pinia is available before any store is used.
 
-> **Known issue**: `installModule` is marked as deprecated in recent `@nuxt/kit` typings (hint-only warning — it still functions correctly). No clean alternative exists for "module installs another module" in Nuxt 4. This will be revisited when Nuxt provides an official replacement pattern. See [Known Limitations](/guide/known-limitations).
+This means adding `@mapomodule/store` (or `@mapomodule/core` / `mapomodule`, which depend on it transitively) to `modules[]` is sufficient — you do not need to separately add `@pinia/nuxt`.
+
+Nuxt 4.1+ introduces `moduleDependencies` (`version`, `defaults`, `overrides`) as the newer dependency declaration model. In this package, the resolver-based `installModule` path is still used for compatibility with the current monorepo/pnpm strict setup. See [Known Limitations](/guide/known-limitations).

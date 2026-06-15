@@ -5,19 +5,59 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/module.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./types": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./runtime/*": {
+      "types": "./src/runtime/*.ts",
+      "import": "./dist/runtime/*.js",
+      "default": "./src/runtime/*"
     }
   },
-  "main": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit",
+    "build": "nuxt-module-build build && vue-tsc -p tsconfig.build-types.json && node ../../../scripts/clean-empty-vue-dts.mjs dist",
+    "dev": "nuxt-module-build build --stub --watch",
+    "prepare": "nuxt-module-build build --stub",
+    "dev:prepare": "nuxt-module-build build --stub",
+    "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@internationalized/date": "^3.7.0",
+    "@mapomodule/store": "workspace:*",
+    "@mapomodule/utils": "workspace:*",
+    "@tiptap/extension-link": "^2.11.5",
+    "@tiptap/extension-underline": "^2.11.5",
+    "@tiptap/starter-kit": "^2.11.5",
+    "@tiptap/vue-3": "^2.11.5",
+    "leaflet": "^1.9.4",
+    "vue-draggable-plus": "^0.6.0"
+  },
+  "optionalDependencies": {
+    "@types/leaflet": "^1.9.18"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4.0.0",
+    "vue": ">=3.5.0"
+  },
+  "devDependencies": {
+    "@nuxt/kit": "4.4.2",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "4.4.2",
+    "nuxt": "^4.4.2",
+    "vitest": "^3.2.0",
+    "vue": "^3.5.32",
+    "vue-router": "^5.0.4",
+    "vue-tsc": "^3.3.4",
+    "zod": "^3.23.8"
   }
 }

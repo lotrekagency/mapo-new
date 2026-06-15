@@ -4,7 +4,7 @@ Mapo provides two global feedback mechanisms — snack notifications and confirm
 
 ## MapoSnackBar
 
-`MapoSnackBar` watches `useSnackStore().current` and bridges it to Nuxt UI's `useToast` + `<UNotifications />`. Any page or composable can trigger a toast by calling `useSnackStore().show(...)`.
+`MapoSnackBar` watches `useSnackStore().messages` and bridges each entry to Nuxt UI's `useToast` + `<UNotifications />`. Multiple toasts can be active simultaneously — each `show()` call appends a new one to the queue. Any page or composable can trigger a toast by calling `useSnackStore().show(...)`.
 
 ### Usage
 
@@ -25,12 +25,16 @@ const snack = useSnackStore();
 const snack = useSnackStore();
 
 snack.show(message, type?, duration?)
-// message  string   — toast text
-// type     SnackType — 'success' | 'error' | 'warning' | 'info'   (default: 'info')
-// duration number   — milliseconds before auto-dismiss              (default: 4000)
+// message  string    — toast text
+// type     SnackType — 'success' | 'error' | 'warning' | 'info'  (default: 'info')
+// duration number    — milliseconds before auto-dismiss            (default: 4000)
 
-snack.dismiss()   // manually clear the current message
-snack.current     // SnackMessage | null — current active message
+snack.dismiss()      // remove the last message in the queue
+snack.dismiss(id)    // remove a specific message by numeric id
+snack.dismissAll()   // clear all messages at once
+
+snack.messages       // SnackMessage[] — full active queue
+snack.current        // SnackMessage | null — last message (getter, backward compat)
 ```
 
 ### Notification types

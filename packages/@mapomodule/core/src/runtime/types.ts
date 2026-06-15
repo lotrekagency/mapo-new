@@ -75,3 +75,14 @@ export interface AuthToken {
   token: string;
   [key: string]: unknown;
 }
+
+/**
+ * Shape of `runtimeConfig.public.mapoCore` as written by the module setup.
+ * All entries are guaranteed by the module `defaults`.
+ */
+export interface MapoCoreRuntimeConfig {
+  authLoginUrl: string;
+  userInfoApi: string;
+  logoutUrl: string;
+  loginUrl: string;
+}

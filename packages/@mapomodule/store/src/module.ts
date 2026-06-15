@@ -16,6 +16,11 @@ export type {
   ConfirmOptions,
 } from "./runtime/types";
 
+export { useAuthStore } from "./runtime/stores/auth";
+export { useSnackStore } from "./runtime/stores/snack";
+export { useConfirmStore } from "./runtime/stores/confirm";
+export { usePermissions } from "./runtime/composables/usePermissions";
+
 export default defineNuxtModule({
   meta: {
     name: "@mapomodule/store",
@@ -26,7 +31,7 @@ export default defineNuxtModule({
     const resolver = createResolver(import.meta.url);
 
     if (!hasNuxtModule("@pinia/nuxt")) {
-      await installModule("@pinia/nuxt");
+      await installModule(await resolver.resolvePath("@pinia/nuxt"));
     }
 
     addImports([

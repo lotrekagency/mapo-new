@@ -15,6 +15,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `roles` middleware                           | Checks `meta.roles` against `useAuthStore.role`                                                                                                                                                                                                                         |
 | 401 auto-logout                              | `$mapoFetch` interceptor calls `auth.reset()` and redirects on 401                                                                                                                                                                                                      |
 | `useCrud<T>()` — full CRUD repository        | `list`, `detail`, `create`, `update`, `partialUpdate`, `delete`, `updateOrder`                                                                                                                                                                                          |
+| `useMapoFetch()` — auth-aware `$fetch`       | Returns the `$mapoFetch` instance (401/403 interceptors). Auto-imported.                                                                                                                                                                                                |
 | Multipart upload with policy                 | `auto` \| `force` \| `disable` — transforms payload when files are detected                                                                                                                                                                                             |
 | `@mapomodule/utils` — base helpers           | `deepMerge`, `deepClone`, `objectDiff`, `getNestedValue`, `setNestedValue`, `formatDate`, `debounce`, `normalizeEndpoint`, `slotNamespace`, `buildRouteTree`, `calcMaxMenuNestDepth`, `isFile`, `isBlob`, `isFileOrBlob`, `findPropPaths`, `filesInObject`, `filterObj` |
 
@@ -25,7 +26,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `useAuthStore`    | `isAuthenticated`, `username`, `role`, `modelPermissions`, `pagePermissions` (populated by `permissions` middleware when using `{ model }` format) |
 | `useSnackStore`   | `show(message, type, duration)`, `dismiss()`                                                                                                       |
 | `useConfirmStore` | `ask(options): Promise<boolean>`                                                                                                                   |
-| `useSidebarStore` | `drawer`, `mini`, `clipped` — all persisted to cookies, SSR-hydrated                                                                               |
+| `useSidebarStore` | `drawer`, `mini` — both persisted to cookies, SSR-hydrated                                                                                         |
 | `usePermissions`  | `userCan(model, action)` helper                                                                                                                    |
 
 ### UIKit Shell
@@ -43,6 +44,8 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `MapoConfirmDialog`        | Bridges `useConfirmStore` to non-dismissible `<UModal>`                                                                              |
 | `MapoRootComponents`       | Mounts SnackBar + ConfirmDialog globally                                                                                             |
 | `MapoThemeToggle`          | Dark/light toggle via `useColorMode()` — drop-in for any slot                                                                        |
+| `MapoLogoutButton`         | Standalone logout button — props: `variant`, `color`, `size`, `iconOnly`; slot for custom label                                      |
+| `MapoSidebarProfile`       | User profile row for the sidebar footer — reads from `useAuthStore`, calls `useMapoAuth().logout()`; supports `mini` prop            |
 | Theming via CSS            | Custom CSS file injected after base via `uikit.css` option                                                                           |
 | Nuxt UI defaults override  | Component config via `uikit.ui` option                                                                                               |
 | Component override system  | Place `MapoXxx.vue` in `app/mapooverride/` to swap any component at build time                                                       |
@@ -54,27 +57,61 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `mapo-integrations-camomilla` | Nitro proxy, path rewriting, cookie sync (`sessionid` ↔ `__mapo_session`), CSRF forwarding |
 | Custom backend integration    | Pattern documented in [Writing your own](/modules/integrations-howto)                      |
 
+### List Engine (`@mapomodule/uikit`)
+
+| Feature                                    | Notes                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `<MapoList>` shell                         | Composes `<MapoListHead>`, `<MapoListFilters>`, `<MapoListActions>`, `<MapoListTabs>`, `<MapoListTable>`, `<MapoListQuickEdit>` |
+| Server-side pagination / search / ordering | Default mode: filters, tabs, and pagination all pass as `list()` params — never baked into the endpoint string                  |
+| Offline mode (`v-model:items`)             | No backend: search / filter / tab / sort / paginate / drag-reorder / delete / quick-edit all run in memory on the parent array  |
+| Hybrid mode (`client-side` prop)           | Single fetch on mount; filters / sort / paginate run client-side. Mutations (delete, drag, quick-edit) hit BE then refetch      |
+| Multi-column sort (offline / hybrid)       | Sorting columns applied in order, each as a tiebreaker for the previous one (matches TanStack default)                          |
+| Filters + sorting work simultaneously      | Active filters are preserved when sorting; sorting is preserved when filters change (B1 fix)                                    |
+| `endpoint` with static query params        | Params in the endpoint URL (e.g. `?ordering=-date`) are passed to `list()` calls; CRUD ops use the clean path (B2 fix)          |
+| Selection keyed by `lookup`                | Paging or sorting does not move selections                                                                                      |
+| Drag reorder via `crud.updateOrder`        | Single server call — no parallel `PATCH` storm                                                                                  |
+| Quick-edit modal                           | Driven by the same `FieldDescriptor[]` used by `<MapoDetail>` — no bespoke dialog code                                          |
+| Column slots                               | `#cell.<key>` receives `{ item, value }`, `#dtable.toolbar`, `#dtable.empty`, `#dtable.loading`, `#qedit.extra`                 |
+
+### Detail / Form Engine (`@mapomodule/form` + `@mapomodule/uikit`)
+
+| Feature                                                                 | Notes                                                                                                                                                       |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FieldDescriptor<T>` typed discriminated union                          | `KnownFieldType` enum + escape hatch for custom string types (`CustomDescriptor`)                                                                           |
+| `FieldRegistry` (`mapping` / `attrs` / `accessor`)                      | Configurable via `nuxt.config.mapoForm`; global `$mapoFormRegistry` provided by the module plugin                                                           |
+| `defineFormField(type, entry, opts)` plugin API                         | Typed helper for registering or overriding field components — collision warning unless `{ override: true }`                                                 |
+| `<MapoForm>` / `<MapoDetail>` auto-inject the global registry           | The `:registry` prop is optional — pass it only to scope a swap                                                                                             |
+| `useMapoForm()` headless composable                                     | Dirty tracking (incremental), diff/patch, touched/submitted gate, per-field debounce, i18n (`translatable` + `synci18n` + auto `initLang`), readonly toggle |
+| `<MapoForm>` / `<MapoFormField>` / `<MapoFormGroup>` / `<MapoFormTabs>` | Tab navigation with per-tab error badge; collapsible groups; `<MapoUnknownField>` fail-soft fallback                                                        |
+| Full slot system                                                        | `field.<key>`, `field.<key>.label`, `.append`, `.prepend`, `.hint`, `.before`, `.after`                                                                     |
+| `MapoFocusPortal` + `useFocusMode()`                                    | Focus / expand mode for repeater items, editors, maps                                                                                                       |
+| `useFormDraft()` / `useUnsavedChangesGuard()`                           | Local-storage draft autosave + `beforeunload` + `onBeforeRouteLeave` guard                                                                                  |
+| `useProgressiveDisclosure()`                                            | Show/hide fields based on `visible()` / `show()` predicates with smooth transitions                                                                         |
+| `useFormFromSchema(schema, options)`                                    | JSON Schema → `FieldDescriptor[]` (Pydantic / DRF), `if/then/else` → `visible()`, `exclude`, `overrides`, cycle-safe `$ref`                                 |
+| Devtools panel                                                          | `/_mapo/devtools/forms` inside Nuxt DevTools — registry inventory & live form inspector                                                                     |
+| `<MapoDetail>` shell                                                    | Two-column layout, `useCrud` lifecycle, differential PATCH, unsaved-changes guard, 400 → field errors, integrated snack/confirm                             |
+| `<MapoDetailLangSwitch>`                                                | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                |
+
+### Form fields library (`@mapomodule/form`)
+
+| Field                                                        | Status | Notes                                                                                                                    |
+| ------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| text / textarea / number / boolean / switch / color / slider | ✅     | NUI direct mapping via thin wrappers (`NuiInput`, `NuiTextarea`, `NuiCheckbox`, `NuiSwitch`, `NuiSlider`)                |
+| file                                                         | ✅     | `MapoFileField` with current-file preview, image thumbnail, and remove button                                            |
+| select                                                       | ✅     | `USelectMenu` with `value-key` / `label-key` via registry                                                                |
+| `MapoDateField` / `MapoTimeField` / `MapoDateTimeField`      | ✅     | ISO ↔ `@internationalized/date`; `datetime` accepts `tz: 'naive' \| 'utc'`                                               |
+| `MapoFksField` (fks / m2m)                                   | ✅     | `USelectMenu` + debounced remote fetch, removable M2M chips                                                              |
+| `MapoRepeater`                                               | ✅     | Drag-and-drop (`vue-draggable-plus`), stable item UIDs, undo stack, templates, contextual mini-card collapse, focus mode |
+| `MapoSeoPreview`                                             | ✅     | 60 / 155 char counters, live SERP preview                                                                                |
+| `MapoWygEditor`                                              | ✅     | Tiptap v2, custom toolbar, safe `Link` validator + HTML sanitizer, extensions via `attrs.extensions`                     |
+| `MapoMapField`                                               | ✅     | Leaflet SSR-safe via `ClientOnly` + dynamic import (`MapoMapFieldClient`)                                                |
+| `MapoMediaField` / `MapoEnhancedMediaField`                  | 🔲     | Depends on Phase 6 (Media Manager)                                                                                       |
+
 ---
 
 ## Not yet implemented 🔲
 
 These features existed in Mapo v1 and are planned for v2 but have not been built yet.
-
-### List Engine
-
-Paginated, filterable, sortable data table.
-
-**v1 had:** `MapoList` with `ListTable`, `ListFilters`, `ListActions`, `ListQuickEdit` sub-components. Server-side pagination, search, select-all across pages, bulk actions, drag-reorder, slot namespacing on every region.
-
-**v2 target:** Rewritten as a typed, headless-optional composable (`useList`) + `MapoList` component built on Nuxt UI's `UTable`. See roadmap Phase 4.
-
-### Detail / Form Engine
-
-Record creation and editing with declarative field configuration.
-
-**v1 had:** `MapoDetail` with `Form` + `FormField`, declarative `fields` config, `usePatch` differential saves, multilingual field sync, unsaved-changes guard, responsive main + sidebar layout.
-
-**v2 target:** Typed `fields` config (replaces `defaults.js`), JSON Schema optional, built on Nuxt UI form primitives. See roadmap Phase 3–4.
 
 ### Media Manager
 
@@ -100,46 +137,15 @@ Multi-language content switching and UI translation.
 
 **v2 target:** `@mapomodule/i18n` module using `@nuxtjs/i18n` v9. See roadmap Phase 7.
 
-### Component Override System ✅
+### Standalone UIKit components
 
-Replacing any Mapo component with a custom one via naming convention.
-
-**v1 had:** `Mapoverride{ComponentName}` naming resolves automatically at `components:extend` build time.
-
-**v2 implementation:** Place a `.vue` file named like any Mapo component (e.g. `MapoTopbar.vue`) inside `app/mapooverride/` in the consuming app. The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` at build time and replaces the default component's `filePath` with the override. Convention: `MapoOverride` prefix is **not** used in v2 — the file must match the exact component name (e.g. `MapoTopbar.vue` overrides `MapoTopbar`, not `MapoOverrideTopbar.vue`).
-
-### Theme Toggle (Dark / Light) ✅
-
-**v1 had:** `ThemeToggle.vue` in the sidebar header.
-
-**v2 implementation:** `MapoThemeToggle` — a `UButton` toggling `useColorMode().preference`. Drop it anywhere (topbar slot, sidebar, etc.).
-
-### Standalone UIKit components (planned — Phase 7)
-
-| Component             | Description                                                          |
-| --------------------- | -------------------------------------------------------------------- |
-| `MapoLogoutButton` 🔲 | Reusable logout button wrapping `useMapoAuth().logout()`             |
-| `MapoLangSwitcher` 🔲 | UI language selector (standalone, separate from full i18n)           |
-| `MapoDropArea` 🔲     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
-| `MapoPagePreview` 🔲  | Page/template preview panel                                          |
-
-### Form Fields Library (`@mapomodule/form` — Phase 5)
-
-| Field                                                      | Notes                                                    |
-| ---------------------------------------------------------- | -------------------------------------------------------- |
-| `MapoDateField` / `MapoDateTimeField` / `MapoTimeField` 🔲 | Nuxt UI `<UInputDate>` / `<UInputTime>` wrappers         |
-| `MapoColorField` 🔲                                        | Color picker                                             |
-| `MapoFileField` 🔲                                         | File upload via `MapoDropArea`                           |
-| `MapoFksField` 🔲                                          | Foreign key select with server-side search via `useCrud` |
-| `MapoMapField` 🔲                                          | Leaflet map picker (lazy-load, `<ClientOnly>`)           |
-| `MapoRepeater` 🔲                                          | Repeatable field group (array of sub-objects)            |
-| `MapoSeoPreview` 🔲                                        | Google SERP preview mock                                 |
-| `MapoWygEditor` 🔲                                         | Rich text editor — Tiptap v2 (decided in DP-3)           |
-| `MapoMediaField` / `MapoEnhancedMediaField` 🔲             | Media picker integrating `MapoMediaManagerDialog`        |
-
-### `usePatch<T>` composable (Phase 3)
-
-Differential PATCH helper: wraps `useCrud.partialUpdate` with automatic `objectDiff` to send only changed fields. `objectDiff` is already in `@mapomodule/utils`.
+| Component             | Status | Description                                                          |
+| --------------------- | ------ | -------------------------------------------------------------------- |
+| `MapoLogoutButton`    | ✅     | Reusable logout button wrapping `useMapoAuth().logout()`             |
+| `MapoSidebarProfile`  | ✅     | User profile row (avatar + username + logout) for the sidebar footer |
+| `MapoLangSwitcher` 🔲 | 🔲     | UI language selector (depends on `@mapomodule/i18n` — Phase 7)       |
+| `MapoDropArea` 🔲     | 🔲     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
+| `MapoPagePreview` 🔲  | 🔲     | Page/template preview panel                                          |
 
 ### `useMediaStore` (Phase 6)
 

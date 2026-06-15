@@ -21,3 +21,36 @@ CLAUDE.md
 .mcp.json
 .gitmodules
 legacy/
+ltk_projects/
+external/
+.DS_Store
+**/.DS_Store
+/e2e
+
+# AI-generated review/plan artifacts (kept locally, not in repo)
+CODE_REVIEW_*.md
+DX_*.md
+DX_improve.md
+UX_*.md
+UX_improve.md
+MISSING*.md
+E2E_*.md
+E2E_improve.md
+DEV_*.md
+DEV_improve.md
+
+# Stray screenshots dropped at repo root
+/Screenshot*.png
+/*.png
+/tickets
+TICKET_ROADMAP.md
+IMPROVE_ROADMAP.md
+*_ROADMAP.md
+
+BRANCH_DIFF_AUDIT.md
+REFACTOR_WORKLOG.md
+SPLIT_MR_PLAN.md
+
+.gitmodules
+testing/
+review_report.md

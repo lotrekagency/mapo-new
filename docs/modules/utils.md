@@ -12,7 +12,7 @@ pnpm add @mapomodule/utils
 
 ## `normalizeEndpoint(endpoint)`
 
-Ensures an API endpoint string has exactly one leading slash and one trailing slash. Used internally by `useCrud` to normalize user-provided paths before making requests.
+Ensures an API endpoint path has exactly one leading slash and one trailing slash. Query strings (anything after `?`) are preserved unchanged — the slash is inserted before the `?`, never after it. Used internally by `useCrud` to normalize user-provided paths.
 
 ```ts
 import { normalizeEndpoint } from "@mapomodule/utils";
@@ -21,6 +21,24 @@ normalizeEndpoint("api/articles"); // '/api/articles/'
 normalizeEndpoint("/api/articles"); // '/api/articles/'
 normalizeEndpoint("/api/articles/"); // '/api/articles/'
 normalizeEndpoint("///api/articles"); // '/api/articles/'
+normalizeEndpoint("/api/articles?fields=id"); // '/api/articles/?fields=id'
+normalizeEndpoint("/api/articles/?ordering=-date"); // '/api/articles/?ordering=-date'
+```
+
+---
+
+## `splitEndpointParams(endpoint)`
+
+Splits an endpoint string into its clean `path` and the parsed query `params`. Useful when an endpoint carries baked-in params (e.g. `?fields=id,title`) that must be merged into request params while CRUD mutations target the bare path. Used by `MapoListTable` to keep the list endpoint and mutation endpoints in sync.
+
+```ts
+import { splitEndpointParams } from "@mapomodule/utils";
+
+splitEndpointParams("/api/articles/?fields=id,title");
+// → { path: '/api/articles/', params: { fields: 'id,title' } }
+
+splitEndpointParams("/api/articles/");
+// → { path: '/api/articles/', params: {} }
 ```
 
 ---
@@ -64,6 +82,8 @@ import { objectDiff } from "@mapomodule/utils";
 objectDiff({ title: "Old", body: "Text" }, { title: "New", body: "Text" });
 // → { title: 'New' }
 ```
+
+Arrays are compared **by content** (deep recursive equality), not by reference. This means a cloned array with identical elements is treated as unchanged — which prevents false-positive `isDirty` flags when the form baseline is built from `deepClone(model)`.
 
 ---
 

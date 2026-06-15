@@ -27,8 +27,12 @@ definePageMeta({
             <UIcon :name="item.icon" class="size-5 text-primary" />
           </div>
           <div>
-            <p class="font-semibold text-highlighted">{{ item.title }}</p>
-            <p class="text-sm text-muted mt-0.5">{{ item.desc }}</p>
+            <p class="font-semibold text-highlighted">
+              {{ item.title }}
+            </p>
+            <p class="text-sm text-muted mt-0.5">
+              {{ item.desc }}
+            </p>
           </div>
         </NuxtLink>
       </UCard>

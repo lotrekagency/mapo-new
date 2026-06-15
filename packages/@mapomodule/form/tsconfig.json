@@ -1,9 +1,13 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": ".",
     "outDir": "dist",
-    "declarationDir": "dist/types",
-    "rootDir": "src"
+    "paths": {
+      "#app": ["./node_modules/nuxt/dist/app/index.d.ts"],
+      "#app/*": ["./node_modules/nuxt/dist/app/*.d.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src/**/*"],
+  "exclude": ["src/runtime/registry/defaults.ts"]
 }

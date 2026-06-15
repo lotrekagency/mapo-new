@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-import { useRouter } from "#imports";
+import { useRouter } from "vue-router";
 import { buildRouteTree } from "@mapomodule/utils";
 import type { MenuNode } from "@mapomodule/utils";
 

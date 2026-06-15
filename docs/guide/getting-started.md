@@ -47,6 +47,53 @@ export default defineNuxtConfig({
 
 All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration).
 
+## Create app.vue
+
+Nuxt 4 requires an explicit `app.vue`. Mapo needs two wrappers to work correctly:
+
+- **`<UApp>`** — provides Nuxt UI context (design tokens, toast, overlays). Without it theming and Nuxt UI components break.
+- **`<NuxtLayout>`** — activates the layout system. The `mapo-default` layout (sidebar + topbar) is only applied if this wrapper is present.
+
+```vue
+<!-- app/app.vue -->
+<script setup lang="ts"></script>
+
+<template>
+  <UApp>
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
+</template>
+```
+
+### Customizing logo and topbar
+
+Pass content into the layout via named slots on `<NuxtLayout>`. The full slot reference is in [Layout slots](../uikit/layout#slots).
+
+```vue
+<template>
+  <UApp>
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
+      <template #sidebar:logo>
+        <NuxtLink to="/" class="flex items-center gap-2.5 min-w-0">
+          <img src="~/assets/logo.svg" class="h-6" alt="Acme" />
+          <span class="font-semibold text-sm truncate">Acme Admin</span>
+        </NuxtLink>
+      </template>
+
+      <template #topbar:right>
+        <MapoThemeToggle />
+      </template>
+
+      <NuxtPage />
+    </NuxtLayout>
+  </UApp>
+</template>
+```
+
 ## Use it
 
 Mapo auto-imports its composables and stores. In any Vue component or page:
@@ -72,8 +119,37 @@ definePageMeta({ middleware: ["auth"] });
 </script>
 ```
 
+## TypeScript types
+
+Composables and stores are **auto-imported** — no explicit import is ever needed. Types require an explicit `import type`.
+
+```ts
+// ✅ No import — composables are auto-imported by Nuxt
+const { list } = useCrud<Article>("/api/articles/");
+const snack = useSnackStore();
+
+// Types — import from the meta-package aggregator (preferred)
+import type { FieldDescriptor, ListColumn } from "mapomodule/types";
+
+// Or from individual packages when needed
+import type { FieldDescriptor } from "@mapomodule/form/types";
+import type { ListColumn } from "@mapomodule/uikit/types";
+
+// Camomilla types are always package-specific (it's an optional module)
+import type { CamomillaPathRewrite } from "mapo-integrations-camomilla/types";
+```
+
+`mapomodule/types` aggregates all types from `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/form`, `@mapomodule/uikit`, and `@mapomodule/utils`.
+
+Utility functions from `@mapomodule/utils` (e.g. `debounce`, `deepMerge`) are **not** auto-imported and require explicit imports.
+
+→ See the full **[Import Guide](./imports)** for the complete API → import mapping table.
+
+---
+
 ## Next steps
 
+- **[Import Guide](./imports)** — full API → import mapping table (composables, types, utils)
 - **[Architecture & Flows](./architecture-flows)** — how SSR hydration, the fetch interceptor, and auth wire together
 - **[Core module](/modules/core)** — full API reference for `useCrud`, `useMapoAuth`, the auth middleware
 - **[Store module](/modules/store)** — auth, snack, confirm, sidebar stores + `usePermissions`

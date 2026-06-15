@@ -5,4 +5,5 @@
 <template>
   <MapoSnackBar />
   <MapoConfirmDialog />
+  <MapoFocusPortal />
 </template>

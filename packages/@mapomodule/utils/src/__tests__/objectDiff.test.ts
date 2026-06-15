@@ -41,4 +41,37 @@ describe("objectDiff", () => {
   it("uses Object.is for NaN comparison", () => {
     expect(objectDiff({ a: NaN }, { a: NaN })).toEqual({});
   });
+
+  it("treats arrays with same content as equal (no false positive after deepClone)", () => {
+    const base = { items: [1, 2, 3] };
+    const current = { items: [1, 2, 3] };
+    expect(objectDiff(base, current)).toEqual({});
+  });
+
+  it("detects changed array content", () => {
+    expect(objectDiff({ items: [1, 2] }, { items: [1, 99] })).toEqual({
+      items: [1, 99],
+    });
+  });
+
+  it("detects added array element", () => {
+    expect(objectDiff({ items: [1] }, { items: [1, 2] })).toEqual({
+      items: [1, 2],
+    });
+  });
+
+  it("deep-compares arrays of plain objects", () => {
+    const base = { list: [{ id: 1, name: "a" }] };
+    const clone = { list: [{ id: 1, name: "a" }] };
+    expect(objectDiff(base, clone)).toEqual({});
+  });
+
+  it("detects changed property inside array object", () => {
+    expect(
+      objectDiff(
+        { list: [{ id: 1, name: "a" }] },
+        { list: [{ id: 1, name: "b" }] },
+      ),
+    ).toEqual({ list: [{ id: 1, name: "b" }] });
+  });
 });

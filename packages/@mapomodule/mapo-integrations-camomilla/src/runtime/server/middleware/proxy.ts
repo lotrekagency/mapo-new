@@ -18,6 +18,10 @@ import {
 import type { CamomillaRuntimeConfig } from "../../../types";
 import { CAMOMILLA_AUTH_PATHS } from "../../constants";
 
+/**
+ * Incoming headers not forwarded to upstream because they are hop-by-hop
+ * or recalculated by `fetch` for the outgoing proxied request.
+ */
 const SKIP_REQUEST_HEADERS = new Set([
   "host",
   "connection",
@@ -25,6 +29,17 @@ const SKIP_REQUEST_HEADERS = new Set([
   "content-length",
 ]);
 
+/**
+ * API proxy middleware for Camomilla integration.
+ *
+ * Flow overview:
+ * - Intercepts eligible `/api/*` requests.
+ * - Rewrites path according to built-in and custom rules.
+ * - Forwards request headers/body and normalized cookies.
+ * - Proxies to configured Camomilla backend.
+ * - Rewrites/aliases Set-Cookie headers on auth paths.
+ * - Returns backend status, headers, and raw response body.
+ */
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event).camomilla as CamomillaRuntimeConfig;
   const {
@@ -37,9 +52,10 @@ export default defineEventHandler(async (event) => {
 
   const url = getRequestURL(event);
 
-  // Only intercept /api paths, but skip Nuxt-internal /api routes
+  // Only intercept /api paths, but skip Nuxt-internal and local mock routes
   if (!url.pathname.startsWith("/api")) return;
   if (url.pathname.startsWith("/api/_nuxt_icon")) return;
+  if (url.pathname.startsWith("/api/mock")) return;
 
   const rewrittenPath = applyPathRewrite(url.pathname, base, customPathRewrite);
   const targetUrl = `${server}${rewrittenPath}${url.search}`;

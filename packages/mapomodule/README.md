@@ -23,6 +23,10 @@ export default defineNuxtConfig({
       css: "~/assets/css/theme.css", // optional CSS token override
       ui: { button: { defaultVariants: { color: "primary" } } }, // optional Nuxt UI defaults
     },
+
+    form: {
+      // optional — global field registry defaults and debounce config
+    },
   },
 });
 ```
@@ -31,13 +35,13 @@ All options are optional and fall back to `MAPO_DEFAULTS`.
 
 ## What it installs
 
-| Package             | Status                                      |
-| ------------------- | ------------------------------------------- |
-| `@mapomodule/store` | ✅ Pinia stores                             |
-| `@mapomodule/core`  | ✅ Service layer (forwards `mapo` config)   |
-| `@mapomodule/uikit` | ✅ UI shell + theming + MapoOverride system |
-| `@mapomodule/form`  | 🔲 Planned                                  |
-| `@mapomodule/i18n`  | 🔲 Planned                                  |
+| Package             | Status                                                                   |
+| ------------------- | ------------------------------------------------------------------------ |
+| `@mapomodule/store` | ✅ Pinia stores                                                          |
+| `@mapomodule/core`  | ✅ Service layer (forwards `mapo` config)                                |
+| `@mapomodule/uikit` | ✅ UI shell + theming + MapoOverride system + List engine + Detail shell |
+| `@mapomodule/form`  | ✅ Form engine (`MapoForm`, `MapoDetail`, `useMapoForm`, field types)    |
+| `@mapomodule/i18n`  | 🔲 Planned                                                               |
 
 ## Dev workflow
 
@@ -50,5 +54,6 @@ pnpm dev:mapomodule   # from monorepo root
 
 - [`@mapomodule/core`](../@mapomodule/core/) — CRUD, auth, middleware
 - [`@mapomodule/store`](../@mapomodule/store/) — Pinia stores
-- [`@mapomodule/uikit`](../@mapomodule/uikit/) — UI shell, theming, MapoOverride
+- [`@mapomodule/uikit`](../@mapomodule/uikit/) — UI shell, theming, MapoOverride, List engine, MapoDetail
+- [`@mapomodule/form`](../@mapomodule/form/) — form engine, field types, `useMapoForm`
 - [docs/modules/core](../../docs/modules/core.md) — full config reference

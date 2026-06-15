@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
-// @ts-expect-error — #imports is a Nuxt virtual module resolved at app build time
-import { useRoute, navigateTo } from "#imports";
+import { useRoute } from "vue-router";
+import { navigateTo } from "#app";
 
 defineSlots<{
-  brand(): unknown;
+  /** Left decorative panel (shown lg+). Replace with your own branding. */
   panel(): unknown;
+  /** Logo / title area above the login form. */
+  brand(): unknown;
+  /** Content injected between the brand slot and the login form card. */
+  "before-form"(): unknown;
+  /** Content injected between the login form card and the footer slot. */
+  "after-form"(): unknown;
+  /** Content below the login card (links, copyright…). */
   footer(): unknown;
 }>();
 
@@ -127,6 +134,8 @@ async function submit() {
           </div>
         </slot>
 
+        <slot name="before-form" />
+
         <UCard class="shadow-xl ring-1 ring-default/60">
           <form class="space-y-5" @submit.prevent="submit">
             <UFormField
@@ -190,6 +199,8 @@ async function submit() {
             </UButton>
           </form>
         </UCard>
+
+        <slot name="after-form" />
 
         <slot name="footer" />
       </div>

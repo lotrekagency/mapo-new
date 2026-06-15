@@ -6,15 +6,15 @@ Mapo is a Vue 3 / Nuxt 4 admin framework for building backoffice interfaces decl
 
 ### Core packages
 
-| Package             | Description                                                                   |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `@mapomodule/core`  | API layer (`useCrud`), auth composables, HTTP interceptors, Nuxt middleware   |
-| `@mapomodule/store` | Pinia stores: auth, snack, confirm, sidebar + `usePermissions` composable     |
-| `@mapomodule/uikit` | UI shell: Sidebar, Topbar, Login, layout, theming, MapoOverride system        |
-| `@mapomodule/utils` | Typed utilities: `deepMerge`, `objectDiff`, `debounce`, `buildRouteTree`, …   |
-| `@mapomodule/form`  | _(planned)_ Declarative typed form engine and field components                |
-| `@mapomodule/i18n`  | _(planned)_ `@nuxtjs/i18n` v9 wrapper with base translations                  |
-| `mapomodule`        | Meta-package: installs all `@mapomodule/*` modules with a single registration |
+| Package             | Description                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `@mapomodule/core`  | API layer (`useCrud`), auth composables, HTTP interceptors, Nuxt middleware                             |
+| `@mapomodule/store` | Pinia stores: auth, snack, confirm, sidebar + `usePermissions` composable                               |
+| `@mapomodule/uikit` | UI shell: Sidebar, Topbar, Login, layout, theming, MapoOverride system                                  |
+| `@mapomodule/utils` | Typed utilities: `deepMerge`, `objectDiff`, `debounce`, `buildRouteTree`, …                             |
+| `@mapomodule/form`  | Declarative typed form engine: `FieldDescriptor[]`, `useMapoForm()`, 14 field types, JSON Schema bridge |
+| `@mapomodule/i18n`  | _(planned)_ `@nuxtjs/i18n` v9 wrapper with base translations                                            |
+| `mapomodule`        | Meta-package: installs all `@mapomodule/*` modules with a single registration                           |
 
 ### Backend integrations
 
@@ -38,11 +38,13 @@ pnpm build
 
 ### Apps
 
-| Script                   | Port | Description                                                                   |
-| ------------------------ | ---- | ----------------------------------------------------------------------------- |
-| `pnpm dev:example`       | 3000 | Core feature demo (login, CRUD, permissions, snackbar, sidebar)               |
-| `pnpm dev:example-theme` | 3001 | Theming & override demo (CSS tokens, Nuxt UI config, MapoOverride, dark mode) |
-| `pnpm docs:dev`          | —    | VitePress documentation site                                                  |
+| Script                   | Port | Description                                                                            |
+| ------------------------ | ---- | -------------------------------------------------------------------------------------- |
+| `pnpm dev:example`       | 3000 | Core feature demo (login, CRUD, permissions, snackbar, sidebar, form engine)           |
+| `pnpm dev:example-theme` | 3001 | Theming & override demo (CSS tokens, Nuxt UI config, MapoOverride, custom fields)      |
+| `pnpm dev:example-form`  | —    | Custom form field demo (custom registry, `defineFormField`, Vuetify field integration) |
+| `pnpm dev:example-e2e`   | —    | E2E test target app — one page per feature scenario                                    |
+| `pnpm docs:dev`          | —    | VitePress documentation site                                                           |
 
 ### Package development
 
@@ -56,6 +58,7 @@ Run a watcher on a single package so `dist/` stays in sync during development:
 | `pnpm dev:utils`      | `@mapomodule/utils`                  |
 | `pnpm dev:mapomodule` | `mapomodule`                         |
 | `pnpm dev:camomilla`  | `mapo-integrations-camomilla`        |
+| `pnpm dev:form`       | `@mapomodule/form`                   |
 | `pnpm dev:packages`   | All packages in parallel (Turborepo) |
 
 Typical workflow — two terminals:
@@ -74,6 +77,12 @@ pnpm dev:example-theme
 | ----------------- | ------------------------------------------------------------ |
 | `pnpm build`      | Build all packages via Turborepo (respects dependency order) |
 | `pnpm docs:build` | Build the VitePress documentation site                       |
+
+Type declarations during build:
+
+- Packages run a dedicated declarations pass via `tsconfig.build-types.json`.
+- TS-only packages use `tsc`; Vue SFC packages (`@mapomodule/form`, `@mapomodule/uikit`) use `vue-tsc`.
+- SFC packages run `scripts/clean-empty-vue-dts.mjs` to remove empty `.vue.d.ts` stubs in `dist/`.
 
 ### Quality
 
@@ -100,10 +109,13 @@ See [docs/guide/release-process.md](docs/guide/release-process.md) for the full 
 ## Monorepo Structure
 
 ```
-packages/@mapomodule/   individual @mapomodule/* packages
-packages/mapomodule/    meta-package
-apps/example/           core feature demo app
-apps/example-theme/     theming & override demo app
-docs/                   VitePress documentation site
-legacy/                 git submodules: mapo-v1 and mapo-v1-middleware (read-only reference)
+packages/@mapomodule/      individual @mapomodule/* packages
+packages/mapomodule/       meta-package
+apps/example/              core feature demo app
+apps/example-theme/        theming & override demo app
+apps/example-custom-form/  custom form field demo (defineFormField, third-party integration)
+apps/example-e2e/          E2E test target — one page per feature scenario
+e2e/                       Playwright E2E test suite
+docs/                      VitePress documentation site
+legacy/                    git submodules: mapo-v1 and mapo-v1-middleware (read-only reference)
 ```

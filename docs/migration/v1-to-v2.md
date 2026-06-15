@@ -114,6 +114,8 @@ export default defineNuxtModule({
 }) satisfies NuxtModule;
 ```
 
+Nuxt 4.1 introduced `moduleDependencies`, and Mapo uses it in compatible modules (for example `@mapomodule/store` for Pinia). The `mapomodule` meta-module currently keeps resolver-based `installModule` for pnpm strict transitive resolution compatibility.
+
 This means `mapomodule` in `modules[]` is now sufficient to install the entire Mapo stack — no need to list `@mapomodule/core` or `@mapomodule/store` separately.
 
 ---
@@ -227,6 +229,252 @@ export default defineNuxtConfig({
   }
 })
 ```
+
+### List view: `MapoList` config object → `<MapoList>` declarative props
+
+In v1 a list view was a Vue component reading a `mapoList` config object. In v2 it is a typed Vue component driven by props/slots that share `FieldDescriptor[]` with `<MapoDetail>`.
+
+```vue
+<!-- v1 -->
+<MapoList :crud="crud" :config="{ headers, filters, actions }" />
+
+<!-- v2 -->
+<MapoList
+  :crud="useCrud < Article > '/api/articles/'"
+  :columns="columns"
+  :filters="filters"
+  :quick-edit-fields="quickEditFields"
+  :tabs="[
+    { key: 'draft', label: 'Drafts' },
+    { key: 'published', label: 'Published' },
+  ]"
+  @row-click="(row) => navigateTo(`/articles/${row.id}`)"
+>
+  <template #cell.status="{ row }">
+    <UBadge :color="row.published ? 'success' : 'neutral'">
+      {{ row.published ? "Published" : "Draft" }}
+    </UBadge>
+  </template>
+</MapoList>
+```
+
+Quick-edit reuses the same field descriptors as `<MapoDetail>` — no separate dialog code. Drag reorder calls `crud.updateOrder` once, not one `PATCH` per row.
+
+### Detail view: `MapoDetail` config → `<MapoDetail>` + `FieldDescriptor[]`
+
+```vue
+<!-- v1 -->
+<MapoDetail :crud="crud" :config="{ fields, tabs, sidebar }" />
+
+<!-- v2 -->
+<script setup lang="ts">
+import type { FieldDescriptor } from "mapomodule/types";
+
+const fields: FieldDescriptor<Article>[] = [
+  { key: "title", type: "text", required: true, tab: "content" },
+  { key: "body", type: "editor", tab: "content", translatable: true },
+  { key: "is_draft", type: "switch", group: "sidebar" },
+];
+</script>
+
+<template>
+  <MapoDetail
+    :crud="useCrud<Article>('/api/articles/')"
+    :fields="fields"
+    :languages="['en', 'it']"
+  />
+</template>
+```
+
+`<MapoDetail>` automatically wires `useMapoForm()`, `useCrud`, the unsaved-changes guard, the snack/confirm bridges, and the language switcher. It sends a differential `PATCH` (only the changed keys) and surfaces field-level 400 errors on the right field.
+
+### Form fields: declarative `fields` config (compatible)
+
+The `fields: FieldDescriptor<T>[]` shape stays similar in spirit to v1 but is now a **TypeScript discriminated union**: typos in `key` are caught by the IDE, `type: 'select'` requires `attrs.options`, and unknown types render as a yellow placeholder instead of crashing.
+
+Per-field i18n:
+
+```ts
+// v1 — `i18n: true` on the descriptor
+// v2
+{ key: 'title', type: 'text', translatable: true }       // reads/writes model.translations[lang].title
+{ key: 'body',  type: 'editor', translatable: true, synci18n: true }  // also propagates to all langs
+```
+
+Custom field registration moved from "stick a Vue component into a folder" to a typed plugin call:
+
+```ts
+// v2 — app/plugins/my-fields.ts
+export default defineNuxtPlugin(() => {
+  defineFormField("video-cut", () => import("~/components/VideoCutField.vue"), {
+    attrs: { aspectRatio: "16:9" },
+  });
+});
+```
+
+See [Custom fields →](/uikit/form/custom-fields) for the per-page registry override and `descriptor.is` escape hatches.
+
+### Legacy `is:` components → v2 field equivalents
+
+In v1 a field descriptor could use `is: 'ComponentName'` to render a fully custom field component (e.g. `is: 'AnimatedTitleFields'`). In v2 the same data is expressed as multiple standard `FieldDescriptor` objects — no custom component needed.
+
+**Group / tab structural change:**
+
+| v1 concept                        | v2 equivalent                          |
+| --------------------------------- | -------------------------------------- |
+| Top-level `group` (renders a tab) | `tab: 'name'` on each field            |
+| Nested group inside a group       | `group: 'name'` on each field          |
+| Sidebar group                     | `sidebarFields` prop on `<MapoDetail>` |
+
+**Component mapping:**
+
+| Legacy `is:`                           | v2 fields                                                             |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `AnimatedTitleFields`                  | 3 × `type: 'text'`: `pre_title`, `underline_title`, `post_title`      |
+| `CTAField`                             | 2 × `type: 'text'`: `title`, `link`                                   |
+| `IconSelect` with `coloredIconChoices` | `type: 'select'` + `attrs.items` array                                |
+| `Prefooter`                            | `type: 'media'` + `type: 'media'` + `type: 'switch'` + `type: 'text'` |
+
+**Before (v1):**
+
+```ts
+// Descriptor with is: pointing to a monolithic component
+{ label: 'Hero', is: 'AnimatedTitleFields', field: 'hero' }
+// → renders one widget that internally manages pre_title / underline_title / post_title
+
+{ label: 'CTA', is: 'CTAField', field: 'cta' }
+// → one widget managing title + link
+
+{ label: 'Icona', is: 'IconSelect', field: 'icon', coloredIconChoices: true }
+
+// Top-level groups were tabs in the UI:
+groups: [
+  { name: 'Contenuto', fields: [ ... ] },      // → top-level tab
+  {
+    name: 'SEO',
+    groups: [                                   // → nested group inside tab
+      { name: 'Meta', fields: [ ... ] },
+    ],
+  },
+]
+```
+
+**After (v2):**
+
+```ts
+import type { FieldDescriptor } from "mapomodule/types";
+import { KnownFieldType } from "mapomodule/types";
+
+interface PageModel {
+  hero_pre_title: string;
+  hero_underline_title: string;
+  hero_post_title: string;
+  cta_title: string;
+  cta_link: string;
+  icon: string;
+  prefooter_bg: string | null;
+  prefooter_logo: string | null;
+  prefooter_dark_mode: boolean;
+  prefooter_tagline: string;
+}
+
+const fields: FieldDescriptor<PageModel>[] = [
+  // ── AnimatedTitleFields → 3 plain text fields (tab: 'contenuto') ─────────
+  {
+    key: "hero_pre_title",
+    type: "text",
+    label: "Pre-titolo",
+    tab: "contenuto",
+    cols: 12,
+  },
+  {
+    key: "hero_underline_title",
+    type: "text",
+    label: "Titolo",
+    tab: "contenuto",
+    cols: 12,
+  },
+  {
+    key: "hero_post_title",
+    type: "text",
+    label: "Post-titolo",
+    tab: "contenuto",
+    cols: 12,
+  },
+
+  // ── CTAField → 2 plain text fields ───────────────────────────────────────
+  {
+    key: "cta_title",
+    type: "text",
+    label: "Testo CTA",
+    tab: "contenuto",
+    cols: 8,
+  },
+  {
+    key: "cta_link",
+    type: "text",
+    label: "URL CTA",
+    tab: "contenuto",
+    cols: 4,
+  },
+
+  // ── IconSelect with coloredIconChoices → select + items ──────────────────
+  {
+    key: "icon",
+    type: KnownFieldType.Select,
+    label: "Icona",
+    tab: "contenuto",
+    attrs: {
+      items: [
+        { label: "🔵 Primario", value: "primary" },
+        { label: "🟡 Accent", value: "accent" },
+        { label: "⚫ Neutro", value: "neutral" },
+      ],
+    },
+  },
+
+  // ── Prefooter → media + media + switch + text (group card) ───────────────
+  {
+    key: "prefooter_bg",
+    type: "media",
+    label: "Sfondo",
+    tab: "contenuto",
+    group: "prefooter",
+  },
+  {
+    key: "prefooter_logo",
+    type: "media",
+    label: "Logo",
+    tab: "contenuto",
+    group: "prefooter",
+  },
+  {
+    key: "prefooter_dark_mode",
+    type: "switch",
+    label: "Dark mode",
+    tab: "contenuto",
+    group: "prefooter",
+  },
+  {
+    key: "prefooter_tagline",
+    type: "text",
+    label: "Tagline",
+    tab: "contenuto",
+    group: "prefooter",
+  },
+];
+```
+
+> **Tip:** use [`flattenFieldGroups`](/uikit/form/advanced#hierarchical-field-authoring-with-flattenFieldGroups) when you have many fields sharing the same `tab` / `group` — it lets you author them as a nested tree and avoid repeating the same keys on every descriptor.
+
+### Component override: `MapoOverride*` folder → `app/mapooverride/`
+
+```
+v1: components/MapoOverrideTopbar.vue   (prefix-based)
+v2: app/mapooverride/MapoTopbar.vue     (exact name match)
+```
+
+The `MapoOverride` prefix is gone in v2 — the file must match the exact component name. See [MapoOverride System →](/uikit/mapoverride).
 
 ### Page meta
 
