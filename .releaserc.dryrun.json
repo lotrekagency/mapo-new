@@ -1,6 +1,7 @@
 {
   "branches": [
     "main",
+    "release/beta",
     { "name": "beta", "prerelease": true, "channel": "next" }
   ],
   "plugins": [
