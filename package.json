@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "build:release": "turbo run build --filter='./packages/**'",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -27,8 +28,8 @@
     "dev:form": "pnpm --filter @mapomodule/form dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
     "prepare": "husky",
-    "release": "pnpm build && multi-semantic-release --extends $PWD/.releaserc.release.json",
-    "release:dry": "pnpm build && multi-semantic-release --dry-run --extends $PWD/.releaserc.dryrun.json",
+    "release": "pnpm build:release && multi-semantic-release --extends $PWD/.releaserc.release.json",
+    "release:dry": "pnpm build:release && multi-semantic-release --dry-run --extends $PWD/.releaserc.dryrun.json",
     "publish:packages": "pnpm -r --filter './packages/**' publish --access public --no-git-checks"
   },
   "engines": {
