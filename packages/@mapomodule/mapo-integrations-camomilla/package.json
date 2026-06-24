@@ -1,5 +1,6 @@
 {
   "name": "mapo-integrations-camomilla",
+  "private": true,
   "version": "0.0.0",
   "description": "Mapo integration for Camomilla CMS: Nitro proxy middleware with path rewriting and session sync",
   "type": "module",
