@@ -1,8 +1,23 @@
 {
   "name": "@mapomodule/i18n",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Mapo i18n wrapper: @nuxtjs/i18n v9 + base translations",
   "type": "module",
+  "license": "MIT",
+  "author": "Lotrek Agency (https://lotrek.it)",
+  "homepage": "https://lotrekagency.github.io/mapo-new/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git",
+    "directory": "packages/@mapomodule/i18n"
+  },
+  "bugs": {
+    "url": "https://github.com/lotrekagency/mapo-new/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",

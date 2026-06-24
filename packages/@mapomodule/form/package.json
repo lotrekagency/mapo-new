@@ -1,8 +1,23 @@
 {
   "name": "@mapomodule/form",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Mapo declarative typed form engine and field components",
   "type": "module",
+  "license": "MIT",
+  "author": "Lotrek Agency (https://lotrek.it)",
+  "homepage": "https://lotrekagency.github.io/mapo-new/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git",
+    "directory": "packages/@mapomodule/form"
+  },
+  "bugs": {
+    "url": "https://github.com/lotrekagency/mapo-new/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
   "exports": {
     ".": {
       "types": "./dist/module.d.mts",
