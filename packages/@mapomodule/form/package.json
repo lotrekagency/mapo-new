@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/form",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Mapo declarative typed form engine and field components",
   "type": "module",
   "license": "MIT",

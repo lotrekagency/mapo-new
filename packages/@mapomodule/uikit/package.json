@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/uikit",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Mapo UI components: Sidebar, Topbar, Login, SnackBar, ConfirmDialog, List, Detail, Media",
   "type": "module",
   "license": "MIT",

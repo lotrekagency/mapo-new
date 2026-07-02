@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/core",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Mapo core: API layer, auth, composables, middleware",
   "type": "module",
   "license": "MIT",
