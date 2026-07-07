@@ -1,3 +1,9 @@
+# mapomodule [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.1...mapomodule@2.0.0-beta.2) (2026-07-07)
+
+### Bug Fixes
+
+- **mapomodule:** remove commented-out i18n module installation ([1880d0c](https://github.com/lotrekagency/mapo-new/commit/1880d0c3913aecd51e0b721ecfdda5355568eb7b))
+
 # mapomodule [2.0.0-beta.1](https://github.com/lotrekagency/mapo-new/compare/mapomodule@1.0.0...mapomodule@2.0.0-beta.1) (2026-07-07)
 
 - feat(release)!: prepare for first 2.0.0.beta release \ BREAKING CHANGE: this is a completely rewritten version of mapo ([d906c8d](https://github.com/lotrekagency/mapo-new/commit/d906c8da8675bef2505ead5f744fd72fbf5acab2))

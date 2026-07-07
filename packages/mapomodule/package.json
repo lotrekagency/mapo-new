@@ -1,6 +1,6 @@
 {
   "name": "mapomodule",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "description": "Mapo meta-package: registers and re-exports all @mapomodule/* modules",
   "type": "module",
   "license": "MIT",
