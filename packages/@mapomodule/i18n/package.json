@@ -1,6 +1,7 @@
 {
   "name": "@mapomodule/i18n",
   "version": "2.0.0",
+  "private": true,
   "description": "Mapo i18n wrapper: @nuxtjs/i18n v9 + base translations",
   "type": "module",
   "license": "MIT",
