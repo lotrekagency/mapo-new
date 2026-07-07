@@ -11,7 +11,6 @@
     { "path": "./packages/@mapomodule/uikit" },
     { "path": "./packages/@mapomodule/utils" },
     { "path": "./packages/@mapomodule/form" },
-    { "path": "./packages/@mapomodule/i18n" },
     { "path": "./packages/@mapomodule/mapo-integrations-camomilla" },
     { "path": "./packages/mapomodule" }
   ]
