@@ -58,8 +58,5 @@ export default defineNuxtModule<MapoModuleOptions>({
         form ?? {},
       );
     }
-
-    // TODO: install when implemented as Nuxt modules
-    // if (!hasNuxtModule('@mapomodule/i18n')) await installModule(await resolver.resolvePath('@mapomodule/i18n'))
   },
 }) satisfies NuxtModule<MapoModuleOptions>;
