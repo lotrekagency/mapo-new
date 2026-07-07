@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/core",
-  "version": "2.0.0",
+  "version": "2.0.0-beta.1",
   "description": "Mapo core: API layer, auth, composables, middleware",
   "type": "module",
   "license": "MIT",
@@ -46,8 +46,8 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@mapomodule/store": "workspace:*",
-    "@mapomodule/utils": "workspace:*"
+    "@mapomodule/store": "2.0.0-beta.1",
+    "@mapomodule/utils": "2.0.0-beta.1"
   },
   "peerDependencies": {
     "nuxt": ">=4.0.0"
