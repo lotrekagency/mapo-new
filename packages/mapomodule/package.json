@@ -1,6 +1,6 @@
 {
   "name": "mapomodule",
-  "version": "2.0.0",
+  "version": "2.0.0-beta.1",
   "description": "Mapo meta-package: registers and re-exports all @mapomodule/* modules",
   "type": "module",
   "license": "MIT",
@@ -44,12 +44,12 @@
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.0",
-    "@mapomodule/core": "workspace:*",
-    "@mapomodule/form": "workspace:*",
+    "@mapomodule/core": "2.0.0-beta.1",
+    "@mapomodule/form": "2.0.0-beta.1",
     "@mapomodule/i18n": "workspace:*",
-    "@mapomodule/store": "workspace:*",
-    "@mapomodule/uikit": "workspace:*",
-    "@mapomodule/utils": "workspace:*",
+    "@mapomodule/store": "2.0.0-beta.1",
+    "@mapomodule/uikit": "2.0.0-beta.1",
+    "@mapomodule/utils": "2.0.0-beta.1",
     "@nuxt/ui": "^4.7.0"
   },
   "devDependencies": {
