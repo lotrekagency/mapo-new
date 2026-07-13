@@ -228,6 +228,9 @@ importers:
       '@mapomodule/utils':
         specifier: workspace:*
         version: link:../utils
+      '@tiptap/extension-image':
+        specifier: ^2.11.5
+        version: 2.27.2(@tiptap/core@2.27.2)
       '@tiptap/extension-link':
         specifier: ^2.11.5
         version: 2.27.2(@tiptap/core@2.27.2)(@tiptap/pm@2.27.2)
@@ -361,7 +364,10 @@ importers:
         version: 8.21.3(vue@3.5.33)
       nuxt:
         specifier: ^4.4.2
-        version: 4.4.2(@babel/core@7.29.0)(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.6.0)(eslint@10.2.1)(rollup@4.60.2)(typescript@5.9.3)(vite@7.3.2)(vue-tsc@3.3.4)
+        version: 4.4.2(@babel/core@7.29.0)(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.6.0)(eslint@10.2.1)(pinia@3.0.4)(rollup@4.60.2)(typescript@5.9.3)(vite@7.3.2)(vue-tsc@3.3.4)
+      pinia:
+        specifier: ^3.0.4
+        version: 3.0.4(typescript@5.9.3)(vue@3.5.33)
       tailwindcss:
         specifier: ^4.0.0
         version: 4.2.4
@@ -370,7 +376,7 @@ importers:
         version: 3.5.33(typescript@5.9.3)
       vue-router:
         specifier: ^5.0.4
-        version: 5.0.6(vue@3.5.33)
+        version: 5.0.6(pinia@3.0.4)(vue@3.5.33)
       vue-tsc:
         specifier: ^3.3.4
         version: 3.3.4(typescript@5.9.3)
@@ -3126,7 +3132,7 @@ packages:
       unplugin-vue-components: 32.0.0(@nuxt/kit@4.4.2)(vue@3.5.33)
       vaul-vue: 0.4.1(reka-ui@2.9.6)(vue@3.5.33)
       vue-component-type-helpers: 3.2.7
-      vue-router: 5.0.6(vue@3.5.33)
+      vue-router: 5.0.6(pinia@3.0.4)(vue@3.5.33)
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -6081,6 +6087,14 @@ packages:
       '@tiptap/core': 3.22.5(@tiptap/pm@3.22.5)
       '@tiptap/pm': 3.22.5
 
+  /@tiptap/extension-image@2.27.2(@tiptap/core@2.27.2):
+    resolution: {integrity: sha512-5zL/BY41FIt72azVrCrv3n+2YJ/JyO8wxCcA4Dk1eXIobcgVyIdo4rG39gCqIOiqziAsqnqoj12QHTBtHsJ6mQ==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
+    dependencies:
+      '@tiptap/core': 2.27.2(@tiptap/pm@2.27.2)
+    dev: false
+
   /@tiptap/extension-image@3.22.5(@tiptap/core@3.22.5):
     resolution: {integrity: sha512-ezMzA6w6UsPesQp6fxTQojI/IkGJLmkwR/VGTimva7sudP3HdSW8k3SGBkjfvp0L2xqUrC/l4nWOchu01A/xtQ==}
     peerDependencies:
@@ -7042,7 +7056,6 @@ packages:
     resolution: {integrity: sha512-kIE8wvwlcZ6TJTbNeU2HQNtaxLx3a84aotTITUuL/4bzfPxzajGBOoqjMhwZJ8L9qFYDU/lAYMEEm11dnZOD6g==}
     dependencies:
       '@vue/devtools-kit': 7.7.9
-    dev: true
 
   /@vue/devtools-api@8.1.1:
     resolution: {integrity: sha512-bsDMJ07b3GN1puVwJb/fyFnj/U2imyswK5UQVLZwVl7O05jDrt6BHxeG5XffmOOdasOj/bOmIjxJvGPxU7pcqw==}
@@ -7068,7 +7081,6 @@ packages:
       perfect-debounce: 1.0.0
       speakingurl: 14.0.1
       superjson: 2.2.6
-    dev: true
 
   /@vue/devtools-kit@8.1.1:
     resolution: {integrity: sha512-gVBaBv++i+adg4JpH71k9ppl4soyR7Y2McEqO5YNgv0BI1kMZ7BDX5gnwkZ5COYgiCyhejZG+yGNrBAjj6Coqg==}
@@ -7082,7 +7094,6 @@ packages:
     resolution: {integrity: sha512-iWAb0v2WYf0QWmxCGy0seZNDPdO3Sp5+u78ORnyeonS6MT4PC7VPrryX2BpMJrwlDeaZ6BD4vP4XKjK0SZqaeA==}
     dependencies:
       rfdc: 1.4.1
-    dev: true
 
   /@vue/devtools-shared@8.1.1:
     resolution: {integrity: sha512-+h4ttmJYl/txpxHKaoZcaKpC+pvckgLzIDiSQlaQ7kKthKh8KuwoLW2D8hPJEnqKzXOvu15UHEoGyngAXCz0EQ==}
@@ -8056,7 +8067,6 @@ packages:
     engines: {node: '>=18'}
     dependencies:
       is-what: 5.5.0
-    dev: true
 
   /core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
@@ -9798,7 +9808,6 @@ packages:
   /is-what@5.5.0:
     resolution: {integrity: sha512-oG7cgbmg5kLYae2N5IVd3jm2s+vldjxJzK1pcu9LfpGuQ93MQSzo0okvRna+7y5ifrD+20FE8FvjusyGaz14fw==}
     engines: {node: '>=18'}
-    dev: true
 
   /is-wsl@3.1.1:
     resolution: {integrity: sha512-e6rvdUCiQCAuumZslxRJWR/Doq4VpPR82kqclvcS0efgt430SlGIk05vdCN58+VrzgtIcfNODjozVielycD4Sw==}
@@ -10540,7 +10549,6 @@ packages:
 
   /mitt@3.0.1:
     resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
-    dev: true
 
   /mkdist@2.4.1(typescript@5.9.3)(vue-sfc-transformer@0.1.17)(vue-tsc@3.3.4)(vue@3.5.33):
     resolution: {integrity: sha512-Ezk0gi04GJBkqMfsksICU5Rjoemc4biIekwgrONWVPor2EO/N9nBgN6MZXAf7Yw4mDDhrNyKbdETaHNevfumKg==}
@@ -12180,7 +12188,6 @@ packages:
 
   /perfect-debounce@1.0.0:
     resolution: {integrity: sha512-xCy9V055GLEqoFaHoC1SoLIaLmWctgCUaBaWxDZ7/Zx4CTyX7cJQLJOok/orfjZAh9kEYpjJa4d0KcJmCbctZA==}
-    dev: true
 
   /perfect-debounce@2.1.0:
     resolution: {integrity: sha512-LjgdTytVFXeUgtHZr9WYViYSM/g8MkcTPYDlPa3cDqMirHjKiSZPYd6DoL7pK8AJQr+uWkQvCjHNdiMqsrJs+g==}
@@ -12218,7 +12225,6 @@ packages:
       '@vue/devtools-api': 7.7.9
       typescript: 5.9.3
       vue: 3.5.33(typescript@5.9.3)
-    dev: true
 
   /pkg-conf@2.1.0:
     resolution: {integrity: sha512-C+VUP+8jis7EsQZIhDYmS5qlNtjv2yP4SNtjXK9AP1ZcTRlnSfuumaTnRfYZnYgUUYVIKqL0fRvmUGDV2fmp6g==}
@@ -12986,7 +12992,6 @@ packages:
 
   /rfdc@1.4.1:
     resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
-    dev: true
 
   /rolldown@1.0.0-rc.17:
     resolution: {integrity: sha512-ZrT53oAKrtA4+YtBWPQbtPOxIbVDbxT0orcYERKd63VJTF13zPcgXTvD4843L8pcsI7M6MErt8QtON6lrB9tyA==}
@@ -13373,7 +13378,6 @@ packages:
   /speakingurl@14.0.1:
     resolution: {integrity: sha512-1POYv7uv2gXoyGFpBCmpDVSNV74IfsWlDW216UPjbWufNf+bSU6GdbDsxdcxtfwb4xlI3yxzOTKClUosxARYrQ==}
     engines: {node: '>=0.10.0'}
-    dev: true
 
   /split2@1.0.0:
     resolution: {integrity: sha512-NKywug4u4pX/AZBB1FCPzZ6/7O+Xhz1qMVbzTvvKvikjO99oPN87SkK08mEY9P63/5lWjK+wgOOgApnTg5r6qg==}
@@ -13558,7 +13562,6 @@ packages:
     engines: {node: '>=16'}
     dependencies:
       copy-anything: 4.0.5
-    dev: true
 
   /supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
@@ -15109,7 +15112,6 @@ packages:
       unplugin-utils: 0.3.1
       vue: 3.5.33(typescript@5.9.3)
       yaml: 2.8.3
-    dev: true
 
   /vue-router@5.0.6(vue@3.5.33):
     resolution: {integrity: sha512-9+kmUTGbKMyW9Asoy98IXXYIzrTMT7JDAdpDDeEkorHvybpUvBI2wsrSM5jFOXrFydpzRFJ9vAh+80DN2PGu9w==}
