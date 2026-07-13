@@ -15,6 +15,7 @@ export {
 } from "./nestedValue.js";
 export { objectDiff } from "./objectDiff.js";
 export { formatDate } from "./formatDate.js";
+export { humanFileSize, slugify } from "./formatters.js";
 export { debounce } from "./debounce.js";
 export { slotNamespace } from "./slotNamespace.js";
 export { buildRouteTree, calcMaxMenuNestDepth } from "./menuHelpers.js";
