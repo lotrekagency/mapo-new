@@ -109,8 +109,22 @@ interface Award {
   organization: string;
 }
 
+// Import MediaItem type for typed media fields
+// @ts-expect-error — MediaItem is from uikit which is not a direct type dependency here
+type MediaItem = import("@mapomodule/uikit/types/media").MediaItem;
+
+interface EnhancedMediaValue {
+  media: MediaItem | null;
+  alt?: string;
+  caption?: string;
+}
+
 interface Article {
   id?: number;
+  // Media picker fields (v2 Media Manager)
+  cover_media: EnhancedMediaValue | null;
+  hero_image: MediaItem | null;
+  gallery_media: MediaItem[];
   // Content
   title: string;
   slug: string;
@@ -731,14 +745,42 @@ const contentFields: FieldDescriptor<Article>[] = [
   },
 ];
 
-// ─── Tab 2: Media (15 fields + 4 repeaters) ───────────────────────────────────
+// ─── Tab 2: Media (15 fields + 4 repeaters + 3 media picker fields) ─────────
 
 const mediaFields: FieldDescriptor<Article>[] = [
-  // ── Cover ──
+  // ── Media Picker fields (v2 Media Manager integration) ──────────────────────
+  {
+    key: "cover_media",
+    // @ts-expect-error — enhanced-media type registered by @mapomodule/uikit plugin
+    type: "enhanced-media",
+    label: "Cover Image (Media Picker)",
+    tab: "Media",
+    cols: 12,
+    attrs: { mime: "image/*" },
+  },
+  {
+    key: "hero_image",
+    // @ts-expect-error — media type registered by @mapomodule/uikit plugin
+    type: "media",
+    label: "Hero Image (single picker)",
+    tab: "Media",
+    cols: 12,
+    attrs: { mime: "image/*" },
+  },
+  {
+    key: "gallery_media",
+    // @ts-expect-error — media-m2m type registered by @mapomodule/uikit plugin
+    type: "media-m2m",
+    label: "Gallery (multi media picker)",
+    tab: "Media",
+    cols: 12,
+  },
+
+  // ── Cover (legacy URL text fields) ──────────────────────────────────────────
   {
     key: "cover_image",
     type: "text",
-    label: "Cover Image URL",
+    label: "Cover Image URL (legacy)",
     tab: "Media",
     cols: 8,
     attrs: { placeholder: "https://cdn.example.com/cover.jpg" },
