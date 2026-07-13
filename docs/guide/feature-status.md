@@ -94,32 +94,40 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 
 ### Form fields library (`@mapomodule/form`)
 
-| Field                                                        | Status | Notes                                                                                                                    |
-| ------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------ |
-| text / textarea / number / boolean / switch / color / slider | ✅     | NUI direct mapping via thin wrappers (`NuiInput`, `NuiTextarea`, `NuiCheckbox`, `NuiSwitch`, `NuiSlider`)                |
-| file                                                         | ✅     | `MapoFileField` with current-file preview, image thumbnail, and remove button                                            |
-| select                                                       | ✅     | `USelectMenu` with `value-key` / `label-key` via registry                                                                |
-| `MapoDateField` / `MapoTimeField` / `MapoDateTimeField`      | ✅     | ISO ↔ `@internationalized/date`; `datetime` accepts `tz: 'naive' \| 'utc'`                                               |
-| `MapoFksField` (fks / m2m)                                   | ✅     | `USelectMenu` + debounced remote fetch, removable M2M chips                                                              |
-| `MapoRepeater`                                               | ✅     | Drag-and-drop (`vue-draggable-plus`), stable item UIDs, undo stack, templates, contextual mini-card collapse, focus mode |
-| `MapoSeoPreview`                                             | ✅     | 60 / 155 char counters, live SERP preview                                                                                |
-| `MapoWygEditor`                                              | ✅     | Tiptap v2, custom toolbar, safe `Link` validator + HTML sanitizer, extensions via `attrs.extensions`                     |
-| `MapoMapField`                                               | ✅     | Leaflet SSR-safe via `ClientOnly` + dynamic import (`MapoMapFieldClient`)                                                |
-| `MapoMediaField` / `MapoEnhancedMediaField`                  | 🔲     | Depends on Phase 6 (Media Manager)                                                                                       |
+| Field                                                        | Status | Notes                                                                                                                                                                           |
+| ------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| text / textarea / number / boolean / switch / color / slider | ✅     | NUI direct mapping via thin wrappers (`NuiInput`, `NuiTextarea`, `NuiCheckbox`, `NuiSwitch`, `NuiSlider`)                                                                       |
+| file                                                         | ✅     | `MapoFileField` with current-file preview, image thumbnail, and remove button                                                                                                   |
+| select                                                       | ✅     | `USelectMenu` with `value-key` / `label-key` via registry                                                                                                                       |
+| `MapoDateField` / `MapoTimeField` / `MapoDateTimeField`      | ✅     | ISO ↔ `@internationalized/date`; `datetime` accepts `tz: 'naive' \| 'utc'`                                                                                                      |
+| `MapoFksField` (fks / m2m)                                   | ✅     | `USelectMenu` + debounced remote fetch, removable M2M chips                                                                                                                     |
+| `MapoRepeater`                                               | ✅     | Drag-and-drop (`vue-draggable-plus`), stable item UIDs, undo stack, templates, contextual mini-card collapse, focus mode                                                        |
+| `MapoSeoPreview`                                             | ✅     | 60 / 155 char counters, live SERP preview                                                                                                                                       |
+| `MapoWygEditor`                                              | ✅     | Tiptap v2, custom toolbar, safe `Link` validator + HTML sanitizer, extensions via `attrs.extensions`                                                                            |
+| `MapoMapField`                                               | ✅     | Leaflet SSR-safe via `ClientOnly` + dynamic import (`MapoMapFieldClient`)                                                                                                       |
+| `media` / `media-m2m` / `enhanced-media`                     | ✅     | `MapoMediaField` (single), `MapoMediaM2mField` (multi, drag-reorder), `MapoEnhancedMediaField` (single + alt/caption); injected into `$mapoFormRegistry` by `@mapomodule/uikit` |
+
+### Media Manager (`@mapomodule/uikit`)
+
+File upload, gallery browsing, folder management, and a picker dialog. Full port of the v1 MediaManager. See [Media Manager](/uikit/media).
+
+| Feature                                               | Status | Notes                                                                                           |
+| ----------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| `useMediaStore`                                       | ✅     | Pinia store: gallery items, folders, breadcrumb, pagination, selection, bulk edit, MIME lock    |
+| `MapoMediaManager` / `MapoMediaManagerDialog`         | ✅     | Orchestrator shell + `UModal` picker (single/multi), pre-seedable selection                     |
+| Gallery (`MapoMediaGallery`)                          | ✅     | CSS-grid, picker selection, bulk select-all/delete, pagination                                  |
+| Folders (`MapoMediaFolders` / `MapoMediaBreadcrumbs`) | ✅     | MIME filters, inline create/rename/delete, breadcrumb navigation                                |
+| Editor (`MapoMediaEditor`)                            | ✅     | Slideover: info, linked models, open-in-new-tab, i18n metadata, file replace, permission gating |
+| Uploader (`MapoMediaUploader`)                        | ✅     | Drop area + queue, per-file progress (XHR), inline metadata, destination folder                 |
+| `MapoDropArea`                                        | ✅     | Generic drag-and-drop zone (reusable outside media)                                             |
+| Backend adapter (`$mapoMediaAdapter`)                 | ✅     | Pluggable request/response/payload transforms; Camomilla ships its own                          |
+| WYG image insertion                                   | ✅     | Tiptap toolbar "Insert image" via the media picker                                              |
 
 ---
 
 ## Not yet implemented 🔲
 
 These features existed in Mapo v1 and are planned for v2 but have not been built yet.
-
-### Media Manager
-
-File upload, gallery browsing, and media picker dialog.
-
-**v1 had:** Gallery with pagination and single/multi selection, folder navigation, drag-and-drop uploader, metadata editor with i18n, bulk delete, `MediaManagerDialog` picker embeddable in form fields.
-
-**v2 target:** Full rewrite as a Nuxt module (`@mapomodule/media`). See roadmap Phase 6.
 
 ### Menu Manager
 
@@ -143,13 +151,9 @@ Multi-language content switching and UI translation.
 | --------------------- | ------ | -------------------------------------------------------------------- |
 | `MapoLogoutButton`    | ✅     | Reusable logout button wrapping `useMapoAuth().logout()`             |
 | `MapoSidebarProfile`  | ✅     | User profile row (avatar + username + logout) for the sidebar footer |
+| `MapoDropArea`        | ✅     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
 | `MapoLangSwitcher` 🔲 | 🔲     | UI language selector (depends on `@mapomodule/i18n` — Phase 7)       |
-| `MapoDropArea` 🔲     | 🔲     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
 | `MapoPagePreview` 🔲  | 🔲     | Page/template preview panel                                          |
-
-### `useMediaStore` (Phase 6)
-
-Pinia store for Media Manager state: gallery items, folders, pagination, selection, edit mode.
 
 ---
 
