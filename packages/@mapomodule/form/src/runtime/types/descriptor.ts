@@ -344,15 +344,28 @@ export interface RepeaterDescriptor<
   };
 }
 
-/** Descriptor for media/file manager fields. */
+/** Descriptor for a single-media picker field (`type: 'media'`). */
 export interface MediaDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
-  type:
-    | `${KnownFieldType.Media}`
-    | `${KnownFieldType.MediaM2m}`
-    | `${KnownFieldType.EnhancedMedia}`;
-  attrs?: { mime?: string; multiple?: boolean };
+  type: `${KnownFieldType.Media}`;
+  attrs?: { mime?: string };
+}
+
+/** Descriptor for a multi-media picker field (`type: 'media-m2m'`). */
+export interface MediaM2mDescriptor<
+  T = Record<string, unknown>,
+> extends FieldBase<T> {
+  type: `${KnownFieldType.MediaM2m}`;
+  attrs?: { mime?: string; maxItems?: number };
+}
+
+/** Descriptor for a media picker with inline alt/caption metadata (`type: 'enhanced-media'`). */
+export interface EnhancedMediaDescriptor<
+  T = Record<string, unknown>,
+> extends FieldBase<T> {
+  type: `${KnownFieldType.EnhancedMedia}`;
+  attrs?: { mime?: string };
 }
 
 /**
@@ -395,7 +408,9 @@ export type FieldDescriptor<T = Record<string, unknown>> =
   | SeoDescriptor<T>
   | MapDescriptor<T>
   | RepeaterDescriptor<T>
-  | MediaDescriptor<T>;
+  | MediaDescriptor<T>
+  | MediaM2mDescriptor<T>
+  | EnhancedMediaDescriptor<T>;
 
 /**
  * {@link FieldDescriptor} plus the {@link CustomDescriptor} escape hatch.

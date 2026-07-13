@@ -22,6 +22,8 @@ export type {
   MapDescriptor,
   RepeaterDescriptor,
   MediaDescriptor,
+  MediaM2mDescriptor,
+  EnhancedMediaDescriptor,
   CustomDescriptor,
 } from "./descriptor.js";
 

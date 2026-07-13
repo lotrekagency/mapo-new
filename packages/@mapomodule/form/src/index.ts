@@ -42,6 +42,8 @@ export type {
   MapDescriptor,
   RepeaterDescriptor,
   MediaDescriptor,
+  MediaM2mDescriptor,
+  EnhancedMediaDescriptor,
   CustomDescriptor,
   FieldComponentEntry,
   FieldRegistry,
