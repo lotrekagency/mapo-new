@@ -28,6 +28,7 @@
     "dev:form": "pnpm --filter @mapomodule/form dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
     "prepare": "husky",
+    "postinstall": "pnpm -r --filter './packages/**' dev:prepare",
     "release": "pnpm build:release && multi-semantic-release --ignore-private-packages",
     "release:dry": "pnpm build:release && multi-semantic-release --dry-run --ignore-private-packages",
     "publish:packages": "pnpm -r --filter './packages/**' publish --access public --no-git-checks"

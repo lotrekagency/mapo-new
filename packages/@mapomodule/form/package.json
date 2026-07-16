@@ -40,7 +40,7 @@
   "scripts": {
     "build": "nuxt-module-build build && vue-tsc -p tsconfig.build-types.json && node ../../../scripts/clean-empty-vue-dts.mjs dist",
     "dev": "nuxt-module-build build --stub --watch",
-    "prepare": "nuxt-module-build build --stub",
+    "prepack": "pnpm build",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src",
@@ -48,8 +48,8 @@
   },
   "dependencies": {
     "@internationalized/date": "^3.7.0",
-    "@mapomodule/store": "2.0.0-beta.1",
-    "@mapomodule/utils": "2.0.0-beta.1",
+    "@mapomodule/store": "workspace:*",
+    "@mapomodule/utils": "workspace:*",
     "@tiptap/extension-link": "^2.11.5",
     "@tiptap/extension-underline": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
