@@ -186,10 +186,10 @@ importers:
   packages/@mapomodule/core:
     dependencies:
       '@mapomodule/store':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../store
       '@mapomodule/utils':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../utils
     devDependencies:
       '@nuxt/kit':
@@ -223,10 +223,10 @@ importers:
         specifier: ^3.7.0
         version: 3.12.1
       '@mapomodule/store':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../store
       '@mapomodule/utils':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../utils
       '@tiptap/extension-link':
         specifier: ^2.11.5
@@ -332,16 +332,16 @@ importers:
   packages/@mapomodule/uikit:
     dependencies:
       '@mapomodule/core':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../core
       '@mapomodule/form':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../form
       '@mapomodule/store':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../store
       '@mapomodule/utils':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../utils
     devDependencies:
       '@nuxt/kit':
@@ -390,19 +390,19 @@ importers:
         specifier: ^1.2.0
         version: 1.2.104
       '@mapomodule/core':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../@mapomodule/core
       '@mapomodule/form':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../@mapomodule/form
       '@mapomodule/store':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../@mapomodule/store
       '@mapomodule/uikit':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../@mapomodule/uikit
       '@mapomodule/utils':
-        specifier: 2.0.0-beta.1
+        specifier: workspace:*
         version: link:../@mapomodule/utils
       '@nuxt/ui':
         specifier: ^4.7.0

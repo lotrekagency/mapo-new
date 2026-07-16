@@ -22,7 +22,13 @@ const publishPlugins = [
   [
     "@semantic-release/git",
     {
-      assets: ["CHANGELOG.md", "package.json"],
+      // Only the changelog is committed back. package.json is deliberately
+      // NOT committed: during a release multi-semantic-release rewrites the
+      // version field and replaces `workspace:*` deps with concrete versions
+      // (npm publish can't handle the workspace protocol). Committing that
+      // rewrite would break local workspace linking and desync pnpm-lock.yaml.
+      // Git tags are the source of truth for released versions.
+      assets: ["CHANGELOG.md"],
       message:
         "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}",
     },
