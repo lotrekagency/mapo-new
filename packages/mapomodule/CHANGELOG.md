@@ -1,3 +1,16 @@
+# mapomodule [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.2...mapomodule@2.0.0-beta.3) (2026-07-16)
+
+### Bug Fixes
+
+- update package.json scripts to use prepack and switch dependencies to workspace ([c7d3abc](https://github.com/lotrekagency/mapo-new/commit/c7d3abc3eca338e50d1af8f93a4a59065a548a8b))
+
+### Dependencies
+
+- **@mapomodule/core:** upgraded to 2.0.0-beta.2
+- **@mapomodule/form:** upgraded to 2.0.0-beta.2
+- **@mapomodule/store:** upgraded to 2.0.0-beta.2
+- **@mapomodule/uikit:** upgraded to 2.0.0-beta.2
+
 # mapomodule [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.1...mapomodule@2.0.0-beta.2) (2026-07-07)
 
 ### Bug Fixes
