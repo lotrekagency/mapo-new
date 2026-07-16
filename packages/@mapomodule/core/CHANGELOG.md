@@ -1,3 +1,13 @@
+# @mapomodule/core [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.2...@mapomodule/core@2.0.0-beta.3) (2026-07-16)
+
+### Bug Fixes
+
+- update dependencies and improve module resolution for Pinia and TailwindCSS ([2c18c13](https://github.com/lotrekagency/mapo-new/commit/2c18c13161faf0c9986a2fe896cbe0ad3843461b))
+
+### Dependencies
+
+- **@mapomodule/store:** upgraded to 2.0.0-beta.3
+
 # @mapomodule/core [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.1...@mapomodule/core@2.0.0-beta.2) (2026-07-16)
 
 ### Bug Fixes
