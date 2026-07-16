@@ -1,3 +1,15 @@
+# @mapomodule/uikit [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.1...@mapomodule/uikit@2.0.0-beta.2) (2026-07-16)
+
+### Bug Fixes
+
+- update package.json scripts to use prepack and switch dependencies to workspace ([c7d3abc](https://github.com/lotrekagency/mapo-new/commit/c7d3abc3eca338e50d1af8f93a4a59065a548a8b))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.2
+- **@mapomodule/store:** upgraded to 2.0.0-beta.2
+- **@mapomodule/core:** upgraded to 2.0.0-beta.2
+
 # @mapomodule/uikit [2.0.0-beta.1](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@1.0.0...@mapomodule/uikit@2.0.0-beta.1) (2026-07-07)
 
 - feat(release)!: prepare for first 2.0.0.beta release \ BREAKING CHANGE: this is a completely rewritten version of mapo ([d906c8d](https://github.com/lotrekagency/mapo-new/commit/d906c8da8675bef2505ead5f744fd72fbf5acab2))
