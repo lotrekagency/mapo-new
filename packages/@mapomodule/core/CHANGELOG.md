@@ -1,3 +1,13 @@
+# @mapomodule/core [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.3...@mapomodule/core@2.0.0-beta.4) (2026-07-16)
+
+### Bug Fixes
+
+- enable SSR transpilation and auto-import for Nuxt modules ([fe7da33](https://github.com/lotrekagency/mapo-new/commit/fe7da33e7795ca142dc13f791c8cd23f5c638490))
+
+### Dependencies
+
+- **@mapomodule/store:** upgraded to 2.0.0-beta.4
+
 # @mapomodule/core [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.2...@mapomodule/core@2.0.0-beta.3) (2026-07-16)
 
 ### Bug Fixes
