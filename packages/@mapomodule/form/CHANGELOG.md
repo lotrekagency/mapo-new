@@ -1,3 +1,9 @@
+# @mapomodule/form [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.2...@mapomodule/form@2.0.0-beta.3) (2026-07-16)
+
+### Dependencies
+
+- **@mapomodule/store:** upgraded to 2.0.0-beta.3
+
 # @mapomodule/form [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.1...@mapomodule/form@2.0.0-beta.2) (2026-07-16)
 
 ### Bug Fixes
