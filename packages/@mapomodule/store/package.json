@@ -45,15 +45,17 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },
+  "dependencies": {
+    "@pinia/nuxt": "^0.11.3"
+  },
   "peerDependencies": {
     "nuxt": ">=4.0.0",
-    "pinia": ">=3.0.0"
+    "pinia": "^3.0.0"
   },
   "devDependencies": {
     "@nuxt/kit": "4.4.2",
     "@nuxt/module-builder": "^1.0.2",
     "@nuxt/schema": "4.4.2",
-    "@pinia/nuxt": "^0.11.3",
     "nuxt": "^4.4.2",
     "pinia": "^3.0.4",
     "vue": "^3.5.32"

@@ -49,7 +49,8 @@
     "@mapomodule/form": "workspace:*",
     "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
-    "@mapomodule/core": "workspace:*"
+    "@mapomodule/core": "workspace:*",
+    "tailwindcss": "^4.0.0"
   },
   "peerDependencies": {
     "@nuxt/ui": ">=4.0.0",
@@ -59,7 +60,6 @@
     "@nuxt/kit": "4.4.2",
     "@nuxt/module-builder": "^1.0.2",
     "@nuxt/schema": "4.4.2",
-    "tailwindcss": "^4.0.0",
     "@nuxt/ui": "^4.7.0",
     "@tanstack/vue-table": "^8.21.3",
     "nuxt": "^4.4.2",

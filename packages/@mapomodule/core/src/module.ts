@@ -50,7 +50,9 @@ export default defineNuxtModule<MapoOptions>({
     });
 
     if (!hasNuxtModule("@mapomodule/store")) {
-      await installModule("@mapomodule/store");
+      // Resolve from core's own node_modules: with pnpm's isolated layout the
+      // consuming app cannot resolve the bare "@mapomodule/store" specifier.
+      await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
     // `defaults` guarantees these are set at runtime, but MapoOptions keeps
