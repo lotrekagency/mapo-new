@@ -1,3 +1,12 @@
+# mapomodule [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.4...mapomodule@2.0.0-beta.5) (2026-07-16)
+
+### Dependencies
+
+- **@mapomodule/core:** upgraded to 2.0.0-beta.4
+- **@mapomodule/form:** upgraded to 2.0.0-beta.4
+- **@mapomodule/store:** upgraded to 2.0.0-beta.4
+- **@mapomodule/uikit:** upgraded to 2.0.0-beta.4
+
 # mapomodule [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.3...mapomodule@2.0.0-beta.4) (2026-07-16)
 
 ### Dependencies
