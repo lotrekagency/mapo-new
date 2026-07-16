@@ -30,6 +30,16 @@ export default defineNuxtModule<MapoFormOptions>({
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
 
+    // In consuming apps this runtime lives inside node_modules, where Nuxt
+    // skips auto-import injection by default (workspace apps are unaffected:
+    // pnpm symlinks resolve outside node_modules). Opt back in and transpile
+    // the runtime for the SSR build.
+    nuxt.options.build.transpile.push(resolver.resolve("./runtime"));
+    nuxt.options.imports.transform ??= {};
+    (nuxt.options.imports.transform.include ??= []).push(
+      /@mapomodule[\\/]form[\\/]/,
+    );
+
     // Only serializable values can go into runtimeConfig.public.
     // `mapping` and `accessor` contain functions → not SSR-serializable.
     // To extend mapping/accessor, use an app plugin that accesses $mapoFormRegistry:

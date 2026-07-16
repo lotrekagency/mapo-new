@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { version } from "../../../package.json";
-
-definePageMeta({ layout: "mapo-default" });
 </script>
 
 <template>
