@@ -169,7 +169,6 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoListTable",
       // ─── Media ───────────────────────────────────────────────────────────
       "MapoDropArea",
-      "MapoMediaPreview",
       "MapoMediaBreadcrumbs",
       "MapoMediaFolders",
       "MapoMediaGallery",
@@ -177,12 +176,24 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoMediaEditor",
       "MapoMediaUploader",
       "MapoMediaManager",
-      "MapoMediaManagerDialog",
     ];
 
     for (const name of components) {
       addComponent({
         name,
+        filePath: resolver.resolve(`./runtime/components/${name}.vue`),
+      });
+    }
+
+    // Registered as `global` so they survive runtime lookup from *another*
+    // package: the media fields in @mapomodule/form resolve the dialog by name
+    // (see useMediaManager) and render the preview in their templates. Nuxt's
+    // build-time auto-import only covers templates it scans, so a non-global
+    // registration resolves to nothing once the caller lives outside uikit.
+    for (const name of ["MapoMediaManagerDialog", "MapoMediaPreview"]) {
+      addComponent({
+        name,
+        global: true,
         filePath: resolver.resolve(`./runtime/components/${name}.vue`),
       });
     }
@@ -212,24 +223,9 @@ export default defineNuxtModule<MapoUikitOptions>({
       );
     });
 
-    // Media form fields — registered separately so consumers can see them individually
-    const mediaFieldComponents = [
-      "MapoMediaField",
-      "MapoMediaM2mField",
-      "MapoEnhancedMediaField",
-    ];
-    for (const name of mediaFieldComponents) {
-      addComponent({
-        name,
-        filePath: resolver.resolve(`./runtime/components/fields/${name}.vue`),
-      });
-    }
-
-    // Plugin: inject media field types into $mapoFormRegistry (runs after form's registry plugin)
-    addPlugin({
-      src: resolver.resolve("./runtime/plugins/media-registry"),
-      order: 10,
-    });
+    // NOTE: the `media` / `media-m2m` / `enhanced-media` field components live in
+    // @mapomodule/form with every other field type and are registered in its
+    // default registry. They resolve the picker dialog below at runtime.
 
     // Plugin: provide the default $mapoMediaAdapter. Integrations register their
     // own plugin ordered after this one to override request/response transforms.
