@@ -244,7 +244,7 @@ function formatDate(dateStr: string): string {
           <!-- Edit form (shown when editing) -->
           <div v-if="editing" class="space-y-4 px-4 py-3">
             <!-- Lang switch -->
-            <UButtonGroup v-if="languages && languages.length > 1" size="xs">
+            <UFieldGroup v-if="languages && languages.length > 1" size="xs">
               <UButton
                 :variant="currentLang === '' ? 'solid' : 'outline'"
                 color="neutral"
@@ -261,7 +261,7 @@ function formatDate(dateStr: string): string {
               >
                 {{ lang.toUpperCase() }}
               </UButton>
-            </UButtonGroup>
+            </UFieldGroup>
 
             <!-- Field inputs -->
             <div class="space-y-3">
