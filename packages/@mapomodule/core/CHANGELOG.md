@@ -1,3 +1,9 @@
+# @mapomodule/core [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.4...@mapomodule/core@2.0.0-beta.5) (2026-07-23)
+
+### Dependencies
+
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.2
+
 # @mapomodule/core [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.3...@mapomodule/core@2.0.0-beta.4) (2026-07-16)
 
 ### Bug Fixes
