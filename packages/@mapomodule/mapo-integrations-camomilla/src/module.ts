@@ -1,4 +1,9 @@
-import { defineNuxtModule, addServerHandler, createResolver } from "@nuxt/kit";
+import {
+  defineNuxtModule,
+  addServerHandler,
+  addPlugin,
+  createResolver,
+} from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { CamomillaOptions } from "./types";
 
@@ -24,6 +29,7 @@ export default defineNuxtModule<CamomillaOptions>({
     syncCamomillaSession: false,
     forwardedHeaders: [],
     pathRewrite: {},
+    mediaAdapter: true,
   },
 
   setup(options, nuxt) {
@@ -43,5 +49,14 @@ export default defineNuxtModule<CamomillaOptions>({
       middleware: true,
       handler: resolver.resolve("./runtime/server/middleware/proxy"),
     });
+
+    // Client plugin: override $mapoMediaAdapter with Camomilla's dialect.
+    // High order so it wins over the default adapter from @mapomodule/uikit.
+    if (options.mediaAdapter !== false) {
+      addPlugin({
+        src: resolver.resolve("./runtime/plugins/media-adapter"),
+        order: 20,
+      });
+    }
   },
 }) satisfies NuxtModule<CamomillaOptions>;

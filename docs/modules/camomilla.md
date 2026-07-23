@@ -45,7 +45,21 @@ export default defineNuxtConfig({
 | `syncCamomillaSession` | `boolean`               | `false`                   | Enable SSO between Mapo and Django admin — see below  |
 | `forwardedHeaders`     | `string[]`              | `[]`                      | Additional request headers to forward to the backend  |
 | `pathRewrite`          | `Record<string,string>` | `{}`                      | Custom path rewrites merged after the built-in ones   |
-| `changeOrigin`         | `boolean`               | `true`                    | Override the `Host` header sent to the backend        |
+| `mediaAdapter`         | `boolean`               | `true`                    | Register the Camomilla media adapter — see below      |
+
+## Media adapter
+
+When `mediaAdapter` is `true` (default), the module registers a client `$mapoMediaAdapter` plugin that maps the Media Manager's canonical params and payloads to Camomilla's dialect:
+
+- mime filter → `fltr=mime_type=<value>`
+- detail fetch → `language_code` query param for per-language metadata
+- folder create/update payload → `{ title, slug, updir }` (canonical `{ name, parent }`); `slug` is auto-derived from the name
+- folder reads normalized back to the canonical `{ name, parent, path }`
+- file replace flag → `same_url` (canonical `maintain_url`)
+
+This lets the [Media Manager](/uikit/media) talk to a Camomilla backend with no extra configuration. Set `mediaAdapter: false` to keep the default REST adapter (e.g. when pointing the media endpoints at a non-Camomilla service).
+
+The media endpoints themselves are already path-rewritten: `/api/media` → `/api/camomilla/media` and `/api/media-folders` → `/api/camomilla/media-folders`.
 
 ## Path rewriting
 

@@ -19,6 +19,15 @@ export default defineNuxtConfig({
     // makes icons and design tokens load correctly.
     uikit: {
       css: "~/assets/css/main.css",
+
+      // Point the Media Manager at the local mock endpoints under /api/mock,
+      // which the Camomilla proxy skips. Demonstrates configurable endpoints.
+      media: {
+        endpoints: {
+          media: "/api/mock/media",
+          folders: "/api/mock/media-folders",
+        },
+      },
     },
   },
 

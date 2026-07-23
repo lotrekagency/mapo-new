@@ -50,6 +50,7 @@
     "@internationalized/date": "^3.7.0",
     "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
+    "@tiptap/extension-image": "^2.11.5",
     "@tiptap/extension-link": "^2.11.5",
     "@tiptap/extension-underline": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",

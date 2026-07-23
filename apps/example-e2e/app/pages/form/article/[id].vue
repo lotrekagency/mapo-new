@@ -29,7 +29,11 @@
  */
 import { navigateTo } from "#app";
 import { flattenFieldGroups } from "@mapomodule/form/types";
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type {
+  FieldDescriptor,
+  MediaItem,
+  EnhancedMediaValue,
+} from "@mapomodule/form/types";
 
 definePageMeta({
   layout: "mapo-default",
@@ -111,6 +115,10 @@ interface Award {
 
 interface Article {
   id?: number;
+  // Media picker fields (v2 Media Manager)
+  cover_media: EnhancedMediaValue | null;
+  hero_image: MediaItem | null;
+  gallery_media: MediaItem[];
   // Content
   title: string;
   slug: string;
@@ -731,14 +739,39 @@ const contentFields: FieldDescriptor<Article>[] = [
   },
 ];
 
-// ─── Tab 2: Media (15 fields + 4 repeaters) ───────────────────────────────────
+// ─── Tab 2: Media (15 fields + 4 repeaters + 3 media picker fields) ─────────
 
 const mediaFields: FieldDescriptor<Article>[] = [
-  // ── Cover ──
+  // ── Media Picker fields (v2 Media Manager integration) ──────────────────────
+  {
+    key: "cover_media",
+    type: "enhanced-media",
+    label: "Cover Image (Media Picker)",
+    tab: "Media",
+    cols: 12,
+    attrs: { mime: "image/*" },
+  },
+  {
+    key: "hero_image",
+    type: "media",
+    label: "Hero Image (single picker)",
+    tab: "Media",
+    cols: 12,
+    attrs: { mime: "image/*" },
+  },
+  {
+    key: "gallery_media",
+    type: "media-m2m",
+    label: "Gallery (multi media picker)",
+    tab: "Media",
+    cols: 12,
+  },
+
+  // ── Cover (legacy URL text fields) ──────────────────────────────────────────
   {
     key: "cover_image",
     type: "text",
-    label: "Cover Image URL",
+    label: "Cover Image URL (legacy)",
     tab: "Media",
     cols: 8,
     attrs: { placeholder: "https://cdn.example.com/cover.jpg" },

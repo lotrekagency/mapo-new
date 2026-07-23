@@ -69,6 +69,38 @@ When installed via `mapomodule`, configure under `mapo.uikit` instead.
 | `MapoListTable`     | Data table with server-side pagination, sort, selection, and whole-row drag reorder (drop-line feedback; auto-disabled while a search/sort is active). Pass `permissionModel` to gate edit/delete row actions. |
 | `MapoListQuickEdit` | Quick-edit modal driven by the same `FieldDescriptor[]` as the detail form                                                                                                                                     |
 
+#### Media Manager
+
+| Component                | Description                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MapoDropArea`           | Standalone drag-and-drop area (reusable outside media manager)                                                                                                           |
+| `MapoMediaPreview`       | MIME-aware preview: `image` → `<img>`, `video` → `<video>`, other → file icon                                                                                            |
+| `MapoMediaBreadcrumbs`   | Folder navigation breadcrumb                                                                                                                                             |
+| `MapoMediaFolders`       | Folder sidebar with MIME filters (image/video/audio/document)                                                                                                            |
+| `MapoMediaGallery`       | Responsive CSS Grid gallery with bulk selection and pagination                                                                                                           |
+| `MapoMediaEditor`        | Right-side drawer for editing media metadata (title, alt text, translations); shows linked models, open-in-new-tab, and gates Edit/Delete on the media model permissions |
+| `MapoMediaFileChanger`   | Replace an existing file while optionally preserving its URL                                                                                                             |
+| `MapoMediaUploader`      | Upload queue with per-file progress, inline metadata (title/alt/description), and destination-folder selection                                                           |
+| `MapoMediaManager`       | Main orchestrator shell (sidebar + gallery + uploader + editor drawer)                                                                                                   |
+| `MapoMediaManagerDialog` | `UModal` wrapper for picker mode — single or multi selection with confirm                                                                                                |
+
+**Form fields** — the `media`, `media-m2m`, and `enhanced-media` field types ship with [`@mapomodule/form`](../form/README.md) in its default registry; they drive the picker above and need this package installed to work.
+
+Media config (endpoints + upload limits) goes under `mapo.uikit.media`; backend-specific request/response transforms are handled by a pluggable `$mapoMediaAdapter` (Camomilla ships its own). See [docs/uikit/media.md](../../../docs/uikit/media.md).
+
+```ts
+mapo: {
+  uikit: {
+    media: {
+      endpoints: { media: "/api/media", folders: "/api/media-folders" },
+      maxImageSize: 10, // MB
+      maxVideoSize: 100, // MB
+      permissionsModel: "media", // Django model for editor change/delete checks
+    },
+  },
+},
+```
+
 #### Detail shell
 
 | Component              | Description                                                                                                                                                                                                                                                                           |
@@ -140,7 +172,7 @@ app/
 
 The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` and swaps the `filePath` — no imports, no registration needed. Keep props and slots compatible with the original.
 
-Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoSidebarProfile`, `MapoLogin`, `MapoLogoutButton`, `MapoThemeToggle`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`, `MapoDetail`, `MapoDetailLangSwitch`, `MapoList`, `MapoListTable`, `MapoListFilters`, `MapoListActions`, `MapoListHead`, `MapoListQuickEdit`.
+Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoSidebarProfile`, `MapoLogin`, `MapoLogoutButton`, `MapoThemeToggle`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`, `MapoDetail`, `MapoDetailLangSwitch`, `MapoList`, `MapoListTable`, `MapoListFilters`, `MapoListActions`, `MapoListHead`, `MapoListQuickEdit`, `MapoMediaManager`, `MapoMediaManagerDialog`, `MapoMediaGallery`, `MapoMediaEditor`, `MapoMediaUploader`, `MapoMediaFolders`.
 
 ## Dev workflow
 
