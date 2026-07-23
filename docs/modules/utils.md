@@ -109,6 +109,31 @@ formatDate("2026-04-28T10:30:00", "DD/MM/YYYY HH:mm"); // '28/04/2026 10:30'
 
 ---
 
+## `humanFileSize(bytes, si?, dp?)`
+
+Formats a byte count as a human-readable string. `si` selects metric units (powers of 1000, `kB/MB`) over binary (powers of 1024, `KiB/MiB`, default); `dp` sets decimal places (default `1`). Used across the Media Manager for file sizes.
+
+```ts
+import { humanFileSize } from "@mapomodule/utils";
+
+humanFileSize(1536); // '1.5 KiB'
+humanFileSize(1500000, true); // '1.5 MB'
+```
+
+---
+
+## `slugify(str)`
+
+Converts a string into a URL-safe slug: lowercase, accents stripped, non-alphanumerics collapsed into single dashes. The Camomilla media adapter uses it to derive a folder `slug` from its title.
+
+```ts
+import { slugify } from "@mapomodule/utils";
+
+slugify("Càffé & Co."); // 'caffe-co'
+```
+
+---
+
 ## `debounce(fn, delay)`
 
 Returns a debounced version of `fn` that delays invocation until `delay` ms have elapsed since the last call.

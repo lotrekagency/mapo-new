@@ -54,7 +54,8 @@
   },
   "peerDependencies": {
     "@nuxt/ui": ">=4.0.0",
-    "nuxt": ">=4.0.0"
+    "nuxt": ">=4.0.0",
+    "pinia": ">=3.0.0"
   },
   "devDependencies": {
     "@nuxt/kit": "4.4.2",
@@ -63,6 +64,7 @@
     "@nuxt/ui": "^4.7.0",
     "@tanstack/vue-table": "^8.21.3",
     "nuxt": "^4.4.2",
+    "pinia": "^3.0.4",
     "vue": "^3.5.32",
     "vue-router": "^5.0.4",
     "vue-tsc": "^3.3.4"

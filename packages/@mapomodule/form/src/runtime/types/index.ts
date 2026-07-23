@@ -22,8 +22,12 @@ export type {
   MapDescriptor,
   RepeaterDescriptor,
   MediaDescriptor,
+  MediaM2mDescriptor,
+  EnhancedMediaDescriptor,
   CustomDescriptor,
 } from "./descriptor.js";
+
+export type { MediaLink, MediaItem, EnhancedMediaValue } from "./media.js";
 
 export type {
   FieldComponentEntry,

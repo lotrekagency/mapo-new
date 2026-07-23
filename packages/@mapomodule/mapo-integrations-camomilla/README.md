@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     forwardedHeaders: [],
     pathRewrite: {}, // merged on top of the built-in rewrites
     changeOrigin: true,
+    mediaAdapter: true, // register the Camomilla media adapter (default true)
   },
 });
 ```
@@ -30,6 +31,7 @@ export default defineNuxtConfig({
 - **Cookie sync**: maps Mapo's `__mapo_session` to Django's `sessionid` on outgoing requests, and aliases `sessionid` back to `__mapo_session` on auth-path responses.
 - **CSRF**: forwards `csrftoken` as `X-CSRFToken` on every non-login request.
 - **Forwarded headers**: optional whitelist of extra request headers to forward to the Camomilla backend.
+- **Media adapter**: registers a `$mapoMediaAdapter` so the [Media Manager](../uikit/) speaks Camomilla's dialect — mime filter → `fltr=mime_type=`, detail fetch → `language_code`. Disable with `mediaAdapter: false`.
 
 ## Source of truth
 

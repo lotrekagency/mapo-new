@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { watch, onBeforeUnmount } from "vue";
+import { ref, watch, onBeforeUnmount, resolveComponent } from "vue";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { AnyExtension } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
+import Image from "@tiptap/extension-image";
 import type { EditorDescriptor } from "../../types/index.js";
 
 const props = defineProps<{
@@ -85,6 +86,7 @@ const editor = useEditor({
       validate: (href: string) => isSafeUrl(href),
     }),
     Underline,
+    Image.configure({ inline: false, allowBase64: false }),
     ...extraExtensions,
   ] as AnyExtension[],
   onUpdate: ({ editor: e }) => {
@@ -112,6 +114,28 @@ watch(
 );
 
 onBeforeUnmount(() => editor.value?.destroy());
+
+// ─── Image insertion ──────────────────────────────────────────────────────
+// MapoMediaManagerDialog is globally registered by @mapomodule/uikit.
+// resolveComponent() works at runtime because it is registered before this
+// component renders. We avoid a direct import to break the form → uikit cycle.
+const imagePickerOpen = ref(false);
+const MediaManagerDialog = resolveComponent("MapoMediaManagerDialog");
+const hasMediaManager = typeof MediaManagerDialog !== "string";
+
+function onImageConfirm(
+  selection:
+    | { file: string; alt_text?: string }
+    | Array<{ file: string; alt_text?: string }>,
+) {
+  const media = Array.isArray(selection) ? selection[0] : selection;
+  if (!media || !editor.value) return;
+  editor.value
+    .chain()
+    .focus()
+    .setImage({ src: media.file, alt: media.alt_text ?? "" })
+    .run();
+}
 </script>
 
 <template>
@@ -223,9 +247,9 @@ onBeforeUnmount(() => editor.value?.destroy());
 
       <USeparator orientation="vertical" class="mx-1 h-5" />
 
-      <!-- Insert Image — enabled in Phase 6 when Media Manager is available -->
+      <!-- Insert Image via Media Manager (available when @mapomodule/uikit is installed) -->
       <UTooltip
-        text="Insert image (requires Media Manager — Phase 6)"
+        :text="hasMediaManager ? 'Insert image' : 'Requires @mapomodule/uikit'"
         :delay-open="300"
       >
         <UButton
@@ -233,12 +257,13 @@ onBeforeUnmount(() => editor.value?.destroy());
           variant="ghost"
           color="neutral"
           icon="i-lucide-image"
-          disabled
+          :disabled="readonly || disabled || !hasMediaManager"
+          @click="imagePickerOpen = true"
         />
       </UTooltip>
     </div>
 
-    <!-- Contenuto editor -->
+    <!-- Editor content -->
     <EditorContent
       :editor="editor"
       class="prose prose-sm max-w-none px-3 py-2 focus-within:outline-none"
@@ -253,4 +278,14 @@ onBeforeUnmount(() => editor.value?.destroy());
       {{ err }}
     </p>
   </div>
+
+  <!-- Image picker dialog — only rendered when MapoMediaManagerDialog is globally available -->
+  <component
+    :is="MediaManagerDialog"
+    v-if="hasMediaManager"
+    v-model="imagePickerOpen"
+    selection-mode="single"
+    mime="image/*"
+    @confirm="onImageConfirm"
+  />
 </template>

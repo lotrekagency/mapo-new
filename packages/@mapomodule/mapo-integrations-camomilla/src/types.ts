@@ -17,7 +17,15 @@ export interface CamomillaOptions {
   forwardedHeaders?: string[];
   /** Custom path rewrites merged after the built-in ones. Key = regex string, value = replacement. */
   pathRewrite?: CamomillaPathRewrite;
+  /**
+   * Register the Camomilla media adapter ($mapoMediaAdapter) that maps the
+   * Media Manager's canonical params to Camomilla's dialect (mime → `fltr`,
+   * `language_code`). Defaults to true. Set false to keep the default REST adapter.
+   */
+  mediaAdapter?: boolean;
 }
 
-/** Shape stored in runtimeConfig (private, server-only). */
-export type CamomillaRuntimeConfig = Required<CamomillaOptions>;
+/** Shape stored in runtimeConfig (private, server-only). `mediaAdapter` is build-time only. */
+export type CamomillaRuntimeConfig = Required<
+  Omit<CamomillaOptions, "mediaAdapter">
+>;

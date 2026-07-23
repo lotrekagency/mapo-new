@@ -4,6 +4,8 @@ import {
   defineNuxtModule,
   addComponent,
   addLayout,
+  addPlugin,
+  addImports,
   addTypeTemplate,
   createResolver,
   extendPages,
@@ -33,7 +35,48 @@ export interface MapoUikitOptions {
    * @see https://ui.nuxt.com/getting-started/theme
    */
   ui?: Record<string, unknown>;
+
+  /**
+   * Media Manager configuration. Endpoints and upload limits are
+   * forwarded to `runtimeConfig.public.mapoMedia` and read by `useMediaStore`.
+   */
+  media?: MapoMediaOptions;
 }
+
+export interface MapoMediaOptions {
+  /**
+   * REST endpoints used by the media store.
+   * Defaults align with the Camomilla integration path-rewrites.
+   */
+  endpoints?: {
+    /** Single-media CRUD (detail, update, delete, upload). Default `/api/media`. */
+    media?: string;
+    /** Folder navigation + CRUD. Default `/api/media-folders`. */
+    folders?: string;
+  };
+  /** Max image upload size in MB. Default 10. */
+  maxImageSize?: number;
+  /** Max video upload size in MB. Default 100. */
+  maxVideoSize?: number;
+  /** Max size for any other file type in MB. Default 10. */
+  maxDefaultSize?: number;
+  /**
+   * Django model used for media permission checks (`change_<model>`,
+   * `delete_<model>`) in the editor. Default `"media"`.
+   */
+  permissionsModel?: string;
+}
+
+const MAPO_MEDIA_DEFAULTS = {
+  endpoints: {
+    media: "/api/media",
+    folders: "/api/media-folders",
+  },
+  maxImageSize: 10,
+  maxVideoSize: 100,
+  maxDefaultSize: 10,
+  permissionsModel: "media",
+} satisfies Required<MapoMediaOptions>;
 
 export default defineNuxtModule<MapoUikitOptions>({
   meta: {
@@ -95,7 +138,25 @@ export default defineNuxtModule<MapoUikitOptions>({
       nuxt.options.ui = { ...options.ui, ...(nuxt.options.ui ?? {}) };
     }
 
+    // Media config → runtimeConfig.public.mapoMedia (read by useMediaStore + uploader).
+    // Only serializable values; the adapter functions go through the plugin below.
+    const media = options.media ?? {};
+    nuxt.options.runtimeConfig.public.mapoMedia = {
+      endpoints: {
+        media: media.endpoints?.media ?? MAPO_MEDIA_DEFAULTS.endpoints.media,
+        folders:
+          media.endpoints?.folders ?? MAPO_MEDIA_DEFAULTS.endpoints.folders,
+      },
+      maxImageSize: media.maxImageSize ?? MAPO_MEDIA_DEFAULTS.maxImageSize,
+      maxVideoSize: media.maxVideoSize ?? MAPO_MEDIA_DEFAULTS.maxVideoSize,
+      maxDefaultSize:
+        media.maxDefaultSize ?? MAPO_MEDIA_DEFAULTS.maxDefaultSize,
+      permissionsModel:
+        media.permissionsModel ?? MAPO_MEDIA_DEFAULTS.permissionsModel,
+    };
+
     const components = [
+      // ─── Shell / Layout ───────────────────────────────────────────────────
       "MapoSnackBar",
       "MapoConfirmDialog",
       "MapoLogin",
@@ -106,6 +167,7 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoLogoutButton",
       "MapoSidebarProfile",
       "MapoTopbar",
+      // ─── CRUD / Detail / List ─────────────────────────────────────────────
       "MapoDetail",
       "MapoDetailLangSwitch",
       "MapoList",
@@ -115,11 +177,33 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoListActions",
       "MapoListQuickEdit",
       "MapoListTable",
+      // ─── Media ───────────────────────────────────────────────────────────
+      "MapoDropArea",
+      "MapoMediaBreadcrumbs",
+      "MapoMediaFolders",
+      "MapoMediaGallery",
+      "MapoMediaFileChanger",
+      "MapoMediaEditor",
+      "MapoMediaUploader",
+      "MapoMediaManager",
     ];
 
     for (const name of components) {
       addComponent({
         name,
+        filePath: resolver.resolve(`./runtime/components/${name}.vue`),
+      });
+    }
+
+    // Registered as `global` so they survive runtime lookup from *another*
+    // package: the media fields in @mapomodule/form resolve the dialog by name
+    // (see useMediaManager) and render the preview in their templates. Nuxt's
+    // build-time auto-import only covers templates it scans, so a non-global
+    // registration resolves to nothing once the caller lives outside uikit.
+    for (const name of ["MapoMediaManagerDialog", "MapoMediaPreview"]) {
+      addComponent({
+        name,
+        global: true,
         filePath: resolver.resolve(`./runtime/components/${name}.vue`),
       });
     }
@@ -148,6 +232,25 @@ export default defineNuxtModule<MapoUikitOptions>({
         new Set([...existing, "lucide"]),
       );
     });
+
+    // NOTE: the `media` / `media-m2m` / `enhanced-media` field components live in
+    // @mapomodule/form with every other field type and are registered in its
+    // default registry. They resolve the picker dialog below at runtime.
+
+    // Plugin: provide the default $mapoMediaAdapter. Integrations register their
+    // own plugin ordered after this one to override request/response transforms.
+    addPlugin({
+      src: resolver.resolve("./runtime/plugins/media-adapter"),
+      order: 5,
+    });
+
+    // Auto-import useMediaStore so consumers can use it without explicit imports
+    addImports([
+      {
+        name: "useMediaStore",
+        from: resolver.resolve("./runtime/stores/media"),
+      },
+    ]);
 
     // MapoOverride* system: if the consuming app has a `mapooverride/` directory
     // inside its srcDir, any .vue file named like a Mapo component will replace it
