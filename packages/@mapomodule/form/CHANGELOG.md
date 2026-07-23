@@ -1,3 +1,14 @@
+# @mapomodule/form [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.4...@mapomodule/form@2.0.0-beta.5) (2026-07-23)
+
+### Features
+
+- **form:** add image insertion to WYG editor via media manager ([08a39fe](https://github.com/lotrekagency/mapo-new/commit/08a39fea5459da8eceed98b61aa2ac4965a3348d))
+- **form:** add media field descriptor types ([49f87c8](https://github.com/lotrekagency/mapo-new/commit/49f87c80f2d077cceb3ca342186930c188d2536e))
+
+### Dependencies
+
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.2
+
 # @mapomodule/form [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.3...@mapomodule/form@2.0.0-beta.4) (2026-07-16)
 
 ### Bug Fixes
