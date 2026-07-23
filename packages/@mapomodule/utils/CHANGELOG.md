@@ -1,3 +1,9 @@
+# @mapomodule/utils [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.1...@mapomodule/utils@2.0.0-beta.2) (2026-07-23)
+
+### Features
+
+- **utils:** add humanFileSize and slugify formatters ([8ffed79](https://github.com/lotrekagency/mapo-new/commit/8ffed790a933a885563f110e1fc9737bff583cdb))
+
 # @mapomodule/utils [2.0.0-beta.1](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@1.0.0...@mapomodule/utils@2.0.0-beta.1) (2026-07-07)
 
 - feat(release)!: prepare for first 2.0.0.beta release \ BREAKING CHANGE: this is a completely rewritten version of mapo ([d906c8d](https://github.com/lotrekagency/mapo-new/commit/d906c8da8675bef2505ead5f744fd72fbf5acab2))
