@@ -1,3 +1,20 @@
+# @mapomodule/uikit [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.4...@mapomodule/uikit@2.0.0-beta.5) (2026-07-23)
+
+### Bug Fixes
+
+- **uikit:** harden media drag reorder and checkbox handler types ([7463754](https://github.com/lotrekagency/mapo-new/commit/74637545bdd9f9dcda19685fab96310855e7c8b4))
+- **uikit:** use UFieldGroup for the media editor language switch ([624abb0](https://github.com/lotrekagency/mapo-new/commit/624abb0bfd557e49a61ac8588fa46c597401635a))
+
+### Features
+
+- **uikit:** add Media Manager ([42c894d](https://github.com/lotrekagency/mapo-new/commit/42c894dbe0c9533db58c369624bfe808dffb07dc))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.5
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.2
+- **@mapomodule/core:** upgraded to 2.0.0-beta.5
+
 # @mapomodule/uikit [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.3...@mapomodule/uikit@2.0.0-beta.4) (2026-07-16)
 
 ### Bug Fixes
