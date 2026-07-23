@@ -67,10 +67,14 @@ export default defineNuxtPlugin({
         pending.value--;
         handle(response.status, String(request));
       },
-      onResponseError({ response, request, error }) {
+      onResponseError({ response, request }) {
         pending.value--;
         handle(response?.status ?? 0, String(request));
-        return Promise.reject(error);
+        // Do NOT reject here: on an HTTP error status `context.error` is
+        // undefined (ofetch only fills it for network failures), so rejecting
+        // with it would replace the FetchError ofetch is about to throw with
+        // `undefined` — callers would lose the status and the response body.
+        // Returning normally lets ofetch throw its own FetchError.
       },
       onRequestError() {
         // Decrement counter on network errors (no response received).
