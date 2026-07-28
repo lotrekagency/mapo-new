@@ -871,7 +871,7 @@ const sortingOptions = computed(() => ({
       <UPagination
         :model-value="pagination.pageIndex + 1"
         :total="total"
-        :page-size="pagination.pageSize"
+        :items-per-page="pagination.pageSize"
         size="sm"
         @update:model-value="
           pagination = { ...pagination, pageIndex: $event - 1 }
