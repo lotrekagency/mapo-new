@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed, shallowRef } from "vue";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { normalizeEndpoint } from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
@@ -27,6 +28,24 @@ export const useMediaStore = defineStore("mapo-media", () => {
     media: mediaConfig.endpoints?.media ?? "/api/media",
     folders: mediaConfig.endpoints?.folders ?? "/api/media-folders",
   };
+
+  /**
+   * Absolute-from-origin URL for the upload POST.
+   *
+   * Every other media request goes through `useCrud` → `$mapoFetch`, which
+   * inherits `baseURL: app.baseURL` from Nuxt's global `$fetch`. The upload has
+   * to use XHR (ofetch exposes no upload-progress hook), so it must reproduce
+   * that resolution itself: `normalizeEndpoint` for the path (same call
+   * `useCrud` makes) plus the app base. Skipping the base made the upload the
+   * only request to miss it, so on a sub-path deployment it bypassed server
+   * middleware mounted under that base — including the proxy that attaches
+   * `X-CSRFToken`, hence 403s on session-authenticated backends.
+   */
+  function uploadUrl(): string {
+    const app = runtimeConfig.app as { baseURL?: string } | undefined;
+    const base = (app?.baseURL ?? "/").replace(/\/+$/, "");
+    return `${base}${normalizeEndpoint(endpoints.media)}`;
+  }
 
   // Adapter: backend-specific request/response transforms. Provided by a plugin
   // ($mapoMediaAdapter); falls back to plain REST when none is registered.
@@ -343,10 +362,11 @@ export const useMediaStore = defineStore("mapo-media", () => {
     const formData = applyMultipartPolicy(body, "force") as FormData;
 
     // ofetch has no upload-progress hook, so uploads go through XHR.
-    // Same-origin request: the session cookie is attached automatically.
+    // Same-origin request: the session cookie is attached automatically, and
+    // `uploadUrl()` keeps the target identical to the one `useCrud` would hit.
     return await new Promise<MediaItem>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${endpoints.media.replace(/\/+$/, "")}/`);
+      xhr.open("POST", uploadUrl());
       xhr.responseType = "json";
       if (onProgress) {
         xhr.upload.addEventListener("progress", (event) => {
