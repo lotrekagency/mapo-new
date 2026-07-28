@@ -1,22 +1,47 @@
 {
   "name": "@mapomodule/i18n",
   "version": "0.0.0",
-  "description": "Mapo i18n wrapper: @nuxtjs/i18n v9 + base translations",
+  "description": "Mapo i18n: @nuxtjs/i18n wrapper with built-in UI translations (en, it) and consumer override support",
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/module.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./types": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./runtime/*": {
+      "types": "./src/runtime/*.ts",
+      "import": "./dist/runtime/*.js",
+      "default": "./src/runtime/*"
     }
   },
-  "main": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "dev": "nuxt-module-build build --stub --watch",
+    "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
+    "prepare": "nuxt-module-build build --stub",
+    "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
+  },
+  "dependencies": {
+    "@nuxtjs/i18n": "^10.4.1",
+    "defu": "^6.1.4"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@nuxt/kit": "4.4.2",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "4.4.2",
+    "nuxt": "^4.4.2",
+    "vue": "^3.5.32"
   }
 }
