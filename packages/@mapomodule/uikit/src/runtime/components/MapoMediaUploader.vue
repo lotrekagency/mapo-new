@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
 import { useMediaStore } from "../stores/media.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
@@ -26,6 +27,7 @@ const emit = defineEmits<{
   uploaded: [];
 }>();
 
+const { t } = useI18n();
 const store = useMediaStore();
 const snack = useSnackStore();
 
@@ -72,7 +74,10 @@ function onFiles(files: File[]) {
 
     if (file.size > limit) {
       snack.show(
-        `File "${file.name}" too large (max ${(limit / (1024 * 1024)).toFixed(0)} MB)`,
+        t("mapo.mediaUploader.fileTooLarge", {
+          name: file.name,
+          max: (limit / (1024 * 1024)).toFixed(0),
+        }),
         "error",
       );
       continue;
@@ -128,7 +133,10 @@ async function upload() {
       successCount++;
     } catch (err) {
       entry.status = "error";
-      entry.error = err instanceof Error ? err.message : "Upload failed";
+      entry.error =
+        err instanceof Error
+          ? err.message
+          : t("mapo.mediaUploader.uploadFailed");
     }
   }
 
@@ -136,7 +144,7 @@ async function upload() {
 
   if (successCount > 0) {
     snack.show(
-      `${successCount} ${successCount === 1 ? "file" : "files"} uploaded successfully`,
+      t("mapo.mediaUploader.success", { numberFiles: successCount }),
       "success",
     );
     await store.getRoot({ page: 1 });
@@ -173,12 +181,18 @@ onUnmounted(clearAll);
           <UIcon name="i-lucide-upload-cloud" class="size-10 text-dimmed" />
           <div class="text-center">
             <p class="text-sm font-medium text-muted">
-              Drag files here or
-              <span class="text-primary">browse</span>
+              {{ t("mapo.mediaUploader.dragHere") }}
+              <span class="text-primary">{{
+                t("mapo.mediaUploader.browse")
+              }}</span>
             </p>
             <p class="mt-0.5 text-xs text-dimmed">
-              Images up to {{ (MAX_IMAGE / (1024 * 1024)).toFixed(0) }} MB ·
-              Videos up to {{ (MAX_VIDEO / (1024 * 1024)).toFixed(0) }} MB
+              {{
+                t("mapo.mediaUploader.limits", {
+                  img: (MAX_IMAGE / (1024 * 1024)).toFixed(0),
+                  vid: (MAX_VIDEO / (1024 * 1024)).toFixed(0),
+                })
+              }}
             </p>
           </div>
         </div>
@@ -189,8 +203,13 @@ onUnmounted(clearAll);
     <div v-if="entries.length > 0" class="space-y-2">
       <div class="flex items-center justify-between">
         <p class="text-xs font-medium text-muted">
-          {{ entries.length }}
-          {{ entries.length === 1 ? "file" : "files" }} selected
+          {{
+            t(
+              "mapo.mediaUploader.nSelected",
+              { n: entries.length },
+              entries.length,
+            )
+          }}
         </p>
         <UButton
           v-if="!uploading"
@@ -200,7 +219,7 @@ onUnmounted(clearAll);
           icon="i-lucide-x"
           @click="clearAll"
         >
-          Clear
+          {{ t("mapo.clear") }}
         </UButton>
       </div>
 
@@ -246,22 +265,26 @@ onUnmounted(clearAll);
                 v-if="entry.status === 'pending'"
                 class="grid grid-cols-2 gap-1.5"
               >
-                <UInput v-model="entry.title" size="xs" placeholder="Title" />
+                <UInput
+                  v-model="entry.title"
+                  size="xs"
+                  :placeholder="t('mapo.title')"
+                />
                 <UInput
                   v-model="entry.alt_text"
                   size="xs"
-                  placeholder="Alt text"
+                  :placeholder="t('mapo.altTag')"
                 />
                 <UInput
                   v-model="entry.description"
                   size="xs"
-                  placeholder="Description"
+                  :placeholder="t('mapo.description')"
                 />
                 <USelect
                   v-model="entry.folder"
                   :items="folderOptions"
                   size="xs"
-                  placeholder="Folder"
+                  :placeholder="t('mapo.folder')"
                 />
               </div>
 
@@ -279,7 +302,9 @@ onUnmounted(clearAll);
                 class="flex items-center gap-1 text-success"
               >
                 <UIcon name="i-lucide-check-circle" class="size-3.5" />
-                <span class="text-xs">Uploaded</span>
+                <span class="text-xs">{{
+                  t("mapo.mediaUploader.uploaded")
+                }}</span>
               </div>
               <div
                 v-if="entry.status === 'error'"
@@ -316,7 +341,9 @@ onUnmounted(clearAll);
           color="primary"
           @click="upload"
         >
-          Upload {{ pendingCount }} {{ pendingCount === 1 ? "file" : "files" }}
+          {{
+            t("mapo.mediaUploader.uploadCta", { n: pendingCount }, pendingCount)
+          }}
         </UButton>
       </div>
     </div>

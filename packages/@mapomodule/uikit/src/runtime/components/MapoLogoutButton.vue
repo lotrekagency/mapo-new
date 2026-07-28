@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
 
 withDefaults(
@@ -27,6 +28,7 @@ withDefaults(
   },
 );
 
+const { t } = useI18n();
 const { logout } = useMapoAuth();
 </script>
 
@@ -36,11 +38,11 @@ const { logout } = useMapoAuth();
     :color="color"
     :size="size"
     icon="i-lucide-log-out"
-    :aria-label="iconOnly ? 'Logout' : undefined"
+    :aria-label="iconOnly ? t('mapo.logout') : undefined"
     @click="logout()"
   >
     <span v-if="!iconOnly">
-      <slot>Logout</slot>
+      <slot>{{ t("mapo.logout") }}</slot>
     </span>
   </UButton>
 </template>

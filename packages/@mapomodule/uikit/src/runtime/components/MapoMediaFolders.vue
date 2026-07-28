@@ -1,29 +1,51 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useMediaStore } from "../stores/media.js";
 import type { MediaFolder } from "../types/media.js";
 
+const { t } = useI18n();
 const store = useMediaStore();
 
 const editingFolder = ref<Partial<MediaFolder> | null>(null);
 const folderName = ref("");
 const saving = ref(false);
 
-const ALL_MIME_FILTERS = [
-  { label: "All", icon: "i-lucide-layers", mime: null as string | null },
-  { label: "Images", icon: "i-lucide-image", mime: "image/*" },
-  { label: "Videos", icon: "i-lucide-film", mime: "video/*" },
-  { label: "Audio", icon: "i-lucide-music", mime: "audio/*" },
+const ALL_MIME_FILTERS = computed(() => [
+  {
+    label: t("mapo.mediaFolders.allFolder"),
+    icon: "i-lucide-layers",
+    mime: null as string | null,
+  },
+  {
+    label: t("mapo.mediaFolders.imageFolder"),
+    icon: "i-lucide-image",
+    mime: "image/*",
+  },
+  {
+    label: t("mapo.mediaFolders.videoFolder"),
+    icon: "i-lucide-film",
+    mime: "video/*",
+  },
+  {
+    label: t("mapo.mediaFolders.audioFolder"),
+    icon: "i-lucide-music",
+    mime: "audio/*",
+  },
   // Family filter (legacy parity): pdf, zip, office docs — not just pdf.
-  { label: "Documents", icon: "i-lucide-file-text", mime: "application/*" },
-];
+  {
+    label: t("mapo.mediaFolders.docFolder"),
+    icon: "i-lucide-file-text",
+    mime: "application/*",
+  },
+]);
 
 // When the host locks a mime (picker fields), only the matching filter is
 // offered — "All" would let the user select media of the wrong type.
 const mimeFilters = computed(() =>
   store.lockedMime
-    ? ALL_MIME_FILTERS.filter((f) => f.mime === store.lockedMime)
-    : ALL_MIME_FILTERS,
+    ? ALL_MIME_FILTERS.value.filter((f) => f.mime === store.lockedMime)
+    : ALL_MIME_FILTERS.value,
 );
 
 function startCreate() {
@@ -77,7 +99,7 @@ function onNameKeyup(event: KeyboardEvent) {
       <p
         class="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-dimmed"
       >
-        Type
+        {{ t("mapo.mime") }}
       </p>
       <UButton
         v-for="f in mimeFilters"
@@ -100,14 +122,14 @@ function onNameKeyup(event: KeyboardEvent) {
     <!-- Folders header -->
     <div class="flex items-center justify-between px-3">
       <p class="text-xs font-semibold uppercase tracking-wide text-dimmed">
-        Folders
+        {{ t("mapo.mediaFolders.folders") }}
       </p>
       <UButton
         icon="i-lucide-folder-plus"
         size="xs"
         variant="ghost"
         color="neutral"
-        title="New folder"
+        :title="t('mapo.mediaFolders.newFolder')"
         @click="startCreate"
       />
     </div>
@@ -117,7 +139,7 @@ function onNameKeyup(event: KeyboardEvent) {
       <UInput
         v-model="folderName"
         size="xs"
-        placeholder="Folder name"
+        :placeholder="t('mapo.mediaFolders.folderName')"
         autofocus
         @keyup="onNameKeyup"
       >
@@ -195,7 +217,7 @@ function onNameKeyup(event: KeyboardEvent) {
         v-if="store.folders.length === 0"
         class="px-2 py-3 text-xs text-dimmed italic"
       >
-        No folders
+        {{ t("mapo.mediaFolders.noFolders") }}
       </p>
     </div>
 
@@ -210,7 +232,7 @@ function onNameKeyup(event: KeyboardEvent) {
         class="justify-start"
         @click="store.navigateToFolder(null)"
       >
-        Back to root
+        {{ t("mapo.mediaFolders.goBack") }}
       </UButton>
     </div>
   </div>

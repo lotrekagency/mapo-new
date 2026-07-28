@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
 import { useRoute } from "vue-router";
 import { navigateTo } from "#app";
@@ -17,6 +18,7 @@ defineSlots<{
   footer(): unknown;
 }>();
 
+const { t } = useI18n();
 const { login } = useMapoAuth();
 const route = useRoute();
 
@@ -41,7 +43,7 @@ async function submit() {
       if (data.username?.length) fieldErrors.username = data.username[0];
       if (data.password?.length) fieldErrors.password = data.password[0];
     } else {
-      error.value = "Invalid credentials. Please try again.";
+      error.value = t("mapo.login.invalidCredentials");
     }
   } finally {
     loading.value = false;
@@ -77,9 +79,11 @@ async function submit() {
             <UIcon name="i-lucide-layers" class="size-10 text-white" />
           </div>
           <div class="space-y-2">
-            <h2 class="text-3xl font-bold tracking-tight">Welcome to Mapo</h2>
+            <h2 class="text-3xl font-bold tracking-tight">
+              {{ t("mapo.login.welcome") }}
+            </h2>
             <p class="text-white/70 text-sm leading-relaxed max-w-xs">
-              A modern admin framework built on Nuxt 4, Pinia, and Nuxt UI v4.
+              {{ t("mapo.login.tagline") }}
             </p>
           </div>
           <div class="flex gap-2 flex-wrap justify-center">
@@ -125,10 +129,10 @@ async function submit() {
             </div>
             <div>
               <h1 class="text-2xl font-bold text-highlighted tracking-tight">
-                Sign in
+                {{ t("mapo.signIn") }}
               </h1>
               <p class="text-sm text-muted mt-1">
-                Enter your credentials to continue
+                {{ t("mapo.login.subtitle") }}
               </p>
             </div>
           </div>
@@ -139,7 +143,7 @@ async function submit() {
         <UCard class="shadow-xl ring-1 ring-default/60">
           <form class="space-y-5" @submit.prevent="submit">
             <UFormField
-              label="Username"
+              :label="t('mapo.username')"
               name="username"
               :error="fieldErrors.username"
             >
@@ -156,7 +160,7 @@ async function submit() {
             </UFormField>
 
             <UFormField
-              label="Password"
+              :label="t('mapo.password')"
               name="password"
               :error="fieldErrors.password"
             >
@@ -195,7 +199,7 @@ async function submit() {
               :disabled="!form.username || !form.password"
               block
             >
-              Sign in
+              {{ t("mapo.signIn") }}
             </UButton>
           </form>
         </UCard>

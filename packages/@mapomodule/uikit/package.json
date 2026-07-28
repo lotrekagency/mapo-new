@@ -32,9 +32,12 @@
   },
   "dependencies": {
     "@mapomodule/form": "workspace:*",
+    "@mapomodule/i18n": "workspace:*",
     "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
-    "@mapomodule/core": "workspace:*"
+    "@mapomodule/core": "workspace:*",
+    "vue-draggable-plus": "^0.6.0",
+    "vue-i18n": "^11.4.0"
   },
   "peerDependencies": {
     "@nuxt/ui": ">=4.0.0",

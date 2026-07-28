@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRuntimeConfig } from "#app";
 import {
   humanFileSize,
@@ -16,6 +17,7 @@ defineProps<{
   defaultLang?: string;
 }>();
 
+const { t } = useI18n();
 const store = useMediaStore();
 
 // Model-permission gating (legacy parity): edit/delete only with the
@@ -59,15 +61,19 @@ const metaRows = computed(() => {
   if (!media.value) return [];
   const m = media.value;
   return [
-    { label: "File", value: m.file?.split("/").pop() ?? "", isUrl: false },
-    { label: "MIME", value: m.mime_type, isUrl: false },
     {
-      label: "Size",
+      label: t("mapo.file"),
+      value: m.file?.split("/").pop() ?? "",
+      isUrl: false,
+    },
+    { label: t("mapo.mime"), value: m.mime_type, isUrl: false },
+    {
+      label: t("mapo.size"),
       value: m.size ? humanFileSize(m.size) : "—",
       isUrl: false,
     },
-    { label: "Created", value: formatDate(m.created), isUrl: false },
-    { label: "URL", value: m.file, isUrl: true },
+    { label: t("mapo.created"), value: formatDate(m.created), isUrl: false },
+    { label: t("mapo.url"), value: m.file, isUrl: true },
   ];
 });
 
@@ -75,9 +81,13 @@ const editFields = computed(() => {
   const lang = currentLang.value;
   const prefix = lang ? `translations.${lang}.` : "";
   return [
-    { path: `${prefix}title`, label: "Title", type: "text" },
-    { path: `${prefix}alt_text`, label: "Alt text", type: "text" },
-    { path: `${prefix}description`, label: "Description", type: "textarea" },
+    { path: `${prefix}title`, label: t("mapo.title"), type: "text" },
+    { path: `${prefix}alt_text`, label: t("mapo.altTag"), type: "text" },
+    {
+      path: `${prefix}description`,
+      label: t("mapo.description"),
+      type: "textarea",
+    },
   ];
 });
 
@@ -174,7 +184,7 @@ function formatDate(dateStr: string): string {
             color="neutral"
             @click="startEditing"
           >
-            Edit
+            {{ t("mapo.edit") }}
           </UButton>
           <UButton
             icon="i-lucide-external-link"
@@ -183,7 +193,7 @@ function formatDate(dateStr: string): string {
             color="neutral"
             :href="media.file"
             target="_blank"
-            title="Open in new tab"
+            :title="t('mapo.mediaEditor.openInNewTab')"
           />
         </div>
 
@@ -198,7 +208,7 @@ function formatDate(dateStr: string): string {
             <p
               class="mb-2 text-xs font-semibold uppercase tracking-wide text-dimmed"
             >
-              Info
+              {{ t("mapo.mediaEditor.details") }}
             </p>
             <dl class="space-y-1">
               <div
@@ -228,7 +238,7 @@ function formatDate(dateStr: string): string {
               <p
                 class="mb-1 text-xs font-semibold uppercase tracking-wide text-dimmed"
               >
-                Linked models
+                {{ t("mapo.linkedModels") }}
               </p>
               <ul class="space-y-0.5 text-xs text-muted">
                 <li
@@ -250,7 +260,7 @@ function formatDate(dateStr: string): string {
                 color="neutral"
                 @click="currentLang = ''"
               >
-                Default
+                {{ t("mapo.mediaEditor.defaultLang") }}
               </UButton>
               <UButton
                 v-for="lang in languages"
@@ -308,7 +318,7 @@ function formatDate(dateStr: string): string {
             color="error"
             @click="store.deleteMedia(media)"
           >
-            Delete
+            {{ t("mapo.delete") }}
           </UButton>
           <span v-else />
 
@@ -320,7 +330,7 @@ function formatDate(dateStr: string): string {
               color="neutral"
               @click="cancelEditing"
             >
-              Cancel
+              {{ t("mapo.cancel") }}
             </UButton>
             <UButton
               v-if="editing"
@@ -330,7 +340,7 @@ function formatDate(dateStr: string): string {
               icon="i-lucide-save"
               @click="save"
             >
-              Save
+              {{ t("mapo.save") }}
             </UButton>
           </div>
         </div>

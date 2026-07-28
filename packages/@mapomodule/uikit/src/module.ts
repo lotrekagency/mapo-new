@@ -9,6 +9,8 @@ import {
   addTypeTemplate,
   createResolver,
   extendPages,
+  hasNuxtModule,
+  installModule,
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 
@@ -98,6 +100,13 @@ export default defineNuxtModule<MapoUikitOptions>({
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
 
+    // UIKit components render every user-facing string through vue-i18n
+    // (`useI18n().t("mapo...")`). @mapomodule/i18n provides the catalogs and
+    // installs @nuxtjs/i18n unless the app manages it itself.
+    if (!hasNuxtModule("@mapomodule/i18n")) {
+      await installModule(await resolver.resolvePath("@mapomodule/i18n"));
+    }
+
     addTypeTemplate({
       filename: "types/mapo-uikit-page-meta.d.ts",
       getContents: () =>
@@ -157,6 +166,8 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoLogoutButton",
       "MapoSidebarProfile",
       "MapoTopbar",
+      "MapoLangSwitcher",
+      "MapoThemeToggle",
       // ─── CRUD / Detail / List ─────────────────────────────────────────────
       "MapoDetail",
       "MapoDetailLangSwitch",

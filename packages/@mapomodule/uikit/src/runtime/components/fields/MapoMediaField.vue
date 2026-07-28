@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, resolveComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import type { MediaDescriptor } from "@mapomodule/form/types";
 import type { MediaItem } from "../../types/media.js";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   modelValue: MediaItem | number | null | undefined;
@@ -76,7 +79,7 @@ const MediaDialog = resolveComponent("MapoMediaManagerDialog");
       :block="!current"
       @click="dialogOpen = true"
     >
-      {{ current ? "Change" : "Select media" }}
+      {{ current ? t("mapo.change") : t("mapo.mediaField.selectMedia") }}
     </UButton>
 
     <!-- Errors -->

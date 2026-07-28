@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, resolveComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import type { EnhancedMediaDescriptor } from "@mapomodule/form/types";
 import type { MediaItem } from "../../types/media.js";
+
+const { t } = useI18n();
 
 interface EnhancedMediaValue {
   media: MediaItem | null;
@@ -80,7 +83,7 @@ const MediaDialog = resolveComponent("MapoMediaManagerDialog");
           <MapoMediaPreview v-if="current" :media="current" size="md" />
           <div v-else class="flex flex-col items-center gap-1 text-dimmed">
             <UIcon name="i-lucide-image-plus" class="size-7" />
-            <span class="text-[10px]">Select</span>
+            <span class="text-[10px]">{{ t("mapo.select") }}</span>
           </div>
         </div>
       </div>
@@ -98,7 +101,7 @@ const MediaDialog = resolveComponent("MapoMediaManagerDialog");
               size="xs"
               variant="ghost"
               color="neutral"
-              title="Change"
+              :title="t('mapo.change')"
               @click="dialogOpen = true"
             />
             <UButton
@@ -107,7 +110,7 @@ const MediaDialog = resolveComponent("MapoMediaManagerDialog");
               size="xs"
               variant="ghost"
               color="neutral"
-              title="Remove"
+              :title="t('mapo.remove')"
               @click="clear"
             />
           </div>
@@ -116,13 +119,13 @@ const MediaDialog = resolveComponent("MapoMediaManagerDialog");
         <UInput
           v-model="altValue"
           size="sm"
-          placeholder="Alt text"
+          :placeholder="t('mapo.enhancedMediaField.altText')"
           :disabled="readonly || disabled || !current"
         />
         <UInput
           v-model="captionValue"
           size="sm"
-          placeholder="Caption"
+          :placeholder="t('mapo.enhancedMediaField.caption')"
           :disabled="readonly || disabled || !current"
         />
       </div>
