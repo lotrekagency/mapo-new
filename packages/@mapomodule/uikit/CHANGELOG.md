@@ -1,3 +1,9 @@
+# @mapomodule/uikit [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.5...@mapomodule/uikit@2.0.0-beta.6) (2026-07-28)
+
+### Bug Fixes
+
+- **media:** unify upload request format using multipart policy ([e745941](https://github.com/lotrekagency/mapo-new/commit/e745941a5a6475bcfd8e6b3e2cca71c1c0146c4a))
+
 # @mapomodule/uikit [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.4...@mapomodule/uikit@2.0.0-beta.5) (2026-07-23)
 
 ### Bug Fixes
