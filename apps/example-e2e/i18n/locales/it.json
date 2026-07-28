@@ -1,0 +1,11 @@
+{
+  "app": {
+    "tagline": "Playground E2E di Mapo"
+  },
+
+  "mapo": {
+    "listTable": {
+      "noItems": "Ancora niente qui — stringa sovrascritta dall'app"
+    }
+  }
+}

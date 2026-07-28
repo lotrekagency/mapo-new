@@ -28,6 +28,7 @@ The app is available at `http://localhost:3000`.
 | `/permissions-raw`        | `permissions: string[]` middleware — route gate only            |
 | `/roles-admin`            | Role-based access (`admin` group required)                      |
 | `/form/*`                 | Form engine scenarios (validation, repeater, draft, etc.)       |
+| `/i18n`                   | Locale switching, app overrides, plurals, `useMapoT()`          |
 | `/feedback`               | `useSnackStore` + `useConfirmStore`                             |
 | `/settings`               | `sidebarFooter` meta                                            |
 | `/sidebar-parent/*`       | Nested sidebar navigation                                       |
@@ -39,3 +40,14 @@ The app is available at `http://localhost:3000`.
 1. Create `app/pages/<scenario>.vue` with `definePageMeta({ label, icon, middleware })`.
 2. The page is automatically added to the sidebar (no manual menu config needed).
 3. Document the E2E plan in `e2e/modules/<area>.md`.
+
+## i18n scenario
+
+`/i18n` covers the whole surface: the switcher (also in the topbar on every
+page), imperative `setLocale`, interpolation, plurals, the escaped `@`, and
+`useMapoT()` for store-like contexts.
+
+The app ships `i18n/locales/{en,it}.json` overriding a single Mapo key
+(`mapo.listTable.noItems`) to prove the deep merge: everything else keeps the
+built-in text. The empty `MapoList` at the bottom of the page renders that
+overridden string.
