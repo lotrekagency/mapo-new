@@ -3,6 +3,7 @@ import { ref, computed, shallowRef } from "vue";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
 import type {
@@ -330,14 +331,16 @@ export const useMediaStore = defineStore("mapo-media", () => {
     payload: MediaUploadPayload,
     onProgress?: (percent: number) => void,
   ): Promise<MediaItem> {
-    const formData = new FormData();
-    formData.append("file", payload.file);
-    if (payload.title) formData.append("title", payload.title);
-    if (payload.alt_text) formData.append("alt_text", payload.alt_text);
-    if (payload.description)
-      formData.append("description", payload.description);
-    if (payload.folder != null)
-      formData.append("folder", String(payload.folder));
+    // Build the body through the same multipart pipeline every other write uses
+    // (`data` JSON envelope + files at their dot-path). Hand-rolling a flat
+    // FormData here made uploads the only write that spoke a different wire
+    // format, which backends parsing the envelope reject.
+    const body: Record<string, unknown> = { file: payload.file };
+    if (payload.title) body.title = payload.title;
+    if (payload.alt_text) body.alt_text = payload.alt_text;
+    if (payload.description) body.description = payload.description;
+    if (payload.folder != null) body.folder = payload.folder;
+    const formData = applyMultipartPolicy(body, "force") as FormData;
 
     // ofetch has no upload-progress hook, so uploads go through XHR.
     // Same-origin request: the session cookie is attached automatically.
