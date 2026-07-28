@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect } from "vue";
+import { useI18n } from "vue-i18n";
 import type {
   AnyFieldDescriptor,
   FieldRegistry,
@@ -8,6 +9,8 @@ import type {
 import { useMapoForm, injectMapoForm } from "../../composables/useMapoForm.js";
 import { useFocusMode } from "../../composables/useFocusMode.js";
 import MapoFormField from "../MapoFormField.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Stable identity-based UID assigned by the parent repeater. */
@@ -173,7 +176,10 @@ function enterFocusMode() {
     registry: props.registry,
     languages: props.languages,
     currentLang: props.currentLang,
-    breadcrumb: [props.repeaterDescriptor?.label ?? "Repeater", label.value],
+    breadcrumb: [
+      props.repeaterDescriptor?.label ?? t("mapo.repeater.repeater"),
+      label.value,
+    ],
   });
 }
 </script>
@@ -246,7 +252,7 @@ function enterFocusMode() {
           color="error"
           icon="i-lucide-trash-2"
           :disabled="readonly"
-          title="Delete"
+          :title="t('mapo.delete')"
           @click.stop="$emit('delete')"
         />
         <UIcon name="i-lucide-chevron-down" class="h-4 w-4 text-gray-400" />
@@ -307,7 +313,7 @@ function enterFocusMode() {
             :max="totalItems"
             size="xs"
             class="w-14 text-center"
-            title="Position"
+            :title="t('mapo.repeater.position')"
             @change="
               $emit(
                 'move-to',
@@ -329,7 +335,7 @@ function enterFocusMode() {
           variant="ghost"
           color="neutral"
           icon="i-lucide-maximize-2"
-          title="Edit full screen"
+          :title="t('mapo.repeater.editFullScreen')"
           @click="enterFocusMode"
         />
 
@@ -339,7 +345,7 @@ function enterFocusMode() {
           color="neutral"
           icon="i-lucide-chevron-up"
           :disabled="readonly"
-          title="Move up"
+          :title="t('mapo.repeater.moveUp')"
           @click="$emit('move-up')"
         />
         <UButton
@@ -348,7 +354,7 @@ function enterFocusMode() {
           color="neutral"
           icon="i-lucide-chevron-down"
           :disabled="readonly"
-          title="Move down"
+          :title="t('mapo.repeater.moveDown')"
           @click="$emit('move-down')"
         />
 
@@ -359,7 +365,7 @@ function enterFocusMode() {
           color="neutral"
           icon="i-lucide-copy"
           :disabled="readonly"
-          title="Duplicate"
+          :title="t('mapo.duplicate')"
           @click="$emit('duplicate')"
         />
 
@@ -369,7 +375,7 @@ function enterFocusMode() {
           color="error"
           icon="i-lucide-trash-2"
           :disabled="readonly"
-          title="Delete"
+          :title="t('mapo.delete')"
           @click="$emit('delete')"
         />
 

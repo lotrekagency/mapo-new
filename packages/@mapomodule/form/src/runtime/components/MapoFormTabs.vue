@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { TabEntry } from "../types/layout.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import MapoFormGroup from "./MapoFormGroup.vue";
 import MapoFormFlatSection from "./MapoFormFlatSection.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{ tabs: TabEntry[] }>();
 
@@ -54,7 +57,7 @@ const tabsWithErrors = computed(() => {
         <span
           v-if="tabsWithErrors.has(tab.name)"
           class="inline-block h-1.5 w-1.5 rounded-full bg-red-500"
-          aria-label="This tab contains errors"
+          :aria-label="t('mapo.form.tabErrors')"
         />
       </button>
       <!-- Extra content appended to the tab bar (actions, badges, …). -->

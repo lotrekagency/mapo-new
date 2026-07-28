@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@internationalized/date": "^3.7.0",
+    "@mapomodule/i18n": "workspace:*",
     "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
     "@tiptap/extension-image": "^2.11.5",
@@ -41,7 +42,8 @@
     "@tiptap/starter-kit": "^2.11.5",
     "@tiptap/vue-3": "^2.11.5",
     "leaflet": "^1.9.4",
-    "vue-draggable-plus": "^0.6.0"
+    "vue-draggable-plus": "^0.6.0",
+    "vue-i18n": "^11.4.0"
   },
   "optionalDependencies": {
     "@types/leaflet": "^1.9.18"

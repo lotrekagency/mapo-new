@@ -6,6 +6,8 @@ import {
   createResolver,
   addImports,
   extendPages,
+  hasNuxtModule,
+  installModule,
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { PartialFieldRegistry } from "./runtime/types/index.js";
@@ -29,6 +31,13 @@ export default defineNuxtModule<MapoFormOptions>({
 
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
+
+    // Form components render user-facing strings through vue-i18n
+    // (`useI18n().t("mapo...")`). @mapomodule/i18n provides the catalogs and
+    // installs @nuxtjs/i18n unless the app manages it itself.
+    if (!hasNuxtModule("@mapomodule/i18n")) {
+      await installModule(await resolver.resolvePath("@mapomodule/i18n"));
+    }
 
     // Only serializable values can go into runtimeConfig.public.
     // `mapping` and `accessor` contain functions → not SSR-serializable.

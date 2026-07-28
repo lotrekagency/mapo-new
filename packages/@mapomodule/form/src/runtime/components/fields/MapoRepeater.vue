@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect } from "vue";
+import { useI18n } from "vue-i18n";
 import { VueDraggable } from "vue-draggable-plus";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import type { RepeaterDescriptor } from "../../types/index.js";
@@ -17,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{ "update:modelValue": [value: unknown[]] }>();
 
 const form = injectMapoForm()!;
+const { t } = useI18n();
 
 const attrs = computed(() => props.descriptor.attrs ?? {});
 
@@ -108,10 +110,8 @@ function minBound(): number {
   return attrs.value.minItems ?? 0;
 }
 
-async function askConfirm(
-  message: string,
-  title = "Confirm",
-): Promise<boolean> {
+async function askConfirm(message: string, title?: string): Promise<boolean> {
+  title ??= t("mapo.confirm");
   try {
     // Falls back to native confirm when the Pinia store is not registered.
     return await useConfirmStore().ask({ title, message });
@@ -135,8 +135,8 @@ async function deleteItem(index: number) {
   if (!canDelete.value) return;
   if (attrs.value.confirmDelete !== false) {
     const confirmed = await askConfirm(
-      "Are you sure you want to delete this item?",
-      "Delete item",
+      t("mapo.confirmDelete"),
+      t("mapo.repeater.deleteItem"),
     );
     if (!confirmed) return;
   }
@@ -275,14 +275,14 @@ async function bulkDelete() {
   // Enforce minItems: would deletion drop below the lower bound?
   if (items.value.length - count < minBound()) {
     await askConfirm(
-      `Cannot delete: at least ${minBound()} items must remain.`,
-      "Action blocked",
+      t("mapo.repeater.minItemsBlock", { min: minBound() }),
+      t("mapo.repeater.actionBlocked"),
     );
     return;
   }
   const confirmed = await askConfirm(
-    `Delete ${count} selected items?`,
-    "Delete items",
+    t("mapo.repeater.confirmBulkDelete", { count }),
+    t("mapo.repeater.deleteItems"),
   );
   if (!confirmed) return;
   pushUndo();
@@ -336,7 +336,7 @@ const errorPrefix = (index: number) =>
       class="flex flex-wrap items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2"
     >
       <span class="text-sm font-medium text-gray-700">
-        {{ items.length }} {{ items.length === 1 ? "item" : "items" }}
+        {{ t("mapo.repeater.nItems", { n: items.length }, items.length) }}
         <span v-if="attrs.maxItems" class="text-gray-400"
           >/ {{ attrs.maxItems }}</span
         >
@@ -344,10 +344,10 @@ const errorPrefix = (index: number) =>
 
       <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
         <UButton size="xs" variant="ghost" color="neutral" @click="collapseAll">
-          Collapse all
+          {{ t("mapo.repeater.collapseAll") }}
         </UButton>
         <UButton size="xs" variant="ghost" color="neutral" @click="expandAll">
-          Expand all
+          {{ t("mapo.repeater.expandAll") }}
         </UButton>
         <UButton
           v-if="undoStack.length"
@@ -355,7 +355,7 @@ const errorPrefix = (index: number) =>
           variant="ghost"
           color="neutral"
           icon="i-lucide-undo-2"
-          title="Undo last action"
+          :title="t('mapo.repeater.undoLastAction')"
           @click="undo"
         />
 
@@ -365,8 +365,10 @@ const errorPrefix = (index: number) =>
           :variant="selectionMode ? 'solid' : 'ghost'"
           color="neutral"
           icon="i-lucide-check-square"
-          title="Bulk selection"
-          :label="selectionMode ? 'Exit selection' : 'Select'"
+          :title="t('mapo.repeater.bulkSelection')"
+          :label="
+            selectionMode ? t('mapo.repeater.exitSelection') : t('mapo.select')
+          "
           @click="toggleSelectionMode"
         />
 
@@ -386,7 +388,7 @@ const errorPrefix = (index: number) =>
           :disabled="!canAdd"
           @click="addItem"
         >
-          Add
+          {{ t("mapo.add") }}
         </UButton>
       </div>
     </div>
@@ -398,11 +400,11 @@ const errorPrefix = (index: number) =>
         class="flex items-center gap-2 rounded border border-primary-200 bg-primary-50 px-3 py-2"
       >
         <span class="text-sm font-medium text-primary-700">
-          {{ selectionCount }} selected
+          {{ t("mapo.repeater.nSelected", { n: selectionCount }) }}
         </span>
         <div class="flex flex-1 flex-wrap items-center gap-2">
           <UButton size="xs" variant="ghost" color="neutral" @click="selectAll">
-            All
+            {{ t("mapo.repeater.all") }}
           </UButton>
           <UButton
             size="xs"
@@ -410,7 +412,7 @@ const errorPrefix = (index: number) =>
             color="neutral"
             @click="clearSelection"
           >
-            Clear
+            {{ t("mapo.clear") }}
           </UButton>
           <UButton
             size="xs"
@@ -420,12 +422,17 @@ const errorPrefix = (index: number) =>
             :disabled="remainingSlots() <= 0"
             :title="
               remainingSlots() < selectionCount
-                ? `Only ${remainingSlots()} of ${selectionCount} can be duplicated (maxItems reached)`
-                : 'Duplicate selected'
+                ? t('mapo.repeater.duplicateLimited', {
+                    slots: remainingSlots(),
+                    count: selectionCount,
+                  })
+                : t('mapo.repeater.duplicateSelected')
             "
             @click="bulkDuplicate"
           >
-            Duplicate ({{ Math.min(selectionCount, remainingSlots()) }})
+            {{ t("mapo.duplicate") }} ({{
+              Math.min(selectionCount, remainingSlots())
+            }})
           </UButton>
           <UButton
             size="xs"
@@ -434,7 +441,7 @@ const errorPrefix = (index: number) =>
             icon="i-lucide-arrow-up"
             @click="bulkMoveToTop"
           >
-            Move to top
+            {{ t("mapo.repeater.moveToTop") }}
           </UButton>
           <UButton
             size="xs"
@@ -444,7 +451,7 @@ const errorPrefix = (index: number) =>
             :disabled="!canDelete"
             @click="bulkDelete"
           >
-            Delete ({{ selectionCount }})
+            {{ t("mapo.delete") }} ({{ selectionCount }})
           </UButton>
         </div>
       </div>
@@ -527,7 +534,7 @@ const errorPrefix = (index: number) =>
       v-if="items.length === 0"
       class="rounded border border-dashed border-gray-300 py-8 text-center text-sm text-gray-400"
     >
-      No items. Click "Add" to start.
+      {{ t("mapo.repeater.empty") }}
     </div>
   </div>
 </template>
