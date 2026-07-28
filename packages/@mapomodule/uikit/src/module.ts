@@ -189,6 +189,11 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoMediaUploader",
       "MapoMediaManager",
       "MapoMediaManagerDialog",
+      // ─── Menu Manager ─────────────────────────────────────────────────────
+      "MapoMenuTreeviewNode",
+      "MapoMenuTreeview",
+      "MapoMenuNodeEditor",
+      "MapoMenuManager",
     ];
 
     for (const name of components) {
