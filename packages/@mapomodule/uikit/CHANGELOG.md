@@ -1,3 +1,10 @@
+# @mapomodule/uikit [2.0.0-beta.7](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.6...@mapomodule/uikit@2.0.0-beta.7) (2026-07-28)
+
+### Bug Fixes
+
+- **media:** update upload URL handling to include CSRF token support ([71cd976](https://github.com/lotrekagency/mapo-new/commit/71cd976bfb8e6cd3ae3f5eea848b6a8aaa75ea95))
+- **pagination:** rename page-size prop to items-per-page for clarity ([f9e2ffe](https://github.com/lotrekagency/mapo-new/commit/f9e2ffe51ad4d3c1f666b31c5ba29fdcf046f1f9))
+
 # @mapomodule/uikit [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.5...@mapomodule/uikit@2.0.0-beta.6) (2026-07-28)
 
 ### Bug Fixes
