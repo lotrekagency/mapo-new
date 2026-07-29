@@ -1,5 +1,5 @@
 import { onBeforeUnmount, type Ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave } from "#app";
 
 /** Optional configuration for the unsaved-changes navigation guard. */
 export interface UnsavedChangesGuardOptions {
