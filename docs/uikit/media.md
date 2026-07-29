@@ -187,30 +187,34 @@ Opt out with `camomilla: { mediaAdapter: false }` to keep the default REST adapt
 
 ### How to: write a custom adapter
 
-Create a Nuxt plugin in the consumer app that provides `$mapoMediaAdapter` (order it after the uikit default):
+Create a Nuxt plugin in the consumer app that overrides methods on the adapter
+uikit provides. Merge into the existing object rather than providing the key a
+second time — since Nuxt 4.5 a provided key is a non-configurable property, and
+providing it twice throws `Cannot redefine property` at boot:
 
 ```ts
 // plugins/my-media-adapter.ts
-export default defineNuxtPlugin(() => ({
-  provide: {
-    mapoMediaAdapter: {
-      buildListParams: (ctx) => ({
-        page: ctx.page,
-        q: ctx.search, // backend uses `q` instead of `search`
-        type: ctx.mime?.replace("/*", ""), // backend uses `type=image`
-      }),
-      parseRootResponse: (raw) => ({
-        media: {
-          items: raw.data,
-          paginator: { page: raw.page, pages: raw.total_pages },
-        },
-        folders: raw.dirs,
-        parent_folder: raw.current ?? null,
-      }),
-    },
-  },
-}));
+export default defineNuxtPlugin((nuxtApp) => {
+  Object.assign(nuxtApp.$mapoMediaAdapter, {
+    buildListParams: (ctx) => ({
+      page: ctx.page,
+      q: ctx.search, // backend uses `q` instead of `search`
+      type: ctx.mime?.replace("/*", ""), // backend uses `type=image`
+    }),
+    parseRootResponse: (raw) => ({
+      media: {
+        items: raw.data,
+        paginator: { page: raw.page, pages: raw.total_pages },
+      },
+      folders: raw.dirs,
+      parent_folder: raw.current ?? null,
+    }),
+  });
+});
 ```
+
+Every method you omit keeps its default implementation. The uikit plugin runs at
+`order: 5`, so an app plugin without an explicit order already runs after it.
 
 ---
 

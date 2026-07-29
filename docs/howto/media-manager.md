@@ -122,30 +122,34 @@ The folder endpoint must return the explorer payload (`{ media, folders, parent_
 
 ## Adapt to a non-standard backend
 
-If your backend uses different query params or response shapes, provide a `$mapoMediaAdapter` plugin instead of changing the store:
+If your backend uses different query params or response shapes, override the
+methods on `$mapoMediaAdapter` instead of changing the store. Merge into the
+object uikit already provided — do **not** `provide` the key again, Nuxt throws
+`Cannot redefine property` when the same key is provided twice:
 
 ```ts
 // plugins/media-adapter.ts
-export default defineNuxtPlugin(() => ({
-  provide: {
-    mapoMediaAdapter: {
-      buildListParams: (ctx) => ({
-        page: ctx.page,
-        q: ctx.search,
-        kind: ctx.mime?.replace("/*", ""),
-      }),
-      parseRootResponse: (raw) => ({
-        media: {
-          items: raw.results,
-          paginator: { page: raw.page, pages: raw.num_pages },
-        },
-        folders: raw.children,
-        parent_folder: raw.current ?? null,
-      }),
-    },
-  },
-}));
+export default defineNuxtPlugin((nuxtApp) => {
+  Object.assign(nuxtApp.$mapoMediaAdapter, {
+    buildListParams: (ctx) => ({
+      page: ctx.page,
+      q: ctx.search,
+      kind: ctx.mime?.replace("/*", ""),
+    }),
+    parseRootResponse: (raw) => ({
+      media: {
+        items: raw.results,
+        paginator: { page: raw.page, pages: raw.num_pages },
+      },
+      folders: raw.children,
+      parent_folder: raw.current ?? null,
+    }),
+  });
+});
 ```
+
+Only the methods you pass are replaced; the rest keep the default REST
+behaviour.
 
 With the **Camomilla** integration this is automatic — it ships an adapter that maps `mime → fltr=mime_type=` and adds `language_code`. Disable it with `camomilla: { mediaAdapter: false }`.
 

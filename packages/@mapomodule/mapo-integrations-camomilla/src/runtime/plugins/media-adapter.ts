@@ -1,6 +1,7 @@
 /**
- * Camomilla media adapter — overrides the default `$mapoMediaAdapter` provided by
- * `@mapomodule/uikit` to speak Camomilla's media API dialect:
+ * Camomilla media adapter — overrides the methods of the default
+ * `$mapoMediaAdapter` provided by `@mapomodule/uikit` so the Media Manager
+ * speaks Camomilla's media API dialect:
  *
  *   - mime filter     → `fltr=mime_type=<value>` (Camomilla filter syntax)
  *   - detail params   → `language_code` (per-language media metadata)
@@ -8,7 +9,7 @@
  *   - folder reads    → normalized back to the canonical `{ name, parent, path }`
  *   - file replace    → `same_url` instead of `maintain_url`
  *
- * Registered AFTER the uikit adapter plugin so this one wins. The structural
+ * Registered AFTER the uikit adapter plugin so these methods win. The structural
  * types below avoid a hard dependency on @mapomodule/uikit (this package is
  * intentionally standalone — same reason slugify is inlined instead of
  * imported from @mapomodule/utils).
@@ -120,8 +121,25 @@ const camomillaMediaAdapter: MediaAdapter = {
   },
 };
 
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin((nuxtApp) => {
+  // Since Nuxt 4.5 `provide` defines a non-configurable property, so providing
+  // `mapoMediaAdapter` a second time throws "Cannot redefine property" and the
+  // app fails to boot. Merge into the object @mapomodule/uikit provided instead
+  // (its plugin runs at order 5, this one at 20). Kept structural so this
+  // package stays standalone — when uikit is absent there is nothing to merge
+  // into and we provide the adapter ourselves.
+  const existing = (
+    nuxtApp as unknown as {
+      $mapoMediaAdapter?: Record<string, unknown>;
+    }
+  ).$mapoMediaAdapter;
+
+  if (existing) {
+    Object.assign(existing, camomillaMediaAdapter);
+    return;
+  }
+
   return {
-    provide: { mapoMediaAdapter: camomillaMediaAdapter },
+    provide: { mapoMediaAdapter: { ...camomillaMediaAdapter } },
   };
 });
