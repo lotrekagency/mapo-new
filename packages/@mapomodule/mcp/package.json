@@ -1,0 +1,59 @@
+{
+  "name": "@mapomodule/mcp",
+  "version": "0.0.0",
+  "description": "Mapo MCP server: grounded docs, component and field APIs, live app introspection and scaffolding for AI assistants",
+  "type": "module",
+  "bin": {
+    "mapo-mcp": "./bin/mapo-mcp.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/module.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./types": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./runtime/*": {
+      "types": "./src/runtime/*.ts",
+      "import": "./dist/runtime/*.js",
+      "default": "./src/runtime/*"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin"
+  ],
+  "scripts": {
+    "build": "nuxt-module-build build && node scripts/clean-handler-dts.mjs && node scripts/build-knowledge.mjs",
+    "dev": "nuxt-module-build build --stub --watch",
+    "prepare": "nuxt-module-build build --stub && node scripts/build-knowledge.mjs",
+    "dev:prepare": "nuxt-module-build build --stub && node scripts/build-knowledge.mjs",
+    "knowledge": "node scripts/build-knowledge.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@nuxtjs/mcp-toolkit": "^0.18.0",
+    "citty": "^0.1.6",
+    "consola": "^3.4.2",
+    "zod": "^4.1.13"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@nuxt/kit": "4.4.2",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "4.4.2",
+    "@types/node": "^25.6.0",
+    "jiti": "^2.7.0",
+    "nuxt": "^4.4.2",
+    "vitest": "^4.1.5",
+    "vue": "^3.5.32"
+  }
+}

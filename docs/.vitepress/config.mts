@@ -40,6 +40,7 @@ export default defineConfig({
           { text: 'Standalone form', link: '/howto/form-standalone' },
           { text: 'Advanced form patterns', link: '/howto/form-advanced' },
           { text: 'Custom backend integration', link: '/howto/backend-integration' },
+          { text: 'AI assistant (MCP)', link: '/howto/ai-assistant' },
         ],
       },
       {
@@ -102,6 +103,7 @@ export default defineConfig({
           { text: 'Store', link: '/modules/store' },
           { text: 'Utils', link: '/modules/utils' },
           { text: 'i18n', link: '/modules/i18n' },
+          { text: 'MCP server (AI assistants)', link: '/modules/mcp' },
           { text: 'Composable & Function API', link: '/modules/api' },
         ],
       },

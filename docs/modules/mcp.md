@@ -1,0 +1,163 @@
+# @mapomodule/mcp
+
+An [MCP](https://modelcontextprotocol.io) server that makes AI assistants
+competent at Mapo **inside your project**: grounded documentation search,
+curated recipes and — with the dev server running — introspection of your real
+app.
+
+::: tip Development tool
+The module registers itself only when `nuxt.options.dev` is true. Production
+builds never expose the endpoint.
+:::
+
+## Why
+
+An assistant editing a Mapo app has no way to learn Mapo on its own: the
+documentation is a private workspace package it never sees, component APIs live
+in `.vue` files inside `node_modules`, and the app's real configuration is only
+knowable from the running Nuxt instance. Left to guess, models invent props,
+invent field types and write v1 code in a v2 project.
+
+This module removes the guessing: the assistant asks the tools instead.
+
+## Installation
+
+Installed by the `mapomodule` meta-package, so a standard setup needs nothing:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ["@nuxt/ui", "mapomodule"],
+});
+```
+
+Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
+startup log announces it:
+
+```
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 3 tools, 1 handler
+```
+
+Then point your editor at it — see
+[How-to: set up your AI assistant](/howto/ai-assistant) for the per-IDE
+configuration, including the `mapo-mcp` stdio server that works with the dev
+server down.
+
+## Configuration
+
+Everything lives under `mapo.mcp`:
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@nuxt/ui", "mapomodule"],
+
+  mapo: {
+    mcp: {
+      // Register the server. Default: nuxt.options.dev
+      enabled: true,
+
+      // Used by the backend schema tools
+      backend: {
+        schemaUrl: "http://localhost:8000/api/schema/?format=json",
+        tokenEnv: "MAPO_BACKEND_TOKEN",
+      },
+    },
+  },
+});
+```
+
+| Option              | Type      | Default                    | Description                                                                     |
+| ------------------- | --------- | -------------------------- | ------------------------------------------------------------------------------- |
+| `enabled`           | `boolean` | `nuxt.options.dev`         | Register the MCP server. Set `true` to force it outside development.            |
+| `backend.schemaUrl` | `string`  | `$MAPO_BACKEND_SCHEMA_URL` | OpenAPI/DRF schema URL used by the backend tools.                               |
+| `backend.tokenEnv`  | `string`  | `"MAPO_BACKEND_TOKEN"`     | Env var holding the schema bearer token. The value is never sent to the client. |
+
+The route is fixed at `<mcp.route>/mapo` (so `/mcp/mapo` with the toolkit's
+default `mcp.route`): the toolkit derives a folder handler's name from its
+directory. Change the prefix with the toolkit's own `mcp.route` option if it
+clashes with something in your app.
+
+Opt out entirely with:
+
+```ts
+mapo: {
+  mcp: false;
+}
+```
+
+The package can also be registered on its own, without the meta-package, under
+the `mapoMcp` config key:
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@nuxt/ui", "@mapomodule/mcp"],
+  mapoMcp: { enabled: true },
+});
+```
+
+## Tools
+
+All tools are prefixed `mapo_` so they stay unambiguous when several MCP servers
+are connected, and all are annotated read-only.
+
+| Tool                | Purpose                                                                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapo_search_docs`  | Ranked search over the Mapo docs. Returns matching **sections** with path, anchor, mentioned symbols and an excerpt — plus the canonical recipe when one matches. Filters: `section`, `pkg`, `limit`. |
+| `mapo_get_doc`      | The exact markdown of a page, or of one section (`heading` accepts the heading text or its anchor), truncated at `maxChars`.                                                                          |
+| `mapo_list_recipes` | The curated task → documentation map. No argument lists everything Mapo does; `task` returns the recipe for a goal.                                                                                   |
+
+A typical exchange:
+
+```
+mapo_list_recipes({ task: "editors need to reorder navigation entries" })
+→ "Build a navigation menu editor" → howto/menu-manager.md
+
+mapo_get_doc({ path: "howto/menu-manager.md" })
+→ the assistant writes code against the real API
+```
+
+More tools are on the way — component and field-type APIs extracted from
+source, live app introspection (`mapo_inspect_app`, `mapo_doctor`), scaffolding
+and Django/DRF schema → `FieldDescriptor` mapping.
+
+## How it works
+
+- The module installs [`@nuxtjs/mcp-toolkit`](https://mcp-toolkit.nuxt.dev) and
+  injects its own definitions through the toolkit's `mcp:definitions:paths`
+  hook, as a **named handler**. Your app's own MCP definitions, if any, keep
+  their own `/mcp` endpoint untouched.
+- The documentation is indexed **at package build time** into a BM25 index
+  bundled with the package: no network, no API keys, and the docs always match
+  the installed version of Mapo.
+- Answers are sections, not whole files, so the assistant's context stays small.
+
+## Security
+
+- Development only by default; the route does not exist in production builds.
+- The app snapshot exposes public runtime config only — private keys appear as
+  key names, never values.
+- Backend credentials are read from the environment and never included in tool
+  output.
+- Every shipped tool is read-only. When scaffolding lands, writing will be
+  opt-in, development-only and confined to the project root.
+
+## Troubleshooting
+
+**`POST /mcp/mapo` returns 404**
+The dev server is not running, `mapo.mcp` is `false`, or the app is a production
+build. Check the startup log for the toolkit line.
+
+**"Mapo knowledge base not found"**
+Only possible in a source checkout — run
+`pnpm --filter @mapomodule/mcp build`. The published package ships the index.
+
+**The assistant still invents props**
+Verify the client actually loaded the server (`tools/list` must show the
+`mapo_*` tools). Some clients ignore the server's `instructions`; in that case
+add a short project rule telling the assistant to consult the `mapo_*` tools
+before writing Mapo code.
+
+## See also
+
+- [How-to: set up your AI assistant](/howto/ai-assistant)
+- [MCP Toolkit documentation](https://mcp-toolkit.nuxt.dev)
