@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  loadApiKnowledge,
   loadDocsKnowledge,
   resolveKnowledgeDir,
 } from "../runtime/core/knowledge.js";
@@ -73,5 +74,64 @@ describeBuilt("generated knowledge base", () => {
     const doc = getDoc(knowledge, "howto/crud-list.md")!;
     expect(doc.title).toBeTruthy();
     expect(doc.content).toContain("MapoList");
+  });
+});
+
+describeBuilt("generated API surface", () => {
+  const api = loadApiKnowledge(knowledgeDir);
+
+  it("extracts the Mapo components from source", () => {
+    const names = api.components.map((component) => component.name);
+    expect(names).toContain("MapoList");
+    expect(names).toContain("MapoDetail");
+    expect(names).toContain("MapoForm");
+    expect(api.components.length).toBeGreaterThan(30);
+  });
+
+  it("reports real prop types and JSDoc, not documentation prose", () => {
+    const list = api.components.find(
+      (component) => component.name === "MapoList",
+    )!;
+    const endpoint = list.props.find((prop) => prop.name === "endpoint")!;
+
+    expect(endpoint.type).toContain("string");
+    expect(list.props.length).toBeGreaterThan(10);
+    expect(list.props.some((prop) => prop.description)).toBe(true);
+    expect(list.slots.length).toBeGreaterThan(0);
+  });
+
+  it("covers every field type of the registry, with its component", () => {
+    const types = api.fieldTypes.map((field) => field.type);
+    for (const expected of [
+      "text",
+      "select",
+      "editor",
+      "repeater",
+      "fks",
+      "date",
+    ]) {
+      expect(types).toContain(expected);
+    }
+
+    const select = api.fieldTypes.find((field) => field.type === "select")!;
+    expect(select.component).toBeTruthy();
+    expect(select.attrs.map((attr) => attr.name)).toContain("items");
+  });
+
+  it("keeps descriptor types readable instead of expanding mapped types", () => {
+    const key = api.fieldCommon.find((member) => member.name === "key")!;
+    expect(key.type).toBe("DeepKeyOf<T>");
+  });
+
+  it("lists the auto-imported composables with their signatures", () => {
+    const names = api.composables.map((composable) => composable.name);
+    expect(names).toContain("useCrud");
+    expect(names).toContain("useMapoAuth");
+
+    const crud = api.composables.find(
+      (composable) => composable.name === "useCrud",
+    )!;
+    expect(crud.pkg).toBe("@mapomodule/core");
+    expect(crud.signature).toContain("endpoint");
   });
 });

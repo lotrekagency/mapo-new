@@ -36,12 +36,14 @@ The package ships **two ways to reach the same tools**:
 
 ```
                 build time (this package)                 dev time (your app)
- docs/**/*.md ─────► scripts/build-knowledge.mjs ─────►  ┌──────────────────────────────┐
-                     dist/knowledge/docs.json            │ @mapomodule/mcp (Nuxt module)│
-                              │                          │  · installs mcp-toolkit      │
-                              ▼                          │  · injects its definitions   │
-                     src/runtime/core/*                  │  · POST /mcp/mapo            │
-                     (specs + search + recipes)          └──────────────────────────────┘
+ docs/**/*.md ────┐                                      ┌──────────────────────────────┐
+ uikit/form .vue ─┼─► src/build/* ────────────────────►  │ @mapomodule/mcp (Nuxt module)│
+ descriptor.ts    │   dist/knowledge/docs.json           │  · installs mcp-toolkit      │
+ module.ts        ┘                     /api.json        │  · injects its definitions   │
+                              │                          │  · POST /mcp/mapo            │
+                              ▼                          └──────────────────────────────┘
+                     src/runtime/core/*
+                     (specs + search + recipes)
                               │
                               └───────────────────────►  bin/mapo-mcp  (stdio, no server needed)
 ```
@@ -59,12 +61,14 @@ diverges between the two transports.
 
 ### Why a bundled knowledge base
 
-The docs are indexed **at package build time** into `dist/knowledge/docs.json`: heading-sized
-chunks plus a BM25 inverted index. That means:
+Everything is extracted **at package build time** into `dist/knowledge/`: `docs.json` (heading-sized
+chunks plus a BM25 inverted index) and `api.json` (components, field types and composables read from
+the packages' sources). That means:
 
 - it works offline, with no API keys and no embedding service;
-- the docs always match the installed version of Mapo, instead of whatever is on the website;
-- answers are _sections_, not whole files — the assistant's context stays small.
+- the knowledge always matches the installed version of Mapo, not whatever is on the website;
+- answers are _sections_, not whole files — the assistant's context stays small;
+- the API surface cannot drift from the code, because it _is_ the code.
 
 ---
 
@@ -158,11 +162,14 @@ the live app.
 Every tool is prefixed `mapo_` so it stays unambiguous when several MCP servers are connected, and
 is annotated `readOnlyHint: true`, `destructiveHint: false`.
 
-| Tool                | What it does                                                                                                                                                                                                                                                                                                                       |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mapo_search_docs`  | Ranked search over the Mapo docs. Returns the matching **sections** with their `path`, `#anchor`, matched symbols and an excerpt — plus the canonical recipe when the query matches a known task. Filters: `section` (`howto`, `guide`, `uikit`, `form`, `modules`, `migration`), `pkg` (`@mapomodule/form`, `uikit`, …), `limit`. |
-| `mapo_get_doc`      | Returns the exact markdown of a page, or of a single section via `heading` (accepts the heading text or its anchor). Reports the page's full heading list so the assistant can narrow down, and truncates at `maxChars`.                                                                                                           |
-| `mapo_list_recipes` | The curated task → documentation map. With no argument it lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                                                       |
+| Tool                    | What it does                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapo_search_docs`      | Ranked search over the Mapo docs. Returns the matching **sections** with their `path`, `#anchor`, matched symbols and an excerpt — plus the canonical recipe when the query matches a known task. Filters: `section` (`howto`, `guide`, `uikit`, `form`, `modules`, `migration`), `pkg` (`@mapomodule/form`, `uikit`, …), `limit`. |
+| `mapo_get_doc`          | Returns the exact markdown of a page, or of a single section via `heading` (accepts the heading text or its anchor). Reports the page's full heading list so the assistant can narrow down, and truncates at `maxChars`.                                                                                                           |
+| `mapo_list_recipes`     | The curated task → documentation map. With no argument it lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                                                       |
+| `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, **extracted from its source**: real types, defaults and JSDoc. Partial names resolve (`list` → `MapoList`); `include` narrows the answer to one section.                                                                                                          |
+| `mapo_list_field_types` | The form registry: every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` with types and descriptions, the registry-level default attrs, and a skeleton descriptor to copy.                                                                                                                                |
+| `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures, grouped by package.                                                                                                                                                                                            |
 
 Typical sequence an assistant follows:
 
@@ -171,7 +178,23 @@ mapo_list_recipes({ task: "editors need to reorder navigation entries" })
   → "Build a navigation menu editor" → howto/menu-manager.md
 mapo_get_doc({ path: "howto/menu-manager.md" })
   → writes code against the real API
+mapo_component_api({ name: "MapoMenuManager" })
+  → props and slots as the component actually declares them
 ```
+
+**Why the API tools read source, not docs**: `docs/uikit/api.md` listed 11 props for `MapoDetail`
+while the component declared 17. Prose drifts; source does not.
+
+## Resources
+
+Attachable context, for clients that support MCP resources:
+
+| URI                      | Contents                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `mapo://knowledge/index` | Everything this server knows: recipes, doc pages, components, field types, composables.   |
+| `mapo://docs/{path}`     | A full documentation page. Clients can list every page.                                   |
+| `mapo://fields/{type}`   | The complete contract of one field type. Clients can list every type.                     |
+| `mapo://app/manifest`    | The running app's Mapo setup — HTTP transport only, since the CLI has no app to describe. |
 
 ### Ranking, briefly
 
@@ -255,18 +278,35 @@ pnpm --filter @mapomodule/mcp build      # module + CLI, then the knowledge inde
 pnpm --filter @mapomodule/mcp knowledge  # index only
 ```
 
-[`scripts/build-knowledge.mjs`](scripts/build-knowledge.mjs) walks `docs/**/*.md` (skipping
-`roadmap/`, which is internal planning), splits each page at its H2/H3 headings — ignoring headings
-inside fenced code blocks — and writes `dist/knowledge/docs.json` containing every chunk plus the
-inverted index. Each chunk carries its path, section, package, VitePress-compatible anchor, the
-symbols it mentions (`MapoList`, `useCrud`, field types) and whether it is API reference.
+[`scripts/build-knowledge.mjs`](scripts/build-knowledge.mjs) drives the generator in
+[`src/build/`](src/build/), which produces two files.
 
-The script deliberately reuses the **compiled** indexer (or the TypeScript source through jiti in
-stub mode) rather than reimplementing tokenisation: index and query side must produce identical
-tokens or recall silently degrades.
+**`docs.json`** — walks `docs/**/*.md` (skipping `roadmap/` and `DECISIONS.md`, which are internal),
+splits each page at its H2/H3 headings — ignoring headings inside fenced code blocks — and writes
+every chunk plus the inverted index. Each chunk carries its path, section, package,
+VitePress-compatible anchor, the symbols it mentions (`MapoList`, `useCrud`, field types) and
+whether it is API reference.
+
+**`api.json`** — reads the packages' sources:
+
+| Extractor                                                    | Source                                                                                  | Produces                                                                             |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`extract-components.ts`](src/build/extract-components.ts)   | `uikit` + `form` `.vue` files, via `vue-component-meta`                                 | props, events, slots, exposed, with resolved types, defaults and JSDoc               |
+| [`extract-fields.ts`](src/build/extract-fields.ts)           | `registry/defaults.ts` (through jiti) + `types/descriptor.ts` (TypeScript compiler API) | every field `type`, its component, its `attrs`, and the shared descriptor properties |
+| [`extract-composables.ts`](src/build/extract-composables.ts) | each module's `addImports([...])` calls                                                 | the auto-imported composables with their signatures                                  |
+
+Each extracted symbol is cross-linked back to the doc sections that document it.
+
+Two deliberate choices: the generator reuses the **compiled** indexer (or the TypeScript source
+through jiti in stub mode) rather than reimplementing tokenisation — index and query side must
+produce identical tokens or recall silently degrades — and it lives in its own bundle entry so
+`vue-component-meta`, `typescript` and `jiti` never reach the runtime.
+
+Field types are extracted from the **declared** type text, not the checker's expansion: the latter
+turns `DeepKeyOf<T>` into an unreadable wall of conditional types.
 
 `MAPO_DOCS_ROOT` overrides the docs location; `MAPO_MCP_KNOWLEDGE_DIR` overrides where the runtime
-looks for the generated index.
+looks for the generated files.
 
 ---
 
@@ -291,12 +331,13 @@ table.
 
    ```ts
    import { myTool } from "../../../../core/tools/<area>.js";
-   import { toMcpTool } from "../../../to-mcp-tool.js";
+   import { toMcpTool } from "../../../../nitro/to-mcp-tool.js";
 
    export default toMcpTool(myTool);
    ```
 
-4. If the tool works without the dev server, add it to `staticTools()` in `src/cli.ts` too.
+4. If the tool works without the dev server, add it to `staticTools()` in `src/cli.ts` too, and
+   update the expected list in `src/__tests__/cli.test.ts`.
 
 Tools return markdown on purpose: assistants read it directly, and it costs fewer tokens than JSON
 wrapped in prose.
@@ -308,12 +349,17 @@ src/
 ├── module.ts                    # Nuxt module: toolkit install, definition injection, app snapshot
 ├── cli.ts                       # citty CLI → MCP over stdio
 ├── index.ts                     # public types
+├── build/                       # build-time only: docs indexing + source extraction
+│   ├── index.ts                 # orchestrator → dist/knowledge/{docs,api}.json
+│   ├── extract-components.ts    # vue-component-meta
+│   ├── extract-fields.ts        # registry + descriptor interfaces
+│   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes, specs
+    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes, tools
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   └── to-mcp-tool.ts       # spec → defineMcpTool
-    ├── mcp/handlers/mapo/       # the named handler and its tools — scanned by the toolkit
+    ├── mcp/handlers/mapo/       # the named handler, its tools and resources — scanned by the toolkit
     └── types/                   # virtual module declarations
 ```
 
@@ -343,14 +389,19 @@ Make sure the client actually loaded the server (`tools/list` should show the `m
 that the handler `instructions` reached it — some clients ignore them, in which case a short project
 rule ("always check Mapo docs with the mapo\_\* tools") does the job.
 
+**A component is missing from `mapo_component_api`**
+The build logs `skipped <Name>` when `vue-component-meta` cannot resolve a component. Only `Mapo*`
+components under `src/runtime/components/` of `uikit` and `form` are extracted.
+
 ---
 
 ## Status
 
-Shipped: documentation search, page retrieval, curated recipes, the dev-only Nuxt module with its
-namespaced handler, and the stdio CLI.
+Shipped: documentation search with curated recipes, page retrieval, component/field/composable APIs
+extracted from source, MCP resources, the dev-only Nuxt module with its namespaced handler, and the
+stdio CLI.
 
 Planned, in this order (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-component and field-type APIs extracted from source · `mapo_inspect_app` and `mapo_doctor` over the
-live app · `mapo_scaffold` with opt-in writing · `mapo_backend_schema` (OpenAPI → `FieldDescriptor`)
-· MCP prompts and resources · `mapo-mcp install` / Agent Skill / MCP App inspector.
+`mapo_inspect_app` and `mapo_doctor` over the live app · `mapo_scaffold` with opt-in writing ·
+`mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · MCP prompts · `mapo-mcp install` / Agent Skill
+/ MCP App inspector.

@@ -8,11 +8,26 @@
  * stdout is reserved for the MCP protocol: every log goes to stderr.
  */
 import { readFileSync } from "node:fs";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { defineCommand, runMain } from "citty";
+import {
+  DOCS_URI_PREFIX,
+  FIELD_URI_PREFIX,
+  INDEX_URI,
+  docResourceList,
+  fieldResourceList,
+  renderDocResource,
+  renderFieldResource,
+  renderKnowledgeIndex,
+} from "./runtime/core/resources.js";
+import { apiTools } from "./runtime/core/tools/api.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
 import {
+  loadApiKnowledge,
   loadDocsKnowledge,
   resolveKnowledgeDir,
 } from "./runtime/core/knowledge.js";
@@ -20,7 +35,7 @@ import type {
   AnyMapoToolSpec,
   MapoToolContext,
 } from "./runtime/core/tool-spec.js";
-import type { DocsKnowledge } from "./runtime/core/types.js";
+import type { ApiKnowledge, DocsKnowledge } from "./runtime/core/types.js";
 
 function readVersion(): string {
   try {
@@ -35,13 +50,15 @@ function readVersion(): string {
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
-  return [...docsTools];
+  return [...docsTools, ...apiTools];
 }
 
 function createToolContext(knowledgeDir: string | null): MapoToolContext {
-  let cached: DocsKnowledge | null = null;
+  let docs: DocsKnowledge | null = null;
+  let api: ApiKnowledge | null = null;
   return {
-    knowledge: () => (cached ??= loadDocsKnowledge(knowledgeDir)),
+    knowledge: () => (docs ??= loadDocsKnowledge(knowledgeDir)),
+    api: () => (api ??= loadApiKnowledge(knowledgeDir)),
   };
 }
 
@@ -85,7 +102,71 @@ export async function createStdioServer(
     );
   }
 
+  registerResources(server, context);
   return server;
+}
+
+/**
+ * Same resources as the Nuxt handler, minus `mapo://app/manifest`: the CLI has
+ * no running app to describe.
+ */
+function registerResources(server: McpServer, context: MapoToolContext): void {
+  const markdown = (uri: URL, text: string) => ({
+    contents: [{ uri: uri.toString(), mimeType: "text/markdown", text }],
+  });
+
+  server.registerResource(
+    "mapo-knowledge-index",
+    INDEX_URI,
+    {
+      title: "Mapo knowledge index",
+      description:
+        "Recipes, documentation pages, components, field types and composables known to this server.",
+      mimeType: "text/markdown",
+    },
+    (uri) =>
+      markdown(uri, renderKnowledgeIndex(context.knowledge(), context.api())),
+  );
+
+  server.registerResource(
+    "mapo-doc",
+    new ResourceTemplate(`${DOCS_URI_PREFIX}{+path}`, {
+      list: () => ({ resources: docResourceList(context.knowledge()) }),
+    }),
+    {
+      title: "Mapo documentation page",
+      description: "A full documentation page, addressed by its path.",
+      mimeType: "text/markdown",
+    },
+    (uri, variables) => {
+      const raw = variables.path;
+      const path = Array.isArray(raw) ? raw.join("/") : (raw ?? "");
+      const text = renderDocResource(
+        context.knowledge(),
+        decodeURIComponent(path),
+      );
+      return markdown(uri, text ?? `No documentation page at "${path}".`);
+    },
+  );
+
+  server.registerResource(
+    "mapo-field-type",
+    new ResourceTemplate(`${FIELD_URI_PREFIX}{type}`, {
+      list: () => ({ resources: fieldResourceList(context.api()) }),
+    }),
+    {
+      title: "Mapo form field type",
+      description:
+        "The component, attrs and descriptor contract of a field type.",
+      mimeType: "text/markdown",
+    },
+    (uri, variables) => {
+      const raw = variables.type;
+      const type = Array.isArray(raw) ? raw[0]! : (raw ?? "");
+      const text = renderFieldResource(context.api(), decodeURIComponent(type));
+      return markdown(uri, text ?? `No field type "${type}" is registered.`);
+    },
+  );
 }
 
 const serve = defineCommand({

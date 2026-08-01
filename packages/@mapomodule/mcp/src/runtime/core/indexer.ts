@@ -25,6 +25,13 @@ const EXCLUDED_DIRS = new Set([
   "dist",
 ]);
 
+/**
+ * Internal pages that are not user documentation. `DECISIONS.md` is an
+ * Italian-language decision log for maintainers; surfacing it to assistants
+ * only pollutes results.
+ */
+const EXCLUDED_FILES = new Set(["DECISIONS.md"]);
+
 /** Field boosts baked into the term frequencies. */
 const BOOST = { heading: 3, title: 2, tags: 3, text: 1 } as const;
 
@@ -69,7 +76,11 @@ export function collectMarkdownFiles(root: string): string[] {
       if (entry.isDirectory()) {
         if (EXCLUDED_DIRS.has(entry.name)) continue;
         walk(full);
-      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith(".md") &&
+        !EXCLUDED_FILES.has(entry.name)
+      ) {
         files.push(full);
       }
     }

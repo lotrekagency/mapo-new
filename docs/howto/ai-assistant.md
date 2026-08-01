@@ -21,7 +21,7 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 3 tools, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 6 tools, 4 resources, 1 handler
 ```
 
 The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
@@ -122,7 +122,8 @@ Ask the assistant something Mapo-specific and watch it call the tools:
 > "How do I build a list of articles with filters and bulk actions?"
 
 Expect it to call `mapo_search_docs` or `mapo_list_recipes`, land on
-`howto/crud-list.md`, and write code that matches the documented props.
+`howto/crud-list.md`, then check the component contract with
+`mapo_component_api({ name: "MapoList" })` before writing code.
 
 Manual check without an assistant:
 
@@ -148,9 +149,10 @@ of the box.
 in `CLAUDE.md` / `.cursorrules` / project instructions goes a long way:
 
 ```md
-This project uses Mapo. Before writing Mapo code, consult the `mapo_*` MCP tools
-(`mapo_list_recipes`, `mapo_search_docs`, `mapo_get_doc`). Never invent
-component props or form field types.
+This project uses Mapo. Before writing Mapo code, consult the `mapo_*` MCP tools:
+`mapo_list_recipes` / `mapo_search_docs` / `mapo_get_doc` for how-to, and
+`mapo_component_api` / `mapo_list_field_types` / `mapo_composable_api` for exact
+APIs. Never invent component props or form field types.
 ```
 
 ## Troubleshooting

@@ -37,16 +37,16 @@ interface ForeignModuleOptions {
  */
 const HANDLER_NAME = "mapo";
 
-/** Reads the default field-type list emitted by the knowledge build, when present. */
+/** Reads the field types extracted from the form registry at build time. */
 function readDefaultFieldTypes(knowledgeDir: string | null): string[] {
   if (!knowledgeDir) return [];
-  const file = join(knowledgeDir, "fields.json");
+  const file = join(knowledgeDir, "api.json");
   if (!existsSync(file)) return [];
   try {
     const parsed = JSON.parse(readFileSync(file, "utf-8")) as {
-      types?: Array<{ type: string }>;
+      fieldTypes?: Array<{ type: string }>;
     };
-    return (parsed.types ?? []).map((entry) => entry.type);
+    return (parsed.fieldTypes ?? []).map((entry) => entry.type);
   } catch {
     return [];
   }

@@ -8,11 +8,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KNOWLEDGE_VERSION } from "./indexer.js";
-import type { DocsKnowledge } from "./types.js";
+import type { ApiKnowledge, DocsKnowledge } from "./types.js";
 
 export const DOCS_KNOWLEDGE_FILE = "docs.json";
+export const API_KNOWLEDGE_FILE = "api.json";
 
 const cache = new Map<string, DocsKnowledge>();
+const apiCache = new Map<string, ApiKnowledge>();
 
 /** Directory layouts we may be imported from: `dist/`, `dist/runtime/core/`, `src/…`. */
 const CANDIDATE_SUFFIXES = [
@@ -79,7 +81,28 @@ export function loadDocsKnowledge(dir?: string | null): DocsKnowledge {
   return knowledge;
 }
 
+/**
+ * Reads and caches `api.json` — the component, field and composable surface
+ * extracted from source at build time.
+ */
+export function loadApiKnowledge(dir?: string | null): ApiKnowledge {
+  const directory = dir ?? resolveKnowledgeDir();
+  if (!directory)
+    throw new KnowledgeNotBuiltError(fileURLToPath(import.meta.url));
+
+  const cached = apiCache.get(directory);
+  if (cached) return cached;
+
+  const file = join(directory, API_KNOWLEDGE_FILE);
+  if (!existsSync(file)) throw new KnowledgeNotBuiltError(directory);
+
+  const api = JSON.parse(readFileSync(file, "utf-8")) as ApiKnowledge;
+  apiCache.set(directory, api);
+  return api;
+}
+
 /** Test helper — drops the in-process cache. */
 export function clearKnowledgeCache(): void {
   cache.clear();
+  apiCache.clear();
 }

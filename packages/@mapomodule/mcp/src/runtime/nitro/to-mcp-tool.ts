@@ -1,6 +1,6 @@
 /** Adapter: shared tool spec → `@nuxtjs/mcp-toolkit` definition. */
 import { defineMcpTool } from "@nuxtjs/mcp-toolkit/server";
-import { useDocsKnowledge } from "./context.js";
+import { useApiKnowledge, useDocsKnowledge } from "./context.js";
 import type { AnyMapoToolSpec } from "../core/tool-spec.js";
 // NOTE: this file must stay OUT of `runtime/mcp/`. The toolkit treats every
 // top-level file of a scanned handler path as a handler definition, so a helper
@@ -15,6 +15,6 @@ export function toMcpTool(spec: AnyMapoToolSpec) {
     annotations: spec.annotations,
     inputExamples: spec.inputExamples,
     handler: async (args: Record<string, unknown>) =>
-      spec.run(args, { knowledge: useDocsKnowledge }),
+      spec.run(args, { knowledge: useDocsKnowledge, api: useApiKnowledge }),
   });
 }

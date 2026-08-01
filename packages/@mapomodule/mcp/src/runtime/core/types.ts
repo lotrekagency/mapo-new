@@ -50,6 +50,68 @@ export interface DocsKnowledge {
   index: Bm25Index;
 }
 
+/** One entry of a component's public API. */
+export interface ApiMember {
+  name: string;
+  type?: string;
+  required?: boolean;
+  default?: string;
+  description?: string;
+}
+
+/** A `Mapo*` component as extracted from its source at build time. */
+export interface ComponentApi {
+  name: string;
+  pkg: string;
+  /** Repo-relative source path. */
+  file: string;
+  description?: string;
+  props: ApiMember[];
+  events: ApiMember[];
+  slots: ApiMember[];
+  exposed: ApiMember[];
+  /** Documentation sections that talk about this component (`path#anchor`). */
+  docs: string[];
+}
+
+/** A field `type` accepted by the form registry, with the descriptor it expects. */
+export interface FieldTypeApi {
+  type: string;
+  /** Component the registry maps this type to. */
+  component?: string;
+  /** Descriptor interface that documents it, e.g. `TextDescriptor`. */
+  descriptor?: string;
+  description?: string;
+  /** `attrs` accepted by this field type. */
+  attrs: ApiMember[];
+  /** Registry-level default `attrs` merged into every field of this type. */
+  defaultAttrs?: Record<string, unknown>;
+  /** Whether the registry installs a default get/set accessor for the type. */
+  hasAccessor?: boolean;
+  docs: string[];
+}
+
+/** An auto-imported composable or helper exposed by a Mapo module. */
+export interface ComposableApi {
+  name: string;
+  pkg: string;
+  file: string;
+  signature?: string;
+  description?: string;
+  docs: string[];
+}
+
+/** Everything extracted from source, shipped next to the docs index. */
+export interface ApiKnowledge {
+  version: number;
+  generatedAt: string;
+  components: ComponentApi[];
+  fieldTypes: FieldTypeApi[];
+  /** Properties every field descriptor accepts, whatever its type. */
+  fieldCommon: ApiMember[];
+  composables: ComposableApi[];
+}
+
 export interface SearchHit {
   id: string;
   path: string;

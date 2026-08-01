@@ -7,12 +7,14 @@
  * therefore never drift between "dev server running" and "dev server down".
  */
 import type { ZodRawShape } from "zod";
-import type { DocsKnowledge } from "./types.js";
+import type { ApiKnowledge, DocsKnowledge } from "./types.js";
 
 /** Everything a tool may need, provided lazily so unused sources are never read. */
 export interface MapoToolContext {
   /** Bundled docs index. Throws `KnowledgeNotBuiltError` when not generated. */
   knowledge: () => DocsKnowledge;
+  /** Component, field and composable surface extracted from source. */
+  api: () => ApiKnowledge;
 }
 
 export interface MapoToolAnnotations {

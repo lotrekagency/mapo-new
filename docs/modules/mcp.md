@@ -35,7 +35,7 @@ Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
 startup log announces it:
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 3 tools, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 6 tools, 4 resources, 1 handler
 ```
 
 Then point your editor at it — see
@@ -100,11 +100,14 @@ export default defineNuxtConfig({
 All tools are prefixed `mapo_` so they stay unambiguous when several MCP servers
 are connected, and all are annotated read-only.
 
-| Tool                | Purpose                                                                                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mapo_search_docs`  | Ranked search over the Mapo docs. Returns matching **sections** with path, anchor, mentioned symbols and an excerpt — plus the canonical recipe when one matches. Filters: `section`, `pkg`, `limit`. |
-| `mapo_get_doc`      | The exact markdown of a page, or of one section (`heading` accepts the heading text or its anchor), truncated at `maxChars`.                                                                          |
-| `mapo_list_recipes` | The curated task → documentation map. No argument lists everything Mapo does; `task` returns the recipe for a goal.                                                                                   |
+| Tool                    | Purpose                                                                                                                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapo_search_docs`      | Ranked search over the Mapo docs. Returns matching **sections** with path, anchor, mentioned symbols and an excerpt — plus the canonical recipe when one matches. Filters: `section`, `pkg`, `limit`. |
+| `mapo_get_doc`          | The exact markdown of a page, or of one section (`heading` accepts the heading text or its anchor), truncated at `maxChars`.                                                                          |
+| `mapo_list_recipes`     | The curated task → documentation map. No argument lists everything Mapo does; `task` returns the recipe for a goal.                                                                                   |
+| `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, extracted from its source with real types, defaults and JSDoc. Partial names work (`list` → `MapoList`).                             |
+| `mapo_list_field_types` | Every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` and the registry defaults — plus a skeleton descriptor to copy.                                                        |
+| `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures.                                                                                   |
 
 A typical exchange:
 
@@ -113,12 +116,30 @@ mapo_list_recipes({ task: "editors need to reorder navigation entries" })
 → "Build a navigation menu editor" → howto/menu-manager.md
 
 mapo_get_doc({ path: "howto/menu-manager.md" })
+mapo_component_api({ name: "MapoMenuManager" })
 → the assistant writes code against the real API
 ```
 
-More tools are on the way — component and field-type APIs extracted from
-source, live app introspection (`mapo_inspect_app`, `mapo_doctor`), scaffolding
-and Django/DRF schema → `FieldDescriptor` mapping.
+::: tip Source over prose
+The API tools read the packages' sources at build time, not the documentation:
+`docs/uikit/api.md` listed 11 props for `MapoDetail` while the component
+declared 17. Ask them whenever you are unsure about a prop, a slot or an
+`attrs` key.
+:::
+
+## Resources
+
+For clients that support MCP resources:
+
+| URI                      | Contents                                                                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapo://knowledge/index` | Everything the server knows: recipes, pages, components, field types, composables.                                                       |
+| `mapo://docs/{path}`     | A full documentation page; clients can list every page.                                                                                  |
+| `mapo://fields/{type}`   | The complete contract of one field type; clients can list every type.                                                                    |
+| `mapo://app/manifest`    | Your app's Mapo setup: installed modules, public config, registered field types, components, admin routes, locales. HTTP transport only. |
+
+Still to come — live diagnostics (`mapo_inspect_app`, `mapo_doctor`),
+scaffolding, and Django/DRF schema → `FieldDescriptor` mapping.
 
 ## How it works
 
