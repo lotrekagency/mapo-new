@@ -40,6 +40,12 @@ export interface MapoAppManifest {
   dev: boolean;
   /** Installed `@mapomodule/*` modules and their versions. */
   modules: Array<{ name: string; version?: string }>;
+  /**
+   * `modules[]` as written in `nuxt.config`, in order. Only string entries are
+   * reported — inline function modules have no stable name. Ordering matters:
+   * `@nuxt/ui` must come before `mapomodule`.
+   */
+  moduleOrder: string[];
   /** Public Mapo runtime config; secret values are replaced by their key names. */
   config: Record<string, unknown>;
   fieldTypes: MapoManifestFieldType[];

@@ -7,6 +7,7 @@
  * therefore never drift between "dev server running" and "dev server down".
  */
 import type { ZodRawShape } from "zod";
+import type { MapoAppManifest } from "../../index.js";
 import type { ApiKnowledge, DocsKnowledge } from "./types.js";
 
 /** Everything a tool may need, provided lazily so unused sources are never read. */
@@ -15,6 +16,11 @@ export interface MapoToolContext {
   knowledge: () => DocsKnowledge;
   /** Component, field and composable surface extracted from source. */
   api: () => ApiKnowledge;
+  /**
+   * Snapshot of the app the server runs inside, or `null` when there is none —
+   * the stdio CLI knows the framework but not the project using it.
+   */
+  manifest: () => MapoAppManifest | null;
 }
 
 export interface MapoToolAnnotations {

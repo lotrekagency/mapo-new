@@ -6,14 +6,19 @@ import {
   fieldTypesTool,
 } from "../runtime/core/tools/api.js";
 import {
+  appTools,
+  doctorTool,
+  inspectAppTool,
+} from "../runtime/core/tools/app.js";
+import {
   docsTools,
   getDocTool,
   searchDocsTool,
 } from "../runtime/core/tools/docs.js";
-import { makeContext } from "./fixtures.js";
+import { makeContext, makeManifest } from "./fixtures.js";
 
 const context = makeContext();
-const allTools = [...docsTools, ...apiTools];
+const allTools = [...docsTools, ...apiTools, ...appTools];
 
 describe("tool specs", () => {
   it("namespaces every tool and declares read-only annotations", () => {
@@ -144,5 +149,78 @@ describe("mapo_composable_api", () => {
   it("reports unknown names without inventing an API", async () => {
     const output = await composableApiTool.run({ name: "useNope" }, context);
     expect(output).toContain("No auto-imported composable matches");
+  });
+});
+
+describe("mapo_inspect_app", () => {
+  it("reports the app's real setup", async () => {
+    const output = await inspectAppTool.run({}, context);
+
+    expect(output).toContain("Installed Mapo modules");
+    expect(output).toContain("@nuxt/ui` → `mapomodule");
+    expect(output).toContain("Registered field types (2)");
+    expect(output).toContain("MapoList");
+    expect(output).toContain("/articles");
+  });
+
+  it("limits the report to the requested sections", async () => {
+    const output = await inspectAppTool.run({ include: ["fields"] }, context);
+
+    expect(output).toContain("Registered field types");
+    expect(output).not.toContain("## Routes");
+  });
+
+  it("declares what a build-time snapshot cannot see", async () => {
+    const output = await inspectAppTool.run({ include: ["fields"] }, context);
+    expect(output).toContain("defineFormField()");
+  });
+
+  it("explains how to get an app when there is none", async () => {
+    const output = await inspectAppTool.run({}, makeContext(undefined, null));
+
+    expect(output).toContain("/mcp/mapo");
+    expect(output).toContain("dev server");
+  });
+});
+
+describe("mapo_doctor", () => {
+  it("reports a clean bill of health", async () => {
+    const output = await doctorTool.run({}, context);
+
+    expect(output).toContain("No problem found");
+    expect(output).toContain("Not checked");
+  });
+
+  it("renders findings with severity, fix and doc link", async () => {
+    const broken = makeContext(
+      undefined,
+      makeManifest({ moduleOrder: ["mapomodule"] }),
+    );
+    const output = await doctorTool.run({}, broken);
+
+    expect(output).toContain("nuxt-ui-missing (error)");
+    expect(output).toContain("**Fix**");
+    expect(output).toContain("guide/getting-started.md");
+  });
+
+  it("filters by severity", async () => {
+    const noisy = makeContext(
+      undefined,
+      makeManifest({
+        config: { mapoCore: { loginUrl: "/login" } },
+        locales: ["fr"],
+      }),
+    );
+
+    const all = await doctorTool.run({}, noisy);
+    const errorsOnly = await doctorTool.run({ severity: "error" }, noisy);
+
+    expect(all).toContain("auth-endpoints-default");
+    expect(errorsOnly).not.toContain("auth-endpoints-default");
+  });
+
+  it("explains how to get an app when there is none", async () => {
+    const output = await doctorTool.run({}, makeContext(undefined, null));
+    expect(output).toContain("/mcp/mapo");
   });
 });

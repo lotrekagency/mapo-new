@@ -8,6 +8,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildDocsKnowledge } from "../runtime/core/indexer.js";
+import { API_KNOWLEDGE_VERSION } from "../runtime/core/knowledge.js";
 import { extractComponents } from "./extract-components.js";
 import { extractComposables } from "./extract-composables.js";
 import { extractFieldTypes } from "./extract-fields.js";
@@ -16,8 +17,6 @@ import type {
   DocChunk,
   DocsKnowledge,
 } from "../runtime/core/types.js";
-
-export const API_KNOWLEDGE_VERSION = 1;
 
 export const DOCS_FILE = "docs.json";
 export const API_FILE = "api.json";

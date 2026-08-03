@@ -2,12 +2,14 @@
  * `mapo-mcp` — standalone MCP server over stdio.
  *
  * Exposes the same tool specs as the Nuxt module, so an IDE stays useful even
- * when the dev server is down. Anything that needs the running app (live
- * introspection) is served by the Nuxt module at `/mcp/mapo`.
+ * when the dev server is down. The tools that need the running app are
+ * forwarded to it when it is reachable (see `createAppProxy`).
  *
  * stdout is reserved for the MCP protocol: every log goes to stderr.
  */
 import { readFileSync } from "node:fs";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   McpServer,
   ResourceTemplate,
@@ -25,6 +27,7 @@ import {
   renderKnowledgeIndex,
 } from "./runtime/core/resources.js";
 import { apiTools } from "./runtime/core/tools/api.js";
+import { appTools } from "./runtime/core/tools/app.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
 import {
   loadApiKnowledge,
@@ -48,6 +51,9 @@ function readVersion(): string {
   }
 }
 
+/** Default endpoint of the Nuxt module, overridable with `--app`. */
+export const DEFAULT_APP_URL = "http://localhost:3000/mcp/mapo";
+
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
   return [...docsTools, ...apiTools];
@@ -59,19 +65,73 @@ function createToolContext(knowledgeDir: string | null): MapoToolContext {
   return {
     knowledge: () => (docs ??= loadDocsKnowledge(knowledgeDir)),
     api: () => (api ??= loadApiKnowledge(knowledgeDir)),
+    // The CLI has no app of its own; live tools are forwarded instead.
+    manifest: () => null,
+  };
+}
+
+function textOf(result: unknown): string {
+  const content =
+    (result as { content?: Array<{ type: string; text?: string }> }).content ??
+    [];
+  return content
+    .filter((part) => part.type === "text" && part.text)
+    .map((part) => part.text)
+    .join("\n");
+}
+
+/**
+ * Forwards a live tool call to the app's own MCP endpoint.
+ *
+ * The connection is lazy and re-established on demand: the dev server is
+ * routinely started *after* the editor spawned this process, and it restarts
+ * whenever nuxt.config changes. A failure is reported as an actionable message
+ * rather than an error, because "the dev server is down" is a normal state.
+ */
+function createAppProxy(appUrl: string) {
+  let client: Client | null = null;
+
+  return async function forward(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    try {
+      if (!client) {
+        const candidate = new Client({
+          name: "mapo-mcp-cli",
+          version: readVersion(),
+        });
+        await candidate.connect(
+          new StreamableHTTPClientTransport(new URL(appUrl)),
+        );
+        client = candidate;
+      }
+      return textOf(await client.callTool({ name, arguments: args }));
+    } catch (error) {
+      client = null; // drop the dead connection so the next call retries
+      const message = error instanceof Error ? error.message : String(error);
+      return (
+        `\`${name}\` needs the running app, and ${appUrl} is not answering (${message}).\n\n` +
+        "Start the dev server (`pnpm dev`) and call the tool again, or point the client " +
+        "directly at the app endpoint. Documentation and API tools work without it."
+      );
+    }
   };
 }
 
 export async function createStdioServer(
   knowledgeDir: string | null,
+  appUrl: string = DEFAULT_APP_URL,
 ): Promise<McpServer> {
   const server = new McpServer(
     { name: "mapo", version: readVersion() },
     {
       instructions:
-        "Mapo admin framework (Nuxt 4). Search the docs before writing Mapo code — v2 differs " +
-        "substantially from v1. Start the app's dev server and connect to /mcp/mapo for live " +
-        "introspection of the project's actual configuration.",
+        "Mapo admin framework (Nuxt 4). Start from mapo_list_recipes, then mapo_search_docs / " +
+        "mapo_get_doc for how-to, and mapo_component_api / mapo_list_field_types / " +
+        "mapo_composable_api for exact APIs — Mapo v2 differs substantially from v1, so never " +
+        "recall its API from memory. mapo_inspect_app and mapo_doctor describe the project itself " +
+        "and need its dev server running.",
     },
   );
 
@@ -99,6 +159,26 @@ export async function createStdioServer(
           };
         }
       },
+    );
+  }
+
+  // Live tools keep their schema and description here, but the app answers.
+  const forward = createAppProxy(appUrl);
+
+  for (const spec of appTools) {
+    server.registerTool(
+      spec.name,
+      {
+        title: spec.title,
+        description: spec.description,
+        inputSchema: spec.inputSchema,
+        ...(spec.annotations ? { annotations: spec.annotations } : {}),
+      },
+      async (args: Record<string, unknown>) => ({
+        content: [
+          { type: "text" as const, text: await forward(spec.name, args) },
+        ],
+      }),
     );
   }
 
@@ -180,6 +260,10 @@ const serve = defineCommand({
       description:
         "Path to a prebuilt knowledge directory (defaults to the bundled one)",
     },
+    app: {
+      type: "string",
+      description: `MCP endpoint of the running app, for the live tools (default ${DEFAULT_APP_URL})`,
+    },
   },
   async run({ args }) {
     const knowledgeDir = args.knowledge
@@ -193,9 +277,16 @@ const serve = defineCommand({
       );
     }
 
-    const server = await createStdioServer(knowledgeDir);
+    const appUrl = String(
+      args.app ?? process.env.MAPO_MCP_APP_URL ?? DEFAULT_APP_URL,
+    );
+
+    const server = await createStdioServer(knowledgeDir, appUrl);
     await server.connect(new StdioServerTransport());
-    console.error(`[mapo-mcp] ready on stdio (${staticTools().length} tools)`);
+    console.error(
+      `[mapo-mcp] ready on stdio (${staticTools().length} tools, ` +
+        `${appTools.length} forwarded to ${appUrl})`,
+    );
   },
 });
 

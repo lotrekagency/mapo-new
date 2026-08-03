@@ -35,7 +35,7 @@ Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
 startup log announces it:
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 6 tools, 4 resources, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 8 tools, 4 resources, 1 handler
 ```
 
 Then point your editor at it — see
@@ -138,8 +138,14 @@ For clients that support MCP resources:
 | `mapo://fields/{type}`   | The complete contract of one field type; clients can list every type.                                                                    |
 | `mapo://app/manifest`    | Your app's Mapo setup: installed modules, public config, registered field types, components, admin routes, locales. HTTP transport only. |
 
-Still to come — live diagnostics (`mapo_inspect_app`, `mapo_doctor`),
-scaffolding, and Django/DRF schema → `FieldDescriptor` mapping.
+::: tip Live tools over stdio
+`mapo_inspect_app` and `mapo_doctor` describe the running project, so they are
+answered by the HTTP endpoint. The `mapo-mcp` CLI still exposes them: it
+forwards the call to `http://localhost:3000/mcp/mapo` (override with `--app` or
+`MAPO_MCP_APP_URL`) and, when the dev server is down, explains how to start it.
+:::
+
+Still to come — scaffolding and Django/DRF schema → `FieldDescriptor` mapping.
 
 ## How it works
 

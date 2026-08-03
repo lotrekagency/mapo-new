@@ -13,6 +13,13 @@ import type { ApiKnowledge, DocsKnowledge } from "./types.js";
 export const DOCS_KNOWLEDGE_FILE = "docs.json";
 export const API_KNOWLEDGE_FILE = "api.json";
 
+/**
+ * Bumped whenever the shape of `api.json` changes. Lives here, not in the
+ * build entry, so the writer imports it from the reader and the two can never
+ * disagree about what version means.
+ */
+export const API_KNOWLEDGE_VERSION = 1;
+
 const cache = new Map<string, DocsKnowledge>();
 const apiCache = new Map<string, ApiKnowledge>();
 
@@ -97,6 +104,12 @@ export function loadApiKnowledge(dir?: string | null): ApiKnowledge {
   if (!existsSync(file)) throw new KnowledgeNotBuiltError(directory);
 
   const api = JSON.parse(readFileSync(file, "utf-8")) as ApiKnowledge;
+  if (api.version !== API_KNOWLEDGE_VERSION) {
+    throw new Error(
+      `Mapo API surface version mismatch: found ${api.version}, expected ${API_KNOWLEDGE_VERSION}. Rebuild it.`,
+    );
+  }
+
   apiCache.set(directory, api);
   return api;
 }

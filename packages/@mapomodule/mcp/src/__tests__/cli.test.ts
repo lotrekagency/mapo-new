@@ -29,7 +29,12 @@ describeBuilt("mapo-mcp stdio server", () => {
   beforeAll(async () => {
     client = new Client({ name: "mapo-mcp-test", version: "0.0.0" });
     await client.connect(
-      new StdioClientTransport({ command: process.execPath, args: [binPath] }),
+      new StdioClientTransport({
+        command: process.execPath,
+        // Port 9 (discard) is always refused: the live tools must degrade
+        // predictably instead of hitting a dev server that may be running.
+        args: [binPath, "serve", "--app", "http://127.0.0.1:9/mcp/mapo"],
+      }),
     );
   });
 
@@ -42,7 +47,9 @@ describeBuilt("mapo-mcp stdio server", () => {
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "mapo_component_api",
       "mapo_composable_api",
+      "mapo_doctor",
       "mapo_get_doc",
+      "mapo_inspect_app",
       "mapo_list_field_types",
       "mapo_list_recipes",
       "mapo_search_docs",
@@ -83,6 +90,18 @@ describeBuilt("mapo-mcp stdio server", () => {
 
     expect(result.isError).toBeFalsy();
     expect(result.content[0]!.text).toContain("howto/");
+  });
+
+  it("degrades gracefully when the app endpoint is unreachable", async () => {
+    const result = (await client.callTool({
+      name: "mapo_inspect_app",
+      arguments: {},
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+
+    const text = result.content[0]!.text;
+    expect(text).toContain("mapo_inspect_app");
+    expect(text).toContain("dev server");
+    expect(text).toContain("127.0.0.1:9");
   });
 
   it("reports invalid input instead of crashing", async () => {

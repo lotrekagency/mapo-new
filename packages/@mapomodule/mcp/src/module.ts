@@ -170,6 +170,11 @@ export default defineNuxtModule<MapoMcpOptions>({
               : {}),
           }))
           .filter((entry) => entry.name.includes("mapo")),
+        // Declaration order, not resolution order: `mapo_doctor` checks that
+        // `@nuxt/ui` is registered before `mapomodule`.
+        moduleOrder: (nuxt.options.modules ?? []).filter(
+          (entry): entry is string => typeof entry === "string",
+        ),
         config: mapoConfig,
         fieldTypes: [
           ...defaultTypes.map((type) => ({ type, source: "default" as const })),

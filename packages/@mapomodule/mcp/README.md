@@ -54,7 +54,8 @@ The package ships **two ways to reach the same tools**:
    `POST /mcp/mapo` that does not interfere with any MCP definitions your app itself may declare
    (the toolkit's default `defaultHandlerStrategy: 'orphans'` keeps them separate).
 2. **stdio CLI** (`mapo-mcp`) — the same tools, spawned directly by the IDE. Works with the dev
-   server down, which is exactly when you are still deciding what to build.
+   server down, which is exactly when you are still deciding what to build; the two live tools are
+   forwarded to the app when it happens to be up.
 
 Both adapters wrap a single set of tool specs in `src/runtime/core/tools/`, so behaviour never
 diverges between the two transports.
@@ -184,6 +185,11 @@ mapo_component_api({ name: "MapoMenuManager" })
 
 **Why the API tools read source, not docs**: `docs/uikit/api.md` listed 11 props for `MapoDetail`
 while the component declared 17. Prose drifts; source does not.
+
+**The two live tools need the app.** Over HTTP they answer directly. Over stdio the CLI forwards
+them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL`),
+reconnecting on every call because the dev server routinely starts after the editor. When it is
+down they explain how to bring it up instead of guessing.
 
 ## Resources
 
@@ -355,7 +361,7 @@ src/
 │   ├── extract-fields.ts        # registry + descriptor interfaces
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes, tools
+    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes, doctor, tools
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   └── to-mcp-tool.ts       # spec → defineMcpTool
@@ -398,10 +404,9 @@ components under `src/runtime/components/` of `uikit` and `form` are extracted.
 ## Status
 
 Shipped: documentation search with curated recipes, page retrieval, component/field/composable APIs
-extracted from source, MCP resources, the dev-only Nuxt module with its namespaced handler, and the
-stdio CLI.
+extracted from source, live app introspection and diagnostics, MCP resources, the dev-only Nuxt
+module with its namespaced handler, and the stdio CLI with transparent forwarding of the live tools.
 
 Planned, in this order (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-`mapo_inspect_app` and `mapo_doctor` over the live app · `mapo_scaffold` with opt-in writing ·
-`mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · MCP prompts · `mapo-mcp install` / Agent Skill
-/ MCP App inspector.
+`mapo_scaffold` with opt-in writing · `mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · MCP
+prompts · `mapo-mcp install` / Agent Skill / MCP App inspector.

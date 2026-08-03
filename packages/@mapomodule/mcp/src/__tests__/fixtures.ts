@@ -3,6 +3,7 @@ import {
   chunkMarkdown,
   KNOWLEDGE_VERSION,
 } from "../runtime/core/indexer.js";
+import type { MapoAppManifest } from "../index.js";
 import type { MapoToolContext } from "../runtime/core/tool-spec.js";
 import type { ApiKnowledge, DocsKnowledge } from "../runtime/core/types.js";
 
@@ -139,14 +140,50 @@ export function makeApi(): ApiKnowledge {
   };
 }
 
+/**
+ * A healthy app snapshot: `@nuxt/ui` first, a login page, real auth endpoints,
+ * one admin route, bundled locales only. Doctor rules should stay silent on it.
+ */
+export function makeManifest(
+  overrides: Partial<MapoAppManifest> = {},
+): MapoAppManifest {
+  return {
+    rootDir: "/tmp/app",
+    dev: true,
+    modules: [
+      { name: "@mapomodule/core", version: "0.0.0" },
+      { name: "@mapomodule/uikit", version: "0.0.0" },
+      { name: "@mapomodule/form", version: "0.0.0" },
+    ],
+    moduleOrder: ["@nuxt/ui", "mapomodule"],
+    config: {
+      mapoCore: {
+        authLoginUrl: "/api/backend/login",
+        userInfoApi: "/api/backend/me/",
+        logoutUrl: "/api/backend/logout",
+        loginUrl: "/login",
+      },
+    },
+    fieldTypes: [
+      { type: "text", source: "default" },
+      { type: "select", source: "default" },
+    ],
+    components: ["MapoList", "MapoDetail"],
+    routes: [{ path: "/login" }, { path: "/articles" }],
+    locales: ["en", "it"],
+    ...overrides,
+  };
+}
+
 /** Tool context backed by the fixtures above. */
 export function makeContext(
   files: Record<string, string> = {
     "howto/crud-list.md": CRUD_LIST_DOC,
     "uikit/form/custom-fields.md": CUSTOM_FIELDS_DOC,
   },
+  manifest: MapoAppManifest | null = makeManifest(),
 ): MapoToolContext {
   const docs = makeKnowledge(files);
   const api = makeApi();
-  return { knowledge: () => docs, api: () => api };
+  return { knowledge: () => docs, api: () => api, manifest: () => manifest };
 }

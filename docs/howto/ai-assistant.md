@@ -21,7 +21,7 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 6 tools, 4 resources, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 8 tools, 4 resources, 1 handler
 ```
 
 The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
@@ -40,13 +40,15 @@ export default defineNuxtConfig({
 
 There are two ways to reach the same tools, and they answer different needs:
 
-| Transport              | Works when                      | Knows                                    |
-| ---------------------- | ------------------------------- | ---------------------------------------- |
-| **stdio** (`mapo-mcp`) | always, even with no dev server | Mapo docs and recipes                    |
-| **HTTP** (`/mcp/mapo`) | while `pnpm dev` is running     | the same, **plus** your app's own config |
+| Transport              | Works when                      | Knows                                           |
+| ---------------------- | ------------------------------- | ----------------------------------------------- |
+| **stdio** (`mapo-mcp`) | always, even with no dev server | Mapo docs, recipes and APIs                     |
+| **HTTP** (`/mcp/mapo`) | while `pnpm dev` is running     | the same, **plus** your app's own configuration |
 
-Configuring both is fine — and recommended. You will usually keep stdio as the
-always-on one and add HTTP when you want app-aware answers.
+In practice stdio is enough: the two tools that need the running app
+(`mapo_inspect_app`, `mapo_doctor`) are forwarded to it automatically when it is
+up. Configure HTTP as well if your client supports it and you want to skip the
+extra hop.
 
 ## 3. Expose the `mapo-mcp` binary
 

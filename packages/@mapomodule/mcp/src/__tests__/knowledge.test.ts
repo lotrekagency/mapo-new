@@ -2,8 +2,14 @@
  * Regression tests against the real generated knowledge base.
  * Skipped when the package has not been built yet (`pnpm build`).
  */
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { KNOWLEDGE_VERSION } from "../runtime/core/indexer.js";
 import {
+  API_KNOWLEDGE_VERSION,
+  clearKnowledgeCache,
   loadApiKnowledge,
   loadDocsKnowledge,
   resolveKnowledgeDir,
@@ -13,6 +19,9 @@ import { getDoc, searchDocs } from "../runtime/core/search.js";
 
 const knowledgeDir = resolveKnowledgeDir(import.meta.url);
 const describeBuilt = knowledgeDir ? describe : describe.skip;
+
+// The loaders memoise per directory; tests below swap directories on purpose.
+afterEach(() => clearKnowledgeCache());
 
 describeBuilt("generated knowledge base", () => {
   const knowledge = loadDocsKnowledge(knowledgeDir);
@@ -133,5 +142,68 @@ describeBuilt("generated API surface", () => {
     )!;
     expect(crud.pkg).toBe("@mapomodule/core");
     expect(crud.signature).toContain("endpoint");
+  });
+});
+
+describe("knowledge loaders", () => {
+  /**
+   * Guards the silent-wrong-data case: chunk indices in the index are only
+   * meaningful against the chunks they were built from, so a file written by a
+   * different generator must fail loudly instead of scoring against stale
+   * postings.
+   */
+  function writeKnowledge(docsVersion: number, apiVersion: number): string {
+    const dir = mkdtempSync(join(tmpdir(), "mapo-mcp-"));
+    writeFileSync(
+      join(dir, "docs.json"),
+      JSON.stringify({
+        version: docsVersion,
+        generatedAt: "",
+        docsRoot: "docs",
+        chunks: [],
+        index: { terms: {}, lengths: [], avgLength: 0, total: 0 },
+      }),
+    );
+    writeFileSync(
+      join(dir, "api.json"),
+      JSON.stringify({
+        version: apiVersion,
+        generatedAt: "",
+        components: [],
+        fieldTypes: [],
+        fieldCommon: [],
+        composables: [],
+      }),
+    );
+    return dir;
+  }
+
+  it("accepts files written by the current generator", () => {
+    const dir = writeKnowledge(KNOWLEDGE_VERSION, API_KNOWLEDGE_VERSION);
+    clearKnowledgeCache();
+
+    expect(loadDocsKnowledge(dir).chunks).toEqual([]);
+    expect(loadApiKnowledge(dir).components).toEqual([]);
+  });
+
+  it("rejects a stale docs index instead of scoring against it", () => {
+    const dir = writeKnowledge(KNOWLEDGE_VERSION + 1, API_KNOWLEDGE_VERSION);
+    clearKnowledgeCache();
+
+    expect(() => loadDocsKnowledge(dir)).toThrow(/version mismatch/i);
+  });
+
+  it("rejects a stale API surface", () => {
+    const dir = writeKnowledge(KNOWLEDGE_VERSION, API_KNOWLEDGE_VERSION + 1);
+    clearKnowledgeCache();
+
+    expect(() => loadApiKnowledge(dir)).toThrow(/version mismatch/i);
+  });
+
+  it("reports a missing knowledge directory with a directive message", () => {
+    clearKnowledgeCache();
+    expect(() =>
+      loadDocsKnowledge(join(tmpdir(), "mapo-mcp-does-not-exist")),
+    ).toThrow(/pnpm --filter @mapomodule\/mcp knowledge/);
   });
 });

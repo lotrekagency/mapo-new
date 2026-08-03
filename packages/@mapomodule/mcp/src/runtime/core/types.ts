@@ -32,7 +32,15 @@ export interface DocChunk {
   tags: string[];
 }
 
-/** Inverted index: `terms[token] = [chunkIndex, termFrequency][]`. */
+/**
+ * Inverted index: `terms[token] = [chunkIndex, termFrequency][]`.
+ *
+ * Chunk indices — not ids — keep the serialised file small (textual ids would
+ * grow it by ~5x). The price is that `terms` and `lengths` are only valid
+ * against the exact `chunks` array they were built from: reordering or
+ * filtering it after the fact corrupts every score without raising anything.
+ * A term's document frequency is the length of its posting list.
+ */
 export interface Bm25Index {
   terms: Record<string, Array<[number, number]>>;
   /** Token count per chunk, aligned with the `chunks` array. */
