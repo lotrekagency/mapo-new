@@ -23,6 +23,11 @@ export function toMcpTool(spec: AnyMapoToolSpec) {
         knowledge: useDocsKnowledge,
         api: useApiKnowledge,
         manifest: useMapoManifest,
+        rootDir: () => useMapoManifest().rootDir,
+        // The module only registers in development, but be explicit: a write
+        // tool reachable from a production build is a remote code execution
+        // primitive.
+        canWrite: () => useMapoManifest().dev,
       }),
   });
 }

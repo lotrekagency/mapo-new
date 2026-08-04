@@ -21,6 +21,13 @@ export interface MapoToolContext {
    * the stdio CLI knows the framework but not the project using it.
    */
   manifest: () => MapoAppManifest | null;
+  /**
+   * Absolute project root for scaffolding, or `null` when unknown. The Nuxt
+   * module reports `rootDir`; the CLI uses its working directory.
+   */
+  rootDir: () => string | null;
+  /** Whether files may be written at all: development only. */
+  canWrite: () => boolean;
 }
 
 export interface MapoToolAnnotations {

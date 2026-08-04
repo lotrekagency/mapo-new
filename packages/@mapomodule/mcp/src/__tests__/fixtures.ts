@@ -182,8 +182,16 @@ export function makeContext(
     "uikit/form/custom-fields.md": CUSTOM_FIELDS_DOC,
   },
   manifest: MapoAppManifest | null = makeManifest(),
+  overrides: Partial<MapoToolContext> = {},
 ): MapoToolContext {
   const docs = makeKnowledge(files);
   const api = makeApi();
-  return { knowledge: () => docs, api: () => api, manifest: () => manifest };
+  return {
+    knowledge: () => docs,
+    api: () => api,
+    manifest: () => manifest,
+    rootDir: () => manifest?.rootDir ?? null,
+    canWrite: () => manifest?.dev ?? false,
+    ...overrides,
+  };
 }

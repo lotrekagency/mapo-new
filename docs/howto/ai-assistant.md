@@ -21,7 +21,7 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 8 tools, 4 resources, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 9 tools, 4 resources, 5 prompts, 1 handler
 ```
 
 The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
@@ -146,6 +146,17 @@ accept").
 **Start from the recipes.** `mapo_list_recipes` with no argument is the fastest
 way to learn what Mapo already does, before designing something Mapo ships out
 of the box.
+
+**Use the slash-commands.** If your client supports MCP prompts, `/mapo-crud-page`,
+`/mapo-custom-field`, `/mapo-debug-form`, `/mapo-migrate-v1` and `/mapo-theme`
+drive the assistant through the right sequence of tools instead of letting it
+improvise one.
+
+**Let it scaffold.** `mapo_scaffold` writes code that matches the framework's
+patterns, and only when you ask: it shows the files first, and `write: true`
+never replaces anything without `overwrite: true`. Restart the dev server after
+new pages appear — Nuxt's server-side router needs it before a new route
+answers.
 
 **Add a project rule.** Some clients ignore the server's `instructions`. A line
 in `CLAUDE.md` / `.cursorrules` / project instructions goes a long way:

@@ -35,7 +35,7 @@ Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
 startup log announces it:
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 8 tools, 4 resources, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 9 tools, 4 resources, 5 prompts, 1 handler
 ```
 
 Then point your editor at it — see
@@ -98,7 +98,8 @@ export default defineNuxtConfig({
 ## Tools
 
 All tools are prefixed `mapo_` so they stay unambiguous when several MCP servers
-are connected, and all are annotated read-only.
+are connected. Every one is annotated read-only except `mapo_scaffold`, which
+can create files and declares it.
 
 | Tool                    | Purpose                                                                                                                                                                                               |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,6 +128,45 @@ declared 17. Ask them whenever you are unsure about a prop, a slot or an
 `attrs` key.
 :::
 
+## Scaffolding
+
+`mapo_scaffold` is the only tool that writes. Nine kinds: `list-page`,
+`detail-page`, `standalone-form`, `custom-field`, `login-page`,
+`theme-override`, `backend-proxy`, `menu-page`, `media-page`.
+
+```
+mapo_scaffold({
+  kind: "detail-page",
+  name: "articles",
+  fields: ["title:text:Title", "body:editor:Content", "status:select:Status"],
+})
+```
+
+Field types are validated against the registry: an unknown `type` fails with
+the list of real ones instead of generating a descriptor that renders nothing.
+
+::: warning Writing is opt-in and guarded
+Nothing touches disk until `write: true`. Even then the write happens only in
+development, only inside the project root (symlinks resolved), and never
+replaces an existing file unless `overwrite: true`.
+:::
+
+After scaffolding new pages, **restart the dev server**: Nuxt hot-reloads
+`routes.mjs`, but the server-side router keeps the previous table and a
+brand-new route answers 404 until it restarts.
+
+## Prompts
+
+Clients that support MCP prompts expose these as slash-commands:
+
+| Prompt              | What it drives                                                              |
+| ------------------- | --------------------------------------------------------------------------- |
+| `mapo-crud-page`    | inspect the app → pick field types → scaffold list + detail → check APIs    |
+| `mapo-custom-field` | rule out built-in types → read the registry contract → scaffold → implement |
+| `mapo-debug-form`   | doctor → inspect registered types → compare `attrs` → search the docs       |
+| `mapo-migrate-v1`   | read the migration page, then verify every symbol against installed source  |
+| `mapo-theme`        | pick the lightest layer: tokens → override file → slots → MapoOverride      |
+
 ## Resources
 
 For clients that support MCP resources:
@@ -145,7 +185,7 @@ forwards the call to `http://localhost:3000/mcp/mapo` (override with `--app` or
 `MAPO_MCP_APP_URL`) and, when the dev server is down, explains how to start it.
 :::
 
-Still to come — scaffolding and Django/DRF schema → `FieldDescriptor` mapping.
+Still to come — Django/DRF schema → `FieldDescriptor` mapping.
 
 ## How it works
 
@@ -165,8 +205,9 @@ Still to come — scaffolding and Django/DRF schema → `FieldDescriptor` mappin
   key names, never values.
 - Backend credentials are read from the environment and never included in tool
   output.
-- Every shipped tool is read-only. When scaffolding lands, writing will be
-  opt-in, development-only and confined to the project root.
+- Every tool is read-only except `mapo_scaffold`, whose writing is opt-in,
+  development-only, confined to the project root and unable to replace an
+  existing file without `overwrite: true`.
 
 ## Troubleshooting
 

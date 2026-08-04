@@ -20,6 +20,8 @@ recipes**, and — when the dev server is running — **introspection of the act
 - [Quick start](#quick-start)
 - [Connecting your IDE](#connecting-your-ide)
 - [Tools](#tools)
+- [Prompts](#prompts)
+- [Resources](#resources)
 - [Recipes](#recipes)
 - [Configuration](#configuration)
 - [Security model](#security-model)
@@ -160,8 +162,9 @@ the live app.
 
 ## Tools
 
-Every tool is prefixed `mapo_` so it stays unambiguous when several MCP servers are connected, and
-is annotated `readOnlyHint: true`, `destructiveHint: false`.
+Every tool is prefixed `mapo_` so it stays unambiguous when several MCP servers are connected. All
+are annotated `readOnlyHint: true` except `mapo_scaffold`, which can create files and says so — no
+tool is ever `destructiveHint`, because nothing here deletes or replaces without an explicit flag.
 
 | Tool                    | What it does                                                                                                                                                                                                                                                                                                                       |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,6 +193,38 @@ while the component declared 17. Prose drifts; source does not.
 them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL`),
 reconnecting on every call because the dev server routinely starts after the editor. When it is
 down they explain how to bring it up instead of guessing.
+
+### Scaffolding
+
+`mapo_scaffold` is the only tool that can change the project, so its contract is deliberately
+narrow:
+
+- **Dry run by default.** It returns the files; nothing touches disk until `write: true`.
+- **Field types are validated against the registry.** `fields: ["title:text", "body:wysiwyg"]`
+  fails with the list of real types rather than emitting a descriptor that renders nothing.
+- **Writing is guarded** by [`write.ts`](src/runtime/core/write.ts): development only, paths
+  resolved and proven to stay inside the project root (symlinks followed), and an existing file is
+  never replaced without `overwrite: true`. Each file reports its own outcome instead of the batch
+  aborting halfway.
+- The generated pages are modelled on the recipes in `docs/howto/` and on the pages that actually
+  run in `apps/example-e2e`, and are verified end to end: a scaffolded list page renders in the
+  example app unmodified.
+
+After scaffolding new pages, **restart the dev server**: Nuxt hot-reloads `routes.mjs` but the
+server-side router keeps the old table, so a brand-new route 404s until it restarts.
+
+## Prompts
+
+Slash-commands in clients that support MCP prompts. Each one names the tools to call and their
+order, which is the part a model improvises worst:
+
+| Prompt              | Workflow                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `mapo-crud-page`    | inspect the app → pick field types → scaffold list + detail → check component APIs |
+| `mapo-custom-field` | check no built-in type fits → read the registry contract → scaffold → implement    |
+| `mapo-debug-form`   | doctor → inspect registered types → compare `attrs` → search the docs              |
+| `mapo-migrate-v1`   | read the migration page → verify every symbol against the installed source         |
+| `mapo-theme`        | pick the lightest layer: tokens → scaffold override → slots → MapoOverride         |
 
 ## Resources
 
@@ -361,11 +396,13 @@ src/
 │   ├── extract-fields.ts        # registry + descriptor interfaces
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes, doctor, tools
+    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes,
+    │                            #   doctor, scaffold/, write guard, prompts, tools
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
-    │   └── to-mcp-tool.ts       # spec → defineMcpTool
-    ├── mcp/handlers/mapo/       # the named handler, its tools and resources — scanned by the toolkit
+    │   ├── to-mcp-tool.ts       # spec → defineMcpTool
+    │   └── to-mcp-prompt.ts     # spec → defineMcpPrompt
+    ├── mcp/handlers/mapo/       # the named handler with its tools, resources and prompts
     └── types/                   # virtual module declarations
 ```
 
@@ -404,9 +441,10 @@ components under `src/runtime/components/` of `uikit` and `form` are extracted.
 ## Status
 
 Shipped: documentation search with curated recipes, page retrieval, component/field/composable APIs
-extracted from source, live app introspection and diagnostics, MCP resources, the dev-only Nuxt
-module with its namespaced handler, and the stdio CLI with transparent forwarding of the live tools.
+extracted from source, live app introspection and diagnostics, guarded scaffolding, MCP resources
+and prompts, the dev-only Nuxt module with its namespaced handler, and the stdio CLI with
+transparent forwarding of the live tools.
 
-Planned, in this order (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-`mapo_scaffold` with opt-in writing · `mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · MCP
-prompts · `mapo-mcp install` / Agent Skill / MCP App inspector.
+Planned (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
+`mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · `mapo-mcp install` / Agent Skill / MCP App
+inspector.

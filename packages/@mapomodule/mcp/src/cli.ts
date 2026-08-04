@@ -29,6 +29,8 @@ import {
 import { apiTools } from "./runtime/core/tools/api.js";
 import { appTools } from "./runtime/core/tools/app.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
+import { scaffoldTools } from "./runtime/core/tools/scaffold.js";
+import { PROMPTS } from "./runtime/core/prompts.js";
 import {
   loadApiKnowledge,
   loadDocsKnowledge,
@@ -56,10 +58,13 @@ export const DEFAULT_APP_URL = "http://localhost:3000/mcp/mapo";
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
-  return [...docsTools, ...apiTools];
+  return [...docsTools, ...apiTools, ...scaffoldTools];
 }
 
-function createToolContext(knowledgeDir: string | null): MapoToolContext {
+function createToolContext(
+  knowledgeDir: string | null,
+  rootDir: string,
+): MapoToolContext {
   let docs: DocsKnowledge | null = null;
   let api: ApiKnowledge | null = null;
   return {
@@ -67,6 +72,11 @@ function createToolContext(knowledgeDir: string | null): MapoToolContext {
     api: () => (api ??= loadApiKnowledge(knowledgeDir)),
     // The CLI has no app of its own; live tools are forwarded instead.
     manifest: () => null,
+    // The editor spawns this process inside the project, so the working
+    // directory is the project — reported back on every write so a wrong root
+    // is visible immediately.
+    rootDir: () => rootDir,
+    canWrite: () => true,
   };
 }
 
@@ -122,6 +132,7 @@ function createAppProxy(appUrl: string) {
 export async function createStdioServer(
   knowledgeDir: string | null,
   appUrl: string = DEFAULT_APP_URL,
+  rootDir: string = process.cwd(),
 ): Promise<McpServer> {
   const server = new McpServer(
     { name: "mapo", version: readVersion() },
@@ -135,7 +146,7 @@ export async function createStdioServer(
     },
   );
 
-  const context = createToolContext(knowledgeDir);
+  const context = createToolContext(knowledgeDir, rootDir);
 
   for (const spec of staticTools()) {
     server.registerTool(
@@ -183,7 +194,35 @@ export async function createStdioServer(
   }
 
   registerResources(server, context);
+  registerPrompts(server);
   return server;
+}
+
+/** The same slash-commands the Nuxt handler exposes. */
+function registerPrompts(server: McpServer): void {
+  for (const prompt of PROMPTS) {
+    server.registerPrompt(
+      prompt.name,
+      {
+        title: prompt.title,
+        description: prompt.description,
+        argsSchema: prompt.argsSchema,
+      },
+      // Same widening as the Nitro adapter: the SDK infers `unknown` from a
+      // generic shape, and zod has already validated the arguments.
+      (args: Record<string, unknown>) => ({
+        messages: [
+          {
+            role: "user" as const,
+            content: {
+              type: "text" as const,
+              text: prompt.render(args as Record<string, string | undefined>),
+            },
+          },
+        ],
+      }),
+    );
+  }
 }
 
 /**
@@ -264,6 +303,11 @@ const serve = defineCommand({
       type: "string",
       description: `MCP endpoint of the running app, for the live tools (default ${DEFAULT_APP_URL})`,
     },
+    root: {
+      type: "string",
+      description:
+        "Project root for scaffolding (default: the working directory)",
+    },
   },
   async run({ args }) {
     const knowledgeDir = args.knowledge
@@ -281,7 +325,8 @@ const serve = defineCommand({
       args.app ?? process.env.MAPO_MCP_APP_URL ?? DEFAULT_APP_URL,
     );
 
-    const server = await createStdioServer(knowledgeDir, appUrl);
+    const rootDir = String(args.root ?? process.cwd());
+    const server = await createStdioServer(knowledgeDir, appUrl, rootDir);
     await server.connect(new StdioServerTransport());
     console.error(
       `[mapo-mcp] ready on stdio (${staticTools().length} tools, ` +

@@ -52,6 +52,7 @@ describeBuilt("mapo-mcp stdio server", () => {
       "mapo_inspect_app",
       "mapo_list_field_types",
       "mapo_list_recipes",
+      "mapo_scaffold",
       "mapo_search_docs",
     ]);
   });
