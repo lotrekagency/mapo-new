@@ -1,3 +1,9 @@
+# @mapomodule/form [2.0.0-beta.7](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.6...@mapomodule/form@2.0.0-beta.7) (2026-08-27)
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.1
+
 # @mapomodule/form [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.5...@mapomodule/form@2.0.0-beta.6) (2026-08-27)
 
 ### Bug Fixes
