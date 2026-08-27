@@ -1,3 +1,9 @@
+# @mapomodule/utils [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.2...@mapomodule/utils@2.0.0-beta.3) (2026-08-27)
+
+### Bug Fixes
+
+- **uikit,form,utils:** resolve the router through Nuxt, not vue-router ([bf4aeb3](https://github.com/lotrekagency/mapo-new/commit/bf4aeb3d6fa4edad7b761cdb5f354152f74f603f))
+
 # @mapomodule/utils [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.1...@mapomodule/utils@2.0.0-beta.2) (2026-07-23)
 
 ### Features
