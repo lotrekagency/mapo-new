@@ -34,7 +34,6 @@
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
     "build": "nuxt-module-build build",
-    "prepack": "pnpm build",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"

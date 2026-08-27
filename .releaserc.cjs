@@ -19,6 +19,21 @@ const analysisPlugins = [
 const publishPlugins = [
   ["@semantic-release/changelog", { changelogFile: "CHANGELOG.md" }],
   "@semantic-release/npm",
+  // Each package is built here rather than from its own `prepack` script.
+  // multi-semantic-release serializes the `prepare` step — a package holds the
+  // baton from the start of `prepare` until its own `publish` begins — but runs
+  // `publish` concurrently. A build in prepack therefore ran alongside sibling
+  // publishes, and `nuxt-module-build` cleans dist/ before rebuilding, so uikit's
+  // vue-tsc could resolve `@mapomodule/form/types` against a dist that form had
+  // just deleted (TS7016, and a cascade of implicit-any errors behind it).
+  //
+  // Two further benefits of `prepare` over `prepack`:
+  //  - it runs after @semantic-release/npm has written the released version into
+  //    package.json, so dist/module.json is stamped with the right version;
+  //  - it runs BEFORE the git tag is created and the changelog is pushed, so a
+  //    build failure aborts cleanly instead of leaving tags for versions that
+  //    never reached npm.
+  ["@semantic-release/exec", { prepareCmd: "pnpm build" }],
   [
     "@semantic-release/git",
     {

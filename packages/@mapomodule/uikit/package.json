@@ -40,7 +40,6 @@
   "scripts": {
     "build": "nuxt-module-build build && vue-tsc -p tsconfig.build-types.json && node ../../../scripts/clean-empty-vue-dts.mjs dist",
     "dev": "nuxt-module-build build --stub --watch",
-    "prepack": "pnpm build",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src"
