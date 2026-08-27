@@ -50,12 +50,14 @@ export default defineNuxtModule<CamomillaOptions>({
       handler: resolver.resolve("./runtime/server/middleware/proxy"),
     });
 
-    // Client plugin: override $mapoMediaAdapter with Camomilla's dialect.
-    // High order so it wins over the default adapter from @mapomodule/uikit.
+    // Client plugin: provide $mapoMediaAdapter speaking Camomilla's dialect.
+    // Ordered BEFORE the uikit fallback plugin (order 5): the first provider
+    // wins — Nuxt provides are non-configurable getters, so the uikit plugin
+    // skips its default when an adapter is already registered.
     if (options.mediaAdapter !== false) {
       addPlugin({
         src: resolver.resolve("./runtime/plugins/media-adapter"),
-        order: 20,
+        order: 4,
       });
     }
   },

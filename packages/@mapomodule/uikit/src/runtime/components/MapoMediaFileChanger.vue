@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
 import type { MediaItem } from "../types/media.js";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   media: MediaItem;
@@ -66,7 +69,9 @@ function onMaintainUrlChange(v: boolean | "indeterminate") {
 
 <template>
   <div class="mapo-media-file-changer space-y-2">
-    <p class="text-xs font-medium text-muted">Replace file</p>
+    <p class="text-xs font-medium text-muted">
+      {{ t("mapo.mediaFileChanger.replaceFile") }}
+    </p>
 
     <MapoDropArea
       :accept="acceptTypes"
@@ -115,7 +120,7 @@ function onMaintainUrlChange(v: boolean | "indeterminate") {
             class="flex flex-1 items-center gap-2 text-sm text-dimmed"
           >
             <UIcon name="i-lucide-upload" class="size-5" />
-            <span>Drag or click to choose a file</span>
+            <span>{{ t("mapo.mediaFileChanger.dragOrClick") }}</span>
           </div>
         </div>
       </template>
@@ -124,7 +129,7 @@ function onMaintainUrlChange(v: boolean | "indeterminate") {
     <UCheckbox
       v-if="newFile"
       :model-value="maintainUrl"
-      label="Keep current URL"
+      :label="t('mapo.mediaFileChanger.keepUrl')"
       @update:model-value="onMaintainUrlChange"
     />
   </div>

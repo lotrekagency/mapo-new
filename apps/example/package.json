@@ -15,7 +15,7 @@
     "@nuxt/ui": "^4.7.0",
     "mapo-integrations-camomilla": "workspace:*",
     "mapomodule": "workspace:*",
-    "nuxt": "^4.4.2",
-    "vue": "^3.5.32"
+    "nuxt": "^4.5.1",
+    "vue": "^3.5.40"
   }
 }

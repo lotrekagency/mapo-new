@@ -1,0 +1,261 @@
+{
+  "mapo": {
+    "cancel": "Annulla",
+    "save": "Salva",
+    "apply": "Applica",
+    "confirm": "Conferma",
+    "ok": "OK",
+    "close": "Chiudi",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "add": "Aggiungi",
+    "remove": "Rimuovi",
+    "clear": "Svuota",
+    "expand": "Espandi",
+    "collapse": "Comprimi",
+    "search": "Cerca...",
+    "create": "Crea",
+    "new": "Nuovo",
+    "createContinue": "Crea e continua",
+    "saveContinue": "Salva e continua",
+    "back": "Indietro",
+    "leave": "Esci",
+    "preview": "Anteprima",
+    "refresh": "Aggiorna",
+    "select": "Seleziona",
+    "change": "Cambia",
+    "duplicate": "Duplica",
+    "restore": "Ripristina",
+    "discard": "Scarta",
+    "loading": "Caricamento...",
+    "genericError": "Qualcosa è andato storto, riprova più tardi...",
+    "saveSuccess": "Elemento salvato con successo!",
+    "createSuccess": "Elemento creato con successo!",
+    "deleteSuccess": "Elemento eliminato con successo!",
+    "saveError": "Salvataggio non riuscito",
+    "deleteError": "Eliminazione non riuscita",
+    "loadError": "Caricamento dati non riuscito",
+    "loadItemError": "Caricamento elemento non riuscito",
+    "fixErrors": "Correggi gli errori prima di salvare.",
+    "confirmDelete": "Vuoi veramente eliminare questo elemento?",
+    "unsavedData": "Modifiche non salvate",
+    "confirmLeaveChanges": "Ci sono modifiche non salvate. Vuoi uscire senza salvare?",
+    "fetchingData": "Caricamento in corso...",
+    "login": {
+      "welcome": "Benvenuto in Mapo",
+      "subtitle": "Inserisci le tue credenziali per continuare",
+      "tagline": "Un framework admin moderno costruito su Nuxt 4, Pinia e Nuxt UI v4.",
+      "invalidCredentials": "Credenziali non valide. Riprova."
+    },
+    "logout": "Esci",
+    "signIn": "Accedi",
+    "username": "Nome utente",
+    "password": "Password",
+    "name": "Nome",
+    "title": "Titolo",
+    "description": "Descrizione",
+    "mime": "Tipo MIME",
+    "fileName": "Nome file",
+    "file": "File",
+    "folder": "Cartella",
+    "created": "Creato il",
+    "size": "Dimensioni",
+    "altTag": "Testo alternativo",
+    "url": "URL",
+    "linkedModels": "Modelli collegati",
+    "latitude": "Latitudine",
+    "longitude": "Longitudine",
+    "language": "Lingua",
+    "index": {
+      "welcomeMessage": "Congratulazioni!! 🥳 Mapo è stato installato correttamente!"
+    },
+    "themeToggle": {
+      "light": "Passa al tema chiaro",
+      "dark": "Passa al tema scuro"
+    },
+    "confirmDialog": {
+      "areYouSure": "Sei sicuro di ciò che stai facendo?"
+    },
+    "dropArea": {
+      "dropOrClick": "Trascina qui i tuoi file, o clicca per selezionarli.",
+      "dropHere": "Trascina qui",
+      "onlyOneFile": "È possibile caricare un solo file alla volta..."
+    },
+    "detail": {
+      "deleteQuestion": "Vuoi veramente eliminare questo elemento? Questa azione non può essere annullata.",
+      "draftFound": "È presente una bozza locale non salvata. Vuoi ripristinarla o scartarla?",
+      "draftSavedAt": "Bozza non salvata trovata — ultima modifica {date}"
+    },
+    "form": {
+      "required": "Questo campo è obbligatorio.",
+      "tabErrors": "Questa scheda contiene errori"
+    },
+    "fksField": {
+      "searchSelect": "Cerca e seleziona...",
+      "noResults": "Nessun risultato trovato",
+      "noItems": "Nessun elemento disponibile"
+    },
+    "dateField": {
+      "selectDate": "Seleziona data",
+      "selectDateTime": "Seleziona data e ora"
+    },
+    "fileField": {
+      "removeFile": "Rimuovi file"
+    },
+    "mediaField": {
+      "selectMedia": "Seleziona media"
+    },
+    "mediaM2MField": {
+      "addMedia": "Aggiungi media"
+    },
+    "enhancedMediaField": {
+      "altText": "Testo alternativo",
+      "caption": "Didascalia"
+    },
+    "repeater": {
+      "repeater": "Repeater",
+      "nItems": "{n} elemento | {n} elementi",
+      "nSelected": "{n} selezionati",
+      "all": "Tutti",
+      "collapseAll": "Comprimi tutti",
+      "expandAll": "Espandi tutti",
+      "deleteItem": "Elimina elemento",
+      "deleteItems": "Elimina elementi",
+      "confirmBulkDelete": "Eliminare {count} elementi selezionati?",
+      "actionBlocked": "Azione bloccata",
+      "minItemsBlock": "Impossibile eliminare: devono rimanere almeno {min} elementi.",
+      "undoLastAction": "Annulla ultima azione",
+      "bulkSelection": "Selezione multipla",
+      "exitSelection": "Esci dalla selezione",
+      "duplicateSelected": "Duplica selezionati",
+      "duplicateLimited": "Solo {slots} di {count} possono essere duplicati (raggiunto maxItems)",
+      "moveToTop": "Sposta in cima",
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù",
+      "position": "Posizione",
+      "editFullScreen": "Modifica a schermo intero",
+      "empty": "Nessun elemento. Clicca \"Aggiungi\" per iniziare."
+    },
+    "seoPreview": {
+      "seoTitle": "Titolo SEO",
+      "metaDescription": "Meta descrizione",
+      "googlePreview": "Anteprima Google",
+      "titlePlaceholder": "Titolo della pagina...",
+      "descriptionPlaceholder": "Descrizione della pagina...",
+      "defaultTitle": "Titolo della pagina",
+      "defaultDescription": "Descrizione della pagina che apparirà nei risultati di ricerca di Google."
+    },
+    "wygEditor": {
+      "insertImage": "Inserisci immagine",
+      "requiresUikit": "Richiede {'@'}mapomodule/uikit"
+    },
+    "listActions": {
+      "bulkActions": "Azioni di gruppo...",
+      "permanentDelete": "Eliminazione permanente",
+      "confirmBulk": "Questa azione verrà applicata a tutti gli elementi. Vuoi continuare?",
+      "confirmBulkCount": "Questa azione verrà applicata a {count} elementi. Vuoi continuare?",
+      "actionCompleted": "Azione completata",
+      "actionFailed": "Azione non riuscita"
+    },
+    "listFilters": {
+      "filters": "Filtri",
+      "clearAll": "Rimuovi tutti"
+    },
+    "listQuickEdit": {
+      "newItem": "Nuovo elemento"
+    },
+    "listTable": {
+      "deleteItemTitle": "Elimina elemento",
+      "itemDeleted": "Elemento eliminato",
+      "deleteItemError": "Eliminazione elemento non riuscita",
+      "orderSaved": "Ordinamento salvato",
+      "orderError": "Riordinamento non riuscito",
+      "selectAllRows": "Seleziona tutte le righe",
+      "selectRow": "Seleziona riga",
+      "dragToReorder": "Trascina per riordinare",
+      "clearToReorder": "Svuota ricerca e ordinamento per riordinare",
+      "noItems": "Nessun elemento trovato",
+      "totalItems": "{total} elementi",
+      "perPage": "{n} / pagina"
+    },
+    "menuManager": {
+      "menu": "Menu",
+      "noSelectedNode": "Seleziona un nodo da modificare o creane uno nuovo."
+    },
+    "menuTreeview": {
+      "newNode": "Crea nodo",
+      "noRootNodes": "Non c'è nessun nodo qui. Creane uno nuovo!",
+      "deleteTitle": "Elimina nodo",
+      "areYouSureDelete": "Sei sicuro di voler eliminare questo nodo e tutti i suoi discendenti?",
+      "maxDepthReached": "Raggiunta la profondità massima di annidamento ({max} livelli)"
+    },
+    "menuNodeEditor": {
+      "editNode": "Nodo",
+      "title": "Titolo",
+      "linkTypeLabel": "Tipo di link",
+      "styleLabel": "Stile",
+      "openInNewTabLabel": "Apri in una nuova finestra",
+      "relContentTypeLabel": "Tipo di pagina",
+      "relPageIdLabel": "Pagina",
+      "staticLabel": "URL statico",
+      "relational": "Relazionale",
+      "static": "Statico",
+      "nodeErrors": "Questo nodo contiene errori"
+    },
+    "mediaEditor": {
+      "details": "Dettagli",
+      "defaultLang": "Predefinita",
+      "openInNewTab": "Apri in una nuova scheda",
+      "confirmDelete": "Vuoi veramente eliminare \"{name}\"?"
+    },
+    "mediaFileChanger": {
+      "replaceFile": "Sostituisci file",
+      "dragOrClick": "Trascina o clicca per scegliere un file",
+      "keepUrl": "Mantieni URL attuale"
+    },
+    "mediaFolders": {
+      "folders": "Cartelle",
+      "goBack": "Torna alla radice",
+      "noFolders": "Non sono presenti cartelle... Creane una!",
+      "newFolder": "Nuova cartella",
+      "folderName": "Nome cartella",
+      "allFolder": "Tutti",
+      "imageFolder": "Immagini",
+      "videoFolder": "Video",
+      "audioFolder": "Audio",
+      "docFolder": "Documenti",
+      "deleteTitle": "Elimina cartella",
+      "confirmDelete": "Eliminare la cartella \"{name}\"? I media al suo interno non verranno eliminati."
+    },
+    "mediaGallery": {
+      "noMediaFound": "Nessun media trovato",
+      "selectAll": "Seleziona pagina",
+      "deselectAll": "Deseleziona pagina",
+      "nSelected": "{number} selezionati",
+      "deleteTitle": "Elimina media selezionati",
+      "deleteSelectedLabel": "Elimina selezionati",
+      "deleteSelected": "Stai per eliminare {number} elementi. Vuoi continuare?",
+      "deleteSuccess": "{number} elementi eliminati!"
+    },
+    "mediaManager": {
+      "root": "Media",
+      "gallery": "Galleria",
+      "uploader": "Caricamento",
+      "fileInfo": "Media aggiornato",
+      "deleteTitle": "Elimina media",
+      "selectMedia": "Seleziona media",
+      "selectAMedia": "Seleziona un media"
+    },
+    "mediaUploader": {
+      "dragHere": "Trascina qui i file oppure",
+      "browse": "sfoglia",
+      "limits": "Immagini fino a {img} MB · Video fino a {vid} MB",
+      "nSelected": "{n} file selezionato | {n} file selezionati",
+      "uploadCta": "Carica {n} file | Carica {n} file",
+      "uploaded": "Caricato",
+      "uploadFailed": "Caricamento non riuscito",
+      "fileTooLarge": "File \"{name}\" troppo grande (max {max} MB)",
+      "success": "{numberFiles} file caricati con successo"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { MediaM2mDescriptor, MediaItem } from "../../types/index.js";
 import { useMediaManager } from "../../composables/useMediaManager.js";
 
@@ -14,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:modelValue": [value: MediaItem[]];
 }>();
+
+const { t } = useI18n();
 
 const dialogOpen = ref(false);
 
@@ -101,7 +104,11 @@ function onDragEnd() {
         color="neutral"
         @click="dialogOpen = true"
       >
-        {{ current.length > 0 ? "Add media" : "Select media" }}
+        {{
+          current.length > 0
+            ? t("mapo.mediaM2MField.addMedia")
+            : t("mapo.mediaField.selectMedia")
+        }}
       </UButton>
 
       <!-- Dialog -->

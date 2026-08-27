@@ -6,6 +6,7 @@ import {
   today,
   getLocalTimeZone,
 } from "@internationalized/date";
+import { useI18n } from "vue-i18n";
 import type { DateDescriptor } from "../../types/index.js";
 
 /** Datetime field with configurable naive/UTC serialisation semantics. */
@@ -19,6 +20,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "update:modelValue": [value: string | null] }>();
 
+const { t } = useI18n();
 const open = ref(false);
 
 // Timezone strategy configurable through `descriptor.attrs.tz`:
@@ -72,7 +74,7 @@ function emitFromCalendar(v: CalendarDateTime) {
 // Displayed label in the trigger button
 const displayLabel = computed(() => {
   const v = calendarValue.value;
-  if (!v) return "Select date and time";
+  if (!v) return t("mapo.dateField.selectDateTime");
   const date = `${String(v.day).padStart(2, "0")}/${String(v.month).padStart(2, "0")}/${v.year}`;
   const time = `${String(v.hour).padStart(2, "0")}:${String(v.minute).padStart(2, "0")}`;
   return `${date} ${time}`;

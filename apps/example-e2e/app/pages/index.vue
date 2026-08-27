@@ -90,6 +90,17 @@ const sections = [
     ],
   },
   {
+    title: "i18n",
+    icon: "i-lucide-languages",
+    items: [
+      {
+        label: "UI translations",
+        to: "/i18n",
+        desc: "LangSwitcher, setLocale, app overrides, plurals, useMapoT",
+      },
+    ],
+  },
+  {
     title: "Auth & Middleware",
     icon: "i-lucide-shield",
     items: [

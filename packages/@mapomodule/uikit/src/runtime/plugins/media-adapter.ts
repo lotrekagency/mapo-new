@@ -1,10 +1,13 @@
 /**
  * Provides the global `$mapoMediaAdapter`, defaulting to plain REST semantics.
  *
- * Integrations (e.g. Camomilla) register their own plugin ordered AFTER this one
- * that overrides `$mapoMediaAdapter` (or merges specific methods) to remap
- * request params / normalize responses. Functions are not serializable through
- * `runtimeConfig`, so this mirrors the `$mapoFormRegistry` pattern.
+ * Integrations (e.g. Camomilla) register their own plugin ordered BEFORE this
+ * one; the first provider wins because Nuxt `provide` getters are
+ * non-configurable — redefining one throws `Cannot redefine property` in SSR.
+ * This plugin therefore only fills the gap when no integration registered an
+ * adapter. Consumers of the adapter fall back to `defaultMediaAdapter`
+ * method-by-method, so partial adapters are fine. Functions are not
+ * serializable through `runtimeConfig`, hence the plugin-injection pattern.
  */
 import { defineNuxtPlugin } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
@@ -22,7 +25,8 @@ declare module "vue" {
   }
 }
 
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin((nuxtApp) => {
+  if ("$mapoMediaAdapter" in nuxtApp) return;
   return {
     provide: { mapoMediaAdapter: defaultMediaAdapter },
   };

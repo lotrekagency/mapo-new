@@ -1,11 +1,35 @@
-import type { RouteRecordNormalized, RouteMeta } from "vue-router";
+/**
+ * Structural stand-ins for `vue-router`'s `RouteMeta` / `RouteRecordNormalized`.
+ *
+ * These are deliberately *not* imported from `vue-router`. `vue-router` declares
+ * `vite`, `pinia` and `@vue/compiler-sfc` as optional peers, so pnpm hands each
+ * workspace package whose dependency set differs its own instance of the same
+ * version — and TypeScript treats two instances as unrelated nominal types.
+ * Typing the public signatures against `vue-router` therefore broke every call
+ * crossing a package boundary (`uikit` passing `router.getRoutes()` here).
+ * Matching the shape structurally keeps those calls valid whichever instance the
+ * caller resolves, and keeps this package free of Vue/Nuxt dependencies.
+ */
+export type MenuRouteMeta = Record<PropertyKey, unknown> & {
+  label?: string;
+  icon?: string;
+  hidden?: boolean;
+  parent?: string;
+  sidebarFooter?: boolean;
+};
+
+/** Structural subset of `RouteRecordNormalized` used to build the menu. */
+export interface MenuRouteRecord {
+  path: string;
+  meta?: MenuRouteMeta;
+}
 
 export interface MenuNode {
   link: string;
   label: string;
   icon: string;
   children: MenuNode[];
-  meta: RouteMeta;
+  meta: MenuRouteMeta;
   sidebarFooter: boolean;
 }
 
@@ -31,7 +55,7 @@ export function calcMaxMenuNestDepth(nodes: MenuNode[], depth = 1): number {
  * @param routes Flat list of normalized router records.
  * @returns Root menu nodes with nested children.
  */
-export function buildRouteTree(routes: RouteRecordNormalized[]): MenuNode[] {
+export function buildRouteTree(routes: MenuRouteRecord[]): MenuNode[] {
   const nodeMap = new Map<string, MenuNode>();
 
   for (const route of routes) {

@@ -41,7 +41,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "vue": "^3.5.32",
-    "vue-router": "^5.0.4"
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0"
   }
 }

@@ -8,10 +8,12 @@
  *   - folder reads    → normalized back to the canonical `{ name, parent, path }`
  *   - file replace    → `same_url` instead of `maintain_url`
  *
- * Registered AFTER the uikit adapter plugin so this one wins. The structural
- * types below avoid a hard dependency on @mapomodule/uikit (this package is
- * intentionally standalone — same reason slugify is inlined instead of
- * imported from @mapomodule/utils).
+ * Registered BEFORE the uikit fallback plugin: the first `provide` wins (Nuxt
+ * provides are non-configurable getters), so uikit skips its default when this
+ * adapter is present. Mapo consumers fall back to the default adapter for any
+ * method not implemented here. The structural types below avoid a hard
+ * dependency on @mapomodule/uikit (this package is intentionally standalone —
+ * same reason slugify is inlined instead of imported from @mapomodule/utils).
  */
 import { defineNuxtPlugin } from "nuxt/app";
 

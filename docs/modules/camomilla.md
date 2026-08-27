@@ -45,6 +45,7 @@ export default defineNuxtConfig({
 | `syncCamomillaSession` | `boolean`               | `false`                   | Enable SSO between Mapo and Django admin — see below  |
 | `forwardedHeaders`     | `string[]`              | `[]`                      | Additional request headers to forward to the backend  |
 | `pathRewrite`          | `Record<string,string>` | `{}`                      | Custom path rewrites merged after the built-in ones   |
+| `skipPaths`            | `string[]`              | `[]`                      | Extra `/api/*` prefixes the proxy must not intercept  |
 | `mediaAdapter`         | `boolean`               | `true`                    | Register the Camomilla media adapter — see below      |
 
 ## Media adapter
@@ -80,7 +81,14 @@ This prevents requests like `/api/profiles/me/` from being rewritten to `/api/ca
 | `/api/profiles/me`   | `/api/camomilla/users/current/` |
 | `/api/media-folders` | `/api/camomilla/media-folders`  |
 | `/api/media`         | `/api/camomilla/media`          |
+| `/api/menus`         | `/api/camomilla/menus`          |
 | `/api/<anything>`    | `/api/<anything>`               |
+
+The `menus` rewrite covers the sub-resources the [Menu Manager](/uikit/menu-manager) calls too — `/api/menus/12` and `/api/menus/page_types` land on `/api/camomilla/menus/12` and `/api/camomilla/menus/page_types`. Point the component at the Mapo-side path:
+
+```vue
+<MapoMenuManager endpoint="/api/menus" :identifier="id" />
+```
 
 Custom rewrites are merged **after** the defaults, so you can extend but not break the built-in mapping:
 
@@ -92,6 +100,32 @@ camomilla: {
   }
 }
 ```
+
+## Paths the proxy leaves alone
+
+Only `/api/*` requests are intercepted, and two prefixes are always excluded so the Nuxt app can serve them itself:
+
+- `/api/_nuxt_icon` — the icon server bundle
+- `/api/mock` — the convention used by the example apps for local mocks
+
+Add your own with `skipPaths`; the values **extend** the built-ins rather than replacing them, so you cannot accidentally start proxying Nuxt internals:
+
+```ts
+camomilla: {
+  server: 'http://localhost:8000',
+  skipPaths: ['/api/webhooks', '/api/og-image'],
+}
+```
+
+Any request whose path starts with one of these prefixes is handled by your own `server/api/**` route.
+
+## Response headers
+
+The proxy forwards the backend's status and headers, with the exception of:
+
+- `content-encoding` and `content-length` — `fetch` transparently decompresses the upstream body, so forwarding the original values would make the browser try to decode already-decoded bytes. Nitro recomputes both when it sends the response.
+- `set-cookie` — handled separately by the [cookie logic](#cookie-and-session-handling) below.
+- `transfer-encoding`, `connection`, `keep-alive` — hop-by-hop headers that must not be proxied.
 
 ## Cookie and session handling
 

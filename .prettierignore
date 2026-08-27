@@ -2,3 +2,4 @@
 # which Prettier's Vue parser does not support
 apps/example-e2e/app/pages/form/slots.vue
 apps/example-e2e/app/pages/form/article/[id].vue
+pnpm-lock.yaml

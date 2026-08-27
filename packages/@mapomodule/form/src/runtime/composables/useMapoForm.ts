@@ -19,6 +19,7 @@ import type { AnyFieldDescriptor, FieldRegistry } from "../types/index.js";
 import { resolveFieldAccessor } from "../types/index.js";
 import { useCurrentLang } from "./useCurrentLang.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 
 /** Options accepted by `useMapoForm()`. */
@@ -121,6 +122,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
 
   const currentLang = useCurrentLang(currentLangProp);
   const snack = useSnackStore();
+  const t = useMapoT();
   const authStore = useAuthStore();
   const backup = ref(safeClone(model.value)) as Ref<T>;
   const clientErrors = ref<Record<string, string>>({});
@@ -318,7 +320,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   ): string | null {
     if (!descriptor.required) return null;
     if (val === null || val === undefined || val === "")
-      return "This field is required.";
+      return t("mapo.form.required");
     return null;
   }
 
@@ -379,7 +381,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     submitted.value = true;
     const { valid } = validateClient();
     if (!valid) {
-      snack.show("Please fix the errors before saving.", "error");
+      snack.show(t("mapo.fixErrors"), "error");
       return;
     }
     isLoading.value = true;

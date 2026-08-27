@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import type { MapDescriptor } from "../../types/index.js";
 
 // Leaflet is loaded only on the client because it is not SSR-safe.
 const LeafletMap = defineAsyncComponent(
   () => import("./MapoMapFieldClient.vue"),
 );
+
+const { t } = useI18n();
 
 /** Geographic coordinates stored by the map field. */
 interface LatLng {
@@ -63,7 +66,7 @@ function clear() {
     <div class="flex gap-2">
       <UInput
         v-model="latInput"
-        placeholder="Latitude"
+        :placeholder="t('mapo.latitude')"
         class="flex-1"
         :readonly="readonly"
         :disabled="disabled"
@@ -71,7 +74,7 @@ function clear() {
       />
       <UInput
         v-model="lngInput"
-        placeholder="Longitude"
+        :placeholder="t('mapo.longitude')"
         class="flex-1"
         :readonly="readonly"
         :disabled="disabled"

@@ -4,6 +4,7 @@ import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { normalizeEndpoint } from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
@@ -219,7 +220,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     const updated = await mediaCrud().partialUpdate(media.id, payload as never);
     // Keep the open editor in sync with the server response (legacy behavior).
     if (editMedia.value?.id === media.id) editMedia.value = updated;
-    useSnackStore().show("Media updated", "success");
+    useSnackStore().show(useMapoT()("mapo.mediaManager.fileInfo"), "success");
     await getRoot();
     return updated;
   }
@@ -258,10 +259,11 @@ export const useMediaStore = defineStore("mapo-media", () => {
   }
 
   async function deleteFolder(folder: MediaFolder): Promise<void> {
+    const t = useMapoT();
     const confirmed = await useConfirmStore().ask({
-      title: "Delete folder",
-      message: `Delete folder "${folder.name}"? Media inside it will not be deleted.`,
-      confirmText: "Delete",
+      title: t("mapo.mediaFolders.deleteTitle"),
+      message: t("mapo.mediaFolders.confirmDelete", { name: folder.name }),
+      confirmText: t("mapo.delete"),
       dangerous: true,
     });
     if (!confirmed) return;
@@ -270,10 +272,13 @@ export const useMediaStore = defineStore("mapo-media", () => {
   }
 
   async function deleteMedia(media: MediaItem): Promise<void> {
+    const t = useMapoT();
     const confirmed = await useConfirmStore().ask({
-      title: "Delete media",
-      message: `Delete "${media.title || media.file}"?`,
-      confirmText: "Delete",
+      title: t("mapo.mediaManager.deleteTitle"),
+      message: t("mapo.mediaEditor.confirmDelete", {
+        name: media.title || media.file,
+      }),
+      confirmText: t("mapo.delete"),
       dangerous: true,
     });
     if (!confirmed) return;
@@ -333,16 +338,20 @@ export const useMediaStore = defineStore("mapo-media", () => {
   async function deleteSelected(): Promise<void> {
     const count = editList.value.length;
     if (count === 0) return;
+    const t = useMapoT();
     const confirmed = await useConfirmStore().ask({
-      title: "Delete selected media",
-      message: `Delete ${count} selected media?`,
-      confirmText: `Delete ${count}`,
+      title: t("mapo.mediaGallery.deleteTitle"),
+      message: t("mapo.mediaGallery.deleteSelected", { number: count }),
+      confirmText: t("mapo.delete"),
       dangerous: true,
     });
     if (!confirmed) return;
     await Promise.all(editList.value.map((id) => mediaCrud().delete(id)));
     editList.value = [];
-    useSnackStore().show(`${count} media deleted`, "success");
+    useSnackStore().show(
+      t("mapo.mediaGallery.deleteSuccess", { number: count }),
+      "success",
+    );
     await getRoot();
   }
 
@@ -379,10 +388,17 @@ export const useMediaStore = defineStore("mapo-media", () => {
           resolve(xhr.response as MediaItem);
         } else {
           const detail = (xhr.response as { detail?: string } | null)?.detail;
-          reject(new Error(detail || `Upload failed (${xhr.status})`));
+          reject(
+            new Error(
+              detail ||
+                `${useMapoT()("mapo.mediaUploader.uploadFailed")} (${xhr.status})`,
+            ),
+          );
         }
       });
-      xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+      xhr.addEventListener("error", () =>
+        reject(new Error(useMapoT()("mapo.mediaUploader.uploadFailed"))),
+      );
       xhr.send(formData);
     });
   }

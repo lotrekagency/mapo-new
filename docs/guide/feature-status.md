@@ -125,35 +125,48 @@ File upload, gallery browsing, folder management, and a picker dialog. Full port
 
 ---
 
+### Menu Manager (`@mapomodule/uikit`)
+
+Split-pane editor for hierarchical navigation menus. Full port of the v1 MenuManager. See [Menu Manager](/uikit/menu-manager).
+
+| Feature                 | Status | Notes                                                                                         |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------- |
+| `MapoMenuManager`       | ✅     | Shell: load/save, per-language trees, permission gating, backend error mapping                |
+| `MapoMenuTreeview`      | ✅     | Drag & drop tree (`vue-draggable-plus`), depth-validated drops with revert, add/delete nodes  |
+| `MapoMenuTreeviewNode`  | ✅     | Recursive node, cross-parent nesting, inline rename on double-click, per-node error marker    |
+| `MapoMenuNodeEditor`    | ✅     | `MapoForm`-based node editor, breadcrumbs, relational page picker via `<endpoint>/page_types` |
+| Custom node fields      | ✅     | `additionalFields` / `coreFields`, plus `editor-form*` slots                                  |
+| Multilingual node trees | ✅     | One tree per language under `translations`, language switch with error flags                  |
+| Camomilla integration   | ✅     | `/api/menus/*` → `/api/camomilla/menus/*` path rewrite                                        |
+
+### i18n (`@mapomodule/i18n`)
+
+UI translations for every Mapo component, extensible by the consuming app. See [i18n](/modules/i18n).
+
+| Feature                     | Status | Notes                                                                                        |
+| --------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| `@nuxtjs/i18n` wiring       | ✅     | Installed with admin defaults (`no_prefix`, browser detection, cookie); app config wins      |
+| Built-in catalogs           | ✅     | `en` + `it` under the `mapo.*` namespace, registered via `i18n:registerModule`               |
+| Consumer overrides          | ✅     | App locale files deep-merge on top, key by key; extra languages fall back to `defaultLocale` |
+| `MapoLangSwitcher`          | ✅     | Locale selector with flag emoji, cookie-persisted                                            |
+| `useMapoT()`                | ✅     | Translator for stores/composables where `useI18n()` is unavailable                           |
+| Fully translated components | ✅     | List, Detail, Form fields, Media Manager, Menu Manager, login, feedback                      |
+
+---
+
 ## Not yet implemented 🔲
 
 These features existed in Mapo v1 and are planned for v2 but have not been built yet.
 
-### Menu Manager
-
-Drag-and-drop reordering of navigation items for end users.
-
-**v1 had:** `MapoMenuManager` with tree-drag via `vue-draggable`, nested items up to 2 levels, live preview of menu structure.
-
-**v2 target:** Phase 7, using `vue-draggable-plus`.
-
-### i18n
-
-Multi-language content switching and UI translation.
-
-**v1 had:** `@nuxtjs/i18n` integration, per-field language switching in Detail, `DetailLangSwitch`, translation sync helpers, base locale files overridable by the consuming app.
-
-**v2 target:** `@mapomodule/i18n` module using `@nuxtjs/i18n` v9. See roadmap Phase 7.
-
 ### Standalone UIKit components
 
-| Component             | Status | Description                                                          |
-| --------------------- | ------ | -------------------------------------------------------------------- |
-| `MapoLogoutButton`    | ✅     | Reusable logout button wrapping `useMapoAuth().logout()`             |
-| `MapoSidebarProfile`  | ✅     | User profile row (avatar + username + logout) for the sidebar footer |
-| `MapoDropArea`        | ✅     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
-| `MapoLangSwitcher` 🔲 | 🔲     | UI language selector (depends on `@mapomodule/i18n` — Phase 7)       |
-| `MapoPagePreview` 🔲  | 🔲     | Page/template preview panel                                          |
+| Component            | Status | Description                                                          |
+| -------------------- | ------ | -------------------------------------------------------------------- |
+| `MapoLogoutButton`   | ✅     | Reusable logout button wrapping `useMapoAuth().logout()`             |
+| `MapoSidebarProfile` | ✅     | User profile row (avatar + username + logout) for the sidebar footer |
+| `MapoDropArea`       | ✅     | Generic drag-and-drop zone — shared by Form fields and Media Manager |
+| `MapoLangSwitcher`   | ✅     | UI language selector — see [i18n](/modules/i18n)                     |
+| `MapoPagePreview` 🔲 | 🔲     | Page/template preview panel                                          |
 
 ---
 
