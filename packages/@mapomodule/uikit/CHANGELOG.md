@@ -1,3 +1,21 @@
+# @mapomodule/uikit [2.0.0-beta.8](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.7...@mapomodule/uikit@2.0.0-beta.8) (2026-08-27)
+
+### Bug Fixes
+
+- **mediamanager:** merge into $mapoMediaAdapter instead of re-providing it ([c9e72d6](https://github.com/lotrekagency/mapo-new/commit/c9e72d6c454028b9ec18008350f2aa82c0b7fb9f))
+- **uikit,form,utils:** resolve the router through Nuxt, not vue-router ([bf4aeb3](https://github.com/lotrekagency/mapo-new/commit/bf4aeb3d6fa4edad7b761cdb5f354152f74f603f))
+- **uikit:** prevent duplicate $mapoMediaAdapter provide ([7a25f33](https://github.com/lotrekagency/mapo-new/commit/7a25f334f19a6ca97dff2d74b8b24b9b1acfe70d))
+
+### Features
+
+- **uikit:** add Menu Manager ([89e8410](https://github.com/lotrekagency/mapo-new/commit/89e8410ae81cce84f1a007b03128aec90b5ebe23))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.6
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.3
+- **@mapomodule/core:** upgraded to 2.0.0-beta.6
+
 # @mapomodule/uikit [2.0.0-beta.7](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.6...@mapomodule/uikit@2.0.0-beta.7) (2026-07-28)
 
 ### Bug Fixes
