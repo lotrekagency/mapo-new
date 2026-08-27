@@ -2,8 +2,14 @@
   "name": "mapo-monorepo",
   "private": true,
   "description": "Monorepo for @mapomodule/* packages and mapomodule",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git"
+  },
   "scripts": {
     "build": "turbo run build",
+    "build:release": "turbo run build --filter='./packages/**'",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -22,8 +28,8 @@
     "dev:form": "pnpm --filter @mapomodule/form dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
     "prepare": "husky",
-    "release": "pnpm build && multi-semantic-release --extends $PWD/.releaserc.release.json",
-    "release:dry": "pnpm build && multi-semantic-release --dry-run --extends $PWD/.releaserc.dryrun.json",
+    "release": "pnpm build:release && multi-semantic-release --ignore-private-packages",
+    "release:dry": "pnpm build:release && multi-semantic-release --dry-run --ignore-private-packages",
     "publish:packages": "pnpm -r --filter './packages/**' publish --access public --no-git-checks"
   },
   "engines": {
@@ -49,7 +55,9 @@
       "@mapomodule/example",
       "@mapomodule/example-theme",
       "@mapomodule/example-custom-form",
-      "@mapomodule/example-e2e"
+      "@mapomodule/example-e2e",
+      "@mapomodule/i18n",
+      "mapo-integrations-camomilla"
     ]
   },
   "devDependencies": {

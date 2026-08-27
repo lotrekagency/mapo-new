@@ -29,7 +29,11 @@
  */
 import { navigateTo } from "#app";
 import { flattenFieldGroups } from "@mapomodule/form/types";
-import type { FieldDescriptor } from "@mapomodule/form/types";
+import type {
+  FieldDescriptor,
+  MediaItem,
+  EnhancedMediaValue,
+} from "@mapomodule/form/types";
 
 definePageMeta({
   layout: "mapo-default",
@@ -107,16 +111,6 @@ interface Award {
   name: string;
   year: number;
   organization: string;
-}
-
-// Import MediaItem type for typed media fields
-// @ts-expect-error — MediaItem is from uikit which is not a direct type dependency here
-type MediaItem = import("@mapomodule/uikit/types/media").MediaItem;
-
-interface EnhancedMediaValue {
-  media: MediaItem | null;
-  alt?: string;
-  caption?: string;
 }
 
 interface Article {
@@ -751,7 +745,6 @@ const mediaFields: FieldDescriptor<Article>[] = [
   // ── Media Picker fields (v2 Media Manager integration) ──────────────────────
   {
     key: "cover_media",
-    // @ts-expect-error — enhanced-media type registered by @mapomodule/uikit plugin
     type: "enhanced-media",
     label: "Cover Image (Media Picker)",
     tab: "Media",
@@ -760,7 +753,6 @@ const mediaFields: FieldDescriptor<Article>[] = [
   },
   {
     key: "hero_image",
-    // @ts-expect-error — media type registered by @mapomodule/uikit plugin
     type: "media",
     label: "Hero Image (single picker)",
     tab: "Media",
@@ -769,7 +761,6 @@ const mediaFields: FieldDescriptor<Article>[] = [
   },
   {
     key: "gallery_media",
-    // @ts-expect-error — media-m2m type registered by @mapomodule/uikit plugin
     type: "media-m2m",
     label: "Gallery (multi media picker)",
     tab: "Media",

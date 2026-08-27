@@ -50,6 +50,7 @@ function onDragOverItem(index: number) {
   if (dragIndex.value === null || dragIndex.value === index) return;
   const items = [...multiSelection.value];
   const [moved] = items.splice(dragIndex.value, 1);
+  if (!moved) return;
   items.splice(index, 0, moved);
   dragIndex.value = index;
   store.setSelection(items);

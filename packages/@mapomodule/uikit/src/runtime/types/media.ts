@@ -1,29 +1,16 @@
-/** A model instance referencing a media (Camomilla returns these as `links`). */
-export interface MediaLink {
-  model: string;
-  id: number;
-  name: string;
-}
+/**
+ * Media **value** types are owned by `@mapomodule/form` (they are the value that
+ * lands in the form model, next to their descriptors) and re-exported here so the
+ * Media Manager keeps a single import surface. `uikit` already depends on `form`,
+ * so this direction introduces no cycle.
+ */
+export type {
+  MediaLink,
+  MediaItem,
+  EnhancedMediaValue,
+} from "@mapomodule/form/types";
 
-export interface MediaItem {
-  id: number;
-  file: string;
-  mime_type: string;
-  title: string;
-  alt_text: string;
-  description: string;
-  size: number;
-  created: string;
-  modified: string;
-  folder?: number | null;
-  name?: string;
-  /** Model instances that reference this media — shown in the editor info panel. */
-  links?: MediaLink[];
-  translations?: Record<
-    string,
-    { title?: string; alt_text?: string; description?: string }
-  >;
-}
+import type { MediaItem } from "@mapomodule/form/types";
 
 export interface MediaFolder {
   id: number;

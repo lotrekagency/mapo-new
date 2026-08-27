@@ -58,15 +58,20 @@ useMediaStore (Pinia)
     │     ├── MapoMediaEditor     ← side drawer for metadata
     │     └── MapoMediaUploader   ← drop area + per-file progress
     │
-    ├── MapoMediaManagerDialog    ← UModal wrapper (picker mode)
-    │
-    └── Form fields (in @mapomodule/uikit, injected into the registry)
+    └── MapoMediaManagerDialog    ← UModal wrapper (picker mode)
+
+@mapomodule/form
+    └── Form fields (in the default registry, like every other field type)
           ├── MapoMediaField         type: 'media'
           ├── MapoMediaM2mField      type: 'media-m2m'
           └── MapoEnhancedMediaField type: 'enhanced-media'
 ```
 
-**Placement note**: `useMediaStore` and all media components live in `@mapomodule/uikit`. The `media`, `media-m2m`, and `enhanced-media` field types are injected into `$mapoFormRegistry` by a Nuxt plugin (`media-registry.ts`) shipped by `@mapomodule/uikit`. This avoids a circular dependency between `@mapomodule/form` and `@mapomodule/uikit`.
+**Placement note**: the Media Manager (`useMediaStore` + components) lives in `@mapomodule/uikit`; the three **field types** live in `@mapomodule/form` alongside every other field, registered in its default registry — no plugin, no special casing.
+
+The fields reach the picker through `resolveComponent('MapoMediaManagerDialog')` at runtime rather than a static import. That keeps `@mapomodule/form` free of a dependency on `@mapomodule/uikit` (which depends on `form`, so a static import would be a cycle) and lets `form` be used standalone: without `uikit` the fields render an explicit "requires `@mapomodule/uikit`" notice instead of a broken picker.
+
+Media **value** types (`MediaItem`, `MediaLink`, `EnhancedMediaValue`) are owned by `@mapomodule/form` too — they are what lands in the form model — and re-exported by `@mapomodule/uikit` so the Media Manager keeps a single import surface.
 
 ---
 
@@ -402,7 +407,7 @@ MIME-aware renderer: `image` → `<img>`, `video` → `<video>`, otherwise a fil
 
 ## Form fields
 
-The three field types are auto-registered in `$mapoFormRegistry` by `@mapomodule/uikit`. No imports needed.
+The three field types ship in `@mapomodule/form`'s default registry, like every other field type. No imports, no plugin. They need `@mapomodule/uikit` installed to render the picker (see [Architecture](#architecture)).
 
 ### `type: 'media'` — `MapoMediaField`
 

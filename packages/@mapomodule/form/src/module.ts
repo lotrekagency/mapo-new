@@ -120,6 +120,21 @@ export {};
       });
     }
 
+    // Media field components — registered so consumers can use them directly,
+    // and so MapoMediaUnavailable resolves inside them.
+    const mediaFieldComponents = [
+      "MapoMediaField",
+      "MapoMediaM2mField",
+      "MapoEnhancedMediaField",
+      "MapoMediaUnavailable",
+    ];
+    for (const name of mediaFieldComponents) {
+      addComponent({
+        name,
+        filePath: resolver.resolve(`./runtime/components/fields/${name}.vue`),
+      });
+    }
+
     // Public auto-imported composables
     addImports([
       {

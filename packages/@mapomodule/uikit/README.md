@@ -84,13 +84,7 @@ When installed via `mapomodule`, configure under `mapo.uikit` instead.
 | `MapoMediaManager`       | Main orchestrator shell (sidebar + gallery + uploader + editor drawer)                                                                                                   |
 | `MapoMediaManagerDialog` | `UModal` wrapper for picker mode — single or multi selection with confirm                                                                                                |
 
-**Form fields (auto-registered in `$mapoFormRegistry`):**
-
-| Field type       | Component                | Value type                                                   |
-| ---------------- | ------------------------ | ------------------------------------------------------------ |
-| `media`          | `MapoMediaField`         | `MediaItem \| null`                                          |
-| `media-m2m`      | `MapoMediaM2mField`      | `MediaItem[]` (drag-reorderable)                             |
-| `enhanced-media` | `MapoEnhancedMediaField` | `{ media: MediaItem \| null, alt: string, caption: string }` |
+**Form fields** — the `media`, `media-m2m`, and `enhanced-media` field types ship with [`@mapomodule/form`](../form/README.md) in its default registry; they drive the picker above and need this package installed to work.
 
 Media config (endpoints + upload limits) goes under `mapo.uikit.media`; backend-specific request/response transforms are handled by a pluggable `$mapoMediaAdapter` (Camomilla ships its own). See [docs/uikit/media.md](../../../docs/uikit/media.md).
 

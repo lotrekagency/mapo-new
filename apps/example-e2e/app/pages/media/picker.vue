@@ -5,7 +5,7 @@
  *   - multi:  selects multiple MediaItem[]
  *   - mime filter: only images
  */
-import type { MediaItem } from "@mapomodule/uikit/types/media";
+import type { MediaItem } from "@mapomodule/uikit/types";
 
 definePageMeta({
   layout: "mapo-default",
