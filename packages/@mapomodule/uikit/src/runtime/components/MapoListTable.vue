@@ -9,6 +9,7 @@ import {
   useSlots,
 } from "vue";
 import type { Ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { TableColumn } from "@nuxt/ui";
 import type { SortingState, PaginationState } from "@tanstack/vue-table";
 import type { ListColumn } from "../types/list.js";
@@ -139,6 +140,7 @@ const slots = useSlots();
 // which is both accurate and avoids any implicit-any errors at the call sites.
 const atKey = (item: T, key: string): T[keyof T] => item[key as keyof T];
 
+const { t } = useI18n();
 const snack = useSnackStore();
 const confirm = useConfirmStore();
 
@@ -328,9 +330,9 @@ const quickEditLocalItem = computed<T | null>(() => {
 // --- Delete ---
 async function deleteRow(item: T) {
   const ok = await confirm.ask({
-    title: "Delete item",
-    message: "Are you sure you want to delete this item?",
-    confirmText: "Delete",
+    title: t("mapo.listTable.deleteItemTitle"),
+    message: t("mapo.confirmDelete"),
+    confirmText: t("mapo.delete"),
     dangerous: true,
   });
   if (!ok) return;
@@ -340,16 +342,16 @@ async function deleteRow(item: T) {
         String(atKey(r, props.lookup)) !== String(atKey(item, props.lookup)),
     );
     emit("update:items", next);
-    snack.show("Item deleted", "success");
+    snack.show(t("mapo.listTable.itemDeleted"), "success");
     return;
   }
   try {
     await crud.delete(atKey(item, props.lookup) as string | number);
-    snack.show("Item deleted", "success");
+    snack.show(t("mapo.listTable.itemDeleted"), "success");
     if (hybridMode.value) hybridLoaded.value = false;
     refresh();
   } catch {
-    snack.show("Failed to delete item", "error");
+    snack.show(t("mapo.listTable.deleteItemError"), "error");
   }
 }
 
@@ -454,13 +456,13 @@ async function onDrop(fromIdx: number, toIdx: number) {
       atKey(moved, props.lookup) as string | number,
       atKey(target, props.lookup) as string | number,
     );
-    snack.show("Order saved", "success");
+    snack.show(t("mapo.listTable.orderSaved"), "success");
     if (hybridMode.value) {
       hybridLoaded.value = false;
       refresh();
     }
   } catch {
-    snack.show("Failed to save order", "error");
+    snack.show(t("mapo.listTable.orderError"), "error");
     refresh();
   }
 }
@@ -554,7 +556,7 @@ async function fetchAll() {
     fullDataset.value = nextItems;
     hybridLoaded.value = true;
   } catch {
-    snack.show("Failed to load data", "error");
+    snack.show(t("mapo.loadError"), "error");
   } finally {
     loading.value = false;
   }
@@ -626,7 +628,7 @@ async function refresh() {
     rows.value = nextItems;
     total.value = nextTotal;
   } catch {
-    snack.show("Failed to load data", "error");
+    snack.show(t("mapo.loadError"), "error");
   } finally {
     loading.value = false;
   }
@@ -682,14 +684,14 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
         modelValue: isAllSelected.value,
         indeterminate: isIndeterminate.value,
         "onUpdate:modelValue": toggleAll,
-        ariaLabel: "Select all rows",
+        ariaLabel: t("mapo.listTable.selectAllRows"),
       }),
     cell: ({ row }: { row: { original: T } }) => {
       const k = pkOf(row.original);
       return h(UCheckbox, {
         modelValue: !!rowSelection.value[k],
         "onUpdate:modelValue": () => toggleRowByKey(k),
-        ariaLabel: "Select row",
+        ariaLabel: t("mapo.listTable.selectRow"),
       });
     },
     meta: { class: { th: "w-10", td: "w-10" } },
@@ -709,8 +711,8 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
               : "cursor-not-allowed text-muted opacity-30",
             draggable: canReorder.value,
             title: canReorder.value
-              ? "Drag to reorder"
-              : "Clear search & sorting to reorder",
+              ? t("mapo.listTable.dragToReorder")
+              : t("mapo.listTable.clearToReorder"),
             onDragstart: (e: DragEvent) => {
               e.dataTransfer?.setData("text/plain", "");
               onDragStart(row.index);
@@ -815,7 +817,7 @@ const sortingOptions = computed(() => ({
     <div v-if="searchable" class="flex items-center gap-2">
       <UInput
         :model-value="search"
-        placeholder="Search..."
+        :placeholder="t('mapo.search')"
         icon="i-lucide-search"
         size="sm"
         class="max-w-xs"
@@ -839,7 +841,7 @@ const sortingOptions = computed(() => ({
         :pagination-options="paginationOptions"
         :sorting="sorting"
         :sorting-options="sortingOptions"
-        empty="No items found"
+        :empty="t('mapo.listTable.noItems')"
         @update:pagination="pagination = $event ?? pagination"
         @update:sorting="sorting = $event ?? sorting"
       >
@@ -847,7 +849,7 @@ const sortingOptions = computed(() => ({
           <slot name="dtable.empty">
             <div class="flex flex-col items-center gap-2 py-8 text-muted">
               <UIcon name="i-lucide-inbox" class="h-8 w-8" />
-              <span class="text-sm">No items found</span>
+              <span class="text-sm">{{ t("mapo.listTable.noItems") }}</span>
             </div>
           </slot>
         </template>
@@ -867,7 +869,7 @@ const sortingOptions = computed(() => ({
 
     <!-- Pagination controls -->
     <div class="flex items-center justify-between text-sm text-muted">
-      <span>{{ total }} items</span>
+      <span>{{ t("mapo.listTable.totalItems", { total }) }}</span>
       <UPagination
         :model-value="pagination.pageIndex + 1"
         :total="total"
@@ -880,7 +882,10 @@ const sortingOptions = computed(() => ({
       <USelect
         :model-value="pagination.pageSize"
         :items="
-          pageSizeOptions.map((n) => ({ label: `${n} / page`, value: n }))
+          pageSizeOptions.map((n) => ({
+            label: t('mapo.listTable.perPage', { n }),
+            value: n,
+          }))
         "
         size="xs"
         class="w-28"

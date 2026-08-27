@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useMediaStore } from "../stores/media.js";
 import type { MediaFolder } from "../types/media.js";
 
+const { t } = useI18n();
 const store = useMediaStore();
 
 const items = computed(() => [
   {
-    label: "Media",
+    label: t("mapo.mediaManager.root"),
     icon: "i-lucide-folder-open",
     folder: null as MediaFolder | null,
   },

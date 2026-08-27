@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
 import { useMediaStore } from "../stores/media.js";
 import type { MediaItem } from "../types/media.js";
 
+const { t } = useI18n();
 const store = useMediaStore();
 
 const isPickerMode = computed(
@@ -85,7 +87,9 @@ function onDragEnd() {
         </div>
       </div>
       <span class="ml-auto shrink-0 pl-2 text-xs text-muted">
-        {{ multiSelection.length }} selected
+        {{
+          t("mapo.mediaGallery.nSelected", { number: multiSelection.length })
+        }}
       </span>
     </div>
 
@@ -100,11 +104,17 @@ function onDragEnd() {
             ? 'indeterminate'
             : store.editListState.value
         "
-        :label="store.editListState.value ? 'Deselect all' : 'Select all'"
+        :label="
+          store.editListState.value
+            ? t('mapo.mediaGallery.deselectAll')
+            : t('mapo.mediaGallery.selectAll')
+        "
         @update:model-value="store.editSelectAll()"
       />
       <span class="text-sm text-muted">
-        {{ store.editList.length }} selected
+        {{
+          t("mapo.mediaGallery.nSelected", { number: store.editList.length })
+        }}
       </span>
       <div class="flex-1" />
       <UButton
@@ -114,7 +124,7 @@ function onDragEnd() {
         variant="soft"
         @click="store.deleteSelected()"
       >
-        Delete selected
+        {{ t("mapo.mediaGallery.deleteSelectedLabel") }}
       </UButton>
       <UButton
         icon="i-lucide-x"
@@ -139,7 +149,9 @@ function onDragEnd() {
       class="flex flex-col items-center gap-3 py-16 text-center"
     >
       <UIcon name="i-lucide-image-off" class="size-12 text-dimmed" />
-      <p class="text-sm text-muted">No media found</p>
+      <p class="text-sm text-muted">
+        {{ t("mapo.mediaGallery.noMediaFound") }}
+      </p>
     </div>
 
     <!-- Grid -->

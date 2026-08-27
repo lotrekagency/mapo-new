@@ -1,0 +1,261 @@
+{
+  "mapo": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "apply": "Apply",
+    "confirm": "Confirm",
+    "ok": "OK",
+    "close": "Close",
+    "edit": "Edit",
+    "delete": "Delete",
+    "add": "Add",
+    "remove": "Remove",
+    "clear": "Clear",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "search": "Search...",
+    "create": "Create",
+    "new": "New",
+    "createContinue": "Create and continue",
+    "saveContinue": "Save and continue",
+    "back": "Back",
+    "leave": "Leave",
+    "preview": "Preview",
+    "refresh": "Refresh",
+    "select": "Select",
+    "change": "Change",
+    "duplicate": "Duplicate",
+    "restore": "Restore",
+    "discard": "Discard",
+    "loading": "Loading...",
+    "genericError": "Something went wrong, please try again later...",
+    "saveSuccess": "Saved successfully",
+    "createSuccess": "Created successfully",
+    "deleteSuccess": "Deleted successfully",
+    "saveError": "Failed to save",
+    "deleteError": "Failed to delete",
+    "loadError": "Failed to load data",
+    "loadItemError": "Failed to load item",
+    "fixErrors": "Please fix the errors before saving.",
+    "confirmDelete": "Are you sure you want to delete this item?",
+    "unsavedData": "Unsaved changes",
+    "confirmLeaveChanges": "You have unsaved changes. Do you want to leave without saving?",
+    "fetchingData": "Fetching data...",
+    "login": {
+      "welcome": "Welcome to Mapo",
+      "subtitle": "Enter your credentials to continue",
+      "tagline": "A modern admin framework built on Nuxt 4, Pinia, and Nuxt UI v4.",
+      "invalidCredentials": "Invalid credentials. Please try again."
+    },
+    "logout": "Logout",
+    "signIn": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "name": "Name",
+    "title": "Title",
+    "description": "Description",
+    "mime": "MIME Type",
+    "fileName": "File name",
+    "file": "File",
+    "folder": "Folder",
+    "created": "Created at",
+    "size": "Size",
+    "altTag": "Alt text",
+    "url": "URL",
+    "linkedModels": "Linked models",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "language": "Language",
+    "index": {
+      "welcomeMessage": "Congratulations!! 🥳 You successfully installed Mapo!"
+    },
+    "themeToggle": {
+      "light": "Switch to light mode",
+      "dark": "Switch to dark mode"
+    },
+    "confirmDialog": {
+      "areYouSure": "Are you sure of what you are doing?"
+    },
+    "dropArea": {
+      "dropOrClick": "Drop your file(s) here, or click to select them.",
+      "dropHere": "Drop here",
+      "onlyOneFile": "Only one file can be uploaded at a time..."
+    },
+    "detail": {
+      "deleteQuestion": "Are you sure you want to delete this item? This action cannot be undone.",
+      "draftFound": "You have a local draft that was not saved. Do you want to restore it or discard it?",
+      "draftSavedAt": "Unsaved draft found — last edited {date}"
+    },
+    "form": {
+      "required": "This field is required.",
+      "tabErrors": "This tab contains errors"
+    },
+    "fksField": {
+      "searchSelect": "Search and select...",
+      "noResults": "No results found",
+      "noItems": "No items available"
+    },
+    "dateField": {
+      "selectDate": "Select date",
+      "selectDateTime": "Select date and time"
+    },
+    "fileField": {
+      "removeFile": "Remove file"
+    },
+    "mediaField": {
+      "selectMedia": "Select media"
+    },
+    "mediaM2MField": {
+      "addMedia": "Add media"
+    },
+    "enhancedMediaField": {
+      "altText": "Alt text",
+      "caption": "Caption"
+    },
+    "repeater": {
+      "repeater": "Repeater",
+      "nItems": "{n} item | {n} items",
+      "nSelected": "{n} selected",
+      "all": "All",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all",
+      "deleteItem": "Delete item",
+      "deleteItems": "Delete items",
+      "confirmBulkDelete": "Delete {count} selected items?",
+      "actionBlocked": "Action blocked",
+      "minItemsBlock": "Cannot delete: at least {min} items must remain.",
+      "undoLastAction": "Undo last action",
+      "bulkSelection": "Bulk selection",
+      "exitSelection": "Exit selection",
+      "duplicateSelected": "Duplicate selected",
+      "duplicateLimited": "Only {slots} of {count} can be duplicated (maxItems reached)",
+      "moveToTop": "Move to top",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "position": "Position",
+      "editFullScreen": "Edit full screen",
+      "empty": "No items. Click \"Add\" to start."
+    },
+    "seoPreview": {
+      "seoTitle": "SEO title",
+      "metaDescription": "Meta description",
+      "googlePreview": "Google preview",
+      "titlePlaceholder": "Page title...",
+      "descriptionPlaceholder": "Page description...",
+      "defaultTitle": "Page title",
+      "defaultDescription": "Page description that will appear in Google search results."
+    },
+    "wygEditor": {
+      "insertImage": "Insert image",
+      "requiresUikit": "Requires {'@'}mapomodule/uikit"
+    },
+    "listActions": {
+      "bulkActions": "Bulk actions...",
+      "permanentDelete": "Delete permanently",
+      "confirmBulk": "This action will be applied to all items. Do you want to continue?",
+      "confirmBulkCount": "This action will be applied to {count} item(s). Do you want to continue?",
+      "actionCompleted": "Action completed",
+      "actionFailed": "Action failed"
+    },
+    "listFilters": {
+      "filters": "Filters",
+      "clearAll": "Clear all"
+    },
+    "listQuickEdit": {
+      "newItem": "New item"
+    },
+    "listTable": {
+      "deleteItemTitle": "Delete item",
+      "itemDeleted": "Item deleted",
+      "deleteItemError": "Failed to delete item",
+      "orderSaved": "Order saved",
+      "orderError": "Failed to save order",
+      "selectAllRows": "Select all rows",
+      "selectRow": "Select row",
+      "dragToReorder": "Drag to reorder",
+      "clearToReorder": "Clear search & sorting to reorder",
+      "noItems": "No items found",
+      "totalItems": "{total} items",
+      "perPage": "{n} / page"
+    },
+    "menuManager": {
+      "menu": "Menu",
+      "noSelectedNode": "Select a node to edit or create a new one."
+    },
+    "menuTreeview": {
+      "newNode": "Create node",
+      "noRootNodes": "No nodes here. Create a new one!",
+      "deleteTitle": "Delete node",
+      "areYouSureDelete": "Are you sure you want to delete this node and all its children?",
+      "maxDepthReached": "Maximum nesting depth reached ({max} levels)"
+    },
+    "menuNodeEditor": {
+      "editNode": "Editing",
+      "title": "Title",
+      "linkTypeLabel": "Link type",
+      "styleLabel": "Style",
+      "openInNewTabLabel": "Open in a new tab",
+      "relContentTypeLabel": "Type of page",
+      "relPageIdLabel": "Page",
+      "staticLabel": "Static URL",
+      "relational": "Relational",
+      "static": "Static",
+      "nodeErrors": "This node contains errors"
+    },
+    "mediaEditor": {
+      "details": "Details",
+      "defaultLang": "Default",
+      "openInNewTab": "Open in new tab",
+      "confirmDelete": "Are you sure you want to delete \"{name}\"?"
+    },
+    "mediaFileChanger": {
+      "replaceFile": "Replace file",
+      "dragOrClick": "Drag or click to choose a file",
+      "keepUrl": "Keep current URL"
+    },
+    "mediaFolders": {
+      "folders": "Folders",
+      "goBack": "Back to root",
+      "noFolders": "No folders here... Create a new one!",
+      "newFolder": "New folder",
+      "folderName": "Folder name",
+      "allFolder": "All",
+      "imageFolder": "Images",
+      "videoFolder": "Videos",
+      "audioFolder": "Audio",
+      "docFolder": "Documents",
+      "deleteTitle": "Delete folder",
+      "confirmDelete": "Delete folder \"{name}\"? Media inside it will not be deleted."
+    },
+    "mediaGallery": {
+      "noMediaFound": "No media found",
+      "selectAll": "Select page",
+      "deselectAll": "Deselect page",
+      "nSelected": "{number} selected",
+      "deleteTitle": "Delete selected media",
+      "deleteSelectedLabel": "Delete selected",
+      "deleteSelected": "You are going to delete {number} assets. Do you want to continue?",
+      "deleteSuccess": "{number} assets deleted!"
+    },
+    "mediaManager": {
+      "root": "Media",
+      "gallery": "Gallery",
+      "uploader": "Upload",
+      "fileInfo": "Media updated",
+      "deleteTitle": "Delete media",
+      "selectMedia": "Select media",
+      "selectAMedia": "Select a media"
+    },
+    "mediaUploader": {
+      "dragHere": "Drag files here or",
+      "browse": "browse",
+      "limits": "Images up to {img} MB · Videos up to {vid} MB",
+      "nSelected": "{n} file selected | {n} files selected",
+      "uploadCta": "Upload {n} file | Upload {n} files",
+      "uploaded": "Uploaded",
+      "uploadFailed": "Upload failed",
+      "fileTooLarge": "File \"{name}\" too large (max {max} MB)",
+      "success": "{numberFiles} files successfully uploaded"
+    }
+  }
+}

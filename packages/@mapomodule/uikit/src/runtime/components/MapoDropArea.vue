@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -103,7 +106,9 @@ defineExpose({ triggerPick });
       >
         <div class="flex flex-col items-center gap-2 text-primary">
           <UIcon name="i-lucide-upload-cloud" class="size-10" />
-          <span class="text-sm font-medium">Drop here</span>
+          <span class="text-sm font-medium">{{
+            t("mapo.dropArea.dropHere")
+          }}</span>
         </div>
       </div>
     </Transition>

@@ -11,9 +11,11 @@
  */
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import { watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useFocusMode } from "../composables/useFocusMode.js";
 import MapoForm from "./MapoForm.vue";
 
+const { t } = useI18n();
 const { focusTarget, exit } = useFocusMode();
 
 const isOpen = computed(() => focusTarget.value !== null);
@@ -88,7 +90,7 @@ function onUpdate(val: Record<string, unknown>) {
             variant="ghost"
             color="neutral"
             icon="i-lucide-x"
-            label="Close"
+            :label="t('mapo.close')"
             size="sm"
             @click="exit"
           />

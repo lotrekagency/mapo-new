@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useMediaStore } from "../stores/media.js";
 import type { MediaItem, SelectMode } from "../types/media.js";
 
@@ -31,6 +32,7 @@ const emit = defineEmits<{
   confirm: [value: MediaItem | MediaItem[]];
 }>();
 
+const { t } = useI18n();
 const store = useMediaStore();
 const open = ref(props.modelValue);
 
@@ -89,7 +91,11 @@ watch(
         <div class="flex items-center gap-2 border-b border-default px-4 py-3">
           <UIcon name="i-lucide-image" class="size-4 text-dimmed" />
           <span class="flex-1 font-semibold text-highlighted">
-            {{ selectionMode === "multi" ? "Select media" : "Select a media" }}
+            {{
+              selectionMode === "multi"
+                ? t("mapo.mediaManager.selectMedia")
+                : t("mapo.mediaManager.selectAMedia")
+            }}
           </span>
           <UButton
             icon="i-lucide-x"
@@ -120,11 +126,11 @@ watch(
             v-if="selectionMode === 'multi' && selectionCount > 0"
             class="text-sm text-muted"
           >
-            {{ selectionCount }} selected
+            {{ t("mapo.mediaGallery.nSelected", { number: selectionCount }) }}
           </p>
           <div class="ml-auto flex gap-2">
             <UButton variant="ghost" color="neutral" @click="cancel">
-              Cancel
+              {{ t("mapo.cancel") }}
             </UButton>
             <UButton
               color="primary"
@@ -132,7 +138,7 @@ watch(
               icon="i-lucide-check"
               @click="confirm"
             >
-              Confirm
+              {{ t("mapo.confirm") }}
             </UButton>
           </div>
         </div>

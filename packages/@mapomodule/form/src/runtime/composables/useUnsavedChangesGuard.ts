@@ -1,5 +1,6 @@
 import { onBeforeUnmount, type Ref } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
+import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 
 /** Optional configuration for the unsaved-changes navigation guard. */
 export interface UnsavedChangesGuardOptions {
@@ -27,8 +28,7 @@ export function useUnsavedChangesGuard(
   isDirty: Ref<boolean>,
   options: UnsavedChangesGuardOptions = {},
 ) {
-  const message =
-    options.message ?? "You have unsaved changes. Do you really want to leave?";
+  const message = options.message ?? useMapoT()("mapo.confirmLeaveChanges");
   const canUseWindow = typeof window !== "undefined";
 
   const isEnabled = (): boolean => {

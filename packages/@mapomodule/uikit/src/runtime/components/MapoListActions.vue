@@ -1,10 +1,12 @@
 <script setup lang="ts" generic="T extends object">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { ActionDescriptor } from "../types/list.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import { getErrorDetail } from "@mapomodule/core/runtime/utils/fetchError";
 
 const props = withDefaults(
   defineProps<{
@@ -29,6 +31,7 @@ defineSlots<{
   append(): any;
 }>();
 
+const { t } = useI18n();
 const snack = useSnackStore();
 const confirm = useConfirmStore();
 const crud = useCrud<T>(props.endpoint);
@@ -37,7 +40,7 @@ const isRunning = ref(false);
 
 const defaultActions = computed<ActionDescriptor<T>[]>(() => [
   {
-    label: "Delete permanently",
+    label: t("mapo.listActions.permanentDelete"),
     handler: async ({ selection }) => {
       if (!selection) return;
       await Promise.all(
@@ -95,9 +98,11 @@ async function runAction() {
     title: action.label,
     message:
       props.selection === "all"
-        ? "This action will be applied to all items. Do you want to continue?"
-        : `This action will be applied to ${(props.selection as T[]).length} item(s). Do you want to continue?`,
-    confirmText: "Confirm",
+        ? t("mapo.listActions.confirmBulk")
+        : t("mapo.listActions.confirmBulkCount", {
+            count: (props.selection as T[]).length,
+          }),
+    confirmText: t("mapo.confirm"),
     dangerous: !!action.dangerous,
   });
   if (!ok) return;
@@ -109,13 +114,14 @@ async function runAction() {
       selectionQuery: props.selectionQuery,
       lookup: props.lookup,
     });
-    snack.show("Action completed", "success");
+    snack.show(t("mapo.listActions.actionCompleted"), "success");
     emit("actionCompleted");
     selectedLabel.value = undefined;
   } catch (err: unknown) {
-    const detail = (err as { response?: { data?: { detail?: string } } })
-      ?.response?.data?.detail;
-    snack.show(detail ?? "Action failed", "error");
+    snack.show(
+      getErrorDetail(err) ?? t("mapo.listActions.actionFailed"),
+      "error",
+    );
   } finally {
     isRunning.value = false;
   }
@@ -134,7 +140,7 @@ const isActive = computed(
       :items="visibleActions"
       value-key="label"
       label-key="label"
-      placeholder="Bulk actions..."
+      :placeholder="t('mapo.listActions.bulkActions')"
       size="sm"
       class="min-w-48"
     />
@@ -145,7 +151,7 @@ const isActive = computed(
       :disabled="!selectedAction || !canRun(selectedAction)"
       @click="runAction"
     >
-      Apply
+      {{ t("mapo.apply") }}
     </UButton>
     <slot name="append" />
   </div>

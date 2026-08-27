@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount, resolveComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { AnyExtension } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
@@ -17,6 +18,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
+
+const { t } = useI18n();
 
 const extraExtensions =
   (props.descriptor.attrs?.extensions as AnyExtension[] | undefined) ?? [];
@@ -249,7 +252,11 @@ function onImageConfirm(
 
       <!-- Insert Image via Media Manager (available when @mapomodule/uikit is installed) -->
       <UTooltip
-        :text="hasMediaManager ? 'Insert image' : 'Requires @mapomodule/uikit'"
+        :text="
+          hasMediaManager
+            ? t('mapo.wygEditor.insertImage')
+            : t('mapo.wygEditor.requiresUikit')
+        "
         :delay-open="300"
       >
         <UButton

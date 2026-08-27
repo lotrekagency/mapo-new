@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type {
   FilterDescriptor,
   ActiveFilter,
   FilterChoice,
 } from "../types/list.js";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   filters: FilterDescriptor[];
@@ -188,7 +191,7 @@ const isOpen = ref(false);
       color="neutral"
       @click="removeAll"
     >
-      Clear all
+      {{ t("mapo.listFilters.clearAll") }}
     </UButton>
 
     <!-- Filter dropdown button -->
@@ -201,7 +204,7 @@ const isOpen = ref(false);
         :disabled="disabled"
         trailing-icon=""
       >
-        Filters
+        {{ t("mapo.listFilters.filters") }}
       </UButton>
 
       <template #content>

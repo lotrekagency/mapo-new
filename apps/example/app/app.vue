@@ -18,6 +18,7 @@
       </template>
 
       <template #topbar:right>
+        <MapoLangSwitcher size="sm" />
         <MapoThemeToggle />
       </template>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { FileDescriptor } from "../../types/index.js";
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "update:modelValue": [value: File | null] }>();
 
+const { t } = useI18n();
 const inputRef = ref<HTMLInputElement | null>(null);
 
 const currentFileName = computed<string | null>(() => {
@@ -78,7 +80,7 @@ const accept = computed(
         variant="ghost"
         color="neutral"
         icon="i-lucide-x"
-        aria-label="Remove file"
+        :aria-label="t('mapo.fileField.removeFile')"
         @click="clear"
       />
     </div>

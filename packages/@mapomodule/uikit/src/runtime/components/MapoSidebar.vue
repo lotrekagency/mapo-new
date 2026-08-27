@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useSidebarStore } from "@mapomodule/store/runtime/stores/sidebar";
 
 defineSlots<{
@@ -15,6 +16,7 @@ defineSlots<{
   footer(): unknown;
 }>();
 
+const { t } = useI18n();
 const sidebar = useSidebarStore();
 
 const sidebarWidth = computed(() => (sidebar.mini ? "w-[60px]" : "w-60"));
@@ -34,7 +36,7 @@ const sidebarWidth = computed(() => (sidebar.mini ? "w-[60px]" : "w-60"));
         :class="sidebar.mini ? 'justify-center' : 'justify-between gap-2'"
       >
         <template v-if="sidebar.mini">
-          <UTooltip text="Expand" :side="'right'">
+          <UTooltip :text="t('mapo.expand')" :side="'right'">
             <UButton
               variant="ghost"
               color="neutral"

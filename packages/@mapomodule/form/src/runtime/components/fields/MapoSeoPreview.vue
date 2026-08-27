@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRequestURL } from "#app";
 import type { SeoDescriptor } from "../../types/index.js";
 
@@ -9,6 +10,8 @@ interface SeoValue {
   /** Matches v1 key. `url` is accepted as alias via the registry accessor. */
   permalink?: string;
 }
+
+const { t } = useI18n();
 
 const props = defineProps<{
   modelValue: unknown;
@@ -58,7 +61,9 @@ const displayUrl = computed(() => value.value.permalink || requestUrl.host);
     <div class="space-y-3">
       <div>
         <div class="mb-1 flex items-center justify-between">
-          <label class="text-sm font-medium text-gray-700">URL</label>
+          <label class="text-sm font-medium text-gray-700">{{
+            t("mapo.url")
+          }}</label>
         </div>
         <UInput
           :model-value="value.permalink"
@@ -72,14 +77,16 @@ const displayUrl = computed(() => value.value.permalink || requestUrl.host);
 
       <div>
         <div class="mb-1 flex items-center justify-between">
-          <label class="text-sm font-medium text-gray-700">SEO title</label>
+          <label class="text-sm font-medium text-gray-700">{{
+            t("mapo.seoPreview.seoTitle")
+          }}</label>
           <span class="text-xs" :class="titleColor">{{ titleLen }} / 60</span>
         </div>
         <UInput
           :model-value="value.title"
           :readonly="readonly"
           :disabled="disabled"
-          placeholder="Page title..."
+          :placeholder="t('mapo.seoPreview.titlePlaceholder')"
           class="w-full"
           @update:model-value="update('title', $event as string)"
         />
@@ -87,9 +94,9 @@ const displayUrl = computed(() => value.value.permalink || requestUrl.host);
 
       <div>
         <div class="mb-1 flex items-center justify-between">
-          <label class="text-sm font-medium text-gray-700"
-            >Meta description</label
-          >
+          <label class="text-sm font-medium text-gray-700">{{
+            t("mapo.seoPreview.metaDescription")
+          }}</label>
           <span class="text-xs" :class="descColor">{{ descLen }} / 155</span>
         </div>
         <UTextarea
@@ -97,7 +104,7 @@ const displayUrl = computed(() => value.value.permalink || requestUrl.host);
           :rows="3"
           :readonly="readonly"
           :disabled="disabled"
-          placeholder="Page description..."
+          :placeholder="t('mapo.seoPreview.descriptionPlaceholder')"
           class="w-full"
           @update:model-value="update('description', $event as string)"
         />
@@ -107,20 +114,17 @@ const displayUrl = computed(() => value.value.permalink || requestUrl.host);
     <!-- SERP preview -->
     <div class="rounded border border-gray-200 bg-gray-50 p-4">
       <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">
-        Google preview
+        {{ t("mapo.seoPreview.googlePreview") }}
       </p>
       <div class="max-w-lg">
         <p class="truncate text-sm text-green-700">
           {{ displayUrl }}
         </p>
         <p class="truncate text-lg text-blue-700 underline">
-          {{ value.title || "Page title" }}
+          {{ value.title || t("mapo.seoPreview.defaultTitle") }}
         </p>
         <p class="mt-1 line-clamp-2 text-sm text-gray-600">
-          {{
-            value.description ||
-            "Page description that will appear in Google search results."
-          }}
+          {{ value.description || t("mapo.seoPreview.defaultDescription") }}
         </p>
       </div>
     </div>
