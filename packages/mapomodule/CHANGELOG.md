@@ -1,3 +1,16 @@
+# mapomodule [2.0.0-beta.9](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.8...mapomodule@2.0.0-beta.9) (2026-08-27)
+
+### Features
+
+- **mapomodule:** install the i18n module ([1bf5038](https://github.com/lotrekagency/mapo-new/commit/1bf5038f03fd67c0a6f605f6d82b72b31885f973))
+
+### Dependencies
+
+- **@mapomodule/core:** upgraded to 2.0.0-beta.6
+- **@mapomodule/form:** upgraded to 2.0.0-beta.6
+- **@mapomodule/uikit:** upgraded to 2.0.0-beta.8
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.3
+
 # mapomodule [2.0.0-beta.8](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.7...mapomodule@2.0.0-beta.8) (2026-07-28)
 
 ### Dependencies
