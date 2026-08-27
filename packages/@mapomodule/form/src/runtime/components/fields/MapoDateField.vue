@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { parseDate, CalendarDate } from "@internationalized/date";
 import type { DateDescriptor } from "../../types/index.js";
 
@@ -14,6 +15,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "update:modelValue": [value: string | null] }>();
 
+const { t } = useI18n();
 const open = ref(false);
 
 /** Parsed calendar value derived from the current ISO-like model string. */
@@ -30,7 +32,7 @@ const calendarValue = computed<CalendarDate | undefined>(() => {
 
 const displayLabel = computed(() => {
   const v = calendarValue.value;
-  if (!v) return "Select date";
+  if (!v) return t("mapo.dateField.selectDate");
   return `${String(v.day).padStart(2, "0")}/${String(v.month).padStart(2, "0")}/${v.year}`;
 });
 

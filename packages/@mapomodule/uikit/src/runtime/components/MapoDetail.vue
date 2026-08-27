@@ -12,8 +12,14 @@ import {
   type VNode,
 } from "vue";
 import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
+import { useI18n } from "vue-i18n";
 import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import {
+  getErrorData,
+  getErrorDetail,
+  getErrorStatus,
+} from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
@@ -127,6 +133,7 @@ const { $mapoFormRegistry } = useNuxtApp() as unknown as {
 };
 const registry = computed(() => props.registry ?? $mapoFormRegistry);
 
+const { t } = useI18n();
 const router = useRouter();
 const snack = useSnackStore();
 const confirm = useConfirmStore();
@@ -342,12 +349,8 @@ async function fetchModel() {
     }
     checkDraft();
   } catch (err: unknown) {
-    const status = (err as { response?: { status?: number } })?.response
-      ?.status;
-    const detail = (err as { response?: { data?: { detail?: string } } })
-      ?.response?.data?.detail;
-    snack.show(detail ?? "Failed to load item", "error");
-    if (status === 404) router.back();
+    snack.show(getErrorDetail(err) ?? t("mapo.loadItemError"), "error");
+    if (getErrorStatus(err) === 404) router.back();
   } finally {
     isLoading.value = false;
   }
@@ -364,7 +367,7 @@ async function save(andBack = false) {
     );
     const message = fieldErrors.length
       ? fieldErrors.map(([field, msg]) => `${field}: ${msg}`).join("\n")
-      : "Please fix the errors before saving.";
+      : t("mapo.fixErrors");
     snack.show(message, "error");
     return;
   }
@@ -396,7 +399,7 @@ async function save(andBack = false) {
     backup.value = deepClone(model.value) as T;
     clearDraft();
     snack.show(
-      isNew.value ? "Created successfully" : "Saved successfully",
+      isNew.value ? t("mapo.createSuccess") : t("mapo.saveSuccess"),
       "success",
     );
     emit("saved", model.value);
@@ -408,10 +411,8 @@ async function save(andBack = false) {
     }
     if (andBack) back();
   } catch (err: unknown) {
-    const response = (err as { response?: { status?: number; data?: unknown } })
-      ?.response;
-    const data = response?.data;
-    if (response?.status === 400 && data && typeof data === "object") {
+    const data = getErrorData(err);
+    if (getErrorStatus(err) === 400 && data && typeof data === "object") {
       errors.value = data as Record<string, string[]>;
       // Field-level errors: the useMapoForm watcher shows the detailed toast.
       // Only surface a toast here if the response carries a top-level detail message.
@@ -419,7 +420,7 @@ async function save(andBack = false) {
       if (detail) snack.show(detail, "error");
     } else {
       const detail = (data as { detail?: string } | undefined)?.detail;
-      snack.show(detail ?? "Failed to save", "error");
+      snack.show(detail ?? t("mapo.saveError"), "error");
     }
   } finally {
     isSaving.value = false;
@@ -435,10 +436,9 @@ function getPatch(): Partial<T> {
 
 async function deleteItem() {
   const ok = await confirm.ask({
-    title: "Delete",
-    message:
-      "Are you sure you want to delete this item? This action cannot be undone.",
-    confirmText: "Delete",
+    title: t("mapo.delete"),
+    message: t("mapo.detail.deleteQuestion"),
+    confirmText: t("mapo.delete"),
     dangerous: true,
   });
   if (!ok) return;
@@ -446,13 +446,11 @@ async function deleteItem() {
   try {
     await crud.delete(recordId());
     backup.value = deepClone(model.value) as T; // clear dirty so guard doesn't fire
-    snack.show("Deleted successfully", "success");
+    snack.show(t("mapo.deleteSuccess"), "success");
     emit("deleted");
     back();
   } catch (err: unknown) {
-    const detail = (err as { response?: { data?: { detail?: string } } })
-      ?.response?.data?.detail;
-    snack.show(detail ?? "Failed to delete", "error");
+    snack.show(getErrorDetail(err) ?? t("mapo.deleteError"), "error");
   } finally {
     isDeleting.value = false;
   }
@@ -467,9 +465,9 @@ function back() {
 async function guardUnsaved(): Promise<boolean> {
   if (!isDirty.value) return true;
   return confirm.ask({
-    title: "Unsaved changes",
-    message: "You have unsaved changes. Do you want to leave without saving?",
-    confirmText: "Leave",
+    title: t("mapo.unsavedData"),
+    message: t("mapo.confirmLeaveChanges"),
+    confirmText: t("mapo.leave"),
     dangerous: true,
   });
 }
@@ -635,12 +633,16 @@ defineSlots<{
           color="warning"
           variant="subtle"
           class="mb-3"
-          :title="`Unsaved draft found — last edited ${draftBanner.savedAt.toLocaleString()}`"
-          description="You have a local draft that was not saved. Do you want to restore it or discard it?"
+          :title="
+            t('mapo.detail.draftSavedAt', {
+              date: draftBanner.savedAt.toLocaleString(),
+            })
+          "
+          :description="t('mapo.detail.draftFound')"
         >
           <template #actions>
             <UButton size="xs" color="warning" @click="draftBanner?.restore()">
-              Restore draft
+              {{ t("mapo.restore") }}
             </UButton>
             <UButton
               size="xs"
@@ -648,7 +650,7 @@ defineSlots<{
               variant="ghost"
               @click="draftBanner?.discard()"
             >
-              Discard
+              {{ t("mapo.discard") }}
             </UButton>
           </template>
         </UAlert>
@@ -658,7 +660,7 @@ defineSlots<{
     <!-- Title -->
     <slot name="title" v-bind="slotBindings">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-        {{ isNew ? "New" : "Edit" }}
+        {{ isNew ? t("mapo.new") : t("mapo.edit") }}
         <span v-if="modelName"> {{ modelName }}</span>
       </h1>
     </slot>
@@ -717,7 +719,7 @@ defineSlots<{
                     icon="i-lucide-save"
                     @click="save(true)"
                   >
-                    {{ isNew ? "Create" : "Save" }}
+                    {{ isNew ? t("mapo.create") : t("mapo.save") }}
                   </UButton>
                 </slot>
 
@@ -730,7 +732,9 @@ defineSlots<{
                     icon="i-lucide-save"
                     @click="save(false)"
                   >
-                    {{ isNew ? "Create and continue" : "Save and continue" }}
+                    {{
+                      isNew ? t("mapo.createContinue") : t("mapo.saveContinue")
+                    }}
                   </UButton>
                 </slot>
 
@@ -741,7 +745,7 @@ defineSlots<{
                     icon="i-lucide-arrow-left"
                     @click="back"
                   >
-                    Back
+                    {{ t("mapo.back") }}
                   </UButton>
                 </slot>
               </div>
@@ -804,7 +808,7 @@ defineSlots<{
             icon="i-lucide-eye"
             @click="previewOpen = true"
           >
-            Preview
+            {{ t("mapo.preview") }}
           </UButton>
 
           <!-- Danger zone: delete action, visually separated from save actions -->
@@ -819,7 +823,7 @@ defineSlots<{
                   icon="i-lucide-trash-2"
                   @click="deleteItem"
                 >
-                  Delete
+                  {{ t("mapo.delete") }}
                 </UButton>
               </slot>
             </UCard>

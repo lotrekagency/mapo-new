@@ -10,6 +10,11 @@ vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
 vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
   useSnackStore: () => ({ show: vi.fn() }),
 }));
+// Pulls in `nuxt/app`, which cannot resolve outside a Nuxt build. Assertions
+// below match on message keys, so echoing the key back is the useful stub.
+vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
+  useMapoT: () => (key: string) => key,
+}));
 
 // provide/inject called outside setup() emits a warning; silence it in tests.
 beforeEach(() => {

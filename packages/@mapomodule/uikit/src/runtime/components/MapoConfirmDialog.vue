@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 
+const { t } = useI18n();
 const store = useConfirmStore();
 </script>
 
@@ -10,7 +12,7 @@ const store = useConfirmStore();
       <div class="p-6 space-y-4">
         <div class="space-y-1">
           <h3 class="text-base font-semibold text-highlighted">
-            {{ store.options?.title ?? "Confirm" }}
+            {{ store.options?.title ?? t("mapo.confirm") }}
           </h3>
           <p class="text-sm text-muted">
             {{ store.options?.message }}
@@ -19,13 +21,13 @@ const store = useConfirmStore();
 
         <div class="flex justify-end gap-3">
           <UButton variant="ghost" color="neutral" @click="store.cancel()">
-            {{ store.options?.cancelText ?? "Cancel" }}
+            {{ store.options?.cancelText ?? t("mapo.cancel") }}
           </UButton>
           <UButton
             :color="store.options?.dangerous ? 'error' : 'primary'"
             @click="store.confirm()"
           >
-            {{ store.options?.confirmText ?? "Confirm" }}
+            {{ store.options?.confirmText ?? t("mapo.confirm") }}
           </UButton>
         </div>
       </div>

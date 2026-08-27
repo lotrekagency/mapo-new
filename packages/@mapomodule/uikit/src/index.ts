@@ -16,3 +16,15 @@ export type {
   MediaUploadPayload,
   SelectMode,
 } from "./runtime/types/media.js";
+export type {
+  MapoMenu,
+  MenuTreeNode,
+  MenuNodeLink,
+  MenuTranslation,
+} from "./runtime/types/menu.js";
+export {
+  createMenuNode,
+  menuTreeDepth,
+  findMenuNode,
+  removeMenuNode,
+} from "./runtime/types/menu.js";

@@ -1,9 +1,11 @@
 <script setup lang="ts" generic="T extends object">
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import type { Ref } from "vue";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
+import { getErrorDetail } from "@mapomodule/core/runtime/utils/fetchError";
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +47,7 @@ defineSlots<{
   extra(props: { model: T }): any;
 }>();
 
+const { t } = useI18n();
 const snack = useSnackStore();
 const crud = useCrud<T>(props.endpoint);
 
@@ -77,7 +80,7 @@ watch(
     try {
       model.value = await crud.detail(id as string | number);
     } catch {
-      snack.show("Failed to load item", "error");
+      snack.show(t("mapo.loadItemError"), "error");
       isOpen.value = false;
     } finally {
       loading.value = false;
@@ -91,7 +94,7 @@ async function save() {
     // Offline: no backend roundtrip — emit the locally edited model and let
     // the parent splice it back into the source array.
     if (props.offline) {
-      snack.show("Saved", "success");
+      snack.show(t("mapo.saveSuccess"), "success");
       emit("saved", { ...model.value } as T);
       isOpen.value = false;
       return;
@@ -100,13 +103,11 @@ async function save() {
       props.itemId != null
         ? await crud.partialUpdate(props.itemId as string | number, model.value)
         : await crud.create(model.value);
-    snack.show("Saved", "success");
+    snack.show(t("mapo.saveSuccess"), "success");
     emit("saved", result);
     isOpen.value = false;
   } catch (err: unknown) {
-    const detail = (err as { response?: { data?: { detail?: string } } })
-      ?.response?.data?.detail;
-    snack.show(detail ?? "Failed to save", "error");
+    snack.show(getErrorDetail(err) ?? t("mapo.saveError"), "error");
   } finally {
     saving.value = false;
   }
@@ -119,7 +120,9 @@ async function save() {
       <div class="p-6 space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-base font-semibold text-highlighted">
-            {{ itemId != null ? "Edit" : "New item" }}
+            {{
+              itemId != null ? t("mapo.edit") : t("mapo.listQuickEdit.newItem")
+            }}
           </h3>
           <UButton
             size="xs"
@@ -150,10 +153,10 @@ async function save() {
 
           <div class="flex justify-end gap-2 pt-2">
             <UButton variant="ghost" color="neutral" @click="isOpen = false">
-              Cancel
+              {{ t("mapo.cancel") }}
             </UButton>
             <UButton color="primary" :loading="saving" @click="save">
-              Save
+              {{ t("mapo.save") }}
             </UButton>
           </div>
         </template>

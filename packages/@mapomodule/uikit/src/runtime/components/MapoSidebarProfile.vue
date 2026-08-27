@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
 
@@ -10,6 +11,7 @@ withDefaults(
   { mini: false },
 );
 
+const { t } = useI18n();
 const auth = useAuthStore();
 const { logout } = useMapoAuth();
 </script>
@@ -38,7 +40,7 @@ const { logout } = useMapoAuth();
           color="neutral"
           icon="i-lucide-log-out"
           size="xs"
-          aria-label="Logout"
+          :aria-label="t('mapo.logout')"
           @click="logout()"
         />
       </template>
@@ -51,7 +53,9 @@ const { logout } = useMapoAuth();
       :class="{ 'justify-center': mini }"
     >
       <UIcon name="i-lucide-log-in" class="size-4 shrink-0" />
-      <span v-if="!mini" class="text-xs font-medium">Sign in</span>
+      <span v-if="!mini" class="text-xs font-medium">{{
+        t("mapo.signIn")
+      }}</span>
     </NuxtLink>
   </template>
 </template>

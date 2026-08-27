@@ -1,0 +1,11 @@
+{
+  "app": {
+    "tagline": "Mapo E2E playground"
+  },
+
+  "mapo": {
+    "listTable": {
+      "noItems": "Nothing here yet — overridden by the app"
+    }
+  }
+}

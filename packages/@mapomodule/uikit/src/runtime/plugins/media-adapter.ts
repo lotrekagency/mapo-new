@@ -1,12 +1,13 @@
 /**
  * Provides the global `$mapoMediaAdapter`, defaulting to plain REST semantics.
  *
- * Integrations (e.g. Camomilla) register their own plugin ordered AFTER this one
- * and remap request params / normalize responses by assigning over the methods
- * of the provided object. They must not `provide` the key a second time: Nuxt
- * defines it as a non-configurable property, so a second provide throws.
- * Functions are not serializable through `runtimeConfig`, so this mirrors the
- * `$mapoFormRegistry` pattern.
+ * Integrations (e.g. Camomilla) register their own plugin ordered BEFORE this
+ * one; the first provider wins because Nuxt `provide` getters are
+ * non-configurable — redefining one throws `Cannot redefine property` in SSR.
+ * This plugin therefore only fills the gap when no integration registered an
+ * adapter. Consumers of the adapter fall back to `defaultMediaAdapter`
+ * method-by-method, so partial adapters are fine. Functions are not
+ * serializable through `runtimeConfig`, hence the plugin-injection pattern.
  */
 import { defineNuxtPlugin } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
@@ -24,13 +25,9 @@ declare module "vue" {
   }
 }
 
-export default defineNuxtPlugin(() => {
-  // A fresh copy per Nuxt app instance — per request under SSR, so integrations
-  // cannot leak overrides across requests. It must be a copy because since Nuxt
-  // 4.5 `provide` defines a non-configurable property: a second `provide` of the
-  // same key throws "Cannot redefine property". Integrations therefore override
-  // methods by mutating this object instead of re-providing it.
+export default defineNuxtPlugin((nuxtApp) => {
+  if ("$mapoMediaAdapter" in nuxtApp) return;
   return {
-    provide: { mapoMediaAdapter: { ...defaultMediaAdapter } },
+    provide: { mapoMediaAdapter: defaultMediaAdapter },
   };
 });

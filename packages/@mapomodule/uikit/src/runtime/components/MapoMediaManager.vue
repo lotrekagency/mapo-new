@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { debounce } from "@mapomodule/utils";
 import { useMediaStore } from "../stores/media.js";
 import type { SelectMode } from "../types/media.js";
@@ -37,13 +38,22 @@ const emit = defineEmits<{
   ];
 }>();
 
+const { t } = useI18n();
 const store = useMediaStore();
 // string (not a union) because UTabs' v-model emits string | number
 const activeTab = ref<string>("gallery");
-const tabItems = [
-  { label: "Gallery", icon: "i-lucide-images", value: "gallery" },
-  { label: "Upload", icon: "i-lucide-upload-cloud", value: "upload" },
-];
+const tabItems = computed(() => [
+  {
+    label: t("mapo.mediaManager.gallery"),
+    icon: "i-lucide-images",
+    value: "gallery",
+  },
+  {
+    label: t("mapo.mediaManager.uploader"),
+    icon: "i-lucide-upload-cloud",
+    value: "upload",
+  },
+]);
 const searchValue = ref("");
 const showFolders = ref(!props.noFolders);
 
@@ -119,7 +129,7 @@ onUnmounted(() => {
           <UInput
             v-model="searchValue"
             size="xs"
-            placeholder="Search..."
+            :placeholder="t('mapo.search')"
             icon="i-lucide-search"
             :loading="store.loading"
           />
@@ -131,7 +141,7 @@ onUnmounted(() => {
           size="xs"
           variant="ghost"
           color="neutral"
-          title="Refresh"
+          :title="t('mapo.refresh')"
           @click="store.getRoot()"
         />
 

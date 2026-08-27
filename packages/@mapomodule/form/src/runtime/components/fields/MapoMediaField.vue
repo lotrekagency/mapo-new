@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { MediaDescriptor, MediaItem } from "../../types/index.js";
 import { useMediaManager } from "../../composables/useMediaManager.js";
 
@@ -14,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:modelValue": [value: MediaItem | null];
 }>();
+
+const { t } = useI18n();
 
 const dialogOpen = ref(false);
 
@@ -79,7 +82,7 @@ function clear() {
         :block="!current"
         @click="dialogOpen = true"
       >
-        {{ current ? "Change" : "Select media" }}
+        {{ current ? t("mapo.change") : t("mapo.mediaField.selectMedia") }}
       </UButton>
 
       <!-- Dialog -->

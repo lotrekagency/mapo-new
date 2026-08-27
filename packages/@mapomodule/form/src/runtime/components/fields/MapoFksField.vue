@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useNuxtApp } from "#app";
 import { debounce } from "@mapomodule/utils";
 import type { FksDescriptor } from "../../types/index.js";
@@ -13,6 +14,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: unknown] }>();
+
+const { t } = useI18n();
 
 const attrs = computed(() => props.descriptor.attrs);
 const isMultiple = computed(
@@ -70,7 +73,7 @@ const internalValue = computed({
 
 // Placeholder
 const placeholder = computed(() =>
-  isMultiple.value ? "Search and select..." : "Search...",
+  isMultiple.value ? t("mapo.fksField.searchSelect") : t("mapo.search"),
 );
 
 // Chip text shown in the trigger.
@@ -144,7 +147,9 @@ function getItemKey(item: unknown): unknown {
     <!-- Empty state -->
     <template #empty>
       <span class="text-sm text-gray-500">
-        {{ searchTerm ? "No results found" : "No items available" }}
+        {{
+          searchTerm ? t("mapo.fksField.noResults") : t("mapo.fksField.noItems")
+        }}
       </span>
     </template>
   </USelectMenu>
