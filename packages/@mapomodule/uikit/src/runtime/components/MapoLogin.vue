@@ -2,8 +2,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useMapoAuth } from "@mapomodule/core/runtime/auth/useMapoAuth";
-import { useRoute } from "vue-router";
-import { navigateTo } from "#app";
+import { useRoute, navigateTo } from "#app";
 
 defineSlots<{
   /** Left decorative panel (shown lg+). Replace with your own branding. */

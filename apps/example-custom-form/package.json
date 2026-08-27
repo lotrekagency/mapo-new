@@ -15,8 +15,8 @@
     "@mapomodule/store": "workspace:*",
     "@mapomodule/utils": "workspace:*",
     "@mdi/font": "^7.4.47",
-    "nuxt": "^4.4.2",
-    "vue": "^3.5.32",
+    "nuxt": "^4.5.1",
+    "vue": "^3.5.40",
     "vuetify": "^3.7.0",
     "vite-plugin-vuetify": "^2.0.4"
   }

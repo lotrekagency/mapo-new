@@ -11,9 +11,8 @@ import {
   type Ref,
   type VNode,
 } from "vue";
-import { useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
 import { useI18n } from "vue-i18n";
-import { useNuxtApp } from "#app";
 import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import {

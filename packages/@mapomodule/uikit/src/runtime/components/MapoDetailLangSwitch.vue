@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "#app";
 
 const props = withDefaults(
   defineProps<{

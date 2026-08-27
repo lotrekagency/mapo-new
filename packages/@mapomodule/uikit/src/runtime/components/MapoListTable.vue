@@ -19,7 +19,7 @@ import { usePermissions } from "@mapomodule/store/runtime/composables/usePermiss
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { debounce, splitEndpointParams } from "@mapomodule/utils";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "#app";
 
 const props = withDefaults(
   defineProps<{
