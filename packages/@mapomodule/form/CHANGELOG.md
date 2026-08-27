@@ -1,3 +1,13 @@
+# @mapomodule/form [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.5...@mapomodule/form@2.0.0-beta.6) (2026-08-27)
+
+### Bug Fixes
+
+- **uikit,form,utils:** resolve the router through Nuxt, not vue-router ([bf4aeb3](https://github.com/lotrekagency/mapo-new/commit/bf4aeb3d6fa4edad7b761cdb5f354152f74f603f))
+
+### Dependencies
+
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.3
+
 # @mapomodule/form [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.4...@mapomodule/form@2.0.0-beta.5) (2026-07-23)
 
 ### Features
