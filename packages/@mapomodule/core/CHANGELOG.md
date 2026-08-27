@@ -1,3 +1,15 @@
+# @mapomodule/core [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.5...@mapomodule/core@2.0.0-beta.6) (2026-08-27)
+
+### Bug Fixes
+
+- **core:** propagate backend error payload from failed requests ([d01fe8b](https://github.com/lotrekagency/mapo-new/commit/d01fe8be31cd3aa0c29d2a61efd89501ca94c47d))
+- fix server asking auth user info on wrong absolute url and fix error handling ([f9ee263](https://github.com/lotrekagency/mapo-new/commit/f9ee263291834da2ef05fdd8c604577466af3d27))
+- re-inject cookie on server side ofetch calls to prevent loosing sessions calling backend ([b8dc58a](https://github.com/lotrekagency/mapo-new/commit/b8dc58a03b638231a246bf2b5950d6272c3540e9))
+
+### Dependencies
+
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.3
+
 # @mapomodule/core [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.4...@mapomodule/core@2.0.0-beta.5) (2026-07-23)
 
 ### Dependencies
