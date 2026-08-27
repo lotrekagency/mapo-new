@@ -1,3 +1,17 @@
+# mapomodule [2.0.0-beta.11](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.10...mapomodule@2.0.0-beta.11) (2026-08-27)
+
+### Bug Fixes
+
+- **release:** build packages from semantic-release prepare, not prepack ([e7f4327](https://github.com/lotrekagency/mapo-new/commit/e7f4327027ac4b4f1f430dfc35fb4669a7703c13))
+
+### Dependencies
+
+- **@mapomodule/core:** upgraded to 2.0.0-beta.7
+- **@mapomodule/form:** upgraded to 2.0.0-beta.8
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.2
+- **@mapomodule/store:** upgraded to 2.0.0-beta.5
+- **@mapomodule/uikit:** upgraded to 2.0.0-beta.10
+
 # mapomodule [2.0.0-beta.10](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.9...mapomodule@2.0.0-beta.10) (2026-08-27)
 
 ### Dependencies
