@@ -1,3 +1,10 @@
+# @mapomodule/uikit [2.0.0-beta.9](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.8...@mapomodule/uikit@2.0.0-beta.9) (2026-08-27)
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.7
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.1
+
 # @mapomodule/uikit [2.0.0-beta.8](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.7...@mapomodule/uikit@2.0.0-beta.8) (2026-08-27)
 
 ### Bug Fixes
