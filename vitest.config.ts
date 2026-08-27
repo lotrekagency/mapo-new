@@ -15,6 +15,13 @@ export default defineConfig({
       ),
     },
   },
+  // `import.meta.server` is a Nuxt build-time flag; unit tests exercise the server
+  // branch (it is read in exactly one place, plugins/00.fetch.ts). `import.meta.client`
+  // and `import.meta.dev` are deliberately left undefined so their guards stay falsy.
+  define: {
+    "import.meta.server": "true",
+  },
+
   test: {
     environment: "node",
   },
