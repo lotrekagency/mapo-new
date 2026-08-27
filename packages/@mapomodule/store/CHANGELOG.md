@@ -1,3 +1,9 @@
+# @mapomodule/store [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/store@2.0.0-beta.4...@mapomodule/store@2.0.0-beta.5) (2026-08-27)
+
+### Bug Fixes
+
+- **release:** build packages from semantic-release prepare, not prepack ([e7f4327](https://github.com/lotrekagency/mapo-new/commit/e7f4327027ac4b4f1f430dfc35fb4669a7703c13))
+
 # @mapomodule/store [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/store@2.0.0-beta.3...@mapomodule/store@2.0.0-beta.4) (2026-07-16)
 
 ### Bug Fixes
