@@ -2,6 +2,7 @@ import { ref, computed } from "vue";
 import {
   defineNuxtPlugin,
   navigateTo,
+  useRequestHeaders,
   useRoute,
   useRuntimeConfig,
 } from "nuxt/app";
@@ -59,18 +60,24 @@ export default defineNuxtPlugin({
     const pending = ref(0);
     const mapoFetchLoading = computed(() => pending.value > 0);
 
+    const forwardedCookie = import.meta.server
+      ? useRequestHeaders(["cookie"]).cookie
+      : undefined;
+
     const mapoFetch = $fetch.create({
-      onRequest() {
+      onRequest({ options }) {
         pending.value++;
+        if (forwardedCookie) {
+          const headers = new Headers(
+            options.headers as HeadersInit | undefined,
+          );
+          if (!headers.has("cookie")) headers.set("cookie", forwardedCookie);
+          options.headers = headers;
+        }
       },
       onResponse({ response, request }) {
         pending.value--;
         handle(response.status, String(request));
-      },
-      onResponseError({ response, request, error }) {
-        pending.value--;
-        handle(response?.status ?? 0, String(request));
-        return Promise.reject(error);
       },
       onRequestError() {
         // Decrement counter on network errors (no response received).
