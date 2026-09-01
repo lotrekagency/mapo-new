@@ -1,3 +1,9 @@
+# @mapomodule/utils [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.3...@mapomodule/utils@2.0.0-beta.4) (2026-09-01)
+
+### Features
+
+- added an experimental flat to produce the form directly from openapi schema in option call ([07fd8ca](https://github.com/lotrekagency/mapo-new/commit/07fd8cafdcda450c5c2c35cbccb0370de9801b0e))
+
 # @mapomodule/utils [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.2...@mapomodule/utils@2.0.0-beta.3) (2026-08-27)
 
 ### Bug Fixes
