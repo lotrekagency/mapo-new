@@ -10,6 +10,8 @@ type DescriptorWithAttrs = {
   };
   fields?: unknown[];
   visible?: (ctx: { model: Record<string, unknown> }) => boolean;
+  readonly?: boolean;
+  translatable?: boolean;
 };
 
 // Pydantic v2 / DRF Spectacular style schema.
@@ -411,5 +413,27 @@ describe("useFormFromSchema — number attrs", () => {
     const typed = f as DescriptorWithAttrs | undefined;
     expect(typed?.attrs?.min).toBe(0);
     expect(typed?.attrs?.max).toBe(5);
+  });
+});
+
+describe("useFormFromSchema — schema flags", () => {
+  // Camomilla's OPTIONS schema marks per-language properties. Dropping the flag
+  // renders them as plain fields under language tabs that no longer bind them.
+  const flagged: JSONSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", title: "Titolo", translatable: true },
+      identifier: { type: "string", title: "Identifier" },
+      created_at: { type: "string", format: "date-time", readOnly: true },
+    },
+  };
+
+  it("carries translatable and readOnly onto the descriptor", () => {
+    const fields = useFormFromSchema(flagged);
+    const by = (k: string) =>
+      fields.find((f) => f.key === k) as DescriptorWithAttrs | undefined;
+    expect(by("title")?.translatable).toBe(true);
+    expect(by("identifier")?.translatable).toBeUndefined();
+    expect(by("created_at")?.readonly).toBe(true);
   });
 });
