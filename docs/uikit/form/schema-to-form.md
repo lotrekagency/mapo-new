@@ -40,6 +40,8 @@ The returned array is a regular `FieldDescriptor[]` — you can splice, sort, an
 
 Properties shaped as `anyOf: [type, null]` (the Pydantic nullable pattern) are unwrapped automatically.
 
+Two keywords ride along onto the descriptor rather than choosing a type: `readOnly: true` becomes `readonly: true`, and `translatable: true` — the extension Camomilla publishes on its `OPTIONS` schema for a property that holds one value per language — becomes `translatable: true`, so a derived field binds to the language tabs around it instead of ignoring them.
+
 ## How to: handle `if/then/else` conditionals
 
 JSON Schema conditionals become reactive `visible()` callbacks:
