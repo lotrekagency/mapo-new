@@ -1,3 +1,15 @@
+# @mapomodule/uikit [2.0.0-beta.11](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.10...@mapomodule/uikit@2.0.0-beta.11) (2026-09-01)
+
+### Features
+
+- added an experimental flat to produce the form directly from openapi schema in option call ([07fd8ca](https://github.com/lotrekagency/mapo-new/commit/07fd8cafdcda450c5c2c35cbccb0370de9801b0e))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.9
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.4
+- **@mapomodule/core:** upgraded to 2.0.0-beta.8
+
 # @mapomodule/uikit [2.0.0-beta.10](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.9...@mapomodule/uikit@2.0.0-beta.10) (2026-08-27)
 
 ### Bug Fixes
