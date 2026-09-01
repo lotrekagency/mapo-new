@@ -1,3 +1,9 @@
+# @mapomodule/store [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/store@2.0.0-beta.5...@mapomodule/store@2.0.0-beta.6) (2026-09-01)
+
+### Bug Fixes
+
+- fix auth permission on user model ([54b1d03](https://github.com/lotrekagency/mapo-new/commit/54b1d036ddd32b0d94ab4d37452300f4786cddfd))
+
 # @mapomodule/store [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/store@2.0.0-beta.4...@mapomodule/store@2.0.0-beta.5) (2026-08-27)
 
 ### Bug Fixes
