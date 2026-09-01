@@ -181,6 +181,7 @@ function propertyToDescriptor(
     label: schema.title ?? undefined,
     required: requiredKeys.has(key),
     ...(schema.readOnly ? { readonly: true } : {}),
+    ...(schema.translatable ? { translatable: true } : {}),
     ...(visible ? { visible } : {}),
     ...(Object.keys(attrs).length ? { attrs } : {}),
   };
