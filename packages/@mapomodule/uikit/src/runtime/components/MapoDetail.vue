@@ -10,6 +10,7 @@ import {
   provide,
   type Ref,
   type VNode,
+  shallowRef,
 } from "vue";
 import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
 import { useI18n } from "vue-i18n";
@@ -24,6 +25,10 @@ import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
+import { languagesFromMetadata } from "../utils/langInfo";
+import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
+import type { UseFormFromSchemaOptions } from "@mapomodule/form/runtime/composables/useFormFromSchema";
+import type { JSONSchema } from "@mapomodule/utils";
 import type { MultipartPolicy } from "@mapomodule/core";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -34,8 +39,28 @@ const props = withDefaults(
     endpoint: string;
     /** Record id. Pass `'new'` to create. */
     id: string | number;
-    /** Fields for the main body form. */
-    fields: AnyFieldDescriptor<T>[];
+    /**
+     * Fields for the main body form.
+     *
+     * Optional only so `experimentalFieldsFromSchema` can supply them; pass them
+     * explicitly for any form you care about the layout of.
+     */
+    fields?: AnyFieldDescriptor<T>[];
+    /**
+     * EXPERIMENTAL. Build the body fields from the endpoint's OPTIONS schema
+     * when `fields` is not given.
+     *
+     * Off by default and deliberately opt-in: a derived form knows types,
+     * labels, relations and what is read-only, but nothing editorial — no tabs,
+     * no column widths, no rich-text vs textarea, no sidebar split, and no
+     * opinion about field order beyond the serializer's. Treat it as a
+     * scaffold to start from, not a finished panel.
+     *
+     * Requires a backend that publishes `schema` on OPTIONS (camomilla >= 6.6).
+     */
+    experimentalFieldsFromSchema?: boolean;
+    /** Passed straight to useFormFromSchema when deriving. */
+    schemaFieldOptions?: UseFormFromSchemaOptions;
     /** Fields for the sidebar form (optional). */
     sidebarFields?: AnyFieldDescriptor<T>[];
     /** Translation language codes (e.g. ['it', 'en']). */
@@ -93,6 +118,9 @@ const props = withDefaults(
     forceLanguages?: string[];
   }>(),
   {
+    fields: undefined,
+    experimentalFieldsFromSchema: false,
+    schemaFieldOptions: undefined,
     sidebarFields: () => [],
     languages: () => [],
     sidebarCols: 4,
@@ -184,9 +212,11 @@ const isDirty = computed(
 const mainCols = computed(() => 12 - props.sidebarCols);
 
 // ─── Languages (auto-derive from lang_info) ──────────────────────────────────
-// Backends like Camomilla embed site_languages inside the fetched model.
-// We read them after the first successful fetch so the host page doesn't need
-// to hard-code the language list. forceLanguages > props.languages > derived.
+// Camomilla describes the MODEL's language situation in the endpoint's OPTIONS
+// metadata, so the host page doesn't hard-code a language list — and a model
+// that is not registered for translation shows no switcher at all, rather than
+// tabs whose extra values the backend would drop.
+// forceLanguages > props.languages > derived.
 const derivedLangs = ref<string[]>([]);
 const activeLangs = computed<string[]>(() => {
   if (props.forceLanguages?.length) return props.forceLanguages;
@@ -324,6 +354,58 @@ if (props.draft || props.draftKey) {
 
 // ─── Fetch ───────────────────────────────────────────────────────────────────
 
+/**
+ * Body fields derived from the OPTIONS schema; empty unless opted in.
+ *
+ * shallowRef, not ref: the array is replaced wholesale, never mutated in place,
+ * and deep reactivity over descriptors (which carry functions) buys nothing.
+ * It also keeps the generic intact — ref()'s UnwrapRef erases the T in
+ * `key: DeepKeyOf<T>`.
+ */
+const derivedFields = shallowRef<AnyFieldDescriptor<T>[]>([]);
+
+/**
+ * The fields actually rendered. An explicit `fields` prop always wins — the
+ * derived set is a scaffold, never an override of a hand-built form.
+ */
+const activeFields = computed<AnyFieldDescriptor<T>[]>(() =>
+  props.fields?.length ? props.fields : derivedFields.value,
+);
+
+/**
+ * Ask the endpoint to describe itself, ONCE, and take from that answer both the
+ * languages and (when opted in) the fields.
+ *
+ * Runs for existing records as well as new ones: the metadata lives on OPTIONS
+ * only, so reading the fetched record would leave an edit form with no tabs.
+ */
+async function describeEndpoint() {
+  const wantsLangs = !props.languages.length && !props.forceLanguages?.length;
+  const wantsFields =
+    props.experimentalFieldsFromSchema && !props.fields?.length;
+  if (!wantsLangs && !wantsFields) return;
+
+  let metadata: Record<string, unknown>;
+  try {
+    metadata = (await crud.options()) as Record<string, unknown>;
+  } catch {
+    // A backend without OPTIONS metadata is not an error worth surfacing: it
+    // just means nothing is auto-derived.
+    return;
+  }
+
+  if (wantsLangs) derivedLangs.value = languagesFromMetadata(metadata);
+  if (wantsFields) {
+    const schema = metadata.schema as JSONSchema | undefined;
+    if (schema?.properties) {
+      derivedFields.value = useFormFromSchema(
+        schema,
+        props.schemaFieldOptions,
+      ) as AnyFieldDescriptor<T>[];
+    }
+  }
+}
+
 async function fetchModel() {
   if (isNew.value) {
     backup.value = null;
@@ -334,19 +416,6 @@ async function fetchModel() {
   try {
     model.value = await crud.detail(props.id);
     backup.value = deepClone(model.value) as T;
-    // Auto-derive languages from the backend response when the host page does
-    // not hard-code them. Camomilla embeds site_languages inside lang_info.
-    const langInfo = (model.value as Record<string, unknown>)?.lang_info as
-      | Record<string, unknown>
-      | undefined;
-    const siteLangs = langInfo?.site_languages as string[] | undefined;
-    if (
-      siteLangs?.length &&
-      !props.languages.length &&
-      !props.forceLanguages?.length
-    ) {
-      derivedLangs.value = siteLangs;
-    }
     checkDraft();
   } catch (err: unknown) {
     snack.show(getErrorDetail(err) ?? t("mapo.loadItemError"), "error");
@@ -494,6 +563,9 @@ onMounted(() => {
       preventWindowClose,
     );
   }
+  // Independent of the record fetch: languages come from OPTIONS either way,
+  // and a new record has no fetch to piggyback on.
+  describeEndpoint();
   fetchModel();
 });
 
@@ -684,7 +756,7 @@ defineSlots<{
         <slot name="body" v-bind="slotBindings">
           <MapoForm
             v-model="model"
-            :fields="fields"
+            :fields="activeFields"
             :errors="errors"
             :languages="activeLangs"
             :current-lang="currentLang"

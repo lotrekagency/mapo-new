@@ -11,9 +11,10 @@ function mapType(schema: JSONSchema, key: string): FieldType {
   const t = Array.isArray(schema.type)
     ? schema.type.find((v) => v !== "null")
     : schema.type;
-  const fmt = schema.format as string | undefined;
+  const fmt = schema.format;
 
   if (t === "string") {
+    if (fmt === "textarea") return "textarea";
     if (fmt === "date") return "date";
     if (fmt === "date-time") return "datetime";
     if (fmt === "time") return "time";
@@ -179,6 +180,7 @@ function propertyToDescriptor(
     type,
     label: schema.title ?? undefined,
     required: requiredKeys.has(key),
+    ...(schema.readOnly ? { readonly: true } : {}),
     ...(visible ? { visible } : {}),
     ...(Object.keys(attrs).length ? { attrs } : {}),
   };

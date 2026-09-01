@@ -37,6 +37,19 @@ export interface CrudOptions {
   multipart?: MultipartPolicy;
 }
 
+/**
+ * What an endpoint returns from OPTIONS. Deliberately loose: backends extend it
+ * (Camomilla adds `lang_info`), and clients read only the keys they know.
+ */
+export interface ResourceMetadata {
+  name?: string;
+  description?: string;
+  renders?: string[];
+  parses?: string[];
+  actions?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface CrudRepository<T> {
   list(params?: ListParams, config?: CrudConfig): Promise<PaginatedResponse<T>>;
   detail(id: string | number, config?: CrudConfig): Promise<T>;
@@ -54,6 +67,7 @@ export interface CrudRepository<T> {
     opts?: CrudOptions,
   ): Promise<T>;
   delete(id: string | number, config?: CrudConfig): Promise<void>;
+  options(config?: CrudConfig): Promise<ResourceMetadata>;
   updateOrCreate(
     data: Partial<T> & { id?: string | number },
     config?: CrudConfig,

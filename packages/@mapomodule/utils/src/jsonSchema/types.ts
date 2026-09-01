@@ -35,6 +35,11 @@ export interface JSONSchema {
   discriminator?: { propertyName: string };
   title?: string;
   default?: unknown;
+  /** e.g. "date-time", "date", "time", "color" — and "textarea" as a multiline hint. */
+  format?: string;
+  /** Standard JSON Schema. Consumers should render the field disabled, not drop it. */
+  readOnly?: boolean;
+  writeOnly?: boolean;
   _nullable?: boolean;
   [key: string]: unknown;
 }
