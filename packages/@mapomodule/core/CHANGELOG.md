@@ -1,3 +1,10 @@
+# @mapomodule/core [2.0.0-beta.9](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.8...@mapomodule/core@2.0.0-beta.9) (2026-09-01)
+
+### Dependencies
+
+- **@mapomodule/store:** upgraded to 2.0.0-beta.6
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.5
+
 # @mapomodule/core [2.0.0-beta.8](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.7...@mapomodule/core@2.0.0-beta.8) (2026-09-01)
 
 ### Features
