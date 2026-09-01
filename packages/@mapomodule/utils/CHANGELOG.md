@@ -1,3 +1,9 @@
+# @mapomodule/utils [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.4...@mapomodule/utils@2.0.0-beta.5) (2026-09-01)
+
+### Bug Fixes
+
+- fix translatable field derived from auto-form capability ([b196664](https://github.com/lotrekagency/mapo-new/commit/b1966644b8c0ac14704a66427e19c66b509f9b9c))
+
 # @mapomodule/utils [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.3...@mapomodule/utils@2.0.0-beta.4) (2026-09-01)
 
 ### Features
