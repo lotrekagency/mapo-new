@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { MapoUser, ModelPermissions } from "../types";
+import type { MapoPermission, MapoUser, ModelPermissions } from "../types";
 
 /**
  * Builds model-level permission flags from raw codename permissions.
@@ -10,6 +10,28 @@ import type { MapoUser, ModelPermissions } from "../types";
  * @param raw Raw permission codenames.
  * @returns Model-keyed permission map with CRUD booleans.
  */
+/**
+ * Codenames, out of whatever shape the backend sent.
+ *
+ * A pk is dropped rather than stringified: nothing on the client can resolve one
+ * to a codename, and keeping it would put a key in `rawPermissions` that no
+ * check ever matches — an access denial dressed up as a granted permission.
+ */
+function toCodenames(raw: MapoPermission[]): string[] {
+  const names = raw.flatMap((perm) => {
+    if (typeof perm === "string") return [perm];
+    const codename = (perm as { codename?: unknown })?.codename;
+    return typeof codename === "string" ? [codename] : [];
+  });
+  // Losing every permission silently locks the user out of every gated panel
+  // with nothing in the console to explain it.
+  if (raw.length && !names.length)
+    console.warn(
+      "[mapo] User payload carried permissions with no codename in them, so every model permission is off. Serialize them as codenames, or as objects with a `codename`.",
+    );
+  return names;
+}
+
 function buildModelPermissions(
   raw: string[],
 ): Record<string, ModelPermissions> {
@@ -60,7 +82,9 @@ export const useAuthStore = defineStore("mapo-auth", {
      */
     setUser(user: MapoUser) {
       this.info = user;
-      const perms = user.all_permissions ?? user.user_permissions ?? [];
+      const perms = toCodenames(
+        user.all_permissions ?? user.user_permissions ?? [],
+      );
       this.rawPermissions = perms;
       this.modelPermissions = buildModelPermissions(perms);
     },
