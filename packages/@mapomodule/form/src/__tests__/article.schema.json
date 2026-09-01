@@ -1,0 +1,193 @@
+{
+  "type": "object",
+  "properties": {
+    "indexable": {
+      "type": "boolean",
+      "translatable": true,
+      "title": "Indexable"
+    },
+    "ordering": {
+      "type": "integer",
+      "maximum": 9223372036854775807,
+      "format": "int64",
+      "minimum": 0,
+      "title": "Ordering"
+    },
+    "is_public": { "type": "boolean", "readOnly": true, "title": "Is public" },
+    "meta": { "type": "object", "title": "Meta" },
+    "routerlink": { "type": "string", "readOnly": true, "title": "Routerlink" },
+    "og_url": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Og url"
+    },
+    "tags": {
+      "type": "relation",
+      "model": "camomilla.Tag",
+      "multiple": true,
+      "endpoint": "/api/camomilla/tags/",
+      "title": "Tags"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "translatable": true,
+      "title": "Published at"
+    },
+    "keywords": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Keywords"
+    },
+    "breadcrumbs_title": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 128,
+      "translatable": true,
+      "title": "Breadcrumbs title"
+    },
+    "content": {
+      "type": "string",
+      "translatable": true,
+      "title": "Content",
+      "format": "textarea"
+    },
+    "identifier": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "title": "Identifier"
+    },
+    "template": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 500,
+      "title": "Template"
+    },
+    "description": {
+      "type": "string",
+      "nullable": true,
+      "translatable": true,
+      "title": "Description",
+      "format": "textarea"
+    },
+    "id": { "type": "integer", "readOnly": true, "title": "ID" },
+    "og_title": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Og title"
+    },
+    "canonical": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Canonical"
+    },
+    "author": {
+      "type": "relation",
+      "model": "auth.User",
+      "multiple": false,
+      "endpoint": "/api/camomilla/users/",
+      "nullable": true,
+      "title": "Author"
+    },
+    "og_image": {
+      "type": "relation",
+      "model": "camomilla.Media",
+      "multiple": false,
+      "endpoint": "/api/camomilla/media/",
+      "nullable": true,
+      "title": "Og image"
+    },
+    "parent_page": {
+      "type": "relation",
+      "model": "camomilla.Article",
+      "multiple": false,
+      "endpoint": "/api/camomilla/articles/",
+      "nullable": true,
+      "title": "Parent page"
+    },
+    "highlight_image": {
+      "type": "relation",
+      "model": "camomilla.Media",
+      "multiple": false,
+      "endpoint": "/api/camomilla/media/",
+      "nullable": true,
+      "title": "Highlight image"
+    },
+    "template_file": {
+      "type": "string",
+      "readOnly": true,
+      "title": "Template file"
+    },
+    "date_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "title": "Date updated at"
+    },
+    "breadcrumbs": {
+      "type": "string",
+      "readOnly": true,
+      "title": "Breadcrumbs"
+    },
+    "og_description": {
+      "type": "string",
+      "nullable": true,
+      "translatable": true,
+      "title": "Og description",
+      "format": "textarea"
+    },
+    "template_data": {
+      "type": "object",
+      "translatable": true,
+      "title": "Template data"
+    },
+    "date_created": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "title": "Date created"
+    },
+    "autopermalink": {
+      "type": "boolean",
+      "translatable": true,
+      "title": "Autopermalink"
+    },
+    "title": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Title"
+    },
+    "permalink": {
+      "type": "string",
+      "translatable": true,
+      "title": "Permalink"
+    },
+    "og_type": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 200,
+      "translatable": true,
+      "title": "Og type"
+    },
+    "status": { "type": "string", "readOnly": true, "title": "Status" },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "nullable": true,
+      "title": "Deleted at"
+    }
+  }
+}
