@@ -1,3 +1,14 @@
+# @mapomodule/form [2.0.0-beta.10](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.9...@mapomodule/form@2.0.0-beta.10) (2026-09-01)
+
+### Bug Fixes
+
+- fix translatable field derived from auto-form capability ([b196664](https://github.com/lotrekagency/mapo-new/commit/b1966644b8c0ac14704a66427e19c66b509f9b9c))
+
+### Dependencies
+
+- **@mapomodule/store:** upgraded to 2.0.0-beta.6
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.5
+
 # @mapomodule/form [2.0.0-beta.9](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.8...@mapomodule/form@2.0.0-beta.9) (2026-09-01)
 
 ### Features
