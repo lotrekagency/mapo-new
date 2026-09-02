@@ -14,7 +14,7 @@ Install the meta-package, `@nuxt/ui`, and (optionally) the Camomilla integration
 
 ```bash
 pnpm add mapomodule @nuxt/ui
-pnpm add mapo-integrations-camomilla   # optional — only if you use Camomilla CMS
+pnpm add @mapomodule/mapo-integrations-camomilla   # optional — only if you use Camomilla CMS
 ```
 
 The `mapomodule` meta-package transparently installs `@mapomodule/core`, `@mapomodule/store`, and `@mapomodule/uikit`. You don't need to add them as separate dependencies. `@iconify-json/lucide` is bundled with `mapomodule` — no need to install it separately.
@@ -28,7 +28,7 @@ export default defineNuxtConfig({
   modules: [
     "@nuxt/ui", // must come before mapomodule — see note below
     "mapomodule",
-    "mapo-integrations-camomilla", // optional
+    "@mapomodule/mapo-integrations-camomilla", // optional
   ],
 
   mapo: {
@@ -136,7 +136,7 @@ import type { FieldDescriptor } from "@mapomodule/form/types";
 import type { ListColumn } from "@mapomodule/uikit/types";
 
 // Camomilla types are always package-specific (it's an optional module)
-import type { CamomillaPathRewrite } from "mapo-integrations-camomilla/types";
+import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomilla/types";
 ```
 
 `mapomodule/types` aggregates all types from `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/form`, `@mapomodule/uikit`, and `@mapomodule/utils`.
@@ -182,7 +182,6 @@ pnpm dev:core         # @mapomodule/core   — nuxt-module-build --stub --watch
 pnpm dev:store        # @mapomodule/store  — nuxt-module-build --stub --watch
 pnpm dev:utils        # @mapomodule/utils  — tsc --watch
 pnpm dev:mapomodule   # mapomodule         — nuxt-module-build --stub --watch
-pnpm dev:camomilla    # mapo-integrations-camomilla — nuxt-module-build --stub --watch
 ```
 
 Or start all package watchers at once with Turborepo:
