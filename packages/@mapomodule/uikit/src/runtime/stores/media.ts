@@ -8,6 +8,7 @@ import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
+import { languagesFromMetadata } from "../utils/langInfo.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -85,6 +86,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const _currentAll = ref(false);
   const _currentLang = ref<string | undefined>(undefined);
 
+  // Language codes the media model is actually registered for, read once from
+  // the endpoint's OPTIONS. It lives here rather than in the editor because all
+  // three entry points — manager, picker dialog, and the `media` form field —
+  // mount their own editor, and each would otherwise need the host page to hand
+  // it a hardcoded list.
+  const languages = ref<string[]>([]);
+  let languagesPromise: Promise<void> | null = null;
+
   // ─── Getters ──────────────────────────────────────────────────────────────
   const parentFolder = computed(
     () => parentFolders.value[parentFolders.value.length - 1] ?? null,
@@ -118,6 +127,27 @@ export const useMediaStore = defineStore("mapo-media", () => {
   }
   function folderCrud() {
     return useCrud<MediaFolder>(endpoints.folders);
+  }
+
+  /**
+   * Ask the media endpoint to describe its language situation, at most once.
+   *
+   * `lang_info` is served on OPTIONS only: it describes the model, so there is
+   * no record to read it from, and a media library nobody registered for
+   * translation reports none — which is the point. The in-flight promise is
+   * kept so several editors mounting at once share a single request.
+   */
+  async function deriveLanguages(): Promise<void> {
+    if (languagesPromise) return languagesPromise;
+    languagesPromise = (async () => {
+      try {
+        languages.value = languagesFromMetadata(await mediaCrud().options());
+      } catch {
+        // A backend without OPTIONS metadata just gets no language switcher.
+        languagesPromise = null;
+      }
+    })();
+    return languagesPromise;
   }
 
   // ─── Breadcrumb maintenance ─────────────────────────────────────────────
@@ -445,12 +475,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection,
     editList,
     selectMode,
+    languages,
     // getters
     parentFolder,
     editListSet,
     editListState,
     // actions
     getRoot,
+    deriveLanguages,
     navigateToFolder,
     openEditor,
     closeEditor,

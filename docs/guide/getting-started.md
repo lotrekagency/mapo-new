@@ -4,7 +4,7 @@ Mapo is a Vue 3 / Nuxt 4 admin framework. This guide gets you from zero to a run
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js ^22.19 || ^24.11 || >=26
 - pnpm >= 8 (or npm / yarn — examples below use pnpm)
 - A Nuxt 4 application
 
@@ -17,7 +17,7 @@ pnpm add mapomodule @nuxt/ui
 pnpm add @mapomodule/mapo-integrations-camomilla   # optional — only if you use Camomilla CMS
 ```
 
-The `mapomodule` meta-package transparently installs `@mapomodule/core`, `@mapomodule/store`, and `@mapomodule/uikit`. You don't need to add them as separate dependencies. `@iconify-json/lucide` is bundled with `mapomodule` — no need to install it separately.
+The `mapomodule` meta-package transparently installs `@mapomodule/store`, `@mapomodule/i18n`, `@mapomodule/core`, `@mapomodule/uikit`, `@mapomodule/form`, and `@mapomodule/utils`. You don't need to add them as separate dependencies. `@iconify-json/lucide` is bundled with `mapomodule` — no need to install it separately.
 
 ## Configure
 
@@ -45,7 +45,7 @@ export default defineNuxtConfig({
 });
 ```
 
-All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration).
+All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration). The example above only sets the core auth keys; sub-module options are nested under their own key: `@mapomodule/i18n` (default locale, browser detection, and a `locales` list that **replaces** the built-in `en` + `it`) under `mapo.i18n`, `@mapomodule/uikit` under `mapo.uikit`, `@mapomodule/form` under `mapo.form`.
 
 ## Create app.vue
 
@@ -180,8 +180,12 @@ When working on the packages themselves, use the per-package watch scripts so `d
 pnpm dev:uikit        # @mapomodule/uikit  — nuxt-module-build --stub --watch
 pnpm dev:core         # @mapomodule/core   — nuxt-module-build --stub --watch
 pnpm dev:store        # @mapomodule/store  — nuxt-module-build --stub --watch
+pnpm dev:form         # @mapomodule/form   — nuxt-module-build --stub --watch
 pnpm dev:utils        # @mapomodule/utils  — tsc --watch
 pnpm dev:mapomodule   # mapomodule         — nuxt-module-build --stub --watch
+
+# no root alias for i18n yet — run it through the filter
+pnpm --filter @mapomodule/i18n dev
 ```
 
 Or start all package watchers at once with Turborepo:

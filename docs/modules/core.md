@@ -110,6 +110,9 @@ const patched = await articles.partialUpdate(42, { title: "Patched" });
 // Delete
 await articles.delete(42);
 
+// Describe the resource (HTTP OPTIONS)
+const metadata = await articles.options();
+
 // Create if no id, update if id present
 await articles.updateOrCreate({ id: 42, title: "Upsert" });
 
@@ -149,6 +152,7 @@ interface CrudRepository<T> {
     opts?: CrudOptions,
   ): Promise<T>;
   delete(id: string | number, config?: CrudConfig): Promise<void>;
+  options(config?: CrudConfig): Promise<ResourceMetadata>;
   updateOrCreate(
     data: Partial<T> & { id?: string | number },
     config?: CrudConfig,
@@ -160,7 +164,18 @@ interface CrudRepository<T> {
     config?: CrudConfig,
   ): Promise<void>;
 }
+
+interface ResourceMetadata {
+  name?: string;
+  description?: string;
+  renders?: string[];
+  parses?: string[];
+  actions?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 ```
+
+`options()` issues an HTTP `OPTIONS` on the collection endpoint. `ResourceMetadata` is deliberately loose: backends extend it with their own keys — Camomilla adds `lang_info` (translatable languages) and `schema` (the JSON Schema the form renderer consumes) — and clients read only the keys they know.
 
 ---
 

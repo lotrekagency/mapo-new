@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRuntimeConfig } from "#app";
 import {
@@ -12,7 +12,8 @@ import { usePermissions } from "@mapomodule/store/runtime/composables/usePermiss
 import { useMediaStore } from "../stores/media.js";
 import type { MediaItem } from "../types/media.js";
 
-defineProps<{
+const props = defineProps<{
+  /** Overrides the languages read from the endpoint. Rarely needed. */
   languages?: string[];
   defaultLang?: string;
 }>();
@@ -35,6 +36,18 @@ const saving = ref(false);
 const newFile = ref<File | null>(null);
 const maintainUrl = ref(false);
 const currentLang = ref("");
+
+// The languages actually offered. An explicit prop wins; otherwise they come
+// from the media endpoint's own OPTIONS metadata, so a host page never has to
+// restate what the backend already knows — and a media model nobody registered
+// for translation shows no switcher rather than tabs whose values it discards.
+const activeLangs = computed(() =>
+  props.languages?.length ? props.languages : store.languages,
+);
+
+onMounted(() => {
+  store.deriveLanguages();
+});
 // Pristine copy taken when entering edit mode, restored on Cancel — the form
 // mutates store.editMedia directly, so without this Cancel would leave the
 // unsaved edits visible in the info panel (legacy used deepClone the same way).
@@ -254,7 +267,7 @@ function formatDate(dateStr: string): string {
           <!-- Edit form (shown when editing) -->
           <div v-if="editing" class="space-y-4 px-4 py-3">
             <!-- Lang switch -->
-            <UFieldGroup v-if="languages && languages.length > 1" size="xs">
+            <UFieldGroup v-if="activeLangs.length > 1" size="xs">
               <UButton
                 :variant="currentLang === '' ? 'solid' : 'outline'"
                 color="neutral"
@@ -263,7 +276,7 @@ function formatDate(dateStr: string): string {
                 {{ t("mapo.mediaEditor.defaultLang") }}
               </UButton>
               <UButton
-                v-for="lang in languages"
+                v-for="lang in activeLangs"
                 :key="lang"
                 :variant="currentLang === lang ? 'solid' : 'outline'"
                 color="neutral"

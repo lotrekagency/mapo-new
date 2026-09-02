@@ -46,6 +46,7 @@ When installed via `mapomodule`, configure under `mapo.uikit` instead.
 | `MapoSidebarProfile`  | User profile row (avatar + username + logout) for the sidebar footer         |
 | `MapoTopbar`          | Top bar with drawer toggle and left/default/right slots                      |
 | `MapoThemeToggle`     | Dark/light mode toggle via `useColorMode()` — drop-in for any slot           |
+| `MapoLangSwitcher`    | Interface locale switcher over the `@nuxtjs/i18n` locales, with flag emoji   |
 | `MapoLogoutButton`    | Standalone logout button with `variant`, `color`, `size`, `iconOnly` props   |
 
 #### Feedback
@@ -103,10 +104,19 @@ mapo: {
 
 #### Detail shell
 
-| Component              | Description                                                                                                                                                                                                                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MapoDetail`           | Two-column detail shell: `useCrud` lifecycle, differential PATCH, error mapping, draft auto-save (`:draft="true"`). Supports permission gating (`permissionModel`), multipart control (`multipart`), live preview (`previewField`), and backend-derived languages (`forceLanguages`). |
-| `MapoDetailLangSwitch` | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                                                                                                                                          |
+| Component              | Description                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoDetail`           | Two-column detail shell: `useCrud` lifecycle, differential PATCH, error mapping, draft auto-save (`:draft="true"`). Supports permission gating (`permissionModel`), multipart control (`multipart`), live preview (`previewField`), and languages derived from the endpoint's OPTIONS `lang_info` (overridable with `languages` / `forceLanguages`). |
+| `MapoDetailLangSwitch` | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                                                                                                                                                                                                         |
+
+#### Menu manager
+
+| Component              | Description                                                                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoMenuManager`      | Split-pane menu editor: `useCrud` load/save, per-language node trees (`translatable`), differential save (`usePatch`), permission gating (`permissionModel`)    |
+| `MapoMenuTreeview`     | Left pane — drag-and-drop node tree with nesting limit (`maxDepth`) and confirm-on-delete                                                                       |
+| `MapoMenuTreeviewNode` | Recursive node renderer: nested drag lists for re-parenting, inline rename, per-node error badge                                                                |
+| `MapoMenuNodeEditor`   | Right pane — `MapoForm` for the selected node (title, link type, style, new tab, page picker, static URL); `coreFields` / `additionalFields` swap the field set |
 
 ### Layout slots (`mapo-default`)
 
@@ -172,7 +182,7 @@ app/
 
 The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` and swaps the `filePath` — no imports, no registration needed. Keep props and slots compatible with the original.
 
-Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoSidebarProfile`, `MapoLogin`, `MapoLogoutButton`, `MapoThemeToggle`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`, `MapoDetail`, `MapoDetailLangSwitch`, `MapoList`, `MapoListTable`, `MapoListFilters`, `MapoListActions`, `MapoListHead`, `MapoListQuickEdit`, `MapoMediaManager`, `MapoMediaManagerDialog`, `MapoMediaGallery`, `MapoMediaEditor`, `MapoMediaUploader`, `MapoMediaFolders`.
+Overridable components: `MapoTopbar`, `MapoSidebar`, `MapoSidebarList`, `MapoSidebarListItem`, `MapoSidebarProfile`, `MapoLogin`, `MapoLogoutButton`, `MapoThemeToggle`, `MapoLangSwitcher`, `MapoSnackBar`, `MapoConfirmDialog`, `MapoRootComponents`, `MapoDetail`, `MapoDetailLangSwitch`, `MapoList`, `MapoListTable`, `MapoListFilters`, `MapoListActions`, `MapoListHead`, `MapoListQuickEdit`, `MapoMediaManager`, `MapoMediaManagerDialog`, `MapoMediaGallery`, `MapoMediaEditor`, `MapoMediaUploader`, `MapoMediaFolders`, `MapoMenuManager`, `MapoMenuTreeview`, `MapoMenuTreeviewNode`, `MapoMenuNodeEditor`.
 
 ## Dev workflow
 

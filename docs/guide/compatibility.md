@@ -6,16 +6,17 @@ This page documents the exact package versions Mapo is tested against, which dep
 
 ## Tested versions
 
-| Package       | Tested with      | Notes                                                                                                                                                               |
-| ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nuxt`        | `^4.4.x`         | Nuxt 4+ required. Nuxt 3 is not supported.                                                                                                                          |
-| `@nuxt/ui`    | `^4.7.x`         | v3.x is not supported. Declare in the app — not managed by mapomodule.                                                                                              |
-| `vue`         | `^3.5.x`         | Vue 3 required.                                                                                                                                                     |
-| `pinia`       | `^3.0.4`         | Managed internally by `@mapomodule/store`. Do **not** declare in your app.                                                                                          |
-| `@pinia/nuxt` | `^0.11.3`        | Managed internally by `@mapomodule/store`. Do **not** declare in your app.                                                                                          |
-| `typescript`  | `^5.x` or `^6.x` | Both work, but mixing versions across workspace packages causes a split-pinia bug. See [Troubleshooting](#getactivepinia-was-called-but-there-was-no-active-pinia). |
-| Node.js       | `>= 20`          |                                                                                                                                                                     |
-| pnpm          | `>= 8`           | Recommended. npm/yarn work but are untested in monorepo setups.                                                                                                     |
+| Package       | Tested with                    | Notes                                                                                                                                                               |
+| ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nuxt`        | `^4.5.x`                       | Nuxt 4+ required. Nuxt 3 is not supported.                                                                                                                          |
+| `@nuxt/ui`    | `^4.7.x`                       | v3.x is not supported. Declare in the app — not managed by mapomodule.                                                                                              |
+| `vue`         | `^3.5.x`                       | Vue 3 required.                                                                                                                                                     |
+| `vue-router`  | `^5.2.x`                       | Vue Router 5 required. Comes with Nuxt 4.                                                                                                                           |
+| `pinia`       | `^3.0.4`                       | Managed internally by `@mapomodule/store`. Do **not** declare in your app.                                                                                          |
+| `@pinia/nuxt` | `^0.11.3`                      | Managed internally by `@mapomodule/store`. Do **not** declare in your app.                                                                                          |
+| `typescript`  | `^5.x` or `^6.x`               | Both work, but mixing versions across workspace packages causes a split-pinia bug. See [Troubleshooting](#getactivepinia-was-called-but-there-was-no-active-pinia). |
+| Node.js       | `^22.19 \|\| ^24.11 \|\| >=26` | Node 24 is the developed-against baseline (`.nvmrc`).                                                                                                               |
+| pnpm          | `>= 8`                         | Recommended. npm/yarn work but are untested in monorepo setups.                                                                                                     |
 
 ---
 
@@ -26,7 +27,7 @@ pnpm add mapomodule @nuxt/ui
 pnpm add @mapomodule/mapo-integrations-camomilla   # only if you use Camomilla CMS
 ```
 
-`mapomodule` is a meta-package. It transparently installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, `@mapomodule/form`, and `@mapomodule/utils`. You don't need to add them separately.
+`mapomodule` is a meta-package. It transparently installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, `@mapomodule/form`, `@mapomodule/i18n`, and `@mapomodule/utils`. You don't need to add them separately.
 
 ### What NOT to declare
 

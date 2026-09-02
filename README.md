@@ -6,15 +6,15 @@ Mapo is a Vue 3 / Nuxt 4 admin framework for building backoffice interfaces decl
 
 ### Core packages
 
-| Package             | Description                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------- |
-| `@mapomodule/core`  | API layer (`useCrud`), auth composables, HTTP interceptors, Nuxt middleware                             |
-| `@mapomodule/store` | Pinia stores: auth, snack, confirm, sidebar + `usePermissions` composable                               |
-| `@mapomodule/uikit` | UI shell (Sidebar, Topbar, Login, layout, theming, MapoOverride) + List/Detail engines + Media Manager  |
-| `@mapomodule/utils` | Typed utilities: `deepMerge`, `objectDiff`, `debounce`, `buildRouteTree`, `humanFileSize`, `slugify`, … |
-| `@mapomodule/form`  | Declarative typed form engine: `FieldDescriptor[]`, `useMapoForm()`, 14 field types, JSON Schema bridge |
-| `@mapomodule/i18n`  | _(planned)_ `@nuxtjs/i18n` v9 wrapper with base translations                                            |
-| `mapomodule`        | Meta-package: installs all `@mapomodule/*` modules with a single registration                           |
+| Package             | Description                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `@mapomodule/core`  | API layer (`useCrud`), auth composables, HTTP interceptors, Nuxt middleware                                           |
+| `@mapomodule/store` | Pinia stores: auth, snack, confirm, sidebar + `usePermissions` composable                                             |
+| `@mapomodule/uikit` | UI shell (Sidebar, Topbar, Login, layout, theming, MapoOverride) + List/Detail engines + Media Manager + Menu Manager |
+| `@mapomodule/utils` | Typed utilities: `deepMerge`, `objectDiff`, `debounce`, `buildRouteTree`, `humanFileSize`, `slugify`, …               |
+| `@mapomodule/form`  | Declarative typed form engine: `FieldDescriptor[]`, `useMapoForm()`, 14 field types, JSON Schema bridge               |
+| `@mapomodule/i18n`  | `@nuxtjs/i18n` v10 wrapper with `en`/`it` base translations                                                           |
+| `mapomodule`        | Meta-package: installs all `@mapomodule/*` modules with a single registration                                         |
 
 ### Backend integrations
 
@@ -24,7 +24,7 @@ Mapo is a Vue 3 / Nuxt 4 admin framework for building backoffice interfaces decl
 
 ## Requirements
 
-- Node.js >= 20
+- Node.js ^22.19 || ^24.11 || >=26 (24 per `.nvmrc`)
 - pnpm >= 8
 
 ## Getting Started
