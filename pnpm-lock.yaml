@@ -82,6 +82,9 @@ importers:
       '@mapomodule/form':
         specifier: workspace:*
         version: link:../../packages/@mapomodule/form
+      '@mapomodule/mapo-integrations-camomilla':
+        specifier: 2.0.0-beta.5
+        version: 2.0.0-beta.5(nuxt@4.5.2)
       '@nuxt/ui':
         specifier: ^4.7.0
         version: 4.7.1(@tiptap/extensions@3.22.5)(@tiptap/y-tiptap@3.0.3)(embla-carousel@8.6.0)(tailwindcss@4.2.4)(typescript@6.0.3)(vite@8.0.10)(vue-router@5.2.0)(vue@3.5.42)(yjs@13.6.30)
@@ -2669,6 +2672,14 @@ packages:
     transitivePeerDependencies:
       - encoding
       - supports-color
+
+  /@mapomodule/mapo-integrations-camomilla@2.0.0-beta.5(nuxt@4.5.2):
+    resolution: {integrity: sha512-Kgdf6YFi8mvc06laKTGz38KKsnkl7k28NayiY8Np87YFiw82EU8YO4RPtAQrLzurH+4As++1ZhgY7t1XAbpP0w==}
+    peerDependencies:
+      nuxt: ^4.5.1
+    dependencies:
+      nuxt: 4.5.2(@types/node@25.6.0)(eslint@10.2.1)(rolldown@1.2.6)(typescript@6.0.3)(vite@8.2.2)(vue-tsc@3.3.4)
+    dev: false
 
   /@mdi/font@7.4.47:
     resolution: {integrity: sha512-43MtGpd585SNzHZPcYowu/84Vz2a2g31TvPMTm9uTiCSWzaheQySUcSyUH/46fPnuPQWof2yd0pGBtzee/IQWw==}
@@ -15167,10 +15178,6 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
-
-  /ultrahtml@1.6.0:
-    resolution: {integrity: sha512-R9fBn90VTJrqqLDwyMph+HGne8eqY1iPfYhPzZrvKpIfwkWZbcYlfpsb8B9dTvBfpy1/hqAD7Wi8EKfP9e8zdw==}
-    dev: true
 
   /ultrahtml@1.7.0:
     resolution: {integrity: sha512-2xRd0VHoAQE4M+vF/DvFFB7pUV0ZxTW1TLi7lHQWnF/Sb5TPeEUV/l+hxcNnGO00ZXGnR0voCMmYRKQf+rvJ2g==}
