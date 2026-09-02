@@ -22,25 +22,28 @@ The returned array is a regular `FieldDescriptor[]` — you can splice, sort, an
 
 ## How it maps types
 
-| Schema                                          | → FieldType                              |
-| ----------------------------------------------- | ---------------------------------------- |
-| `type: string`, `format: date`                  | `date`                                   |
-| `type: string`, `format: date-time`             | `datetime`                               |
-| `type: string`, `format: time`                  | `time`                                   |
-| `type: string`, `format: color`                 | `color`                                  |
-| `type: string`, `maxLength > 200`               | `textarea`                               |
-| `enum: [...]`                                   | `select` (options derived from the enum) |
-| `type: integer` / `number`                      | `number`                                 |
-| `type: boolean`                                 | `boolean`                                |
-| `type: array, items: object`                    | `repeater` (recursive)                   |
-| `type: array, items: relation`                  | `m2m`                                    |
-| `type: relation`                                | `fks` or `m2m`                           |
-| `type: object` with `title + description + url` | `seo`                                    |
-| Anything else                                   | `text`                                   |
+| Schema                                                    | → FieldType                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------------ |
+| `enum: [...]` (any type, checked first)                   | `select` (options derived from the enum)                           |
+| `type: string`, `format: textarea`                        | `textarea`                                                         |
+| `type: string`, `format: date`                            | `date`                                                             |
+| `type: string`, `format: date-time`                       | `datetime`                                                         |
+| `type: string`, `format: time`                            | `time`                                                             |
+| `type: string`, `format: color`                           | `color`                                                            |
+| `type: string`, `maxLength > 255`                         | `textarea`                                                         |
+| `type: integer` / `number`                                | `number`                                                           |
+| `type: boolean`                                           | `boolean`                                                          |
+| `type: array, items: relation`                            | `m2m`                                                              |
+| `type: array, items: object`                              | `repeater` (recursive)                                             |
+| `type: array` of scalars                                  | `select` (single-value, no derived options — set `attrs` yourself) |
+| `type: relation`                                          | `fks` or `m2m`                                                     |
+| `type: object` with `title + description + url` or `slug` | `seo`                                                              |
+| `type: object`, any other shape                           | `object:<key>`                                                     |
+| Anything else                                             | `text`                                                             |
 
 Properties shaped as `anyOf: [type, null]` (the Pydantic nullable pattern) are unwrapped automatically.
 
-Two keywords ride along onto the descriptor rather than choosing a type: `readOnly: true` becomes `readonly: true`, and `translatable: true` — the extension Camomilla publishes on its `OPTIONS` schema for a property that holds one value per language — becomes `translatable: true`, so a derived field binds to the language tabs around it instead of ignoring them.
+Two keywords ride along onto the descriptor rather than choosing a type. `readOnly: true` becomes `readonly: true`, which stops server-computed fields (`id`, `date_created`) from rendering as editable inputs whose values the backend discards. `translatable: true` — the extension Camomilla publishes on its `OPTIONS` schema for a property that holds one value per language — becomes `translatable: true`, so a derived field binds to the language tabs around it instead of ignoring them.
 
 ## How to: handle `if/then/else` conditionals
 
@@ -137,7 +140,11 @@ const fields = useFormFromSchema(schema, {
   overrides: {
     body: { type: "editor", translatable: true },
     slug: { validate: (v) => (/\s/.test(String(v)) ? "No spaces" : null) },
+    // camomilla ships `status` as a readOnly string, so the type and the
+    // readonly flag both have to be overridden for the options to land
     status: {
+      type: "select",
+      readonly: false,
       attrs: {
         options: [
           { text: "Draft", value: "draft" },
@@ -192,4 +199,4 @@ const fields = [
 - **Cycle-safe but lossy** — `$ref` cycles are caught and trimmed. If two schemas refer to each other, the inner one becomes a `text` placeholder. Add an explicit override.
 - **`oneOf` collapses** — the resolver picks the first non-null branch. For discriminated unions, model the schema with `discriminator` so the resolver can keep `oneOf` intact.
 - **Dotted paths in errors** — when the schema nests properties under `translations` or `meta`, error keys reach the form as `translations.it.title`. The default error matcher handles this; do not flatten manually.
-- **`maxLength > 200` triggers textarea** — if you want a single-line input for long strings, override the type explicitly.
+- **`maxLength > 255` triggers textarea** — if you want a single-line input for long strings, override the type explicitly.

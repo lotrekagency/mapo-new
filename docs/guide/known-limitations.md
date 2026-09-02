@@ -141,7 +141,7 @@ Django session cookies have a configurable lifetime (typically 2 weeks). When th
 
 **Status**: Fixed, no regression test yet
 
-A bug caused double slashes in rewritten URLs (e.g. `/api/camomilla//users/current/`) when the path already ended with `/`. The fix is:
+A bug caused double slashes in rewritten URLs (e.g. `/api/camomilla/users/current//`) when the path already ended with `/`. The fix is:
 
 ```ts
 rewritten.replace(/([^:]\/)\/+/g, "$1");
