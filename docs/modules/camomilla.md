@@ -1,6 +1,6 @@
-# mapo-integrations-camomilla
+# @mapomodule/mapo-integrations-camomilla
 
-Nuxt module that integrates Mapo with [Camomilla CMS](https://github.com/lotrekagency/camomilla). It works as a **Nitro server-side proxy**: every `/api/*` request from the Nuxt app is intercepted, the path is rewritten to the correct Camomilla endpoint, and the request is forwarded to the backend. Cookie handling and session sync are managed transparently.
+Nuxt module that integrates Mapo with [Camomilla CMS](https://github.com/lotrekagency/camomilla). It is developed and released from its own repository — [camomillacms/mapo-integrations-camomilla](https://github.com/camomillacms/mapo-integrations-camomilla) — and consumed here as a published dependency. It works as a **Nitro server-side proxy**: every `/api/*` request from the Nuxt app is intercepted, the path is rewritten to the correct Camomilla endpoint, and the request is forwarded to the backend. Cookie handling and session sync are managed transparently.
 
 ## Prerequisites
 
@@ -190,7 +190,7 @@ camomilla: {
 
 ## Integration with `@mapomodule/core`
 
-`mapo-integrations-camomilla` and `@mapomodule/core` are designed to work together without any glue code.
+`@mapomodule/mapo-integrations-camomilla` and `@mapomodule/core` are designed to work together without any glue code.
 
 > **SSR proxy routing**: The `@mapomodule/core` init server plugin calls `userInfoApi` using an **absolute URL** (`http://host/api/profiles/me/`). This is required so the internal server-side `$fetch` call enters Nitro's request pipeline and gets intercepted by this proxy — a relative path would bypass Nitro middleware entirely.
 

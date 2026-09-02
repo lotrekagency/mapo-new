@@ -6,7 +6,7 @@ export default defineNuxtConfig({
     "@nuxt/ui",
     "mapomodule",
     "@mapomodule/form",
-    "mapo-integrations-camomilla",
+    "@mapomodule/mapo-integrations-camomilla",
   ],
 
   mapo: {

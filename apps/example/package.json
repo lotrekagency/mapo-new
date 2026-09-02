@@ -12,8 +12,8 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.0",
     "@mapomodule/form": "workspace:*",
+    "@mapomodule/mapo-integrations-camomilla": "2.0.0-beta.5",
     "@nuxt/ui": "^4.7.0",
-    "mapo-integrations-camomilla": "workspace:*",
     "mapomodule": "workspace:*",
     "nuxt": "^4.5.1",
     "vue": "^3.5.40"

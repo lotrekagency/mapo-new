@@ -18,8 +18,9 @@ Mapo is a Vue 3 / Nuxt 4 admin framework for building backoffice interfaces decl
 
 ### Backend integrations
 
-| Package | Description |
-| ------- | ----------- |
+| Package                                   | Description                                                                                                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@mapomodule/mapo-integrations-camomilla` | Nitro proxy for [Camomilla CMS](https://github.com/lotrekagency/camomilla) — ships from its own repo: [camomillacms/mapo-integrations-camomilla](https://github.com/camomillacms/mapo-integrations-camomilla) |
 
 ## Requirements
 
