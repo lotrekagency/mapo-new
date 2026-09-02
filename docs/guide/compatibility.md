@@ -23,7 +23,7 @@ This page documents the exact package versions Mapo is tested against, which dep
 
 ```bash
 pnpm add mapomodule @nuxt/ui
-pnpm add mapo-integrations-camomilla   # only if you use Camomilla CMS
+pnpm add @mapomodule/mapo-integrations-camomilla   # only if you use Camomilla CMS
 ```
 
 `mapomodule` is a meta-package. It transparently installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, `@mapomodule/form`, and `@mapomodule/utils`. You don't need to add them separately.
@@ -51,7 +51,7 @@ export default defineNuxtConfig({
   modules: [
     "@nuxt/ui", // ← must come FIRST
     "mapomodule",
-    "mapo-integrations-camomilla", // optional
+    "@mapomodule/mapo-integrations-camomilla", // optional
   ],
 });
 ```

@@ -52,10 +52,10 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 
 ### Integrations
 
-| Feature                       | Notes                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `mapo-integrations-camomilla` | Nitro proxy, path rewriting, cookie sync (`sessionid` ↔ `__mapo_session`), CSRF forwarding |
-| Custom backend integration    | Pattern documented in [Writing your own](/modules/integrations-howto)                      |
+| Feature                                   | Notes                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `@mapomodule/mapo-integrations-camomilla` | Nitro proxy, path rewriting, cookie sync (`sessionid` ↔ `__mapo_session`), CSRF forwarding |
+| Custom backend integration                | Pattern documented in [Writing your own](/modules/integrations-howto)                      |
 
 ### List Engine (`@mapomodule/uikit`)
 

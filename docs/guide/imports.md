@@ -78,51 +78,51 @@ import type { CrudRepository } from "@mapomodule/core/types";
 Camomilla is an optional integration and is never part of `mapomodule/types`:
 
 ```ts
-import type { CamomillaPathRewrite } from "mapo-integrations-camomilla/types";
+import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomilla/types";
 ```
 
 ---
 
 ## Full API → import table
 
-| API                                             | Kind        | Recommended import                                             | Notes                        |
-| ----------------------------------------------- | ----------- | -------------------------------------------------------------- | ---------------------------- |
-| `useCrud`                                       | composable  | auto-imported                                                  | —                            |
-| `useMapoAuth`                                   | composable  | auto-imported                                                  | —                            |
-| `useMapoFetch`                                  | composable  | auto-imported                                                  | returns `{ fetch, loading }` |
-| `useAuthStore`                                  | store       | auto-imported                                                  | —                            |
-| `useSnackStore`                                 | store       | auto-imported                                                  | —                            |
-| `useConfirmStore`                               | store       | auto-imported                                                  | —                            |
-| `useSidebarStore`                               | store       | auto-imported                                                  | —                            |
-| `usePermissions`                                | composable  | auto-imported                                                  | —                            |
-| `useMapoForm`                                   | composable  | auto-imported                                                  | —                            |
-| `useFormFromSchema`                             | composable  | auto-imported                                                  | —                            |
-| `useFormDraft`                                  | composable  | auto-imported                                                  | —                            |
-| `useUnsavedChangesGuard`                        | composable  | auto-imported                                                  | —                            |
-| `useFocusMode`                                  | composable  | auto-imported                                                  | —                            |
-| `defineFormField`                               | function    | auto-imported                                                  | call from a Nuxt plugin      |
-| `when` / `whenAny` / `whenNot` / `matchesField` | helpers     | auto-imported                                                  | progressive disclosure       |
-| `isOneOf` / `isNoneOf` / `isEmpty` / …          | matchers    | auto-imported                                                  | use with `matchesField`      |
-| `debounce`                                      | utility     | `import { debounce } from '@mapomodule/utils'`                 | not a composable             |
-| `deepMerge`                                     | utility     | `import { deepMerge } from '@mapomodule/utils'`                | —                            |
-| `objectDiff`                                    | utility     | `import { objectDiff } from '@mapomodule/utils'`               | —                            |
-| `deepClone`                                     | utility     | `import { deepClone } from '@mapomodule/utils'`                | —                            |
-| `formatDate`                                    | utility     | `import { formatDate } from '@mapomodule/utils'`               | —                            |
-| `normalizeEndpoint`                             | utility     | `import { normalizeEndpoint } from '@mapomodule/utils'`        | —                            |
-| `getNestedValue`                                | utility     | `import { getNestedValue } from '@mapomodule/utils'`           | —                            |
-| `setNestedValue`                                | utility     | `import { setNestedValue } from '@mapomodule/utils'`           | —                            |
-| `setNestedValueMutating`                        | utility     | `import { setNestedValueMutating } from '@mapomodule/utils'`   | —                            |
-| `buildRouteTree`                                | utility     | `import { buildRouteTree } from '@mapomodule/utils'`           | —                            |
-| `resolveSchema`                                 | json-schema | `import { resolveSchema } from '@mapomodule/utils/jsonSchema'` | —                            |
-| `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`   | —                            |
-| `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`      | strict built-in union        |
-| `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`   | includes custom field types  |
-| `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`        | —                            |
-| `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`           | generic preserved            |
-| `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`       | —                            |
-| `MapoUser`                                      | type        | `import type { MapoUser } from 'mapomodule/types'`             | —                            |
-| `SnackType`                                     | type        | `import type { SnackType } from 'mapomodule/types'`            | —                            |
-| `CamomillaPathRewrite`                          | type        | `import type { ... } from 'mapo-integrations-camomilla/types'` | optional package             |
+| API                                             | Kind        | Recommended import                                                         | Notes                        |
+| ----------------------------------------------- | ----------- | -------------------------------------------------------------------------- | ---------------------------- |
+| `useCrud`                                       | composable  | auto-imported                                                              | —                            |
+| `useMapoAuth`                                   | composable  | auto-imported                                                              | —                            |
+| `useMapoFetch`                                  | composable  | auto-imported                                                              | returns `{ fetch, loading }` |
+| `useAuthStore`                                  | store       | auto-imported                                                              | —                            |
+| `useSnackStore`                                 | store       | auto-imported                                                              | —                            |
+| `useConfirmStore`                               | store       | auto-imported                                                              | —                            |
+| `useSidebarStore`                               | store       | auto-imported                                                              | —                            |
+| `usePermissions`                                | composable  | auto-imported                                                              | —                            |
+| `useMapoForm`                                   | composable  | auto-imported                                                              | —                            |
+| `useFormFromSchema`                             | composable  | auto-imported                                                              | —                            |
+| `useFormDraft`                                  | composable  | auto-imported                                                              | —                            |
+| `useUnsavedChangesGuard`                        | composable  | auto-imported                                                              | —                            |
+| `useFocusMode`                                  | composable  | auto-imported                                                              | —                            |
+| `defineFormField`                               | function    | auto-imported                                                              | call from a Nuxt plugin      |
+| `when` / `whenAny` / `whenNot` / `matchesField` | helpers     | auto-imported                                                              | progressive disclosure       |
+| `isOneOf` / `isNoneOf` / `isEmpty` / …          | matchers    | auto-imported                                                              | use with `matchesField`      |
+| `debounce`                                      | utility     | `import { debounce } from '@mapomodule/utils'`                             | not a composable             |
+| `deepMerge`                                     | utility     | `import { deepMerge } from '@mapomodule/utils'`                            | —                            |
+| `objectDiff`                                    | utility     | `import { objectDiff } from '@mapomodule/utils'`                           | —                            |
+| `deepClone`                                     | utility     | `import { deepClone } from '@mapomodule/utils'`                            | —                            |
+| `formatDate`                                    | utility     | `import { formatDate } from '@mapomodule/utils'`                           | —                            |
+| `normalizeEndpoint`                             | utility     | `import { normalizeEndpoint } from '@mapomodule/utils'`                    | —                            |
+| `getNestedValue`                                | utility     | `import { getNestedValue } from '@mapomodule/utils'`                       | —                            |
+| `setNestedValue`                                | utility     | `import { setNestedValue } from '@mapomodule/utils'`                       | —                            |
+| `setNestedValueMutating`                        | utility     | `import { setNestedValueMutating } from '@mapomodule/utils'`               | —                            |
+| `buildRouteTree`                                | utility     | `import { buildRouteTree } from '@mapomodule/utils'`                       | —                            |
+| `resolveSchema`                                 | json-schema | `import { resolveSchema } from '@mapomodule/utils/jsonSchema'`             | —                            |
+| `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`               | —                            |
+| `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`                  | strict built-in union        |
+| `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`               | includes custom field types  |
+| `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`                    | —                            |
+| `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`                       | generic preserved            |
+| `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`                   | —                            |
+| `MapoUser`                                      | type        | `import type { MapoUser } from 'mapomodule/types'`                         | —                            |
+| `SnackType`                                     | type        | `import type { SnackType } from 'mapomodule/types'`                        | —                            |
+| `CamomillaPathRewrite`                          | type        | `import type { ... } from '@mapomodule/mapo-integrations-camomilla/types'` | optional package             |
 
 ---
 
@@ -170,4 +170,4 @@ import {
 1. **Composables and stores** → no import, Nuxt handles it.
 2. **Types** → `import type { ... } from 'mapomodule/types'` for the common case; package-specific when the type isn't re-exported or when building a standalone plugin.
 3. **Utils** → always explicit: `import { fn } from '@mapomodule/utils'`.
-4. **Camomilla types** → always `mapo-integrations-camomilla/types`.
+4. **Camomilla types** → always `@mapomodule/mapo-integrations-camomilla/types`.

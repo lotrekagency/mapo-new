@@ -135,32 +135,6 @@ Django session cookies have a configurable lifetime (typically 2 weeks). When th
 
 ---
 
-## `mapo-integrations-camomilla` double slash bug fixed — but test coverage missing
-
-**Affects**: `packages/mapo-integrations-camomilla/src/runtime/server/utils/pathRewrite.ts`
-
-**Status**: Fixed, no regression test yet
-
-A bug caused double slashes in rewritten URLs (e.g. `/api/camomilla//users/current/`) when the path already ended with `/`. The fix is:
-
-```ts
-rewritten.replace(/([^:]\/)\/+/g, "$1");
-```
-
-**TODO**: Add unit tests for `applyPathRewrite` covering paths with and without trailing slashes, and paths with query strings.
-
----
-
-## No integration between `mapo-integrations-camomilla` and Nuxt DevTools
-
-**Status**: Not started
-
-`@nuxt/devtools` supports custom tabs via `nuxt/devtools/kit`. `mapo-integrations-camomilla` could expose a tab showing the proxy request log, path rewrite rules, and cookie state.
-
-**TODO (Phase 3)**: Add a DevTools integration to `mapo-integrations-camomilla`.
-
----
-
 ## Direct type imports require declaring the package (pnpm strict mode)
 
 **Affects**: any consuming app that imports types or runtime helpers from a specific `@mapomodule/*` package
