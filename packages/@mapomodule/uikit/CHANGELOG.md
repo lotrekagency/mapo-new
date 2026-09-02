@@ -1,3 +1,9 @@
+# @mapomodule/uikit [2.0.0-beta.13](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.12...@mapomodule/uikit@2.0.0-beta.13) (2026-09-02)
+
+### Bug Fixes
+
+- get media manager languages from media endpoint OPTIONS ([00eedab](https://github.com/lotrekagency/mapo-new/commit/00eedabcebf416f62cc5a638cc61e2330c358061))
+
 # @mapomodule/uikit [2.0.0-beta.12](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.11...@mapomodule/uikit@2.0.0-beta.12) (2026-09-01)
 
 ### Dependencies
