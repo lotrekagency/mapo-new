@@ -85,9 +85,9 @@ v1 was plain JavaScript. v2 is **TypeScript strict** end-to-end. All packages ex
 
 ### New packages
 
-| Package                       | Purpose                                                                                                   |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `mapo-integrations-camomilla` | Nitro proxy middleware for Camomilla CMS — rewrites `/api/*` paths and handles Django session/cookie sync |
+| Package                                   | Purpose                                                                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@mapomodule/mapo-integrations-camomilla` | Nitro proxy middleware for Camomilla CMS — rewrites `/api/*` paths and handles Django session/cookie sync |
 
 ### Renamed / restructured
 
@@ -218,7 +218,7 @@ mapo: {
 
 // v2 — nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ['mapomodule', 'mapo-integrations-camomilla'],
+  modules: ['mapomodule', '@mapomodule/mapo-integrations-camomilla'],
   mapo: {
     authLoginUrl: '/api/auth/login',
     userInfoApi: '/api/profiles/me/',

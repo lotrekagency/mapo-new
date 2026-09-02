@@ -10,7 +10,7 @@ This page explains how Mapo's packages work together at runtime. Each flow shows
 mapomodule                          ← real Nuxt module: installs @mapomodule/core if not present
 ├── @mapomodule/core                      ← service layer (CRUD, auth, middleware, boot plugins)
 │   └── depends on @mapomodule/store      ← Pinia stores (auth, sidebar, snack, confirm)
-└── mapo-integrations-camomilla  (optional)     ← Nitro proxy middleware for Camomilla CMS
+└── @mapomodule/mapo-integrations-camomilla  (optional, separate repo)   ← Nitro proxy middleware for Camomilla CMS
     └── independent of core/store
 ```
 
@@ -20,7 +20,7 @@ mapomodule                          ← real Nuxt module: installs @mapomodule/c
 
 `@mapomodule/core` depends on `@mapomodule/store` at **build time** via package.json `dependencies`. At runtime, stores are accessed through composables (`useAuthStore()`, `useSnackStore()`) which are auto-imported by Nuxt — there is no static import of the module entry from runtime code.
 
-`mapo-integrations-camomilla` sits at the **Nitro layer** — it runs on the server before Nuxt's rendering pipeline. It has no knowledge of stores or composables. It communicates with `@mapomodule/core` purely through HTTP: the proxy rewrites paths and manages cookies; `@mapomodule/core` plugins consume the resulting HTTP responses.
+`@mapomodule/mapo-integrations-camomilla` sits at the **Nitro layer** — it runs on the server before Nuxt's rendering pipeline. It has no knowledge of stores or composables. It communicates with `@mapomodule/core` purely through HTTP: the proxy rewrites paths and manages cookies; `@mapomodule/core` plugins consume the resulting HTTP responses.
 
 ---
 
@@ -31,7 +31,7 @@ What happens when a user with a `__mapo_session` cookie visits the app:
 ```
 Browser → GET /admin/articles
   │
-  ├─ Nitro middleware (mapo-integrations-camomilla)
+  ├─ Nitro middleware (@mapomodule/mapo-integrations-camomilla)
   │    Not an /api path — passes through
   │
   ├─ Nuxt server plugin: mapo-core:fetch (00.fetch.ts)
@@ -43,7 +43,7 @@ Browser → GET /admin/articles
   │    │    (HttpOnly — readable server-side from request headers)
   │    ├─ $mapoFetch GET http://host/api/profiles/me/
   │    │    (absolute URL required to pass through Nitro proxy)
-  │    │     ↓ intercepted by mapo-integrations-camomilla proxy
+  │    │     ↓ intercepted by @mapomodule/mapo-integrations-camomilla proxy
   │    │     ↓ maps __mapo_session → sessionid cookie header
   │    │     ↓ rewritten to /api/camomilla/users/current/
   │    │     ↓ forwarded to Camomilla backend
@@ -66,7 +66,7 @@ User submits login form
   ├─ useMapoAuth().login({ username, password })
   │    │
   │    ├─ Step 1: $mapoFetch POST /api/auth/login
-  │    │     ↓ mapo-integrations-camomilla proxy:
+  │    │     ↓ @mapomodule/mapo-integrations-camomilla proxy:
   │    │     ├─ strips existing session cookies from request
   │    │     ├─ rewrites to /api/camomilla/auth/login/
   │    │     ├─ forwards to Camomilla
@@ -96,7 +96,7 @@ User submits login form
 Component calls: useCrud<Article>('/api/articles/').list({ page: 1 })
   │
   └─ $mapoFetch GET /api/articles/?page=1
-        ↓ mapo-integrations-camomilla proxy:
+        ↓ @mapomodule/mapo-integrations-camomilla proxy:
         ├─ maps __mapo_session → sessionid cookie header
         ├─ adds X-CSRFToken header from csrftoken cookie
         ├─ adds X-Forwarded-Host / X-Forwarded-Proto from Referer
@@ -117,7 +117,7 @@ Component calls: useCrud<Media>('/api/media/').create({ title: 'Photo', file: Fi
   │    ↳ detects File in data → converts to FormData
   │
   └─ $mapoFetch POST /api/media/ (body: FormData)
-        ↓ mapo-integrations-camomilla proxy:
+        ↓ @mapomodule/mapo-integrations-camomilla proxy:
         ├─ rewrites /api/media → /api/camomilla/media
         └─ forwards multipart request to Camomilla
 ```
@@ -185,13 +185,13 @@ This handles the case where the Django session expires after the user has loaded
 
 ## Data flow summary
 
-| Layer                               | Technology                    | Responsibility                                  |
-| ----------------------------------- | ----------------------------- | ----------------------------------------------- |
-| Browser                             | Vue 3 / Nuxt 4                | UI, composable calls                            |
-| Nuxt server plugin `00.fetch`       | `@mapomodule/core`            | `$mapoFetch` with 401/403 interceptors          |
-| Nuxt server plugin `01.init.server` | `@mapomodule/core`            | SSR hydration (auth + sidebar)                  |
-| Pinia stores                        | `@mapomodule/store`           | Auth state, UI state, snack, confirm            |
-| Composables                         | `@mapomodule/core`            | `useCrud`, `useMapoAuth`, `useMapo`             |
-| Route middleware                    | `@mapomodule/core`            | Auth, permission, role guards                   |
-| Nitro proxy                         | `mapo-integrations-camomilla` | Path rewriting, cookie sync, backend forwarding |
-| Backend                             | Camomilla / Django            | Data, auth, media                               |
+| Layer                               | Technology                                | Responsibility                                  |
+| ----------------------------------- | ----------------------------------------- | ----------------------------------------------- |
+| Browser                             | Vue 3 / Nuxt 4                            | UI, composable calls                            |
+| Nuxt server plugin `00.fetch`       | `@mapomodule/core`                        | `$mapoFetch` with 401/403 interceptors          |
+| Nuxt server plugin `01.init.server` | `@mapomodule/core`                        | SSR hydration (auth + sidebar)                  |
+| Pinia stores                        | `@mapomodule/store`                       | Auth state, UI state, snack, confirm            |
+| Composables                         | `@mapomodule/core`                        | `useCrud`, `useMapoAuth`, `useMapo`             |
+| Route middleware                    | `@mapomodule/core`                        | Auth, permission, role guards                   |
+| Nitro proxy                         | `@mapomodule/mapo-integrations-camomilla` | Path rewriting, cookie sync, backend forwarding |
+| Backend                             | Camomilla / Django                        | Data, auth, media                               |

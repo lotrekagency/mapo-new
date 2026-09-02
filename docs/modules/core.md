@@ -75,11 +75,11 @@ Sequence:
 2. Reads `__mapo_session` cookie via `useCookie()` (SSR-safe — reads the incoming HTTP request headers)
 3. If the cookie is absent, returns immediately (unauthenticated request)
 4. Forwards the `cookie` header to the backend via `useRequestHeaders(['cookie'])`
-5. Calls `$mapoFetch(absolute_url, { method: 'GET', headers })` with an **absolute URL** — required so the request routes through the Nitro proxy layer (`mapo-integrations-camomilla`) rather than bypassing it
+5. Calls `$mapoFetch(absolute_url, { method: 'GET', headers })` with an **absolute URL** — required so the request routes through the Nitro proxy layer (`@mapomodule/mapo-integrations-camomilla`) rather than bypassing it
 6. Calls `authStore.setUser(user)` on success → `isAuthenticated` becomes `true`
 7. On any error: `authStore.reset()` + clears `__mapo_session` cookie (stale or invalid session)
 
-> **Why absolute URL?** An internal server-side `$fetch` call with a relative path would bypass Nitro middleware. The init plugin constructs `${protocol}//${host}${path}` from `useRequestURL()` to ensure the request enters the normal Nitro pipeline and gets the cookie/path rewriting from `mapo-integrations-camomilla`.
+> **Why absolute URL?** An internal server-side `$fetch` call with a relative path would bypass Nitro middleware. The init plugin constructs `${protocol}//${host}${path}` from `useRequestURL()` to ensure the request enters the normal Nitro pipeline and gets the cookie/path rewriting from `@mapomodule/mapo-integrations-camomilla`.
 
 > **Why not read the cookie value directly?** `__mapo_session` is an HttpOnly cookie. Its value is readable in SSR (from HTTP request headers) but never from client JS. The plugin does not store or forward the raw token — it only forwards the `cookie` header wholesale, letting the backend validate the session.
 
@@ -109,6 +109,9 @@ const patched = await articles.partialUpdate(42, { title: "Patched" });
 
 // Delete
 await articles.delete(42);
+
+// Describe the resource (HTTP OPTIONS)
+const metadata = await articles.options();
 
 // Create if no id, update if id present
 await articles.updateOrCreate({ id: 42, title: "Upsert" });
@@ -149,6 +152,7 @@ interface CrudRepository<T> {
     opts?: CrudOptions,
   ): Promise<T>;
   delete(id: string | number, config?: CrudConfig): Promise<void>;
+  options(config?: CrudConfig): Promise<ResourceMetadata>;
   updateOrCreate(
     data: Partial<T> & { id?: string | number },
     config?: CrudConfig,
@@ -160,7 +164,18 @@ interface CrudRepository<T> {
     config?: CrudConfig,
   ): Promise<void>;
 }
+
+interface ResourceMetadata {
+  name?: string;
+  description?: string;
+  renders?: string[];
+  parses?: string[];
+  actions?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 ```
+
+`options()` issues an HTTP `OPTIONS` on the collection endpoint. `ResourceMetadata` is deliberately loose: backends extend it with their own keys — Camomilla adds `lang_info` (translatable languages) and `schema` (the JSON Schema the form renderer consumes) — and clients read only the keys they know.
 
 ---
 

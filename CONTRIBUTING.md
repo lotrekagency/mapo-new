@@ -2,8 +2,10 @@
 
 ## Prerequisites
 
-- Node.js >= 20
+- Node.js ^22.19 || ^24.11 || >=26
 - pnpm >= 8
+
+The repo ships an `.nvmrc` — run `nvm use` to pick up the version local development is built against.
 
 ```bash
 pnpm install

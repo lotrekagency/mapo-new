@@ -69,21 +69,21 @@ different backend.
 
 ## Props
 
-| Prop               | Type                           | Default              | Description                                                    |
-| ------------------ | ------------------------------ | -------------------- | -------------------------------------------------------------- |
-| `endpoint`         | `string`                       | —                    | **Required.** Menu CRUD endpoint.                              |
-| `identifier`       | `string \| number`             | `'new'`              | Menu id to load; `'new'` starts from an empty menu.            |
-| `modelValue`       | `MapoMenu \| null`             | `null`               | Menu payload (`v-model`). Seeds the model when creating.       |
-| `translatable`     | `boolean`                      | `true`               | Manage one tree per language under `translations`.             |
-| `lang`             | `string`                       | first of `languages` | Active editing language (`v-model:lang`).                      |
-| `languages`        | `string[]`                     | `[]`                 | Language codes. With fewer than 2, the switcher is hidden.     |
-| `usePatch`         | `boolean`                      | `false`              | Save with `PATCH` sending only the changed keys.               |
-| `maxDepth`         | `number`                       | `-1`                 | Max nesting depth; `-1` = unlimited.                           |
-| `permissionModel`  | `string`                       | —                    | Django model for permission gating (`add_*` / `change_*`).     |
-| `readonly`         | `boolean`                      | `false`              | Force read-only mode.                                          |
-| `coreFields`       | `AnyFieldDescriptor[] \| null` | `null`               | Replaces the node editor's default fields entirely.            |
-| `additionalFields` | `AnyFieldDescriptor[]`         | `[]`                 | Extra fields appended after the core ones.                     |
-| `availableClasses` | `Record<string, string>`       | `{}`                 | Choices for the node `style` select, as `{ label: cssClass }`. |
+| Prop               | Type                           | Default              | Description                                                                                          |
+| ------------------ | ------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `endpoint`         | `string`                       | —                    | **Required.** Menu CRUD endpoint.                                                                    |
+| `identifier`       | `string \| number`             | `'new'`              | Menu id to load; `'new'` starts from an empty menu.                                                  |
+| `modelValue`       | `MapoMenu \| null`             | `null`               | Menu payload (`v-model`). Seeds the model when creating.                                             |
+| `translatable`     | `boolean`                      | `true`               | Manage one tree per language under `translations`.                                                   |
+| `lang`             | `string`                       | first of `languages` | Active editing language (`v-model:lang`). When derived, empty until `languages` resolves.            |
+| `languages`        | `string[]`                     | `[]`                 | Language codes. Derived from the endpoint's `OPTIONS` when empty. With none, the switcher is hidden. |
+| `usePatch`         | `boolean`                      | `false`              | Save with `PATCH` sending only the changed keys.                                                     |
+| `maxDepth`         | `number`                       | `-1`                 | Max nesting depth; `-1` = unlimited.                                                                 |
+| `permissionModel`  | `string`                       | —                    | Django model for permission gating (`add_*` / `change_*`).                                           |
+| `readonly`         | `boolean`                      | `false`              | Force read-only mode.                                                                                |
+| `coreFields`       | `AnyFieldDescriptor[] \| null` | `null`               | Replaces the node editor's default fields entirely.                                                  |
+| `additionalFields` | `AnyFieldDescriptor[]`         | `[]`                 | Extra fields appended after the core ones.                                                           |
+| `availableClasses` | `Record<string, string>`       | `{}`                 | Choices for the node `style` select, as `{ label: cssClass }`.                                       |
 
 ### Events
 
@@ -180,6 +180,13 @@ own tree under `translations.<code>.nodes` and a language switcher appears above
 the tree. Switching language clears the selection, since a node only exists
 inside one language's tree.
 
+Left empty, `languages` is derived from an `OPTIONS` call on `endpoint`, reading
+`lang_info.languages`: a menu model not registered for translation reports none,
+so no switcher appears and the tree falls back to the flat `nodes` array —
+edits land there, not under `translations`, even though `translatable` is still
+on. The call resolves asynchronously — `lang` stays empty until it lands, then
+takes the first derived code.
+
 A language whose nodes failed validation is flagged in the switcher, so an error
 in a collapsed language isn't silently lost.
 
@@ -240,12 +247,13 @@ definePageMeta({
 
 ## Backend contract
 
-Three endpoints, all relative to `endpoint`:
+All relative to `endpoint`:
 
 | Request                                             | Purpose                                                                             |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `GET <endpoint>/<id>`                               | Load the menu.                                                                      |
 | `POST <endpoint>` / `PUT` / `PATCH <endpoint>/<id>` | Save it. `PATCH` is used when `usePatch` is on.                                     |
+| `OPTIONS <endpoint>`                                | Optional. `lang_info.languages` here feeds the `languages` prop when it is empty.   |
 | `GET <endpoint>/page_types`                         | Content types for the relational picker. Items need `id` and `verbose_name_plural`. |
 | `GET <endpoint>/page_types/<id>`                    | Routable pages of that type. Items need `name` and `url_node_id`.                   |
 
