@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/core",
-  "version": "1.0.0",
+  "version": "2.0.0-beta.1",
   "description": "Mapo core: API layer, auth, composables, middleware",
   "type": "module",
   "license": "MIT",
@@ -40,7 +40,6 @@
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
     "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
-    "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
@@ -50,7 +49,8 @@
     "@mapomodule/utils": "workspace:*"
   },
   "peerDependencies": {
-    "nuxt": ">=4.0.0"
+    "nuxt": ">=4.0.0",
+    "pinia": "^3.0.0"
   },
   "devDependencies": {
     "@nuxt/kit": "4.4.2",

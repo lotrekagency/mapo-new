@@ -319,6 +319,10 @@ importers:
         version: 3.5.42(typescript@5.9.3)
 
   packages/@mapomodule/store:
+    dependencies:
+      '@pinia/nuxt':
+        specifier: ^0.11.3
+        version: 0.11.3(pinia@3.0.4)
     devDependencies:
       '@nuxt/kit':
         specifier: 4.4.2
@@ -329,9 +333,6 @@ importers:
       '@nuxt/schema':
         specifier: 4.4.2
         version: 4.4.2
-      '@pinia/nuxt':
-        specifier: ^0.11.3
-        version: 0.11.3(pinia@3.0.4)
       nuxt:
         specifier: ^4.5.1
         version: 4.5.2(@types/node@25.6.0)(esbuild@0.28.0)(eslint@10.2.1)(pinia@3.0.4)(rolldown@1.2.6)(rollup@4.60.2)(typescript@5.9.3)(vite@8.2.2)(vue-tsc@3.3.4)
@@ -359,6 +360,9 @@ importers:
       '@mapomodule/utils':
         specifier: workspace:*
         version: link:../utils
+      tailwindcss:
+        specifier: ^4.0.0
+        version: 4.2.4
       vue-draggable-plus:
         specifier: ^0.6.0
         version: 0.6.1(@types/sortablejs@1.15.9)
@@ -387,9 +391,6 @@ importers:
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@5.9.3)(vue@3.5.42)
-      tailwindcss:
-        specifier: ^4.0.0
-        version: 4.2.4
       vue:
         specifier: ^3.5.40
         version: 3.5.42(typescript@5.9.3)
@@ -937,7 +938,7 @@ packages:
     resolution: {integrity: sha512-YA6Ma2KsCdGb+WC6UpBVFJGXL58MDA6oyONbjyF/+5sBgxY/dwkhLogbMT2GXXyU84/IhRw/2D1Os1B/giz+BQ==}
     engines: {node: '>=6.9.0'}
     dependencies:
-      '@babel/code-frame': 7.29.7
+      '@babel/code-frame': 7.29.0
       '@babel/parser': 7.29.2
       '@babel/types': 7.29.0
 
@@ -953,7 +954,7 @@ packages:
     resolution: {integrity: sha512-4HPiQr0X7+waHfyXPZpWPfWL/J7dcN1mx9gL6WdQVMbPnF3+ZhSMs8tCxN7oHddJE9fhNE7+lxdnlyemKfJRuA==}
     engines: {node: '>=6.9.0'}
     dependencies:
-      '@babel/code-frame': 7.29.7
+      '@babel/code-frame': 7.29.0
       '@babel/generator': 7.29.1
       '@babel/helper-globals': 7.28.0
       '@babel/parser': 7.29.2
@@ -4801,7 +4802,7 @@ packages:
       pinia: 3.0.4(typescript@5.9.3)(vue@3.5.42)
     transitivePeerDependencies:
       - magicast
-    dev: true
+    dev: false
 
   /@pkgjs/parseargs@0.11.0:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -7187,7 +7188,7 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
-      '@babel/code-frame': 7.29.7
+      '@babel/code-frame': 7.29.0
       '@babel/core': 7.29.0
       '@babel/helper-module-imports': 7.28.6
       '@babel/helper-plugin-utils': 7.28.6
