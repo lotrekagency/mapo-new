@@ -1,0 +1,298 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "example-e2e mock API",
+    "version": "1.0.0",
+    "description": "Hand-maintained OpenAPI description of the in-memory API served by server/api/**, in the shape drf-spectacular would emit. It is a curated subset of the Article stress-test model — enough to exercise every mapping rule of mapo_backend_schema without duplicating 150 properties. Relations are declared as nested components because that is how the app's own form treats them (fks/m2m with returnObject: false), while the wire format carries plain ids."
+  },
+  "paths": {
+    "/api/articles": {
+      "get": {
+        "operationId": "articles_list",
+        "responses": {
+          "200": {
+            "description": "Paginated list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Article" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "articles_create",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Article" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/articles/{id}": {
+      "get": {
+        "operationId": "articles_retrieve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One article",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Article" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "categories_list",
+        "responses": {
+          "200": {
+            "description": "Bare array, as the mock serves it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Category" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "operationId": "tags_list",
+        "responses": {
+          "200": {
+            "description": "Bare array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Tag" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/topics": {
+      "get": {
+        "operationId": "topics_list",
+        "responses": {
+          "200": {
+            "description": "Bare array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Topic" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/series": {
+      "get": {
+        "operationId": "series_list",
+        "responses": {
+          "200": {
+            "description": "Bare array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Series" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles": {
+      "get": {
+        "operationId": "profiles_list",
+        "responses": {
+          "200": {
+            "description": "Bare array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Profile" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Article": {
+        "type": "object",
+        "description": "Curated subset of the article model exercised by /form/article/[id].",
+        "required": ["title", "slug", "status"],
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "title": { "type": "string", "maxLength": 200, "title": "Title" },
+          "slug": { "type": "string", "maxLength": 200 },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Short teaser shown in listings."
+          },
+          "body": {
+            "type": "string",
+            "description": "Main content, rich text."
+          },
+          "status": {
+            "type": "string",
+            "title": "Publication status",
+            "enum": ["draft", "review", "ready", "published", "archived"]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "private", "unlisted"]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "embargo_until": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "featured": { "type": "boolean" },
+          "allow_comments": { "type": "boolean" },
+          "reading_time": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "description": "Minutes."
+          },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "canonical_url": { "type": "string", "format": "uri" },
+          "cover_image": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
+          },
+          "category": {
+            "allOf": [{ "$ref": "#/components/schemas/Category" }],
+            "nullable": true
+          },
+          "series": {
+            "allOf": [{ "$ref": "#/components/schemas/Series" }],
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Tag" }
+          },
+          "topics": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Topic" }
+          },
+          "gallery": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/GalleryItem" },
+            "description": "Inline images; no collection endpoint serves them."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 100 },
+          "slug": { "type": "string", "maxLength": 100 }
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 60 },
+          "color": { "type": "string", "maxLength": 7 }
+        }
+      },
+      "Topic": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 60 },
+          "slug": { "type": "string", "maxLength": 60 }
+        }
+      },
+      "Series": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 120 },
+          "slug": { "type": "string", "maxLength": 120 },
+          "total_parts": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 120 },
+          "email": { "type": "string", "format": "email" },
+          "role": {
+            "type": "string",
+            "enum": ["admin", "editor", "viewer"]
+          }
+        }
+      },
+      "GalleryItem": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "alt": { "type": "string", "maxLength": 200 },
+          "caption": { "type": "string", "maxLength": 200 },
+          "credit": { "type": "string", "maxLength": 120 },
+          "type": { "type": "string", "enum": ["image", "video"] }
+        }
+      }
+    }
+  }
+}

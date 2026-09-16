@@ -45,6 +45,7 @@ describeBuilt("mapo-mcp stdio server", () => {
   it("advertises every tool that works without the dev server", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "mapo_backend_schema",
       "mapo_component_api",
       "mapo_composable_api",
       "mapo_doctor",

@@ -35,7 +35,7 @@ Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
 startup log announces it:
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 9 tools, 4 resources, 5 prompts, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 4 resources, 5 prompts, 1 handler
 ```
 
 Then point your editor at it — see
@@ -155,6 +155,44 @@ After scaffolding new pages, **restart the dev server**: Nuxt hot-reloads
 `routes.mjs`, but the server-side router keeps the previous table and a
 brand-new route answers 404 until it restarts.
 
+## Backend schema
+
+`mapo_backend_schema` reads the OpenAPI document your backend already publishes
+(drf-spectacular for Django REST Framework) and turns a serializer into Mapo
+field descriptors.
+
+```
+mapo_backend_schema({ action: "list_models" })
+mapo_backend_schema({ action: "describe_model", model: "Article" })
+mapo_backend_schema({ action: "to_fields",     model: "Article" })
+```
+
+What the mapping does for you:
+
+| Schema                                   | Field                                          |
+| ---------------------------------------- | ---------------------------------------------- |
+| `enum`                                   | `select` with readable item labels             |
+| `format: date-time` / `date` / `time`    | `datetime` / `date` / `time`                   |
+| `format: email` / `uri` / `binary`       | `email` / `url` / `file`                       |
+| `type: string` with a short `maxLength`  | `text` (limit carried into `attrs`)            |
+| `type: string` long or unbounded         | `textarea`                                     |
+| `type: integer` with `minimum`/`maximum` | `number` with bounds                           |
+| `$ref` to a component                    | `fks` **with the endpoint** taken from `paths` |
+| array of `$ref`                          | `m2m`, same endpoint inference                 |
+
+`readOnly` properties are skipped (`includeReadOnly: true` keeps them as
+readonly fields), anything uncertain carries an inline comment instead of a
+confident guess, and a property whose mapping is not registered in your app is
+skipped rather than emitted. The response ends with a ready-made
+`mapo_scaffold` payload.
+
+::: tip Source of the schema
+`mapo.mcp.backend.schemaUrl`, `$MAPO_BACKEND_SCHEMA_URL`, or the tool's `url`
+argument. An http(s) URL **or a local file path**, so you can commit an exported
+schema and work offline. drf-spectacular serves YAML by default — the tool
+detects it and reminds you to add `?format=json`.
+:::
+
 ## Prompts
 
 Clients that support MCP prompts expose these as slash-commands:
@@ -185,7 +223,7 @@ forwards the call to `http://localhost:3000/mcp/mapo` (override with `--app` or
 `MAPO_MCP_APP_URL`) and, when the dev server is down, explains how to start it.
 :::
 
-Still to come — Django/DRF schema → `FieldDescriptor` mapping.
+Still to come — `mapo-mcp install`, the Agent Skill and the MCP App inspector.
 
 ## How it works
 
@@ -203,8 +241,9 @@ Still to come — Django/DRF schema → `FieldDescriptor` mapping.
 - Development only by default; the route does not exist in production builds.
 - The app snapshot exposes public runtime config only — private keys appear as
   key names, never values.
-- Backend credentials are read from the environment and never included in tool
-  output.
+- Backend credentials are read from the environment **per request** — only the
+  name of the variable reaches the build output — and never appear in a tool
+  response.
 - Every tool is read-only except `mapo_scaffold`, whose writing is opt-in,
   development-only, confined to the project root and unable to replace an
   existing file without `overwrite: true`.

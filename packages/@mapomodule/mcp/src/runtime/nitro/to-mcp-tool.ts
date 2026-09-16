@@ -3,6 +3,7 @@ import { defineMcpTool } from "@nuxtjs/mcp-toolkit/server";
 import {
   useApiKnowledge,
   useDocsKnowledge,
+  useMapoBackend,
   useMapoManifest,
 } from "./context.js";
 import type { AnyMapoToolSpec } from "../core/tool-spec.js";
@@ -28,6 +29,7 @@ export function toMcpTool(spec: AnyMapoToolSpec) {
         // tool reachable from a production build is a remote code execution
         // primitive.
         canWrite: () => useMapoManifest().dev,
+        backend: useMapoBackend,
       }),
   });
 }

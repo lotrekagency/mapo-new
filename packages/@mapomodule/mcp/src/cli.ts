@@ -30,6 +30,7 @@ import { apiTools } from "./runtime/core/tools/api.js";
 import { appTools } from "./runtime/core/tools/app.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
 import { scaffoldTools } from "./runtime/core/tools/scaffold.js";
+import { backendTools } from "./runtime/core/tools/backend.js";
 import { PROMPTS } from "./runtime/core/prompts.js";
 import {
   loadApiKnowledge,
@@ -58,12 +59,13 @@ export const DEFAULT_APP_URL = "http://localhost:3000/mcp/mapo";
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
-  return [...docsTools, ...apiTools, ...scaffoldTools];
+  return [...docsTools, ...apiTools, ...scaffoldTools, ...backendTools];
 }
 
 function createToolContext(
   knowledgeDir: string | null,
   rootDir: string,
+  schemaUrl: string | null = null,
 ): MapoToolContext {
   let docs: DocsKnowledge | null = null;
   let api: ApiKnowledge | null = null;
@@ -77,6 +79,11 @@ function createToolContext(
     // is visible immediately.
     rootDir: () => rootDir,
     canWrite: () => true,
+    // No nuxt.config to read: the CLI takes the schema from a flag or the env.
+    backend: () => ({
+      schemaUrl: schemaUrl ?? process.env.MAPO_BACKEND_SCHEMA_URL ?? null,
+      token: process.env.MAPO_BACKEND_TOKEN ?? null,
+    }),
   };
 }
 
@@ -133,6 +140,7 @@ export async function createStdioServer(
   knowledgeDir: string | null,
   appUrl: string = DEFAULT_APP_URL,
   rootDir: string = process.cwd(),
+  schemaUrl: string | null = null,
 ): Promise<McpServer> {
   const server = new McpServer(
     { name: "mapo", version: readVersion() },
@@ -146,7 +154,7 @@ export async function createStdioServer(
     },
   );
 
-  const context = createToolContext(knowledgeDir, rootDir);
+  const context = createToolContext(knowledgeDir, rootDir, schemaUrl);
 
   for (const spec of staticTools()) {
     server.registerTool(
@@ -326,7 +334,13 @@ const serve = defineCommand({
     );
 
     const rootDir = String(args.root ?? process.cwd());
-    const server = await createStdioServer(knowledgeDir, appUrl, rootDir);
+    const schemaUrl = args.schema ? String(args.schema) : null;
+    const server = await createStdioServer(
+      knowledgeDir,
+      appUrl,
+      rootDir,
+      schemaUrl,
+    );
     await server.connect(new StdioServerTransport());
     console.error(
       `[mapo-mcp] ready on stdio (${staticTools().length} tools, ` +

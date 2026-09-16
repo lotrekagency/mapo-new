@@ -28,6 +28,12 @@ export interface MapoToolContext {
   rootDir: () => string | null;
   /** Whether files may be written at all: development only. */
   canWrite: () => boolean;
+  /**
+   * Where to read the backend's OpenAPI schema, and the credential for it.
+   * The token is resolved per request from the environment, never baked into
+   * the build output.
+   */
+  backend: () => { schemaUrl: string | null; token: string | null };
 }
 
 export interface MapoToolAnnotations {

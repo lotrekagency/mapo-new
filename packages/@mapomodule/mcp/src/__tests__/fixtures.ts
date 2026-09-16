@@ -192,6 +192,7 @@ export function makeContext(
     manifest: () => manifest,
     rootDir: () => manifest?.rootDir ?? null,
     canWrite: () => manifest?.dev ?? false,
+    backend: () => ({ schemaUrl: null, token: null }),
     ...overrides,
   };
 }

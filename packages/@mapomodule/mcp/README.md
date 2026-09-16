@@ -213,6 +213,37 @@ narrow:
 After scaffolding new pages, **restart the dev server**: Nuxt hot-reloads `routes.mjs` but the
 server-side router keeps the old table, so a brand-new route 404s until it restarts.
 
+### From the backend schema to a page
+
+`mapo_backend_schema` closes the last gap: the assistant knows Mapo _and_ the API this project
+talks to.
+
+```
+mapo_backend_schema({ action: "list_models" })            # what the API exposes
+mapo_backend_schema({ action: "to_fields", model: "Article" })
+```
+
+The mapping is deliberate rather than mechanical:
+
+- `enum` → `select` with readable item labels; `format: date-time` → `datetime`; `binary` → `file`;
+  a short `maxLength` stays a `text`, a long one becomes a `textarea`.
+- A nested component becomes `fks` and an array of components becomes `m2m` — **with the real
+  endpoint**, found by scanning `paths` for the collection route that serves that component
+  (`{count, results}` pagination and bare arrays both recognised).
+- `readOnly` properties are skipped, and the tool says so; `includeReadOnly: true` keeps them as
+  readonly descriptors.
+- Anything uncertain carries an inline comment (`// no list endpoint found for Editor`) instead of
+  a confident guess.
+- A property whose mapping is not registered in _this_ app is skipped, not emitted.
+
+The response ends with a ready-made `mapo_scaffold` payload, so schema → descriptors → page is
+three calls.
+
+The source is `mapo.mcp.backend.schemaUrl`, `$MAPO_BACKEND_SCHEMA_URL`, or the tool's `url`
+argument — an http(s) URL **or a local file**, so a team can commit an exported schema and work
+offline. drf-spectacular serves YAML by default: the tool detects it and tells you to add
+`?format=json`.
+
 ## Prompts
 
 Slash-commands in clients that support MCP prompts. Each one names the tools to call and their
@@ -397,7 +428,7 @@ src/
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
     ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes,
-    │                            #   doctor, scaffold/, write guard, prompts, tools
+    │                            #   doctor, scaffold/, write guard, openapi, prompts, tools
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   ├── to-mcp-tool.ts       # spec → defineMcpTool
@@ -441,10 +472,9 @@ components under `src/runtime/components/` of `uikit` and `form` are extracted.
 ## Status
 
 Shipped: documentation search with curated recipes, page retrieval, component/field/composable APIs
-extracted from source, live app introspection and diagnostics, guarded scaffolding, MCP resources
-and prompts, the dev-only Nuxt module with its namespaced handler, and the stdio CLI with
-transparent forwarding of the live tools.
+extracted from source, live app introspection and diagnostics, guarded scaffolding, backend schema
+mapping, MCP resources and prompts, the dev-only Nuxt module with its namespaced handler, and the
+stdio CLI with transparent forwarding of the live tools.
 
 Planned (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-`mapo_backend_schema` (OpenAPI → `FieldDescriptor`) · `mapo-mcp install` / Agent Skill / MCP App
-inspector.
+`mapo-mcp install` / Agent Skill / MCP App inspector.

@@ -21,7 +21,7 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 9 tools, 4 resources, 5 prompts, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 4 resources, 5 prompts, 1 handler
 ```
 
 The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
@@ -157,6 +157,12 @@ patterns, and only when you ask: it shows the files first, and `write: true`
 never replaces anything without `overwrite: true`. Restart the dev server after
 new pages appear — Nuxt's server-side router needs it before a new route
 answers.
+
+**Point it at your backend.** With `mapo.mcp.backend.schemaUrl` set to your
+OpenAPI schema, `mapo_backend_schema` maps a serializer straight to field
+descriptors — including the endpoint of each relation — and hands the result to
+`mapo_scaffold`. Three calls from "the API has an Article model" to a working
+detail page.
 
 **Add a project rule.** Some clients ignore the server's `instructions`. A line
 in `CLAUDE.md` / `.cursorrules` / project instructions goes a long way:
