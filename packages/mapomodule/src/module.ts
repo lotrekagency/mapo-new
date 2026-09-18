@@ -9,6 +9,7 @@ import type { MapoOptions } from "@mapomodule/core";
 import type { MapoUikitOptions } from "@mapomodule/uikit";
 import type { MapoFormOptions } from "@mapomodule/form";
 import type { MapoI18nOptions } from "@mapomodule/i18n";
+import type { MapoMcpOptions } from "@mapomodule/mcp/types";
 
 interface MapoModuleOptions extends MapoOptions {
   /** Options forwarded to @mapomodule/uikit (CSS override, Nuxt UI defaults). */
@@ -17,6 +18,11 @@ interface MapoModuleOptions extends MapoOptions {
   form?: MapoFormOptions;
   /** Options forwarded to @mapomodule/i18n (default locale, extra locales). */
   i18n?: MapoI18nOptions;
+  /**
+   * Options forwarded to @mapomodule/mcp (MCP server for AI assistants).
+   * Installed in development only; pass `false` to skip it entirely.
+   */
+  mcp?: MapoMcpOptions | false;
 }
 
 // Meta-module: installs all @mapomodule/* Nuxt modules with a single registration.
@@ -27,7 +33,7 @@ export default defineNuxtModule<MapoModuleOptions>({
     configKey: "mapo",
   },
 
-  async setup(options, _nuxt) {
+  async setup(options, nuxt) {
     // Resolve paths from mapomodule's own node_modules so pnpm strict mode
     // doesn't require the consuming app to declare each @mapomodule/* directly.
     const resolver = createResolver(import.meta.url);
@@ -36,10 +42,10 @@ export default defineNuxtModule<MapoModuleOptions>({
       await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
-    // Forward only core options: `uikit`, `form` and `i18n` have their own
-    // modules, and leaking them into `runtimeConfig.public.mapoCore` would
+    // Forward only core options: `uikit`, `form`, `i18n` and `mcp` have their
+    // own modules, and leaking them into `runtimeConfig.public.mapoCore` would
     // change its generated type per-app.
-    const { uikit, form, i18n, ...coreOptions } = options;
+    const { uikit, form, i18n, mcp, ...coreOptions } = options;
 
     if (!hasNuxtModule("@mapomodule/i18n")) {
       await installModule(
@@ -66,6 +72,16 @@ export default defineNuxtModule<MapoModuleOptions>({
       await installModule(
         await resolver.resolvePath("@mapomodule/form"),
         form ?? {},
+      );
+    }
+
+    // MCP server for AI assistants: development only, and never installed when
+    // the app opts out with `mapo: { mcp: false }`.
+    const mcpEnabled = mcp !== false && (mcp?.enabled ?? nuxt.options.dev);
+    if (mcpEnabled && !hasNuxtModule("@mapomodule/mcp")) {
+      await installModule(
+        await resolver.resolvePath("@mapomodule/mcp"),
+        mcp || {},
       );
     }
   },

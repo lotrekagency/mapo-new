@@ -13,6 +13,19 @@ export default defineNuxtConfig({
     userInfoApi: "/api/profiles/me/",
     logoutUrl: "/api/auth/logout",
 
+    // MCP server for AI assistants. It turns itself on in development anyway;
+    // what is configured here is the backend schema the tools read.
+    // `api-schema.json` is this app's own mock API described the way
+    // drf-spectacular would, so `mapo_backend_schema` has something real to map.
+    mcp: {
+      backend: {
+        schemaUrl: "api-schema.json",
+        // Only the *name* of the env var: the value never reaches the build
+        // output or a tool response. The mock API needs no token.
+        tokenEnv: "MAPO_BACKEND_TOKEN",
+      },
+    },
+
     i18n: {
       defaultLocale: "en",
       // `file` points at i18n/locales/<file>: those messages are deep-merged on

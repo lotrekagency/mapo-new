@@ -12,6 +12,7 @@
     { "path": "./packages/@mapomodule/utils" },
     { "path": "./packages/@mapomodule/form" },
     { "path": "./packages/@mapomodule/i18n" },
+    { "path": "./packages/@mapomodule/mcp" },
     { "path": "./packages/mapomodule" }
   ]
 }

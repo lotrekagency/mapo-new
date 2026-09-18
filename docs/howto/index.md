@@ -78,3 +78,4 @@ Done. Navigate to `/login`, log in, and you'll see the admin shell with your pag
 | [Standalone form](./form-standalone)                | `<MapoForm>` with `useCrud`, tabs, columns, field slots                   |
 | [Advanced form patterns](./form-advanced)           | Repeater/block editor, client validation, `useMapoForm()` headless        |
 | [Custom backend integration](./backend-integration) | Nitro proxy middleware, path rewriting, cookie aliasing                   |
+| [AI assistant (MCP)](./ai-assistant)                | Connect Claude Code / Cursor / VS Code to the Mapo MCP server             |
