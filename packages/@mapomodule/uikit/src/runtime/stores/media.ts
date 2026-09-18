@@ -2,10 +2,13 @@ import { defineStore } from "pinia";
 import { ref, computed, shallowRef } from "vue";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { normalizeEndpoint } from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
+import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
+import { languagesFromMetadata } from "../utils/langInfo.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -27,6 +30,24 @@ export const useMediaStore = defineStore("mapo-media", () => {
     media: mediaConfig.endpoints?.media ?? "/api/media",
     folders: mediaConfig.endpoints?.folders ?? "/api/media-folders",
   };
+
+  /**
+   * Absolute-from-origin URL for the upload POST.
+   *
+   * Every other media request goes through `useCrud` → `$mapoFetch`, which
+   * inherits `baseURL: app.baseURL` from Nuxt's global `$fetch`. The upload has
+   * to use XHR (ofetch exposes no upload-progress hook), so it must reproduce
+   * that resolution itself: `normalizeEndpoint` for the path (same call
+   * `useCrud` makes) plus the app base. Skipping the base made the upload the
+   * only request to miss it, so on a sub-path deployment it bypassed server
+   * middleware mounted under that base — including the proxy that attaches
+   * `X-CSRFToken`, hence 403s on session-authenticated backends.
+   */
+  function uploadUrl(): string {
+    const app = runtimeConfig.app as { baseURL?: string } | undefined;
+    const base = (app?.baseURL ?? "/").replace(/\/+$/, "");
+    return `${base}${normalizeEndpoint(endpoints.media)}`;
+  }
 
   // Adapter: backend-specific request/response transforms. Provided by a plugin
   // ($mapoMediaAdapter); falls back to plain REST when none is registered.
@@ -65,6 +86,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const _currentAll = ref(false);
   const _currentLang = ref<string | undefined>(undefined);
 
+  // Language codes the media model is actually registered for, read once from
+  // the endpoint's OPTIONS. It lives here rather than in the editor because all
+  // three entry points — manager, picker dialog, and the `media` form field —
+  // mount their own editor, and each would otherwise need the host page to hand
+  // it a hardcoded list.
+  const languages = ref<string[]>([]);
+  let languagesPromise: Promise<void> | null = null;
+
   // ─── Getters ──────────────────────────────────────────────────────────────
   const parentFolder = computed(
     () => parentFolders.value[parentFolders.value.length - 1] ?? null,
@@ -98,6 +127,27 @@ export const useMediaStore = defineStore("mapo-media", () => {
   }
   function folderCrud() {
     return useCrud<MediaFolder>(endpoints.folders);
+  }
+
+  /**
+   * Ask the media endpoint to describe its language situation, at most once.
+   *
+   * `lang_info` is served on OPTIONS only: it describes the model, so there is
+   * no record to read it from, and a media library nobody registered for
+   * translation reports none — which is the point. The in-flight promise is
+   * kept so several editors mounting at once share a single request.
+   */
+  async function deriveLanguages(): Promise<void> {
+    if (languagesPromise) return languagesPromise;
+    languagesPromise = (async () => {
+      try {
+        languages.value = languagesFromMetadata(await mediaCrud().options());
+      } catch {
+        // A backend without OPTIONS metadata just gets no language switcher.
+        languagesPromise = null;
+      }
+    })();
+    return languagesPromise;
   }
 
   // ─── Breadcrumb maintenance ─────────────────────────────────────────────
@@ -339,20 +389,23 @@ export const useMediaStore = defineStore("mapo-media", () => {
     payload: MediaUploadPayload,
     onProgress?: (percent: number) => void,
   ): Promise<MediaItem> {
-    const formData = new FormData();
-    formData.append("file", payload.file);
-    if (payload.title) formData.append("title", payload.title);
-    if (payload.alt_text) formData.append("alt_text", payload.alt_text);
-    if (payload.description)
-      formData.append("description", payload.description);
-    if (payload.folder != null)
-      formData.append("folder", String(payload.folder));
+    // Build the body through the same multipart pipeline every other write uses
+    // (`data` JSON envelope + files at their dot-path). Hand-rolling a flat
+    // FormData here made uploads the only write that spoke a different wire
+    // format, which backends parsing the envelope reject.
+    const body: Record<string, unknown> = { file: payload.file };
+    if (payload.title) body.title = payload.title;
+    if (payload.alt_text) body.alt_text = payload.alt_text;
+    if (payload.description) body.description = payload.description;
+    if (payload.folder != null) body.folder = payload.folder;
+    const formData = applyMultipartPolicy(body, "force") as FormData;
 
     // ofetch has no upload-progress hook, so uploads go through XHR.
-    // Same-origin request: the session cookie is attached automatically.
+    // Same-origin request: the session cookie is attached automatically, and
+    // `uploadUrl()` keeps the target identical to the one `useCrud` would hit.
     return await new Promise<MediaItem>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${endpoints.media.replace(/\/+$/, "")}/`);
+      xhr.open("POST", uploadUrl());
       xhr.responseType = "json";
       if (onProgress) {
         xhr.upload.addEventListener("progress", (event) => {
@@ -422,12 +475,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection,
     editList,
     selectMode,
+    languages,
     // getters
     parentFolder,
     editListSet,
     editListState,
     // actions
     getRoot,
+    deriveLanguages,
     navigateToFolder,
     openEditor,
     closeEditor,

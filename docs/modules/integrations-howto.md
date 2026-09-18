@@ -1,6 +1,6 @@
 # Writing a Custom Backend Integration
 
-Mapo is backend-agnostic. `mapo-integrations-camomilla` is the reference integration for Camomilla CMS, but you can write an integration for any backend — Django REST Framework, Laravel, Express, Strapi, or a custom API.
+Mapo is backend-agnostic. `@mapomodule/mapo-integrations-camomilla` is the reference integration for Camomilla CMS, but you can write an integration for any backend — Django REST Framework, Laravel, Express, Strapi, or a custom API.
 
 An integration is simply a **Nuxt module** that adds a Nitro server middleware. The middleware intercepts `/api/*` requests and does whatever is needed: path rewriting, auth header injection, response transformation, etc.
 

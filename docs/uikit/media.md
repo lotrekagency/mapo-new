@@ -58,15 +58,20 @@ useMediaStore (Pinia)
     │     ├── MapoMediaEditor     ← side drawer for metadata
     │     └── MapoMediaUploader   ← drop area + per-file progress
     │
-    ├── MapoMediaManagerDialog    ← UModal wrapper (picker mode)
-    │
-    └── Form fields (in @mapomodule/uikit, injected into the registry)
+    └── MapoMediaManagerDialog    ← UModal wrapper (picker mode)
+
+@mapomodule/form
+    └── Form fields (in the default registry, like every other field type)
           ├── MapoMediaField         type: 'media'
           ├── MapoMediaM2mField      type: 'media-m2m'
           └── MapoEnhancedMediaField type: 'enhanced-media'
 ```
 
-**Placement note**: `useMediaStore` and all media components live in `@mapomodule/uikit`. The `media`, `media-m2m`, and `enhanced-media` field types are injected into `$mapoFormRegistry` by a Nuxt plugin (`media-registry.ts`) shipped by `@mapomodule/uikit`. This avoids a circular dependency between `@mapomodule/form` and `@mapomodule/uikit`.
+**Placement note**: the Media Manager (`useMediaStore` + components) lives in `@mapomodule/uikit`; the three **field types** live in `@mapomodule/form` alongside every other field, registered in its default registry — no plugin, no special casing.
+
+The fields reach the picker through `resolveComponent('MapoMediaManagerDialog')` at runtime rather than a static import. That keeps `@mapomodule/form` free of a dependency on `@mapomodule/uikit` (which depends on `form`, so a static import would be a cycle) and lets `form` be used standalone: without `uikit` the fields render an explicit "requires `@mapomodule/uikit`" notice instead of a broken picker.
+
+Media **value** types (`MediaItem`, `MediaLink`, `EnhancedMediaValue`) are owned by `@mapomodule/form` too — they are what lands in the form model — and re-exported by `@mapomodule/uikit` so the Media Manager keeps a single import surface.
 
 ---
 
@@ -182,30 +187,34 @@ Opt out with `camomilla: { mediaAdapter: false }` to keep the default REST adapt
 
 ### How to: write a custom adapter
 
-Create a Nuxt plugin in the consumer app that provides `$mapoMediaAdapter` (order it after the uikit default):
+Create a Nuxt plugin in the consumer app that overrides methods on the adapter
+uikit provides. Merge into the existing object rather than providing the key a
+second time — since Nuxt 4.5 a provided key is a non-configurable property, and
+providing it twice throws `Cannot redefine property` at boot:
 
 ```ts
 // plugins/my-media-adapter.ts
-export default defineNuxtPlugin(() => ({
-  provide: {
-    mapoMediaAdapter: {
-      buildListParams: (ctx) => ({
-        page: ctx.page,
-        q: ctx.search, // backend uses `q` instead of `search`
-        type: ctx.mime?.replace("/*", ""), // backend uses `type=image`
-      }),
-      parseRootResponse: (raw) => ({
-        media: {
-          items: raw.data,
-          paginator: { page: raw.page, pages: raw.total_pages },
-        },
-        folders: raw.dirs,
-        parent_folder: raw.current ?? null,
-      }),
-    },
-  },
-}));
+export default defineNuxtPlugin((nuxtApp) => {
+  Object.assign(nuxtApp.$mapoMediaAdapter, {
+    buildListParams: (ctx) => ({
+      page: ctx.page,
+      q: ctx.search, // backend uses `q` instead of `search`
+      type: ctx.mime?.replace("/*", ""), // backend uses `type=image`
+    }),
+    parseRootResponse: (raw) => ({
+      media: {
+        items: raw.data,
+        paginator: { page: raw.page, pages: raw.total_pages },
+      },
+      folders: raw.dirs,
+      parent_folder: raw.current ?? null,
+    }),
+  });
+});
 ```
+
+Every method you omit keeps its default implementation. The uikit plugin runs at
+`order: 5`, so an app plugin without an explicit order already runs after it.
 
 ---
 
@@ -402,7 +411,7 @@ MIME-aware renderer: `image` → `<img>`, `video` → `<video>`, otherwise a fil
 
 ## Form fields
 
-The three field types are auto-registered in `$mapoFormRegistry` by `@mapomodule/uikit`. No imports needed.
+The three field types ship in `@mapomodule/form`'s default registry, like every other field type. No imports, no plugin. They need `@mapomodule/uikit` installed to render the picker (see [Architecture](#architecture)).
 
 ### `type: 'media'` — `MapoMediaField`
 

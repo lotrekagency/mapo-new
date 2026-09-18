@@ -35,6 +35,17 @@ export interface JSONSchema {
   discriminator?: { propertyName: string };
   title?: string;
   default?: unknown;
+  /** e.g. "date-time", "date", "time", "color" — and "textarea" as a multiline hint. */
+  format?: string;
+  /** Standard JSON Schema. Consumers should render the field disabled, not drop it. */
+  readOnly?: boolean;
+  writeOnly?: boolean;
+  /**
+   * Extension: this property holds one value per language. Camomilla publishes it
+   * on the flat form schema served by OPTIONS. Without it a derived form renders
+   * translated fields as plain ones, which ignore the language tabs around them.
+   */
+  translatable?: boolean;
   _nullable?: boolean;
   [key: string]: unknown;
 }

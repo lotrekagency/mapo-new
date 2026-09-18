@@ -4,6 +4,7 @@ import { useMapoFetch } from "../utils/useMapoFetch";
 import { MultipartPolicyEnum } from "../types";
 import type {
   PaginatedResponse,
+  ResourceMetadata,
   CrudConfig,
   CrudOptions,
   CrudRepository,
@@ -107,6 +108,13 @@ export function useCrud<T>(
     delete(id, config) {
       return fetch<void>(`${base}${id}/`, {
         method: "DELETE",
+        ...merged(config),
+      });
+    },
+
+    options(config) {
+      return fetch<ResourceMetadata>(base, {
+        method: "OPTIONS",
         ...merged(config),
       });
     },

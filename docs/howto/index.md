@@ -69,6 +69,9 @@ Done. Navigate to `/login`, log in, and you'll see the admin shell with your pag
 | [First admin page](./first-admin-page)              | Install Mapo, layout, sidebar menu, nested routes                         |
 | [CRUD list view](./crud-list)                       | `<MapoList>` with columns, filters, tabs, bulk actions, quick-edit        |
 | [CRUD detail / form](./crud-detail)                 | `<MapoDetail>` with field descriptors, translatable content, sidebar      |
+| [Media Manager](./media-manager)                    | Upload, gallery, folders, picker dialog                                   |
+| [Menu Manager](./menu-manager)                      | `<MapoMenuManager>`, per-language trees, custom node fields               |
+| [Translating the UI](./i18n)                        | Default locale, language switcher, overriding Mapo strings                |
 | [Auth & permissions](./auth-permissions)            | Login page, protected routes, model permissions, gating UI elements       |
 | [Feedback: toasts & dialogs](./feedback)            | `useSnackStore`, `useConfirmStore`, reusable delete confirm composable    |
 | [Theming & customization](./theming)                | CSS tokens, `MapoOverride`, Nuxt UI component defaults, logo/topbar slots |

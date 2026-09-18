@@ -2,7 +2,11 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/ui", "mapomodule"],
-  devtools: { enabled: true },
+  // componentInspector is disabled: its vite-plugin-vue-tracer injects a
+  // relative import of `client/record.mjs` into Nuxt's `virtual:nuxt:` modules
+  // (e.g. the generated layout wrapper), and that path does not resolve under
+  // pnpm's isolated node_modules layout, breaking the dev server.
+  devtools: { enabled: true, componentInspector: false },
 
   mapo: {
     authLoginUrl: "/api/auth/login",

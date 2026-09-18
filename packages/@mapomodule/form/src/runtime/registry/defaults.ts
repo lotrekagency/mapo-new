@@ -31,7 +31,15 @@ export const defaultRegistry: FieldRegistry = {
     editor: () => import("../components/fields/MapoWygEditor.vue"),
     map: () => import("../components/fields/MapoMapField.vue"),
     repeater: () => import("../components/fields/MapoRepeater.vue"),
-    // media, media-m2m, enhanced-media: added in Phase 6
+
+    // ─── Media pickers ────────────────────────────────────────────────────────
+    // The fields live here with every other field type; the Media Manager they
+    // drive ships with @mapomodule/uikit and is resolved at runtime
+    // (see useMediaManager). Without uikit they render an explicit notice.
+    media: () => import("../components/fields/MapoMediaField.vue"),
+    "media-m2m": () => import("../components/fields/MapoMediaM2mField.vue"),
+    "enhanced-media": () =>
+      import("../components/fields/MapoEnhancedMediaField.vue"),
   },
 
   attrs: {

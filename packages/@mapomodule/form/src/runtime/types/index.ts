@@ -27,6 +27,8 @@ export type {
   CustomDescriptor,
 } from "./descriptor.js";
 
+export type { MediaLink, MediaItem, EnhancedMediaValue } from "./media.js";
+
 export type {
   FieldComponentEntry,
   FieldRegistry,

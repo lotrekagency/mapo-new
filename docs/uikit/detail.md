@@ -54,25 +54,27 @@ The page now supports:
 
 ## Props
 
-| Prop              | Type                             | Default       | Description                                                                                                                                                                                           |
-| ----------------- | -------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `endpoint`        | `string`                         | —             | REST endpoint for `useCrud`                                                                                                                                                                           |
-| `id`              | `string \| number`               | —             | Record id; pass `'new'` for create mode                                                                                                                                                               |
-| `fields`          | `FieldDescriptor<T>[]`           | —             | Body form fields                                                                                                                                                                                      |
-| `sidebarFields`   | `FieldDescriptor<T>[]`           | `[]`          | Sidebar form fields                                                                                                                                                                                   |
-| `languages`       | `string[]`                       | `[]`          | Translation language codes (e.g. `['it', 'en']`)                                                                                                                                                      |
-| `modelName`       | `string`                         | —             | Human-readable name for the page title                                                                                                                                                                |
-| `sidebarCols`     | `number`                         | `4`           | Sidebar column span on a 12-col grid                                                                                                                                                                  |
-| `sticky`          | `boolean`                        | `true`        | Keep the sidebar sticky while scrolling                                                                                                                                                               |
-| `usePatch`        | `boolean`                        | `true`        | Send PATCH (diff only) on update; otherwise PUT                                                                                                                                                       |
-| `readonly`        | `boolean`                        | `false`       | Force read-only mode                                                                                                                                                                                  |
-| `registry`        | `FieldRegistry`                  | auto-injected | Optional registry override                                                                                                                                                                            |
-| `draft`           | `boolean`                        | `false`       | Enable auto-save draft to localStorage. Key is auto-generated as `${endpoint}:${id}`.                                                                                                                 |
-| `draftKey`        | `string`                         | —             | Custom localStorage key for draft persistence. Requires `draft: true`. Prefix: `mapo:draft:`.                                                                                                         |
-| `multipart`       | `"auto" \| "force" \| "disable"` | `"auto"`      | Controls multipart/form-data upload behaviour. `"auto"` uses multipart only when the model contains a `File` or `Blob`; `"force"` always uses it; `"disable"` never does.                             |
-| `permissionModel` | `string`                         | —             | Django model label (e.g. `"news.article"`). When set, save buttons are hidden if the user lacks `add_*` / `change_*`, and the delete card is hidden without `delete_*`. Superusers are never blocked. |
-| `previewField`    | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
-| `forceLanguages`  | `string[]`                       | —             | Override the language list regardless of the `languages` prop or the `lang_info` embedded by the backend. Useful for per-model language subsets.                                                      |
+| Prop                           | Type                             | Default       | Description                                                                                                                                                                                           |
+| ------------------------------ | -------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `endpoint`                     | `string`                         | —             | REST endpoint for `useCrud`                                                                                                                                                                           |
+| `id`                           | `string \| number`               | —             | Record id; pass `'new'` for create mode                                                                                                                                                               |
+| `fields`                       | `FieldDescriptor<T>[]`           | —             | Body form fields. Optional only when `experimentalFieldsFromSchema` supplies them.                                                                                                                    |
+| `experimentalFieldsFromSchema` | `boolean`                        | `false`       | Derive the body fields from the `schema` on the endpoint's OPTIONS response when `fields` is not given.                                                                                               |
+| `schemaFieldOptions`           | `UseFormFromSchemaOptions`       | —             | Passed straight to `useFormFromSchema` when deriving.                                                                                                                                                 |
+| `sidebarFields`                | `FieldDescriptor<T>[]`           | `[]`          | Sidebar form fields                                                                                                                                                                                   |
+| `languages`                    | `string[]`                       | `[]`          | Translation language codes (e.g. `['it', 'en']`)                                                                                                                                                      |
+| `modelName`                    | `string`                         | —             | Human-readable name for the page title                                                                                                                                                                |
+| `sidebarCols`                  | `number`                         | `4`           | Sidebar column span on a 12-col grid                                                                                                                                                                  |
+| `sticky`                       | `boolean`                        | `true`        | Keep the sidebar sticky while scrolling                                                                                                                                                               |
+| `usePatch`                     | `boolean`                        | `true`        | Send PATCH (diff only) on update; otherwise PUT                                                                                                                                                       |
+| `readonly`                     | `boolean`                        | `false`       | Force read-only mode                                                                                                                                                                                  |
+| `registry`                     | `FieldRegistry`                  | auto-injected | Optional registry override                                                                                                                                                                            |
+| `draft`                        | `boolean`                        | `false`       | Enable auto-save draft to localStorage. Key is auto-generated as `${endpoint}:${id}`.                                                                                                                 |
+| `draftKey`                     | `string`                         | —             | Custom localStorage key for draft persistence. Requires `draft: true`. Prefix: `mapo:draft:`.                                                                                                         |
+| `multipart`                    | `"auto" \| "force" \| "disable"` | `"auto"`      | Controls multipart/form-data upload behaviour. `"auto"` uses multipart only when the model contains a `File` or `Blob`; `"force"` always uses it; `"disable"` never does.                             |
+| `permissionModel`              | `string`                         | —             | Django model label (e.g. `"news.article"`). When set, save buttons are hidden if the user lacks `add_*` / `change_*`, and the delete card is hidden without `delete_*`. Superusers are never blocked. |
+| `previewField`                 | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
+| `forceLanguages`               | `string[]`                       | —             | Override the language list regardless of the `languages` prop or the `lang_info` returned by the endpoint's OPTIONS response. Useful for per-model language subsets.                                  |
 
 The `registry` prop is optional — `<MapoDetail>` resolves `$mapoFormRegistry` automatically.
 
@@ -125,6 +127,23 @@ const sidebarFields: FieldDescriptor<Article>[] = [
 ```
 
 The split is purely visual; both groups share the same model. `getPatch()` diffs across both.
+
+## How to: derive the fields from the backend schema (experimental)
+
+```vue
+<MapoDetail
+  endpoint="/api/articles/"
+  :id="route.params.id"
+  :experimental-fields-from-schema="true"
+/>
+```
+
+With `experimentalFieldsFromSchema` on and no `fields` prop, `<MapoDetail>` builds the body form from the `schema` published on the endpoint's `OPTIONS` response. `schemaFieldOptions` is forwarded to `useFormFromSchema` untouched.
+
+A derived form knows types, labels, relations and what is read-only — but nothing editorial: no tabs, no column widths, no rich-text vs textarea, no sidebar split, and no opinion about field order beyond the serializer's. Treat it as a scaffold to start from, not a finished panel.
+
+- Requires a backend that publishes `schema` on OPTIONS (camomilla >= 6.6).
+- An explicit `fields` prop always wins — the derived set never overrides a hand-built form.
 
 ## How to: handle multilingual content
 
@@ -431,10 +450,10 @@ The URL is read reactively from `model[previewField]`. If the value is `null`, e
 
 ## How to: auto-derive languages from the backend
 
-When the backend embeds language information in the fetched model (e.g. Camomilla embeds `lang_info.site_languages`), you can skip the `languages` prop entirely and let `<MapoDetail>` pick them up automatically:
+`<MapoDetail>` asks the endpoint to describe itself with a single `OPTIONS` call on mount — independently of the record fetch, so a create form gets its tabs too — and reads the language list from the `lang_info` of that response:
 
 ```vue
-<!-- No :languages prop needed — derived from lang_info in the response -->
+<!-- No :languages prop needed — derived from lang_info on OPTIONS -->
 <MapoDetail endpoint="/api/articles/" :id="route.params.id" :fields="fields" />
 ```
 
@@ -442,7 +461,11 @@ Language priority chain:
 
 1. `forceLanguages` prop (always wins)
 2. `languages` prop (non-empty array)
-3. `lang_info.site_languages` from the fetched model
+3. `lang_info.languages` from the endpoint's OPTIONS response
+
+`lang_info.languages` describes the **model**, not the site. `lang_info.site_languages` is context only and is **never** used: a model whose `lang_info.translatable` is `false`, or which has no `lang_info` at all, renders no language switcher. A multilingual site can still expose models nobody registered for translation, and tabs on those invite the editor to type values the backend drops on save.
+
+**Behaviour change** — pages that relied on site-wide tabs appearing for every model must now pass `languages` or `forceLanguages` explicitly.
 
 Use `forceLanguages` when you need to restrict the editor to a subset of the site languages for a specific model:
 

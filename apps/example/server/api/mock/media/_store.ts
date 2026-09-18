@@ -119,12 +119,14 @@ export const mockMediaItems: MockMediaItem[] = DEMO_IMAGES.map((img, i) => ({
 
 /**
  * Extract a mime filter from either the canonical `mime` param (default adapter)
- * or the Camomilla `fltr=mime_type=<value>` param (Camomilla adapter).
+ * or Camomilla's `fltr` (Camomilla adapter), which sends a glob as a prefix
+ * match — `fltr=mime_type__startswith=image/` — and a concrete type as an
+ * exact `fltr=mime_type=image/png`. Both reduce to the prefix compared below.
  */
 export function parseMimeFilter(query: Record<string, unknown>): string | null {
   if (query.mime) return String(query.mime);
   const fltr = query.fltr ? String(query.fltr) : "";
-  const match = fltr.match(/mime_type=([^&]+)/);
+  const match = fltr.match(/mime_type(?:__startswith)?=([^&]+)/);
   return match?.[1] ?? null;
 }
 

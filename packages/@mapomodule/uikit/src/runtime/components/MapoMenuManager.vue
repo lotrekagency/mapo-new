@@ -9,6 +9,7 @@ import {
 } from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
+import { languagesFromMetadata } from "../utils/langInfo";
 import { deepClone, objectDiff } from "@mapomodule/utils";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
 import {
@@ -115,13 +116,23 @@ const model = ref<MapoMenu>(
 let backup: MapoMenu = deepClone(model.value);
 
 const selected = ref<MenuTreeNode | null>(null);
+// ─── Languages (auto-derive from lang_info) ──────────────────────────────────
+// Camomilla describes the model's language situation in the endpoint's OPTIONS
+// metadata; reading it means a host page no longer hardcodes a list, and a menu
+// model that is not registered for translation shows no switcher instead of tabs
+// the backend would drop. props.languages still wins when a page insists.
+const derivedLangs = ref<string[]>([]);
+const activeLangs = computed<string[]>(() =>
+  props.languages.length ? props.languages : derivedLangs.value,
+);
+
 const currentLang = ref(props.lang ?? props.languages[0] ?? "");
 const isLoading = ref(String(props.identifier) !== "new");
 const isSaving = ref(false);
 
 const isNew = computed(() => String(props.identifier) === "new");
 const translationsActive = computed(
-  () => props.translatable && props.languages.length > 0,
+  () => props.translatable && activeLangs.value.length > 0,
 );
 
 // ─── Permissions ─────────────────────────────────────────────────────────────
@@ -137,10 +148,20 @@ const effectiveReadonly = computed(() => {
 
 // ─── Language handling ───────────────────────────────────────────────────────
 
+// Derivation resolves after mount, so the initial currentLang is "" whenever the
+// list is not hardcoded. Adopt the first language as soon as one is known.
+watch(
+  activeLangs,
+  (langs) => {
+    if (!currentLang.value && langs.length) currentLang.value = langs[0]!;
+  },
+  { immediate: true },
+);
+
 watch(
   () => props.lang,
   (val) => {
-    if (val && props.languages.includes(val)) currentLang.value = val;
+    if (val && activeLangs.value.includes(val)) currentLang.value = val;
   },
 );
 
@@ -189,7 +210,21 @@ watch(
 
 watch(model, (val) => emit("update:modelValue", val));
 
+/**
+ * Ask the endpoint to describe itself. `lang_info` lives on OPTIONS only, so
+ * this runs for an existing menu as well as a brand new one.
+ */
+async function deriveLanguages() {
+  if (props.languages.length) return;
+  try {
+    derivedLangs.value = languagesFromMetadata(await crud.options());
+  } catch {
+    // Backend without OPTIONS metadata: just no auto-derived languages.
+  }
+}
+
 onMounted(async () => {
+  deriveLanguages();
   if (isNew.value) return;
   isLoading.value = true;
   try {
@@ -331,7 +366,7 @@ const treeview = ref<InstanceType<typeof MapoMenuTreeview> | null>(null);
           <div class="border-b border-default px-2 pt-2">
             <MapoDetailLangSwitch
               v-model="currentLang"
-              :langs="languages"
+              :langs="activeLangs"
               :errors="langErrors"
               no-route-change
             />

@@ -8,7 +8,7 @@ How to connect Mapo to any REST API backend — not just Camomilla. You'll write
 - You need custom path rewrites, token auth (JWT Bearer), or response transformation
 - You're using Laravel, FastAPI, Node.js, Strapi, or any other REST API
 
-If you **are** using Camomilla, install `mapo-integrations-camomilla` instead and skip this guide.
+If you **are** using Camomilla, install `@mapomodule/mapo-integrations-camomilla` instead and skip this guide.
 
 ## How it works
 

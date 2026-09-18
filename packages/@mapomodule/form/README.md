@@ -5,7 +5,7 @@ Form engine for Mapo v2 — descriptor-driven, typesafe, headless-ready admin fo
 ## Features
 
 - **Descriptor-driven**: define fields as `FieldDescriptor[]` — layout, validation, i18n in one object
-- **All field types built-in**: text, select, date/time, FK/M2M autocomplete, WYSIWYG editor, SEO preview, map, repeater
+- **All field types built-in**: text, select, date/time, FK/M2M autocomplete, WYSIWYG editor, SEO preview, map, repeater, media pickers
 - **Headless composable**: `useMapoForm()` for fully custom layouts; `<MapoForm>` for the default shell
 - **Registry auto-injection**: `<MapoForm>` and `<MapoDetail>` resolve `$mapoFormRegistry` automatically — no boilerplate
 - **Typed extension API**: `defineFormField(type, entry, opts)` to register custom fields with collision detection
@@ -16,6 +16,7 @@ Form engine for Mapo v2 — descriptor-driven, typesafe, headless-ready admin fo
 - **Consistent repeater items**: `MapoRepeater` drives each item through `useMapoForm`, so nested-path keys, `translatable`, accessors, `descriptor.is` overrides and **client validation** behave identically inside a repeater
 - **Draft persistence**: `draftKey` option on `useMapoForm()` auto-saves to localStorage every 2 s; `checkDraft()` / `draftBanner` offer restore/discard; clears on successful `submit()`
 - **Fail-soft**: unknown field types render a non-destructive placeholder, never crash the form
+- **Media pickers**: `media`, `media-m2m` and `enhanced-media` field types are built in; they drive the Media Manager from [`@mapomodule/uikit`](../uikit/README.md), resolved at runtime — install it to enable them
 
 ## Install
 

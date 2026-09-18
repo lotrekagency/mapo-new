@@ -59,9 +59,11 @@ function clearFile() {
 
 onUnmounted(revokePreview);
 
-function onMaintainUrlChange(v: boolean) {
-  maintainUrl.value = v;
-  emit("update:maintainUrl", v);
+// UCheckbox emits `boolean | "indeterminate"`; this checkbox is binary.
+function onMaintainUrlChange(v: boolean | "indeterminate") {
+  const checked = v === true;
+  maintainUrl.value = checked;
+  emit("update:maintainUrl", checked);
 }
 </script>
 

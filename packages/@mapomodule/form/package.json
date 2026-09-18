@@ -1,8 +1,23 @@
 {
   "name": "@mapomodule/form",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Mapo declarative typed form engine and field components",
   "type": "module",
+  "license": "MIT",
+  "author": "Lotrek Agency (https://lotrek.it)",
+  "homepage": "https://lotrekagency.github.io/mapo-new/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git",
+    "directory": "packages/@mapomodule/form"
+  },
+  "bugs": {
+    "url": "https://github.com/lotrekagency/mapo-new/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
   "exports": {
     ".": {
       "types": "./dist/module.d.mts",
@@ -56,10 +71,10 @@
     "@nuxt/kit": "4.4.2",
     "@nuxt/module-builder": "^1.0.2",
     "@nuxt/schema": "4.4.2",
-    "nuxt": "^4.4.2",
+    "nuxt": "^4.5.1",
     "vitest": "^3.2.0",
-    "vue": "^3.5.32",
-    "vue-router": "^5.0.4",
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0",
     "vue-tsc": "^3.3.4",
     "zod": "^3.23.8"
   }

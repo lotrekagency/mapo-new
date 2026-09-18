@@ -3,7 +3,6 @@ import {
   useRuntimeConfig,
   useCookie,
   useRequestHeaders,
-  useRequestURL,
 } from "nuxt/app";
 import { setActivePinia } from "pinia";
 import type { Pinia } from "pinia";
@@ -22,7 +21,8 @@ import type { MapoCoreRuntimeConfig } from "../types";
  * - If the HttpOnly session cookie is present, calls the configured `userInfoApi`
  *   (forwarding request cookies) to restore the authenticated user in the auth store.
  *
- * On session restore failure, it resets auth state and clears the session cookie.
+ * On session restore failure it resets auth state, and clears the session cookie only
+ * when the backend rejected the session (401/403) — never on a transport error.
  */
 export default defineNuxtPlugin({
   name: "mapo-core:init",
@@ -47,16 +47,20 @@ export default defineNuxtPlugin({
 
     try {
       const headers = useRequestHeaders(["cookie"]);
-      const url = useRequestURL();
-      const absolute = `${url.protocol}//${url.host}${userInfoApi}`;
       const user = await (
         nuxtApp.$mapoFetch as (url: string, opts: object) => Promise<unknown>
-      )(absolute, { method: "GET", headers });
+      )(userInfoApi, { method: "GET", headers });
       authStore.setUser(user as MapoUser);
     } catch (e) {
       console.error(`[mapo] Cannot restore session from cookie:\n${e}`);
       authStore.reset();
-      sessionCookie.value = null;
+      // Only drop the cookie when the backend actually rejected the session.
+      // A network blip or a 5xx must not log the user out: the cookie is HttpOnly,
+      // so clearing it here is irreversible for the client.
+      const status =
+        (e as { status?: number; response?: { status?: number } })?.status ??
+        (e as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) sessionCookie.value = null;
     }
   },
 });

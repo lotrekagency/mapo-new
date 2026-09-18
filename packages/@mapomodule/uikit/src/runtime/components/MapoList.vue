@@ -11,7 +11,7 @@ import type {
 } from "../types/list.js";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { debounce } from "@mapomodule/utils";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "#app";
 
 const props = withDefaults(
   defineProps<{

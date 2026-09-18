@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { navigateTo } from "#app";
+
 definePageMeta({
   layout: "mapo-default",
   label: "Media",
   icon: "i-lucide-images",
   middleware: ["auth"],
 });
+
+// Wrapped in a function: `navigateTo` is auto-imported for the script block but
+// template expressions resolve against the component instance, where it is absent.
+function go(path: string) {
+  return navigateTo(path);
+}
 </script>
 
 <template>
@@ -17,7 +25,7 @@ definePageMeta({
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <UCard
         class="cursor-pointer hover:ring-2 hover:ring-primary-400 transition-all"
-        @click="navigateTo('/media/gallery')"
+        @click="go('/media/gallery')"
       >
         <div class="flex items-start gap-3">
           <UIcon name="i-lucide-images" class="size-8 text-primary-500" />
@@ -31,7 +39,7 @@ definePageMeta({
       </UCard>
       <UCard
         class="cursor-pointer hover:ring-2 hover:ring-primary-400 transition-all"
-        @click="navigateTo('/media/picker')"
+        @click="go('/media/picker')"
       >
         <div class="flex items-start gap-3">
           <UIcon name="i-lucide-image-plus" class="size-8 text-primary-500" />
@@ -45,7 +53,7 @@ definePageMeta({
       </UCard>
       <UCard
         class="cursor-pointer hover:ring-2 hover:ring-primary-400 transition-all"
-        @click="navigateTo('/form/article/new')"
+        @click="go('/form/article/new')"
       >
         <div class="flex items-start gap-3">
           <UIcon name="i-lucide-newspaper" class="size-8 text-primary-500" />

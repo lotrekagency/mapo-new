@@ -1,5 +1,5 @@
 import { onBeforeUnmount, type Ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave } from "#app";
 import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 
 /** Optional configuration for the unsaved-changes navigation guard. */

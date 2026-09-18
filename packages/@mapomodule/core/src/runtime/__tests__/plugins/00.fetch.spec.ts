@@ -73,7 +73,9 @@ describe("Mapo Fetch Plugin — Pending Counter", () => {
     mapoFetch.onRequest();
     expect(pending.value).toBe(1);
 
-    // Simulate HTTP error (500): onResponseError is called instead of onResponse
+    // Simulate HTTP error (500). NOTE: ofetch calls onResponse for EVERY response
+    // (ofetch createFetch: onResponse, then onResponseError for status >= 400), so the
+    // real plugin must decrement in onResponse only. See the `real plugin` suite below.
     mapoFetch.onResponseError({
       response: { status: 500 },
       request: "/api/users",

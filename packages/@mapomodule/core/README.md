@@ -27,13 +27,13 @@ When installed via `mapomodule`, configure under the `mapo` key instead.
 
 ## What you get (auto-imported)
 
-| API               | Purpose                                                                     |
-| ----------------- | --------------------------------------------------------------------------- |
-| `useCrud<T>(url)` | Typed CRUD repository: `list`, `get`, `create`, `update`, `patch`, `delete` |
-| `useMapoAuth()`   | `login`, `logout`, `fetchUser` — drives the auth store                      |
-| `useMapoFetch()`  | Pre-configured `$fetch` with 401/403 interceptors                           |
-| `useMapo()`       | Facade exposing the above as a single object                                |
-| `auth` middleware | Route middleware: redirects unauthenticated users to `loginUrl`             |
+| API               | Purpose                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `useCrud<T>(url)` | Typed CRUD repository: `list`, `detail`, `create`, `update`, `partialUpdate`, `delete`, `updateOrCreate`, `updateOrder`, `options` |
+| `useMapoAuth()`   | `login`, `logout`, `fetchUser` — drives the auth store                                                                             |
+| `useMapoFetch()`  | Pre-configured `$fetch` with 401/403 interceptors                                                                                  |
+| `useMapo()`       | Facade exposing the above as a single object                                                                                       |
+| `auth` middleware | Route middleware: redirects unauthenticated users to `loginUrl`                                                                    |
 
 ## Dev workflow
 
