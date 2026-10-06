@@ -3,4 +3,3 @@ packages:
   - "packages/mapomodule"
   - "apps/*"
   - "docs"
-  - "testing/*"

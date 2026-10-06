@@ -47,6 +47,7 @@
     "@mapomodule/core": "workspace:*",
     "@mapomodule/form": "workspace:*",
     "@mapomodule/i18n": "workspace:*",
+    "@mapomodule/mcp": "workspace:*",
     "@mapomodule/store": "workspace:*",
     "@mapomodule/uikit": "workspace:*",
     "@mapomodule/utils": "workspace:*",
