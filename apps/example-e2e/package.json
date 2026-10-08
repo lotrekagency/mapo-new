@@ -9,6 +9,9 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
+  "devDependencies": {
+    "@mapomodule/mcp": "workspace:*"
+  },
   "dependencies": {
     "@mapomodule/form": "workspace:*",
     "@mapomodule/uikit": "workspace:*",
