@@ -1,3 +1,13 @@
+# mapomodule [2.0.0-beta.15](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.14...mapomodule@2.0.0-beta.15) (2026-10-09)
+
+### Features
+
+- **mcp:** add @mapomodule/mcp MCP server for AI assistants ([dd4a687](https://github.com/lotrekagency/mapo-new/commit/dd4a6872e94026d7c4b82a45a74908732be1af3d))
+
+### Dependencies
+
+- **@mapomodule/mcp:** upgraded to 1.0.0-beta.1
+
 # mapomodule [2.0.0-beta.14](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.13...mapomodule@2.0.0-beta.14) (2026-09-02)
 
 ### Dependencies
