@@ -3,8 +3,23 @@
   "version": "0.0.0",
   "description": "Mapo MCP server: grounded docs, component and field APIs, live app introspection and scaffolding for AI assistants",
   "type": "module",
+  "license": "MIT",
+  "author": "Lotrek Agency (https://lotrek.it)",
+  "homepage": "https://lotrekagency.github.io/mapo-new/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git",
+    "directory": "packages/@mapomodule/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/lotrekagency/mapo-new/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
   "bin": {
-    "mapo-mcp": "./bin/mapo-mcp.mjs"
+    "mapo-mcp": "bin/mapo-mcp.mjs"
   },
   "exports": {
     ".": {
@@ -29,7 +44,6 @@
   "scripts": {
     "build": "nuxt-module-build build && node scripts/clean-handler-dts.mjs && node scripts/build-knowledge.mjs",
     "dev": "nuxt-module-build build --stub --watch",
-    "prepare": "nuxt-module-build build --stub && node scripts/build-knowledge.mjs",
     "dev:prepare": "nuxt-module-build build --stub && node scripts/build-knowledge.mjs",
     "knowledge": "node scripts/build-knowledge.mjs",
     "typecheck": "tsc --noEmit",
