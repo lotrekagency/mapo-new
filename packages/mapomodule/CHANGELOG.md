@@ -1,3 +1,9 @@
+# mapomodule [2.0.0-beta.16](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.15...mapomodule@2.0.0-beta.16) (2026-10-09)
+
+### Dependencies
+
+- **@mapomodule/mcp:** upgraded to 1.0.0-beta.1
+
 # mapomodule [2.0.0-beta.15](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.14...mapomodule@2.0.0-beta.15) (2026-10-09)
 
 ### Features
