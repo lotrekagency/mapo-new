@@ -2,8 +2,6 @@
 import { useI18n } from "vue-i18n";
 import { version } from "../../../package.json";
 
-definePageMeta({ layout: "mapo-default" });
-
 const { t } = useI18n();
 </script>
 

@@ -40,6 +40,16 @@ export default defineNuxtModule<MapoOptions>({
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
 
+    // In consuming apps this runtime lives inside node_modules, where Nuxt
+    // skips auto-import injection by default (workspace apps are unaffected:
+    // pnpm symlinks resolve outside node_modules). Opt back in and transpile
+    // the runtime for the SSR build.
+    nuxt.options.build.transpile.push(resolver.resolve("./runtime"));
+    nuxt.options.imports.transform ??= {};
+    (nuxt.options.imports.transform.include ??= []).push(
+      /@mapomodule[\\/]core[\\/]/,
+    );
+
     addTypeTemplate({
       filename: "types/mapo-core-page-meta.d.ts",
       getContents: () =>
@@ -50,7 +60,9 @@ export default defineNuxtModule<MapoOptions>({
     });
 
     if (!hasNuxtModule("@mapomodule/store")) {
-      await installModule("@mapomodule/store");
+      // Resolve from core's own node_modules: with pnpm's isolated layout the
+      // consuming app cannot resolve the bare "@mapomodule/store" specifier.
+      await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
     // `defaults` guarantees these are set at runtime, but MapoOptions keeps
