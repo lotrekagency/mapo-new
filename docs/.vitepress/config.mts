@@ -6,6 +6,8 @@ export default defineConfig({
   title: 'Mapo',
   description: 'Mapo v2 — Vue 3 / Nuxt 4 admin framework',
   ignoreDeadLinks: true,
+  // Agent manuals live next to the docs they govern; they are not site pages.
+  srcExclude: ['**/AGENTS.md', '**/CLAUDE.md'],
 
   head: [
     ['meta', { name: 'theme-color', content: '#16a34a' }],
@@ -21,6 +23,7 @@ export default defineConfig({
       { text: 'Modules', link: '/modules/core' },
       { text: 'Integrations', link: '/modules/camomilla' },
       { text: 'Migration', link: '/migration/v1-to-v2' },
+      { text: 'Contributing', link: '/contributing/' },
     ],
 
     sidebar: [
@@ -55,7 +58,6 @@ export default defineConfig({
           { text: 'Architecture & Flows', link: '/guide/architecture-flows' },
           { text: 'Known Limitations', link: '/guide/known-limitations' },
           { text: 'Release Process', link: '/guide/release-process' },
-          { text: 'Contributing', link: '/guide/contributing' },
         ],
       },
       {
@@ -123,6 +125,20 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'v1 → v2', link: '/migration/v1-to-v2' },
+        ],
+      },
+      {
+        text: 'Contributing',
+        collapsed: false,
+        items: [
+          { text: 'Overview', link: '/contributing/' },
+          { text: 'Testing and verification', link: '/contributing/testing' },
+          { text: 'Writing documentation', link: '/contributing/documentation' },
+          { text: 'Adding a field type', link: '/contributing/add-field-type' },
+          { text: 'Adding a UIKit component', link: '/contributing/add-component' },
+          { text: 'Adding a composable or utility', link: '/contributing/add-composable' },
+          { text: 'Working on the MCP server', link: '/contributing/mcp-server' },
+          { text: 'Working with AI agents', link: '/contributing/ai-workflow' },
         ],
       },
     ],

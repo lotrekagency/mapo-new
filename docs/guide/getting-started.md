@@ -45,7 +45,7 @@ export default defineNuxtConfig({
 });
 ```
 
-All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration). The example above only sets the core auth keys; sub-module options are nested under their own key: `@mapomodule/i18n` (default locale, browser detection, and a `locales` list that **replaces** the built-in `en` + `it`) under `mapo.i18n`, `@mapomodule/uikit` under `mapo.uikit`, `@mapomodule/form` under `mapo.form`.
+All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#options). The example above only sets the core auth keys; sub-module options are nested under their own key: `@mapomodule/i18n` (default locale, browser detection, and a `locales` list that **replaces** the built-in `en` + `it`) under `mapo.i18n`, `@mapomodule/uikit` under `mapo.uikit`, `@mapomodule/form` under `mapo.form`.
 
 ## Create app.vue
 

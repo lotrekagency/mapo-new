@@ -2,7 +2,7 @@
 
 Mapo uses **[multi-semantic-release](https://github.com/qiwi/multi-semantic-release)** to automate versioning, changelog generation, GitHub tagging, and npm publishing across all packages in the monorepo.
 
-The entire process is triggered automatically by CI on every push to `main`. No manual version bumping or publishing is ever required.
+A release is started by hand from the `CD` workflow; everything after that is automatic. No manual version bumping or publishing is ever required.
 
 ---
 
@@ -48,14 +48,20 @@ feat(core): add new composable
 
 ### 4. CI Pipeline
 
-The full pipeline runs on every push to `main`:
+Three GitHub Actions workflows are involved:
+
+| Workflow     | Trigger                                                   | Jobs                                                         |
+| ------------ | --------------------------------------------------------- | ------------------------------------------------------------ |
+| `CI`         | Pull request to `main`                                    | `lint` (build, lint, typecheck), then `test` (build, Vitest) |
+| `Docs Pages` | Push to `main`                                            | Builds and deploys the documentation site                    |
+| `CD`         | Manual dispatch with `release_mode` `normal` or `dry-run` | A guard that refuses to run from `main`, then the release    |
+
+The release itself:
 
 ```
-push to main
+CD (manual dispatch, from beta or another release branch)
   │
-  ├── lint       ESLint + TypeScript check (turbo)
-  ├── test       Vitest + Cypress (turbo) — runs after lint
-  └── release    Runs after lint + test pass
+  └── release    release_mode: normal (dry-run runs pnpm release:dry instead)
         │
         └── pnpm release
               │
@@ -71,7 +77,7 @@ push to main
                     └── Publish to npm  (@semantic-release/npm)
 ```
 
-The `release` job only runs on `push` to `main`, never on pull requests.
+`.releaserc.cjs` releases from `main` and from `beta`, where versions are prereleases published on the `next` dist-tag. Pull requests never release.
 
 TODO: extend the validation stage in the future with a test matrix across multiple supported Node.js versions, Nuxt versions, and other compatibility dimensions so releases are validated against more than one environment.
 

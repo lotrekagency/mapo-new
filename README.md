@@ -14,6 +14,7 @@ Mapo is a Vue 3 / Nuxt 4 admin framework for building backoffice interfaces decl
 | `@mapomodule/utils` | Typed utilities: `deepMerge`, `objectDiff`, `debounce`, `buildRouteTree`, `humanFileSize`, `slugify`, …               |
 | `@mapomodule/form`  | Declarative typed form engine: `FieldDescriptor[]`, `useMapoForm()`, 14 field types, JSON Schema bridge               |
 | `@mapomodule/i18n`  | `@nuxtjs/i18n` v10 wrapper with `en`/`it` base translations                                                           |
+| `@mapomodule/mcp`   | Development-only MCP server: Mapo docs, real component and field APIs and app introspection for AI assistants         |
 | `mapomodule`        | Meta-package: installs all `@mapomodule/*` modules with a single registration                                         |
 
 ### Backend integrations
@@ -114,7 +115,10 @@ apps/example/              core feature demo app
 apps/example-theme/        theming & override demo app
 apps/example-custom-form/  custom form field demo (defineFormField, third-party integration)
 apps/example-e2e/          E2E test target — one page per feature scenario
-e2e/                       Playwright E2E test suite
-docs/                      VitePress documentation site
-legacy/                    git submodules: mapo-v1 and mapo-v1-middleware (read-only reference)
+docs/                      VitePress documentation site, also indexed by @mapomodule/mcp
+.claude/                   AI agent setup: skills, subagents, shared permissions
 ```
+
+## Contributing
+
+Start from [Contributing](docs/contributing/index.md): setup, how a change is made, the definition of done, testing and documentation. AI agents (Claude Code, GitHub Copilot) start from [`AGENTS.md`](AGENTS.md); the setup is explained in [Working with AI agents](docs/contributing/ai-workflow.md).

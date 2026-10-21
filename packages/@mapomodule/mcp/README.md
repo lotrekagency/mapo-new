@@ -392,26 +392,13 @@ pnpm --filter @mapomodule/mcp test        # unit + real-index regressions + stdi
 pnpm --filter @mapomodule/mcp typecheck
 ```
 
-[TESTING.md](TESTING.md) walks through the full verification: build, suites, both
-transports, the consumer flow, search-quality spot-checks and a troubleshooting
-table.
+How to add a recipe, a prompt, a resource or a tool, and what to update when Mapo changes, is in
+[Working on the MCP server](../../../docs/contributing/mcp-server.md). Verification across the
+monorepo is in [Testing and verification](../../../docs/contributing/testing.md).
 
-### Adding a tool
-
-1. Write the spec in `src/runtime/core/tools/<area>.ts` with `defineMapoTool` — an explicit `Args`
-   interface, a zod `inputSchema`, annotations, `inputExamples`, and a `run` returning markdown.
-2. Export it from the area's tool array.
-3. Add a one-line Nitro wrapper in `src/runtime/mcp/handlers/mapo/tools/<name>.ts`:
-
-   ```ts
-   import { myTool } from "../../../../core/tools/<area>.js";
-   import { toMcpTool } from "../../../../nitro/to-mcp-tool.js";
-
-   export default toMcpTool(myTool);
-   ```
-
-4. If the tool works without the dev server, add it to `staticTools()` in `src/cli.ts` too, and
-   update the expected list in `src/__tests__/cli.test.ts`.
+What the server says about Mapo has two sources: the instructions in
+[`src/runtime/core/instructions.ts`](src/runtime/core/instructions.ts), shared by both transports,
+and the [Concepts](../../../docs/guide/concepts.md) page, served as `mapo://overview`.
 
 Tools return markdown on purpose: assistants read it directly, and it costs fewer tokens than JSON
 wrapped in prose.
@@ -479,5 +466,4 @@ extracted from source, live app introspection and diagnostics, guarded scaffoldi
 mapping, MCP resources and prompts, the dev-only Nuxt module with its namespaced handler, and the
 stdio CLI with transparent forwarding of the live tools.
 
-Planned (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-`mapo-mcp install` / Agent Skill / MCP App inspector.
+Planned: `mapo-mcp install` / Agent Skill / MCP App inspector.
