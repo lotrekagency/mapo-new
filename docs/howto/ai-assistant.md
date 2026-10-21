@@ -21,7 +21,7 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 4 resources, 5 prompts, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 5 resources, 5 prompts, 1 handler
 ```
 
 The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
@@ -143,9 +143,10 @@ beats "pagination". The ranker demotes prop tables for task-shaped questions and
 promotes them when you ask about an API surface ("what props does `MapoDetail`
 accept").
 
-**Start from the recipes.** `mapo_list_recipes` with no argument is the fastest
-way to learn what Mapo already does, before designing something Mapo ships out
-of the box.
+**Start from the overview and the recipes.** `mapo_list_recipes` with no
+argument opens with what Mapo is and lists what it already does, before you
+design something Mapo ships out of the box. Clients that attach MCP resources
+can add `mapo://overview`, the whole [Concepts](/guide/concepts) page.
 
 **Use the slash-commands.** If your client supports MCP prompts, `/mapo-crud-page`,
 `/mapo-custom-field`, `/mapo-debug-form`, `/mapo-migrate-v1` and `/mapo-theme`
@@ -165,7 +166,9 @@ descriptors — including the endpoint of each relation — and hands the result
 detail page.
 
 **Add a project rule.** Some clients ignore the server's `instructions`. A line
-in `CLAUDE.md` / `.cursorrules` / project instructions goes a long way:
+in your project's agent instructions goes a long way: `AGENTS.md` (read by
+GitHub Copilot, Codex and Cursor), `CLAUDE.md` for Claude Code (a single
+`@AGENTS.md` line imports the same file), or `.cursor/rules`:
 
 ```md
 This project uses Mapo. Before writing Mapo code, consult the `mapo_*` MCP tools:

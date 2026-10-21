@@ -170,7 +170,7 @@ tool is ever `destructiveHint`, because nothing here deletes or replaces without
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mapo_search_docs`      | Ranked search over the Mapo docs. Returns the matching **sections** with their `path`, `#anchor`, matched symbols and an excerpt — plus the canonical recipe when the query matches a known task. Filters: `section` (`howto`, `guide`, `uikit`, `form`, `modules`, `migration`), `pkg` (`@mapomodule/form`, `uikit`, …), `limit`. |
 | `mapo_get_doc`          | Returns the exact markdown of a page, or of a single section via `heading` (accepts the heading text or its anchor). Reports the page's full heading list so the assistant can narrow down, and truncates at `maxChars`.                                                                                                           |
-| `mapo_list_recipes`     | The curated task → documentation map. With no argument it lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                                                       |
+| `mapo_list_recipes`     | The curated task → documentation map. With no argument it opens with what Mapo is and lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                           |
 | `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, **extracted from its source**: real types, defaults and JSDoc. Partial names resolve (`list` → `MapoList`); `include` narrows the answer to one section.                                                                                                          |
 | `mapo_list_field_types` | The form registry: every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` with types and descriptions, the registry-level default attrs, and a skeleton descriptor to copy.                                                                                                                                |
 | `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures, grouped by package.                                                                                                                                                                                            |
@@ -263,6 +263,7 @@ Attachable context, for clients that support MCP resources:
 
 | URI                      | Contents                                                                                  |
 | ------------------------ | ----------------------------------------------------------------------------------------- |
+| `mapo://overview`        | How Mapo fits together: the `guide/concepts.md` page, whole.                              |
 | `mapo://knowledge/index` | Everything this server knows: recipes, doc pages, components, field types, composables.   |
 | `mapo://docs/{path}`     | A full documentation page. Clients can list every page.                                   |
 | `mapo://fields/{type}`   | The complete contract of one field type. Clients can list every type.                     |
@@ -335,9 +336,9 @@ are not installing the `mapomodule` meta-package.
 - **No secrets in responses.** The app snapshot exposes public runtime config only; private keys
   appear as key names, never values. Backend credentials are read from the environment and are never
   included in tool output.
-- **Read-only today.** Every shipped tool is annotated read-only. When scaffolding lands, writing is
-  opt-in (`write: true`), development-only, refuses to escape the project root and never overwrites
-  an existing file without `overwrite: true`.
+- **Read-only except scaffolding.** Every tool is annotated read-only except `mapo_scaffold`, whose
+  writing is opt-in (`write: true`), development-only, refuses to escape the project root and never
+  overwrites an existing file without `overwrite: true`.
 - The toolkit's `security.allowedOrigins` default is left in place, so cross-site browser clients
   must present an allowed `Origin`.
 
@@ -353,7 +354,8 @@ pnpm --filter @mapomodule/mcp knowledge  # index only
 [`scripts/build-knowledge.mjs`](scripts/build-knowledge.mjs) drives the generator in
 [`src/build/`](src/build/), which produces two files.
 
-**`docs.json`** — walks `docs/**/*.md` (skipping `roadmap/` and `DECISIONS.md`, which are internal),
+**`docs.json`** — walks `docs/**/*.md` (skipping `roadmap/`, `contributing/`, `DECISIONS.md` and the
+`AGENTS.md` / `CLAUDE.md` agent manuals, which are not app-building docs),
 splits each page at its H2/H3 headings — ignoring headings inside fenced code blocks — and writes
 every chunk plus the inverted index. Each chunk carries its path, section, package,
 VitePress-compatible anchor, the symbols it mentions (`MapoList`, `useCrud`, field types) and
@@ -427,8 +429,9 @@ src/
 │   ├── extract-fields.ts        # registry + descriptor interfaces
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes,
-    │                            #   doctor, scaffold/, write guard, openapi, prompts, tools
+    ├── core/                    # transport-agnostic: instructions, overview, tokenizer, indexer,
+    │                            #   search, recipes, doctor, scaffold/, write guard, openapi,
+    │                            #   prompts, tools
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   ├── to-mcp-tool.ts       # spec → defineMcpTool

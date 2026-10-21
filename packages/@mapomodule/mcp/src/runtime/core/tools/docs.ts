@@ -1,5 +1,6 @@
 /** Docs tools: grounded search, curated recipes and exact section retrieval. */
 import { z } from "zod";
+import { overviewSummary } from "../overview.js";
 import { matchRecipes, RECIPES } from "../recipes.js";
 import { getDoc, searchDocs } from "../search.js";
 import { defineMapoTool } from "../tool-spec.js";
@@ -187,7 +188,7 @@ export const listRecipesTool = defineMapoTool({
     openWorldHint: false,
   },
   inputExamples: [{}, { task: "upload images and pick them in a form" }],
-  run: (args: ListRecipesArgs) => {
+  run: (args: ListRecipesArgs, context: MapoToolContext) => {
     if (args.task) {
       const matches = matchRecipes(args.task, 3);
       if (!matches.length) {
@@ -199,11 +200,13 @@ export const listRecipesTool = defineMapoTool({
       return `${renderRecipes(matches)}Read the page with mapo_get_doc({ path }).`;
     }
 
+    // With no task the caller is surveying Mapo, so lead with what it is.
+    const summary = overviewSummary(context.knowledge());
     const lines = RECIPES.map(
       (recipe) =>
         `- **${recipe.task}** → \`${recipe.doc}\` — ${recipe.summary}`,
     );
-    return `${RECIPES.length} Mapo recipes:\n\n${lines.join("\n")}\n\nRead one with mapo_get_doc({ path }).`;
+    return `${summary ? `${summary}\n\n` : ""}${RECIPES.length} Mapo recipes:\n\n${lines.join("\n")}\n\nRead one with mapo_get_doc({ path }).`;
   },
 });
 

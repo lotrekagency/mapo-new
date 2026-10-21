@@ -17,20 +17,26 @@ export const KNOWLEDGE_VERSION = 1;
 /** Chunks larger than this are split further (H3, then paragraphs). */
 const MAX_CHUNK_CHARS = 3500;
 
-/** Directories under the docs root that are internal planning, not user docs. */
+/**
+ * Directories under the docs root that are not app-building docs: internal
+ * planning, and `contributing/`, whose procedures for changing Mapo itself
+ * would otherwise compete with the answers for app developers.
+ */
 const EXCLUDED_DIRS = new Set([
   "node_modules",
   "roadmap",
+  "contributing",
   ".vitepress",
   "dist",
 ]);
 
 /**
  * Internal pages that are not user documentation. `DECISIONS.md` is an
- * Italian-language decision log for maintainers; surfacing it to assistants
- * only pollutes results.
+ * Italian-language decision log for maintainers, and `AGENTS.md` / `CLAUDE.md`
+ * are the manuals of the agents that edit the docs; surfacing them to
+ * assistants only pollutes results.
  */
-const EXCLUDED_FILES = new Set(["DECISIONS.md"]);
+const EXCLUDED_FILES = new Set(["DECISIONS.md", "AGENTS.md", "CLAUDE.md"]);
 
 /** Field boosts baked into the term frequencies. */
 const BOOST = { heading: 3, title: 2, tags: 3, text: 1 } as const;
