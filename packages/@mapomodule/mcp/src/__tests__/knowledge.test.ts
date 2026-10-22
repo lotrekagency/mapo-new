@@ -14,6 +14,7 @@ import {
   loadDocsKnowledge,
   resolveKnowledgeDir,
 } from "../runtime/core/knowledge.js";
+import { overviewSummary } from "../runtime/core/overview.js";
 import { RECIPES } from "../runtime/core/recipes.js";
 import { getDoc, searchDocs } from "../runtime/core/search.js";
 
@@ -40,6 +41,20 @@ describeBuilt("generated knowledge base", () => {
     expect(roadmap).toEqual([]);
   });
 
+  it("excludes the contributor docs and the agent manuals", () => {
+    const paths = [...new Set(knowledge.chunks.map((chunk) => chunk.path))];
+    expect(paths.filter((path) => path.startsWith("contributing/"))).toEqual(
+      [],
+    );
+    expect(
+      paths.filter((path) => /(^|\/)(AGENTS|CLAUDE)\.md$/.test(path)),
+    ).toEqual([]);
+  });
+
+  it("indexes the overview the server opens with", () => {
+    expect(overviewSummary(knowledge)).toContain("Nuxt 4");
+  });
+
   it.each([
     ["how do I build a paginated list of articles", "howto/crud-list.md"],
     ["add a new field type to the registry", "uikit/form/registry.md"],
@@ -47,6 +62,7 @@ describeBuilt("generated knowledge base", () => {
     ["protect a page with permissions", "howto/auth-permissions.md"],
     ["show a toast notification", "howto/feedback.md"],
     ["connect a django backend", "howto/backend-integration.md"],
+    ["how do the packages fit together", "guide/concepts.md"],
   ])("ranks %j near the top of the results", (query, expectedPath) => {
     const hits = searchDocs(knowledge, query, { limit: 3 });
     expect(hits.map((hit) => hit.path)).toContain(expectedPath);

@@ -3,3 +3,7 @@
 apps/example-e2e/app/pages/form/slots.vue
 apps/example-e2e/app/pages/form/article/[id].vue
 pnpm-lock.yaml
+
+# Agent skills are vendored as published (skills-lock.json pins their hashes)
+.claude/skills/
+skills-lock.json

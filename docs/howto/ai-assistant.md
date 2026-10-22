@@ -21,10 +21,14 @@ pnpm dev
 ```
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 4 resources, 5 prompts, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 5 resources, 5 prompts, 1 handler
 ```
 
-The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
+The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**, and the `mapo:mcp`
+line of the startup log prints it. Like every server route, it sits under the
+app's `app.baseURL`: an app served under `/backoffice/` answers at
+`/backoffice/mcp/mapo`. Behind a proxy, use the address you open the app with,
+for example `http://localhost/backoffice/mcp/mapo`.
 
 If you do not want it at all:
 
@@ -56,7 +60,7 @@ The MCP package is installed as a dependency of `mapomodule`, and package
 managers only link the binaries of **direct** dependencies. Add it explicitly:
 
 ```bash
-pnpm add -D @mapomodule/mcp
+pnpm add -D @mapomodule/mcp@next   # @next: Mapo v2 is in beta
 ```
 
 Now `npx mapo-mcp serve` runs the local copy — no download, no version drift
@@ -114,8 +118,33 @@ Restart Claude Code and check with `/mcp` that the `mapo` server is connected.
 
 ### Any client, over HTTP
 
-Point it at `http://localhost:3000/mcp/mapo` (Streamable HTTP). For clients that
-only speak stdio, keep the `mapo-mcp` entry above.
+Point it at `http://localhost:3000/mcp/mapo` (Streamable HTTP). In Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "mapo": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp/mapo"
+    }
+  }
+}
+```
+
+For clients that only speak stdio, keep the `mapo-mcp` entry above.
+
+### Apps on another port, behind a proxy or under a base URL
+
+The examples above assume the app answers at `http://localhost:3000/`. When it
+does not, take the endpoint from the `mapo:mcp` line of the startup log, or
+build it from the address you open the app with plus `mcp/mapo`. An app served
+by a proxy on port 80 under `/backoffice/` answers at
+`http://localhost/backoffice/mcp/mapo`.
+
+- Over HTTP, use that URL as the `url`.
+- Over stdio, pass it to the CLI so the live tools are forwarded there:
+  `"args": ["mapo-mcp", "serve", "--app", "http://localhost/backoffice/mcp/mapo"]`,
+  or set `MAPO_MCP_APP_URL`.
 
 ## 5. Verify
 
@@ -143,9 +172,10 @@ beats "pagination". The ranker demotes prop tables for task-shaped questions and
 promotes them when you ask about an API surface ("what props does `MapoDetail`
 accept").
 
-**Start from the recipes.** `mapo_list_recipes` with no argument is the fastest
-way to learn what Mapo already does, before designing something Mapo ships out
-of the box.
+**Start from the overview and the recipes.** `mapo_list_recipes` with no
+argument opens with what Mapo is and lists what it already does, before you
+design something Mapo ships out of the box. Clients that attach MCP resources
+can add `mapo://overview`, the whole [Concepts](/guide/concepts) page.
 
 **Use the slash-commands.** If your client supports MCP prompts, `/mapo-crud-page`,
 `/mapo-custom-field`, `/mapo-debug-form`, `/mapo-migrate-v1` and `/mapo-theme`
@@ -165,7 +195,9 @@ descriptors — including the endpoint of each relation — and hands the result
 detail page.
 
 **Add a project rule.** Some clients ignore the server's `instructions`. A line
-in `CLAUDE.md` / `.cursorrules` / project instructions goes a long way:
+in your project's agent instructions goes a long way: `AGENTS.md` (read by
+GitHub Copilot, Codex and Cursor), `CLAUDE.md` for Claude Code (a single
+`@AGENTS.md` line imports the same file), or `.cursor/rules`:
 
 ```md
 This project uses Mapo. Before writing Mapo code, consult the `mapo_*` MCP tools:
@@ -185,6 +217,12 @@ root. If it does not, step 3 was skipped: the binary only exists once
 **`/mcp/mapo` returns 404**
 The dev server is not running, or the app is a production build, or
 `mapo.mcp` is `false`.
+
+**`/mcp/mapo` redirects, or the live tools say the app is not answering**
+Clients follow the redirect as a GET and report `Method not allowed. Use POST
+for MCP requests.` The app has an `app.baseURL`, or runs behind a proxy: the
+endpoint is under the base URL, as the startup log prints it. See
+[Apps on another port, behind a proxy or under a base URL](#apps-on-another-port-behind-a-proxy-or-under-a-base-url).
 
 **Answers reference APIs that do not exist**
 Verify the tools were actually called. Models that answer from memory are the

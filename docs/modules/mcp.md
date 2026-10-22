@@ -35,7 +35,7 @@ Start the dev server and the endpoint is live at **`POST /mcp/mapo`**. The
 startup log announces it:
 
 ```
-[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 4 resources, 5 prompts, 1 handler
+[@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 5 resources, 5 prompts, 1 handler
 ```
 
 Then point your editor at it — see
@@ -72,10 +72,12 @@ export default defineNuxtConfig({
 | `backend.schemaUrl` | `string`  | `$MAPO_BACKEND_SCHEMA_URL` | OpenAPI/DRF schema URL used by the backend tools.                               |
 | `backend.tokenEnv`  | `string`  | `"MAPO_BACKEND_TOKEN"`     | Env var holding the schema bearer token. The value is never sent to the client. |
 
-The route is fixed at `<mcp.route>/mapo` (so `/mcp/mapo` with the toolkit's
-default `mcp.route`): the toolkit derives a folder handler's name from its
-directory. Change the prefix with the toolkit's own `mcp.route` option if it
-clashes with something in your app.
+The route is fixed at `/mcp/mapo`: the toolkit mounts named handlers at
+`/mcp/<name>`, takes the name from the handler's directory, and its own
+`mcp.route` option moves only its default handler. Like every server route, it
+sits under the app's `app.baseURL`: an app served under `/backoffice/` answers
+at `/backoffice/mcp/mapo`. The `mapo:mcp` line of the startup log prints the
+full URL.
 
 Opt out entirely with:
 
@@ -95,6 +97,12 @@ export default defineNuxtConfig({
 });
 ```
 
+## What the assistant is told
+
+When a client connects, the server sends its **instructions**: a short description of Mapo (the packages, declarative pages, the v1 → v2 break) and the workflow to follow — read the overview, inspect the app, start from the recipes, search the docs, and look up exact APIs instead of recalling them. Many clients put these instructions in front of the model before the first tool call.
+
+The long form is the [Concepts](/guide/concepts) page. The server serves it whole as the `mapo://overview` resource, and `mapo_list_recipes` with no argument opens with its summary, so an assistant meets the same description whichever way it starts.
+
 ## Tools
 
 All tools are prefixed `mapo_` so they stay unambiguous when several MCP servers
@@ -105,7 +113,7 @@ can create files and declares it.
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mapo_search_docs`      | Ranked search over the Mapo docs. Returns matching **sections** with path, anchor, mentioned symbols and an excerpt — plus the canonical recipe when one matches. Filters: `section`, `pkg`, `limit`. |
 | `mapo_get_doc`          | The exact markdown of a page, or of one section (`heading` accepts the heading text or its anchor), truncated at `maxChars`.                                                                          |
-| `mapo_list_recipes`     | The curated task → documentation map. No argument lists everything Mapo does; `task` returns the recipe for a goal.                                                                                   |
+| `mapo_list_recipes`     | The curated task → documentation map. No argument opens with what Mapo is and lists everything it does; `task` returns the recipe for a goal.                                                         |
 | `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, extracted from its source with real types, defaults and JSDoc. Partial names work (`list` → `MapoList`).                             |
 | `mapo_list_field_types` | Every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` and the registry defaults — plus a skeleton descriptor to copy.                                                        |
 | `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures.                                                                                   |
@@ -211,6 +219,7 @@ For clients that support MCP resources:
 
 | URI                      | Contents                                                                                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapo://overview`        | How Mapo fits together: the [Concepts](/guide/concepts) page, whole.                                                                     |
 | `mapo://knowledge/index` | Everything the server knows: recipes, pages, components, field types, composables.                                                       |
 | `mapo://docs/{path}`     | A full documentation page; clients can list every page.                                                                                  |
 | `mapo://fields/{type}`   | The complete contract of one field type; clients can list every type.                                                                    |
@@ -220,7 +229,8 @@ For clients that support MCP resources:
 `mapo_inspect_app` and `mapo_doctor` describe the running project, so they are
 answered by the HTTP endpoint. The `mapo-mcp` CLI still exposes them: it
 forwards the call to `http://localhost:3000/mcp/mapo` (override with `--app` or
-`MAPO_MCP_APP_URL`) and, when the dev server is down, explains how to start it.
+`MAPO_MCP_APP_URL` when the app runs on another port, behind a proxy or under
+an `app.baseURL`) and, when the dev server is down, explains how to start it.
 :::
 
 Still to come — `mapo-mcp install`, the Agent Skill and the MCP App inspector.
@@ -233,7 +243,8 @@ Still to come — `mapo-mcp install`, the Agent Skill and the MCP App inspector.
   their own `/mcp` endpoint untouched.
 - The documentation is indexed **at package build time** into a BM25 index
   bundled with the package: no network, no API keys, and the docs always match
-  the installed version of Mapo.
+  the installed version of Mapo. Pages for Mapo's own contributors and internal
+  notes are left out, so they never compete with answers about building an app.
 - Answers are sections, not whole files, so the assistant's context stays small.
 
 ## Security

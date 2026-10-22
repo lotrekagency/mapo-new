@@ -5,7 +5,7 @@ Pure TypeScript utility helpers shared across all `@mapomodule/*` packages. No V
 ## Installation
 
 ```bash
-pnpm add @mapomodule/utils
+pnpm add @mapomodule/utils@next   # @next: Mapo v2 is in beta, latest is still v1
 ```
 
 ---

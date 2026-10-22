@@ -1,13 +1,13 @@
 # @mapomodule/core
 
-The service layer of Mapo. Provides the typed CRUD factory, auth composable, route middleware, the `$mapoFetch` interceptor, and the boot plugins that wire everything together.
+The service layer of Mapo: an auth-aware `$fetch`, a typed CRUD repository for Django REST Framework endpoints, the auth composable, the `auth`, `permissions` and `roles` route middleware, and a server-side plugin that loads the session before any page renders.
 
 ## Installation
 
-In a Nuxt 4 app — typically you don't install this directly; install the meta-package [`mapomodule`](../../mapomodule/) which registers `core` together with `@mapomodule/store`. If you really want it standalone:
+Apps get it through the meta-package [`mapomodule`](https://www.npmjs.com/package/mapomodule) and set its options at the top level of the `mapo` key. On its own:
 
 ```bash
-pnpm add @mapomodule/core
+pnpm add @mapomodule/core@next
 ```
 
 ```ts
@@ -16,31 +16,41 @@ export default defineNuxtConfig({
   modules: ["@mapomodule/core"],
   mapoCore: {
     authLoginUrl: "/api/auth/login",
-    userInfoApi: "/api/profiles/me/",
-    logoutUrl: "/api/auth/logout",
-    loginUrl: "/login",
   },
 });
 ```
 
-When installed via `mapomodule`, configure under the `mapo` key instead.
+It installs `@mapomodule/store` when the app does not register it. Mapo v2 is published on the `next` dist-tag while it is in beta.
 
-## What you get (auto-imported)
+## Options
 
-| API               | Purpose                                                                                                                            |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `useCrud<T>(url)` | Typed CRUD repository: `list`, `detail`, `create`, `update`, `partialUpdate`, `delete`, `updateOrCreate`, `updateOrder`, `options` |
-| `useMapoAuth()`   | `login`, `logout`, `fetchUser` — drives the auth store                                                                             |
-| `useMapoFetch()`  | Pre-configured `$fetch` with 401/403 interceptors                                                                                  |
-| `useMapo()`       | Facade exposing the above as a single object                                                                                       |
-| `auth` middleware | Route middleware: redirects unauthenticated users to `loginUrl`                                                                    |
+| Option         | Default               | Description                                                               |
+| -------------- | --------------------- | ------------------------------------------------------------------------- |
+| `authLoginUrl` | `"/api/auth/login"`   | Endpoint called by `useMapoAuth().login()`                                |
+| `userInfoApi`  | `"/api/profiles/me/"` | Endpoint that returns the logged-in user, called server-side on page load |
+| `logoutUrl`    | `"/api/auth/logout"`  | Endpoint called by `useMapoAuth().logout()`                               |
+| `loginUrl`     | `"/login"`            | Route that the `auth` middleware and a 401 response redirect to           |
 
-## Dev workflow
+## What you get
 
-```bash
-pnpm dev:core   # from monorepo root — watch mode
-```
+Composables are auto-imported and the middleware is registered by name.
 
-## Configuration
+| API                            | Purpose                                                                                                                                        |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useCrud<T>(endpoint)`         | Repository over a DRF endpoint: `list`, `detail`, `create`, `update`, `partialUpdate`, `delete`, `options`, `updateOrCreate`, `updateOrder`    |
+| `useMapoAuth()`                | `login`, `logout` and `fetchUser`, kept in sync with `useAuthStore`                                                                            |
+| `useMapoFetch()`               | `{ fetch, loading }`: the `$mapoFetch` instance and a flag that is `true` while any request is in flight                                       |
+| `useMapo()`                    | One object exposing `$api`, `$auth`, `$snack` and `$confirm`                                                                                   |
+| `useCanAccessRoute(meta)`      | Whether the current user passes a route's `auth`, `roles` and `permissions` checks                                                             |
+| `$mapoFetch`                   | The `$fetch` instance behind all of the above: a 401 (except on logout) resets the session and redirects to `loginUrl`; a 403 shows a snackbar |
+| `auth`, `permissions`, `roles` | Route middleware driven by `definePageMeta` (`permissions: { model }` or a list of codenames, `roles`)                                         |
 
-All endpoints fall back to the `MAPO_DEFAULTS` constant exported from this package. See [docs/modules/core](../../../docs/modules/core.md) for the full reference.
+Types such as `CrudRepository` and `PaginatedResponse` come from `mapomodule/types`.
+
+## Documentation
+
+- [@mapomodule/core](https://lotrekagency.github.io/mapo-new/modules/core)
+- [Auth & permissions](https://lotrekagency.github.io/mapo-new/howto/auth-permissions)
+- [Custom backend integration](https://lotrekagency.github.io/mapo-new/howto/backend-integration)
+- [Architecture & Integration Flows](https://lotrekagency.github.io/mapo-new/guide/architecture-flows)
+- [Composable & Function API Reference](https://lotrekagency.github.io/mapo-new/modules/api)

@@ -5,13 +5,15 @@ This recipe walks you through installing Mapo and creating a working admin inter
 ## Prerequisites
 
 - Nuxt 4 app
-- Node >= 20, pnpm >= 8
+- Node.js ^22.19 || ^24.11 || >=26, pnpm >= 8
 
 ## 1. Install packages
 
 ```bash
-pnpm add @nuxt/ui mapomodule
+pnpm add @nuxt/ui mapomodule@next   # @next: Mapo v2 is in beta, latest is still v1
 ```
+
+> Mapo v2 is published under the `next` dist-tag: without `@next` you install Mapo v1. See [The `next` channel](/guide/getting-started#the-next-channel).
 
 > `@nuxt/ui` **must** be declared before `mapomodule` in `modules[]`. Reversing the order causes an SSR `Icon.vue` infinite recursion.
 

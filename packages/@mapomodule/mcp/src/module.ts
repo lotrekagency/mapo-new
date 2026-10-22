@@ -10,6 +10,7 @@ import {
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { MapoAppManifest, MapoMcpContext, MapoMcpOptions } from "./index";
+import { mcpEndpointUrl } from "./runtime/core/endpoint";
 
 export type { MapoAppManifest, MapoMcpContext, MapoMcpOptions } from "./index";
 
@@ -29,13 +30,6 @@ interface ForeignModuleOptions {
   mapoForm?: { fields?: { mapping?: Record<string, unknown> } };
   i18n?: { locales?: Array<string | { code: string }> };
 }
-
-/**
- * Directory name under `runtime/mcp/handlers/`, which the toolkit turns into
- * the handler name and the route segment. It is not configurable: folder
- * handlers always take their name from the directory.
- */
-const HANDLER_NAME = "mapo";
 
 /** Reads the field types extracted from the form registry at build time. */
 function readDefaultFieldTypes(knowledgeDir: string | null): string[] {
@@ -207,8 +201,13 @@ export default defineNuxtModule<MapoMcpOptions>({
       getContents: () => `export default ${JSON.stringify(buildContext())}`,
     });
 
+    // Nitro serves the handler under `app.baseURL`: print the URL it really
+    // answers on, which is what an HTTP client or `mapo-mcp serve --app` needs.
     log.info(
-      `MCP server available at ${nuxt.options.devServer?.url ?? "http://localhost:3000"}/mcp/${HANDLER_NAME}`,
+      `MCP server available at ${mcpEndpointUrl(
+        nuxt.options.devServer?.url ?? "http://localhost:3000",
+        nuxt.options.app.baseURL,
+      )}`,
     );
   },
 }) satisfies NuxtModule<MapoMcpOptions>;

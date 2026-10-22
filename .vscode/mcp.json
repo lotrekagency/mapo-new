@@ -1,0 +1,21 @@
+{
+  "servers": {
+    "mapo": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/packages/@mapomodule/mcp/bin/mapo-mcp.mjs",
+        "serve",
+        "--root",
+        "${workspaceFolder}/apps/example-e2e"
+      ],
+      "env": {
+        "MAPO_BACKEND_SCHEMA_URL": "api-schema.json"
+      }
+    },
+    "nuxt-ui": {
+      "type": "http",
+      "url": "https://ui.nuxt.com/mcp"
+    }
+  }
+}

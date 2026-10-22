@@ -9,7 +9,7 @@ Get a working admin panel in 5 minutes:
 **1. Install**
 
 ```bash
-pnpm add mapomodule @nuxt/ui
+pnpm add mapomodule@next @nuxt/ui   # @next: Mapo v2 is in beta, latest is still v1
 ```
 
 **2. Configure `nuxt.config.ts`**

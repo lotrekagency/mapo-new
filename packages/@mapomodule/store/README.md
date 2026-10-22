@@ -1,13 +1,13 @@
 # @mapomodule/store
 
-Pinia stores for Mapo: auth, snackbar, confirm dialog, and sidebar. Plus the `usePermissions` composable. All stores are SSR-safe (`useCookie`, `useNuxtApp` under the hood).
+The Pinia stores of Mapo (the session, the snackbar queue, the confirm dialog and the sidebar state) and the `usePermissions` selectors. The UIKit components and the core middleware read them, and so can your pages.
 
 ## Installation
 
-Typically installed via the meta-package [`mapomodule`](../../mapomodule/). Standalone:
+Installed by the meta-package [`mapomodule`](https://www.npmjs.com/package/mapomodule), and by `@mapomodule/core` when the app does not register it. On its own:
 
 ```bash
-pnpm add @mapomodule/store
+pnpm add @mapomodule/store@next
 ```
 
 ```ts
@@ -17,24 +17,26 @@ export default defineNuxtConfig({
 });
 ```
 
-The module installs `@pinia/nuxt` automatically if not already present.
+The module has no options and installs `@pinia/nuxt` when the app does not register it. Mapo v2 is published on the `next` dist-tag while it is in beta.
 
-## What you get (auto-imported)
+## What you get
 
-| API                | Purpose                                                             |
-| ------------------ | ------------------------------------------------------------------- |
-| `useAuthStore`     | Authenticated user info, role, permissions, model permissions       |
-| `useSnackStore`    | Snackbar message queue (`show`, `dismiss`, `dismissAll`)            |
-| `useConfirmStore`  | Promise-based confirm dialog (`ask` returns `Promise<boolean>`)     |
-| `useSidebarStore`  | Sidebar `drawer` / `mini` / `clipped` state with cookie persistence |
-| `usePermissions()` | Selectors over the auth store: `canView`, `canAdd`, `hasRole`, etc. |
+All of these are auto-imported.
 
-## Dev workflow
+| API                 | Purpose                                                                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useAuthStore()`    | The logged-in user (`info`), `isAuthenticated`, `role`, `permissions`, `modelPermissions`; `setUser` and `reset`                                           |
+| `useSnackStore()`   | The snackbar queue: `show(message, type?, duration?)`, `dismiss(id?)`, `dismissAll()`                                                                      |
+| `useConfirmStore()` | `ask(options)` opens the confirm dialog and resolves to `true` or `false`                                                                                  |
+| `useSidebarStore()` | `drawer` and `mini` state, persisted in cookies; `toggleDrawer` and `toggleMini`                                                                           |
+| `usePermissions()`  | `canView`, `canAdd`, `canChange`, `canDelete` for a Django model, `checkPermission(codename)` and `hasRole(group)`; superusers pass every permission check |
 
-```bash
-pnpm dev:store   # from monorepo root — watch mode
-```
+`MapoSnackBar` and `MapoConfirmDialog` from `@mapomodule/uikit` render the snack and confirm stores.
 
-## Reference
+Code outside Nuxt's auto-imports, such as another module's runtime, imports a store by subpath (`@mapomodule/store/runtime/stores/auth`), never from the package root, which is the Nuxt module.
 
-See [docs/modules/store](../../../docs/modules/store.md) for the full API.
+## Documentation
+
+- [@mapomodule/store](https://lotrekagency.github.io/mapo-new/modules/store)
+- [Feedback: toasts & dialogs](https://lotrekagency.github.io/mapo-new/howto/feedback)
+- [Auth & permissions](https://lotrekagency.github.io/mapo-new/howto/auth-permissions)

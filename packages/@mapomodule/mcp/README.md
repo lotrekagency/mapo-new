@@ -12,6 +12,9 @@ invented field types, and Mapo v1 code in a v2 project.
 This package gives the assistant the real thing: **grounded documentation search**, **curated
 recipes**, and — when the dev server is running — **introspection of the actual app**.
 
+Setting it up in an app: [How-to: set up your AI assistant](https://lotrekagency.github.io/mapo-new/howto/ai-assistant).
+Reference on the docs site: [@mapomodule/mcp](https://lotrekagency.github.io/mapo-new/modules/mcp).
+
 ---
 
 ## Table of contents
@@ -101,19 +104,29 @@ curl -s -X POST http://localhost:3000/mcp/mapo \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 ```
 
+The endpoint sits under the app's `app.baseURL`, like every server route: an app served under
+`/backoffice/` answers at `/backoffice/mcp/mapo`, and `/mcp/mapo` redirects to the app. The
+`mapo:mcp` line of the startup log prints the full URL; behind a proxy, use the address you open
+the app with (for example `http://localhost/backoffice/mcp/mapo`).
+
 For the transport-independent variant, add the package explicitly — it ships as a dependency of
 `mapomodule`, and package managers only expose the binaries of **direct** dependencies:
 
 ```bash
-pnpm add -D @mapomodule/mcp
+pnpm add -D @mapomodule/mcp@next
 npx mapo-mcp serve      # MCP over stdio, no dev server required
 ```
+
+Mapo v2 is published on the `next` dist-tag while it is in beta. `mapo-mcp serve` accepts
+`--app <url>` (the endpoint the live tools are forwarded to), `--root <dir>` (the project root for
+scaffolding, by default the working directory) and `--knowledge <dir>` (a prebuilt knowledge base
+instead of the bundled one).
 
 ---
 
 ## Connecting your IDE
 
-All snippets assume `pnpm add -D @mapomodule/mcp` has been run in the app, so `npx` resolves
+All snippets assume `pnpm add -D @mapomodule/mcp@next` has been run in the app, so `npx` resolves
 `mapo-mcp` from the local `node_modules/.bin`.
 
 ### Claude Code (`.mcp.json` in the project root)
@@ -152,8 +165,16 @@ All snippets assume `pnpm add -D @mapomodule/mcp` has been run in the app, so `n
 ### HTTP instead of stdio
 
 If your client speaks Streamable HTTP and you keep the dev server running, point it at
-`http://localhost:3000/mcp/mapo` instead. That variant additionally exposes the tools that need
-the live app.
+`http://localhost:3000/mcp/mapo` instead, or at the URL the startup log prints when the app runs
+elsewhere. That variant additionally exposes the tools that need the live app. In Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "mapo": { "type": "http", "url": "http://localhost:3000/mcp/mapo" }
+  }
+}
+```
 
 > **stdio vs HTTP** — stdio always works and knows the docs; HTTP additionally knows _your_ app.
 > Configuring both is a perfectly reasonable setup.
@@ -170,10 +191,14 @@ tool is ever `destructiveHint`, because nothing here deletes or replaces without
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mapo_search_docs`      | Ranked search over the Mapo docs. Returns the matching **sections** with their `path`, `#anchor`, matched symbols and an excerpt — plus the canonical recipe when the query matches a known task. Filters: `section` (`howto`, `guide`, `uikit`, `form`, `modules`, `migration`), `pkg` (`@mapomodule/form`, `uikit`, …), `limit`. |
 | `mapo_get_doc`          | Returns the exact markdown of a page, or of a single section via `heading` (accepts the heading text or its anchor). Reports the page's full heading list so the assistant can narrow down, and truncates at `maxChars`.                                                                                                           |
-| `mapo_list_recipes`     | The curated task → documentation map. With no argument it lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                                                       |
+| `mapo_list_recipes`     | The curated task → documentation map. With no argument it opens with what Mapo is and lists everything Mapo does out of the box; with `task` it returns the canonical recipe for a goal.                                                                                                                                           |
 | `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, **extracted from its source**: real types, defaults and JSDoc. Partial names resolve (`list` → `MapoList`); `include` narrows the answer to one section.                                                                                                          |
 | `mapo_list_field_types` | The form registry: every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` with types and descriptions, the registry-level default attrs, and a skeleton descriptor to copy.                                                                                                                                |
 | `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures, grouped by package.                                                                                                                                                                                            |
+| `mapo_inspect_app`      | **Live.** How Mapo is set up in the running app: installed modules and versions, public Mapo configuration, registered field types, available components, routes and locales.                                                                                                                                                      |
+| `mapo_doctor`           | **Live.** Checks the running app for known misconfigurations (module order, missing login route, untouched auth endpoints, locales without catalogs, media endpoints) and returns each problem with its fix.                                                                                                                       |
+| `mapo_scaffold`         | Generates pages, forms, custom fields, a login page, a theme override, a backend proxy, menu and media pages in Mapo's own patterns. A dry run unless `write: true`. See [Scaffolding](#scaffolding).                                                                                                                              |
+| `mapo_backend_schema`   | Reads the backend's OpenAPI/DRF schema and turns a serializer into field descriptors, with choices, required and read-only flags and the endpoint of every relation. See [From the backend schema to a page](#from-the-backend-schema-to-a-page).                                                                                  |
 
 Typical sequence an assistant follows:
 
@@ -190,9 +215,10 @@ mapo_component_api({ name: "MapoMenuManager" })
 while the component declared 17. Prose drifts; source does not.
 
 **The two live tools need the app.** Over HTTP they answer directly. Over stdio the CLI forwards
-them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL`),
-reconnecting on every call because the dev server routinely starts after the editor. When it is
-down they explain how to bring it up instead of guessing.
+them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL` when the
+app runs on another port, behind a proxy or under an `app.baseURL`), reconnecting on every call
+because the dev server routinely starts after the editor. When it is down they explain how to
+bring it up instead of guessing.
 
 ### Scaffolding
 
@@ -219,7 +245,8 @@ server-side router keeps the old table, so a brand-new route 404s until it resta
 talks to.
 
 ```
-mapo_backend_schema({ action: "list_models" })            # what the API exposes
+mapo_backend_schema({ action: "list_models" })                  # what the API exposes
+mapo_backend_schema({ action: "describe_model", model: "Article" })
 mapo_backend_schema({ action: "to_fields", model: "Article" })
 ```
 
@@ -263,6 +290,7 @@ Attachable context, for clients that support MCP resources:
 
 | URI                      | Contents                                                                                  |
 | ------------------------ | ----------------------------------------------------------------------------------------- |
+| `mapo://overview`        | How Mapo fits together: the `guide/concepts.md` page, whole.                              |
 | `mapo://knowledge/index` | Everything this server knows: recipes, doc pages, components, field types, composables.   |
 | `mapo://docs/{path}`     | A full documentation page. Clients can list every page.                                   |
 | `mapo://fields/{type}`   | The complete contract of one field type. Clients can list every type.                     |
@@ -319,9 +347,10 @@ mapo: {
 | `backend.schemaUrl` | `MAPO_BACKEND_SCHEMA_URL` | OpenAPI/DRF schema used by the backend tools.                                           |
 | `backend.tokenEnv`  | `"MAPO_BACKEND_TOKEN"`    | Name of the env var holding the schema bearer token.                                    |
 
-The route is fixed at `<mcp.route>/mapo`: the toolkit derives a folder handler's
-name from its directory. Use the toolkit's own `mcp.route` option to move the
-prefix.
+The route is fixed at `/mcp/mapo`, under the app's `app.baseURL`: the toolkit mounts named
+handlers at `/mcp/<name>`, takes the name from the handler's directory, and its own `mcp.route`
+option moves only its default handler. [`src/runtime/core/endpoint.ts`](src/runtime/core/endpoint.ts)
+computes the URL the startup log prints.
 
 The module can also be used standalone (`modules: ["@mapomodule/mcp"]`, config key `mapoMcp`) if you
 are not installing the `mapomodule` meta-package.
@@ -330,14 +359,14 @@ are not installing the `mapomodule` meta-package.
 
 ## Security model
 
-- **Development only by default.** The module returns early unless `nuxt.options.dev`, so the route
-  never exists in a production build.
+- **Development only by default.** The module returns early unless `enabled`, which defaults to
+  `nuxt.options.dev`, so the route does not exist in a production build unless you force it on.
 - **No secrets in responses.** The app snapshot exposes public runtime config only; private keys
   appear as key names, never values. Backend credentials are read from the environment and are never
   included in tool output.
-- **Read-only today.** Every shipped tool is annotated read-only. When scaffolding lands, writing is
-  opt-in (`write: true`), development-only, refuses to escape the project root and never overwrites
-  an existing file without `overwrite: true`.
+- **Read-only except scaffolding.** Every tool is annotated read-only except `mapo_scaffold`, whose
+  writing is opt-in (`write: true`), development-only, refuses to escape the project root and never
+  overwrites an existing file without `overwrite: true`.
 - The toolkit's `security.allowedOrigins` default is left in place, so cross-site browser clients
   must present an allowed `Origin`.
 
@@ -353,7 +382,8 @@ pnpm --filter @mapomodule/mcp knowledge  # index only
 [`scripts/build-knowledge.mjs`](scripts/build-knowledge.mjs) drives the generator in
 [`src/build/`](src/build/), which produces two files.
 
-**`docs.json`** — walks `docs/**/*.md` (skipping `roadmap/` and `DECISIONS.md`, which are internal),
+**`docs.json`** — walks `docs/**/*.md` (skipping `roadmap/`, `contributing/`, `DECISIONS.md` and the
+`AGENTS.md` / `CLAUDE.md` agent manuals, which are not app-building docs),
 splits each page at its H2/H3 headings — ignoring headings inside fenced code blocks — and writes
 every chunk plus the inverted index. Each chunk carries its path, section, package,
 VitePress-compatible anchor, the symbols it mentions (`MapoList`, `useCrud`, field types) and
@@ -390,26 +420,15 @@ pnpm --filter @mapomodule/mcp test        # unit + real-index regressions + stdi
 pnpm --filter @mapomodule/mcp typecheck
 ```
 
-[TESTING.md](TESTING.md) walks through the full verification: build, suites, both
-transports, the consumer flow, search-quality spot-checks and a troubleshooting
-table.
+How to add a recipe, a prompt, a resource or a tool, and what to update when Mapo changes, is in
+[Working on the MCP server](https://lotrekagency.github.io/mapo-new/contributing/mcp-server).
+Verification across the monorepo is in
+[Testing and verification](https://lotrekagency.github.io/mapo-new/contributing/testing).
 
-### Adding a tool
-
-1. Write the spec in `src/runtime/core/tools/<area>.ts` with `defineMapoTool` — an explicit `Args`
-   interface, a zod `inputSchema`, annotations, `inputExamples`, and a `run` returning markdown.
-2. Export it from the area's tool array.
-3. Add a one-line Nitro wrapper in `src/runtime/mcp/handlers/mapo/tools/<name>.ts`:
-
-   ```ts
-   import { myTool } from "../../../../core/tools/<area>.js";
-   import { toMcpTool } from "../../../../nitro/to-mcp-tool.js";
-
-   export default toMcpTool(myTool);
-   ```
-
-4. If the tool works without the dev server, add it to `staticTools()` in `src/cli.ts` too, and
-   update the expected list in `src/__tests__/cli.test.ts`.
+What the server says about Mapo has two sources: the instructions in
+[`src/runtime/core/instructions.ts`](src/runtime/core/instructions.ts), shared by both transports,
+and the [Concepts](https://lotrekagency.github.io/mapo-new/guide/concepts) page, served as
+`mapo://overview`.
 
 Tools return markdown on purpose: assistants read it directly, and it costs fewer tokens than JSON
 wrapped in prose.
@@ -417,6 +436,10 @@ wrapped in prose.
 ### Layout
 
 ```
+bin/mapo-mcp.mjs                 # the CLI entry point
+scripts/
+├── build-knowledge.mjs          # drives src/build → dist/knowledge/
+└── clean-handler-dts.mjs        # strips .d.ts files from the handler folder after the build
 src/
 ├── module.ts                    # Nuxt module: toolkit install, definition injection, app snapshot
 ├── cli.ts                       # citty CLI → MCP over stdio
@@ -427,8 +450,10 @@ src/
 │   ├── extract-fields.ts        # registry + descriptor interfaces
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: tokenizer, indexer, search, recipes,
-    │                            #   doctor, scaffold/, write guard, openapi, prompts, tools
+    ├── core/                    # transport-agnostic: instructions, overview, knowledge loader,
+    │                            #   tokenizer, indexer, search, recipes, prompts, resources,
+    │                            #   doctor, openapi + schema source, endpoint URL, scaffold/,
+    │                            #   write guard, tool specs (tools/)
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   ├── to-mcp-tool.ts       # spec → defineMcpTool
@@ -449,6 +474,12 @@ src/
 The module only registers in development. Check that the dev server is running, that
 `mapo.mcp` is not `false`, and that the startup log contains the `mapo:mcp` line announcing the
 endpoint.
+
+**`POST /mcp/mapo` redirects, or the live tools say the app is not answering**
+Clients follow the redirect as a GET and report `Method not allowed. Use POST for MCP requests.`
+The app has an `app.baseURL` or runs behind a proxy, so the handler answers below the base URL.
+Use the URL of the `mapo:mcp` startup line (for example `http://localhost/backoffice/mcp/mapo`)
+as the HTTP `url`, or pass it to the stdio CLI with `--app` or `MAPO_MCP_APP_URL`.
 
 **"Mapo knowledge base not found"**
 The index was not generated. Run `pnpm --filter @mapomodule/mcp build`. Inside a consumer project
@@ -476,5 +507,4 @@ extracted from source, live app introspection and diagnostics, guarded scaffoldi
 mapping, MCP resources and prompts, the dev-only Nuxt module with its namespaced handler, and the
 stdio CLI with transparent forwarding of the live tools.
 
-Planned (see [docs/roadmap/MCP_SERVER_PLAN.md](../../../docs/roadmap/MCP_SERVER_PLAN.md)):
-`mapo-mcp install` / Agent Skill / MCP App inspector.
+Planned: `mapo-mcp install` / Agent Skill / MCP App inspector.

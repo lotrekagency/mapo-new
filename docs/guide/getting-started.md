@@ -10,14 +10,24 @@ Mapo is a Vue 3 / Nuxt 4 admin framework. This guide gets you from zero to a run
 
 ## Install
 
-Install the meta-package, `@nuxt/ui`, and (optionally) the Camomilla integration:
+Install the meta-package, `@nuxt/ui`, and (optionally) the Camomilla integration. Mapo packages come from the `next` dist-tag (see [below](#the-next-channel)):
 
 ```bash
-pnpm add mapomodule @nuxt/ui
-pnpm add @mapomodule/mapo-integrations-camomilla   # optional — only if you use Camomilla CMS
+pnpm add mapomodule@next @nuxt/ui
+pnpm add @mapomodule/mapo-integrations-camomilla@next   # optional — only if you use Camomilla CMS
 ```
 
 The `mapomodule` meta-package transparently installs `@mapomodule/store`, `@mapomodule/i18n`, `@mapomodule/core`, `@mapomodule/uikit`, `@mapomodule/form`, and `@mapomodule/utils`. You don't need to add them as separate dependencies. `@iconify-json/lucide` is bundled with `mapomodule` — no need to install it separately.
+
+### The `next` channel
+
+Mapo v2 is in beta, and every v2 package is published on npm under the `next` dist-tag. For `mapomodule` and most `@mapomodule/*` packages the `latest` tag still points to Mapo v1 (Nuxt 2, Vue 2, Vuex, Axios), so a command without `@next` installs v1: `pnpm add mapomodule` writes `"mapomodule": "^1.0.0"` into your `package.json`.
+
+- Install every Mapo package you add yourself with `@next`: `mapomodule`, `@mapomodule/mapo-integrations-camomilla`, `@mapomodule/mcp`, `@mapomodule/utils`. The packages that `mapomodule` installs for you are pinned by it to matching versions.
+- To upgrade, run the same command again, listing every Mapo package your app declares so they move together: `pnpm add mapomodule@next @mapomodule/mapo-integrations-camomilla@next`.
+- To see where each tag points: `npm view mapomodule dist-tags`.
+
+With npm or yarn the tag works the same way: `npm install mapomodule@next`, `yarn add mapomodule@next`. Once v2 is published as `latest`, the suffix is no longer needed.
 
 ## Configure
 
@@ -45,7 +55,7 @@ export default defineNuxtConfig({
 });
 ```
 
-All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#configuration). The example above only sets the core auth keys; sub-module options are nested under their own key: `@mapomodule/i18n` (default locale, browser detection, and a `locales` list that **replaces** the built-in `en` + `it`) under `mapo.i18n`, `@mapomodule/uikit` under `mapo.uikit`, `@mapomodule/form` under `mapo.form`.
+All `mapo` keys are optional — they fall back to the [defaults defined in `MAPO_DEFAULTS`](/modules/core#options). The example above only sets the core auth keys; sub-module options are nested under their own key: `@mapomodule/i18n` (default locale, browser detection, and a `locales` list that **replaces** the built-in `en` + `it`) under `mapo.i18n`, `@mapomodule/uikit` under `mapo.uikit`, `@mapomodule/form` under `mapo.form`.
 
 ## Create app.vue
 
