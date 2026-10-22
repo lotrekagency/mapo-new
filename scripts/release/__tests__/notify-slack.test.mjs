@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildSlackMessage,
+  parseChannels,
   parseNotes,
   run,
   toMrkdwn,
@@ -76,6 +77,12 @@ describe("parseNotes", () => {
 });
 
 describe("toMrkdwn", () => {
+  it("never turns commit text into a Slack mention", () => {
+    expect(toMrkdwn("ping <!channel> and [all](!here) and <@U123>")).toBe(
+      "ping &lt;!channel&gt; and [all](!here) and &lt;@U123&gt;",
+    );
+  });
+
   it("converts bold and links, and escapes Slack control characters", () => {
     expect(toMrkdwn("**core:** a & b < c ([abc](https://x.y/z))")).toBe(
       "*core:* a &amp; b &lt; c (<https://x.y/z|abc>)",
@@ -221,6 +228,28 @@ describe("run", () => {
     expect(logger.error.mock.calls[0][0]).toContain("not_in_channel");
   });
 
+  it("posts once per channel and keeps going when one channel rejects it", async () => {
+    const fetchImpl = vi.fn(async (_url, init) => ({
+      json: async () =>
+        JSON.parse(init.body).channel === "C2"
+          ? { ok: false, error: "not_in_channel" }
+          : { ok: true },
+    }));
+    const logger = quietLogger();
+    const env = {
+      RELEASE_SUMMARY_FILE: summaryWith(releases),
+      SLACK_BOT_TOKEN: "xoxb-test",
+      SLACK_RELEASE_CHANNEL: "C1, C2,C3",
+    };
+
+    expect(await run({ env, argv: [], fetchImpl, logger })).toBe(1);
+    expect(
+      fetchImpl.mock.calls.map(([, init]) => JSON.parse(init.body).channel),
+    ).toEqual(["C1", "C2", "C3"]);
+    expect(logger.error.mock.calls).toHaveLength(1);
+    expect(logger.error.mock.calls[0][0]).toContain("C2: not_in_channel");
+  });
+
   it("prints the message instead of sending it with --dry-run", async () => {
     const fetchImpl = vi.fn();
     const logger = quietLogger();
@@ -235,5 +264,14 @@ describe("run", () => {
     expect(JSON.parse(logger.log.mock.calls[0][0]).text).toBe(
       "Mapo 2.0.0-beta.17 released",
     );
+  });
+});
+
+describe("parseChannels", () => {
+  it("accepts one ID or a comma-separated list, without blanks or repeats", () => {
+    expect(parseChannels("C1")).toEqual(["C1"]);
+    expect(parseChannels(" C1, C2 ,,C1\nC3 ")).toEqual(["C1", "C2", "C3"]);
+    expect(parseChannels(undefined)).toEqual([]);
+    expect(parseChannels("  ")).toEqual([]);
   });
 });

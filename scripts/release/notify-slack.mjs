@@ -8,7 +8,8 @@
 // and the "Dependencies" sections are left out: they only repeat version bumps.
 //
 // Posting needs $SLACK_BOT_TOKEN (a bot with the chat:write scope) and
-// $SLACK_RELEASE_CHANNEL; without them the step is skipped with a notice.
+// $SLACK_RELEASE_CHANNEL, one channel ID or several separated by commas; without
+// them the step is skipped with a notice.
 //
 // Usage: node scripts/release/notify-slack.mjs [--dry-run]   (--dry-run prints the message)
 import { existsSync, readFileSync } from "node:fs";
@@ -62,13 +63,17 @@ export function parseNotes(notes) {
   return sections;
 }
 
-/** GitHub-flavoured markdown → Slack mrkdwn, for the subset semantic-release emits. */
+/**
+ * GitHub-flavoured markdown → Slack mrkdwn, for the subset semantic-release emits.
+ * Escaping `<` and `>` and linking only http(s) URLs keep commit messages from
+ * producing Slack control sequences such as `<!channel>` or `<@user>`.
+ */
 export function toMrkdwn(text) {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "<$2|$1>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "<$2|$1>")
     .replace(/\*\*([^*]+)\*\*/g, "*$1*");
 }
 
@@ -205,40 +210,58 @@ export async function run({
   }
 
   const token = env.SLACK_BOT_TOKEN;
-  const channel = env.SLACK_RELEASE_CHANNEL;
-  if (!token || !channel) {
+  const channels = parseChannels(env.SLACK_RELEASE_CHANNEL);
+  if (!token || !channels.length) {
     logger.log(
       "::notice::SLACK_BOT_TOKEN or SLACK_RELEASE_CHANNEL is not set: the release was not announced on Slack.",
     );
     return 0;
   }
 
-  const response = await fetchImpl("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify({
-      channel,
-      ...message,
-      unfurl_links: false,
-      unfurl_media: false,
-    }),
-  });
-  const result = await response
-    .json()
-    .catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
+  // One message per channel, each on its own: a channel that rejects it does
+  // not keep the others from getting the announcement.
+  let failed = 0;
+  for (const channel of channels) {
+    const response = await fetchImpl("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel,
+        ...message,
+        unfurl_links: false,
+        unfurl_media: false,
+      }),
+    });
+    const result = await response
+      .json()
+      .catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
 
-  if (!result.ok) {
-    logger.error(
-      `::error::Slack rejected the release announcement: ${result.error}`,
-    );
-    return 1;
+    if (result.ok) {
+      logger.log(`Announced "${message.text}" in ${channel}.`);
+    } else {
+      failed += 1;
+      logger.error(
+        `::error::Slack rejected the release announcement in ${channel}: ${result.error}`,
+      );
+    }
   }
 
-  logger.log(`Announced "${message.text}" on Slack.`);
-  return 0;
+  return failed ? 1 : 0;
+}
+
+/** `C1, C2` or `C1,C2` → `["C1", "C2"]`, without blanks or repeats. */
+export function parseChannels(value) {
+  return [
+    ...new Set(
+      (value ?? "")
+        .split(/[\s,]+/)
+        .map((channel) => channel.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 if (

@@ -75,7 +75,8 @@ jobs:
           # A Slack app bot token with the chat:write scope. Until it is set, the
           # step only prints a notice.
           SLACK_BOT_TOKEN: ${{ secrets['SLACK_BOT_TOKEN'] }}
-          # The channel ID, as a repository variable (or a secret).
+          # One channel ID, or several separated by commas, as a repository
+          # variable (or a secret). The message is posted once in each channel.
           SLACK_RELEASE_CHANNEL: ${{ vars['SLACK_RELEASE_CHANNEL'] || secrets['SLACK_RELEASE_CHANNEL'] }}
         run: node scripts/release/notify-slack.mjs
 

@@ -130,7 +130,7 @@ How it works:
 Setup:
 
 1. Create a Slack app with a bot user and the `chat:write` scope, install it in the workspace and invite the bot to the channel (or add `chat:write.public` to post in public channels without joining).
-2. Add its bot token as the `SLACK_BOT_TOKEN` secret, and the channel ID as the `SLACK_RELEASE_CHANNEL` variable.
+2. Add its bot token as the `SLACK_BOT_TOKEN` secret, and the channel ID as the `SLACK_RELEASE_CHANNEL` variable. To announce in several channels, list their IDs separated by commas (`C0123456789,C0987654321`): the message is posted once in each, and a channel that rejects it does not stop the others.
 
 Until both are set, the step only prints a notice. If Slack rejects the message, the step is marked as failed but the job is not: the packages are already published. Dry runs post nothing.
 
@@ -151,7 +151,7 @@ Configure these in the GitHub repository (`Settings → Secrets and variables �
 | `GITHUB_TOKEN`          | Secret               | Automatically provided by GitHub Actions. No setup needed.                                                                                       |
 | `NPM_TOKEN`             | Secret               | An npm automation token with publish rights. Generate at [npmjs.com](https://www.npmjs.com) → `Access Tokens → Generate New Token → Automation`. |
 | `SLACK_BOT_TOKEN`       | Secret               | The bot token (`xoxb-…`) of the Slack app that announces releases. See [Slack announcement](#slack-announcement).                                |
-| `SLACK_RELEASE_CHANNEL` | Variable (or secret) | The ID of the Slack channel to post in (for example `C0123456789`).                                                                              |
+| `SLACK_RELEASE_CHANNEL` | Variable (or secret) | The ID of the Slack channel to post in (for example `C0123456789`), or several IDs separated by commas.                                          |
 
 ---
 
