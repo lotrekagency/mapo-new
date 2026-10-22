@@ -62,7 +62,22 @@ jobs:
           # ignored. Needed for the first publish of brand-new packages; remove
           # once every package has a Trusted Publisher registered.
           NPM_TOKEN: ${{ secrets['NPM_TOKEN'] }}
+          # One JSON line per published package (scripts/release/summary-plugin.cjs),
+          # read by the Slack step below.
+          RELEASE_SUMMARY_FILE: ${{ runner.temp }}/release-summary.jsonl
         run: pnpm release
+
+      - name: Announce on Slack
+        # The packages are already published: a Slack problem must not fail the release.
+        continue-on-error: true
+        env:
+          RELEASE_SUMMARY_FILE: ${{ runner.temp }}/release-summary.jsonl
+          # A Slack app bot token with the chat:write scope. Until it is set, the
+          # step only prints a notice.
+          SLACK_BOT_TOKEN: ${{ secrets['SLACK_BOT_TOKEN'] }}
+          # The channel ID, as a repository variable (or a secret).
+          SLACK_RELEASE_CHANNEL: ${{ vars['SLACK_RELEASE_CHANNEL'] || secrets['SLACK_RELEASE_CHANNEL'] }}
+        run: node scripts/release/notify-slack.mjs
 
   release_dryrun:
     name: Release Dry Run

@@ -8,6 +8,8 @@
 //
 // Dry-run is detected from the multi-semantic-release CLI flag (`--dry-run`),
 // with an explicit env override (`DRY_RUN=true`) as a fallback.
+const path = require("node:path");
+
 const isDryRun =
   process.argv.includes("--dry-run") || process.env.DRY_RUN === "true";
 
@@ -28,6 +30,10 @@ const publishPlugins = [
     },
   ],
   "@semantic-release/github",
+  // Records each published package for the Slack announcement of the CD
+  // workflow (scripts/release/notify-slack.mjs). The path is absolute because
+  // multi-semantic-release resolves plugins from each package's directory.
+  path.join(__dirname, "scripts/release/summary-plugin.cjs"),
 ];
 
 module.exports = {

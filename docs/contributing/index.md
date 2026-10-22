@@ -50,7 +50,7 @@ If you run `pnpm build` on a package during development, re-run its `dev:prepare
 | `apps/example-theme/`       | Theming and MapoOverride demo, no backend                                         |
 | `apps/example-custom-form/` | Custom field registry demo (Vuetify fields)                                       |
 | `docs/`                     | This site, and the knowledge base of the MCP server                               |
-| `scripts/`                  | Build helpers shared by the packages                                              |
+| `scripts/`                  | Build helpers shared by the packages, and the release announcement on Slack       |
 
 How the packages relate is explained in [Concepts](/guide/concepts#the-packages).
 
@@ -106,11 +106,11 @@ The commit type drives the version bump of the affected packages (see [Release P
 
 ## CI and releases
 
-| Workflow     | Trigger                          | What it runs                                                        |
-| ------------ | -------------------------------- | ------------------------------------------------------------------- |
-| `CI`         | Pull request to `main`           | `build` + `lint` + `typecheck`, then `build` + `test`               |
-| `Docs Pages` | Push to `main`                   | Builds this site and deploys it to GitHub Pages                     |
-| `CD`         | Manual dispatch, never on `main` | `pnpm release` or `pnpm release:dry` through multi-semantic-release |
+| Workflow     | Trigger                          | What it runs                                                                                                   |
+| ------------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `CI`         | Pull request to `main`           | `build` + `lint` + `typecheck`, then `build` + `test`                                                          |
+| `Docs Pages` | Push to `main`                   | Builds this site and deploys it to GitHub Pages                                                                |
+| `CD`         | Manual dispatch, never on `main` | `pnpm release` or `pnpm release:dry` through multi-semantic-release; a real release is then announced on Slack |
 
 Releases are cut by maintainers. The details are in [Release Process](/guide/release-process).
 
