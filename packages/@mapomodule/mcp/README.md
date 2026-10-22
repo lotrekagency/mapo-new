@@ -12,6 +12,9 @@ invented field types, and Mapo v1 code in a v2 project.
 This package gives the assistant the real thing: **grounded documentation search**, **curated
 recipes**, and — when the dev server is running — **introspection of the actual app**.
 
+Setting it up in an app: [How-to: set up your AI assistant](https://lotrekagency.github.io/mapo-new/howto/ai-assistant).
+Reference on the docs site: [@mapomodule/mcp](https://lotrekagency.github.io/mapo-new/modules/mcp).
+
 ---
 
 ## Table of contents
@@ -110,15 +113,20 @@ For the transport-independent variant, add the package explicitly — it ships a
 `mapomodule`, and package managers only expose the binaries of **direct** dependencies:
 
 ```bash
-pnpm add -D @mapomodule/mcp
+pnpm add -D @mapomodule/mcp@next
 npx mapo-mcp serve      # MCP over stdio, no dev server required
 ```
+
+Mapo v2 is published on the `next` dist-tag while it is in beta. `mapo-mcp serve` accepts
+`--app <url>` (the endpoint the live tools are forwarded to), `--root <dir>` (the project root for
+scaffolding, by default the working directory) and `--knowledge <dir>` (a prebuilt knowledge base
+instead of the bundled one).
 
 ---
 
 ## Connecting your IDE
 
-All snippets assume `pnpm add -D @mapomodule/mcp` has been run in the app, so `npx` resolves
+All snippets assume `pnpm add -D @mapomodule/mcp@next` has been run in the app, so `npx` resolves
 `mapo-mcp` from the local `node_modules/.bin`.
 
 ### Claude Code (`.mcp.json` in the project root)
@@ -187,6 +195,10 @@ tool is ever `destructiveHint`, because nothing here deletes or replaces without
 | `mapo_component_api`    | Props, events, slots and exposed methods of a `Mapo*` component, **extracted from its source**: real types, defaults and JSDoc. Partial names resolve (`list` → `MapoList`); `include` narrows the answer to one section.                                                                                                          |
 | `mapo_list_field_types` | The form registry: every `type` a `FieldDescriptor` accepts, the component behind it, its `attrs` with types and descriptions, the registry-level default attrs, and a skeleton descriptor to copy.                                                                                                                                |
 | `mapo_composable_api`   | The auto-imported composables and stores (`useCrud`, `useMapoAuth`, `useMediaStore`, …) with their real signatures, grouped by package.                                                                                                                                                                                            |
+| `mapo_inspect_app`      | **Live.** How Mapo is set up in the running app: installed modules and versions, public Mapo configuration, registered field types, available components, routes and locales.                                                                                                                                                      |
+| `mapo_doctor`           | **Live.** Checks the running app for known misconfigurations (module order, missing login route, untouched auth endpoints, locales without catalogs, media endpoints) and returns each problem with its fix.                                                                                                                       |
+| `mapo_scaffold`         | Generates pages, forms, custom fields, a login page, a theme override, a backend proxy, menu and media pages in Mapo's own patterns. A dry run unless `write: true`. See [Scaffolding](#scaffolding).                                                                                                                              |
+| `mapo_backend_schema`   | Reads the backend's OpenAPI/DRF schema and turns a serializer into field descriptors, with choices, required and read-only flags and the endpoint of every relation. See [From the backend schema to a page](#from-the-backend-schema-to-a-page).                                                                                  |
 
 Typical sequence an assistant follows:
 
@@ -233,7 +245,8 @@ server-side router keeps the old table, so a brand-new route 404s until it resta
 talks to.
 
 ```
-mapo_backend_schema({ action: "list_models" })            # what the API exposes
+mapo_backend_schema({ action: "list_models" })                  # what the API exposes
+mapo_backend_schema({ action: "describe_model", model: "Article" })
 mapo_backend_schema({ action: "to_fields", model: "Article" })
 ```
 
@@ -346,8 +359,8 @@ are not installing the `mapomodule` meta-package.
 
 ## Security model
 
-- **Development only by default.** The module returns early unless `nuxt.options.dev`, so the route
-  never exists in a production build.
+- **Development only by default.** The module returns early unless `enabled`, which defaults to
+  `nuxt.options.dev`, so the route does not exist in a production build unless you force it on.
 - **No secrets in responses.** The app snapshot exposes public runtime config only; private keys
   appear as key names, never values. Backend credentials are read from the environment and are never
   included in tool output.
@@ -408,12 +421,14 @@ pnpm --filter @mapomodule/mcp typecheck
 ```
 
 How to add a recipe, a prompt, a resource or a tool, and what to update when Mapo changes, is in
-[Working on the MCP server](../../../docs/contributing/mcp-server.md). Verification across the
-monorepo is in [Testing and verification](../../../docs/contributing/testing.md).
+[Working on the MCP server](https://lotrekagency.github.io/mapo-new/contributing/mcp-server).
+Verification across the monorepo is in
+[Testing and verification](https://lotrekagency.github.io/mapo-new/contributing/testing).
 
 What the server says about Mapo has two sources: the instructions in
 [`src/runtime/core/instructions.ts`](src/runtime/core/instructions.ts), shared by both transports,
-and the [Concepts](../../../docs/guide/concepts.md) page, served as `mapo://overview`.
+and the [Concepts](https://lotrekagency.github.io/mapo-new/guide/concepts) page, served as
+`mapo://overview`.
 
 Tools return markdown on purpose: assistants read it directly, and it costs fewer tokens than JSON
 wrapped in prose.
@@ -421,6 +436,10 @@ wrapped in prose.
 ### Layout
 
 ```
+bin/mapo-mcp.mjs                 # the CLI entry point
+scripts/
+├── build-knowledge.mjs          # drives src/build → dist/knowledge/
+└── clean-handler-dts.mjs        # strips .d.ts files from the handler folder after the build
 src/
 ├── module.ts                    # Nuxt module: toolkit install, definition injection, app snapshot
 ├── cli.ts                       # citty CLI → MCP over stdio
@@ -431,9 +450,10 @@ src/
 │   ├── extract-fields.ts        # registry + descriptor interfaces
 │   └── extract-composables.ts   # addImports declarations
 └── runtime/
-    ├── core/                    # transport-agnostic: instructions, overview, tokenizer, indexer,
-    │                            #   search, recipes, doctor, scaffold/, write guard, openapi,
-    │                            #   prompts, tools
+    ├── core/                    # transport-agnostic: instructions, overview, knowledge loader,
+    │                            #   tokenizer, indexer, search, recipes, prompts, resources,
+    │                            #   doctor, openapi + schema source, endpoint URL, scaffold/,
+    │                            #   write guard, tool specs (tools/)
     ├── nitro/                   # server-side adapters
     │   ├── context.ts           # reads the build-time context virtual module
     │   ├── to-mcp-tool.ts       # spec → defineMcpTool
