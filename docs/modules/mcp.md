@@ -72,10 +72,12 @@ export default defineNuxtConfig({
 | `backend.schemaUrl` | `string`  | `$MAPO_BACKEND_SCHEMA_URL` | OpenAPI/DRF schema URL used by the backend tools.                               |
 | `backend.tokenEnv`  | `string`  | `"MAPO_BACKEND_TOKEN"`     | Env var holding the schema bearer token. The value is never sent to the client. |
 
-The route is fixed at `<mcp.route>/mapo` (so `/mcp/mapo` with the toolkit's
-default `mcp.route`): the toolkit derives a folder handler's name from its
-directory. Change the prefix with the toolkit's own `mcp.route` option if it
-clashes with something in your app.
+The route is fixed at `/mcp/mapo`: the toolkit mounts named handlers at
+`/mcp/<name>`, takes the name from the handler's directory, and its own
+`mcp.route` option moves only its default handler. Like every server route, it
+sits under the app's `app.baseURL`: an app served under `/backoffice/` answers
+at `/backoffice/mcp/mapo`. The `mapo:mcp` line of the startup log prints the
+full URL.
 
 Opt out entirely with:
 
@@ -227,7 +229,8 @@ For clients that support MCP resources:
 `mapo_inspect_app` and `mapo_doctor` describe the running project, so they are
 answered by the HTTP endpoint. The `mapo-mcp` CLI still exposes them: it
 forwards the call to `http://localhost:3000/mcp/mapo` (override with `--app` or
-`MAPO_MCP_APP_URL`) and, when the dev server is down, explains how to start it.
+`MAPO_MCP_APP_URL` when the app runs on another port, behind a proxy or under
+an `app.baseURL`) and, when the dev server is down, explains how to start it.
 :::
 
 Still to come — `mapo-mcp install`, the Agent Skill and the MCP App inspector.

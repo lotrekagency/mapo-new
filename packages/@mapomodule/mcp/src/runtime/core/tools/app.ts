@@ -20,9 +20,10 @@ const READ_ONLY = {
 
 const NO_APP =
   "This tool needs the running app and is only served over HTTP.\n\n" +
-  "Start the dev server (`pnpm dev`) and point the client at " +
-  "`http://localhost:3000/mcp/mapo`. The stdio server (`mapo-mcp serve`) knows the framework " +
-  "and its documentation, but not the project using it.";
+  "Start the dev server (`pnpm dev`) and point the client at the URL it prints at startup: " +
+  "`http://localhost:3000/mcp/mapo` by default, under the app's `app.baseURL` when it has one. " +
+  "The stdio server (`mapo-mcp serve`) knows the framework and its documentation, but not the " +
+  "project using it.";
 
 type InspectSection =
   | "modules"

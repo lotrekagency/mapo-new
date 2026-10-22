@@ -20,7 +20,8 @@ src/
   index.ts               public types
   build/                 build time only: docs indexing + component/field/composable extraction
   runtime/core/          transport-agnostic: instructions, tokenizer, indexer, search, recipes,
-                         prompts, resources, doctor, openapi, scaffold/, write guard, tools/
+                         prompts, resources, doctor, openapi, endpoint URL, scaffold/, write guard,
+                         tools/
   runtime/nitro/         Nitro adapters (context, to-mcp-tool, to-mcp-prompt)
   runtime/mcp/handlers/mapo/   the named handler: index.ts, tools/, resources/, prompts/
 scripts/build-knowledge.mjs    generator driver; clean-handler-dts.mjs strips .d.ts from handlers

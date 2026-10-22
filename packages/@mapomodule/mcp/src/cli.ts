@@ -27,6 +27,7 @@ import {
   renderFieldResource,
   renderKnowledgeIndex,
 } from "./runtime/core/resources.js";
+import { mcpEndpointUrl } from "./runtime/core/endpoint.js";
 import { MAPO_INSTRUCTIONS } from "./runtime/core/instructions.js";
 import { renderOverview } from "./runtime/core/overview.js";
 import { apiTools } from "./runtime/core/tools/api.js";
@@ -58,7 +59,7 @@ function readVersion(): string {
 }
 
 /** Default endpoint of the Nuxt module, overridable with `--app`. */
-export const DEFAULT_APP_URL = "http://localhost:3000/mcp/mapo";
+export const DEFAULT_APP_URL = mcpEndpointUrl("http://localhost:3000");
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
@@ -132,8 +133,10 @@ function createAppProxy(appUrl: string) {
       const message = error instanceof Error ? error.message : String(error);
       return (
         `\`${name}\` needs the running app, and ${appUrl} is not answering (${message}).\n\n` +
-        "Start the dev server (`pnpm dev`) and call the tool again, or point the client " +
-        "directly at the app endpoint. Documentation and API tools work without it."
+        "Start the dev server (`pnpm dev`) and call the tool again. If the app runs on another " +
+        "port, behind a proxy or under an `app.baseURL`, pass its endpoint with `--app` or " +
+        "`MAPO_MCP_APP_URL` (for example `http://localhost/backoffice/mcp/mapo`): the dev server " +
+        "prints it at startup. Documentation and API tools work without it."
       );
     }
   };

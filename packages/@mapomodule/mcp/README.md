@@ -101,6 +101,11 @@ curl -s -X POST http://localhost:3000/mcp/mapo \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 ```
 
+The endpoint sits under the app's `app.baseURL`, like every server route: an app served under
+`/backoffice/` answers at `/backoffice/mcp/mapo`, and `/mcp/mapo` redirects to the app. The
+`mapo:mcp` line of the startup log prints the full URL; behind a proxy, use the address you open
+the app with (for example `http://localhost/backoffice/mcp/mapo`).
+
 For the transport-independent variant, add the package explicitly — it ships as a dependency of
 `mapomodule`, and package managers only expose the binaries of **direct** dependencies:
 
@@ -152,8 +157,16 @@ All snippets assume `pnpm add -D @mapomodule/mcp` has been run in the app, so `n
 ### HTTP instead of stdio
 
 If your client speaks Streamable HTTP and you keep the dev server running, point it at
-`http://localhost:3000/mcp/mapo` instead. That variant additionally exposes the tools that need
-the live app.
+`http://localhost:3000/mcp/mapo` instead, or at the URL the startup log prints when the app runs
+elsewhere. That variant additionally exposes the tools that need the live app. In Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "mapo": { "type": "http", "url": "http://localhost:3000/mcp/mapo" }
+  }
+}
+```
 
 > **stdio vs HTTP** — stdio always works and knows the docs; HTTP additionally knows _your_ app.
 > Configuring both is a perfectly reasonable setup.
@@ -190,9 +203,10 @@ mapo_component_api({ name: "MapoMenuManager" })
 while the component declared 17. Prose drifts; source does not.
 
 **The two live tools need the app.** Over HTTP they answer directly. Over stdio the CLI forwards
-them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL`),
-reconnecting on every call because the dev server routinely starts after the editor. When it is
-down they explain how to bring it up instead of guessing.
+them to `http://localhost:3000/mcp/mapo` (override with `--app` or `MAPO_MCP_APP_URL` when the
+app runs on another port, behind a proxy or under an `app.baseURL`), reconnecting on every call
+because the dev server routinely starts after the editor. When it is down they explain how to
+bring it up instead of guessing.
 
 ### Scaffolding
 
@@ -320,9 +334,10 @@ mapo: {
 | `backend.schemaUrl` | `MAPO_BACKEND_SCHEMA_URL` | OpenAPI/DRF schema used by the backend tools.                                           |
 | `backend.tokenEnv`  | `"MAPO_BACKEND_TOKEN"`    | Name of the env var holding the schema bearer token.                                    |
 
-The route is fixed at `<mcp.route>/mapo`: the toolkit derives a folder handler's
-name from its directory. Use the toolkit's own `mcp.route` option to move the
-prefix.
+The route is fixed at `/mcp/mapo`, under the app's `app.baseURL`: the toolkit mounts named
+handlers at `/mcp/<name>`, takes the name from the handler's directory, and its own `mcp.route`
+option moves only its default handler. [`src/runtime/core/endpoint.ts`](src/runtime/core/endpoint.ts)
+computes the URL the startup log prints.
 
 The module can also be used standalone (`modules: ["@mapomodule/mcp"]`, config key `mapoMcp`) if you
 are not installing the `mapomodule` meta-package.
@@ -439,6 +454,12 @@ src/
 The module only registers in development. Check that the dev server is running, that
 `mapo.mcp` is not `false`, and that the startup log contains the `mapo:mcp` line announcing the
 endpoint.
+
+**`POST /mcp/mapo` redirects, or the live tools say the app is not answering**
+Clients follow the redirect as a GET and report `Method not allowed. Use POST for MCP requests.`
+The app has an `app.baseURL` or runs behind a proxy, so the handler answers below the base URL.
+Use the URL of the `mapo:mcp` startup line (for example `http://localhost/backoffice/mcp/mapo`)
+as the HTTP `url`, or pass it to the stdio CLI with `--app` or `MAPO_MCP_APP_URL`.
 
 **"Mapo knowledge base not found"**
 The index was not generated. Run `pnpm --filter @mapomodule/mcp build`. Inside a consumer project

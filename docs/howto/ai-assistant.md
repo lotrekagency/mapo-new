@@ -24,7 +24,11 @@ pnpm dev
 [@nuxtjs/mcp-toolkit] ✔ /mcp enabled with 10 tools, 5 resources, 5 prompts, 1 handler
 ```
 
-The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**.
+The Mapo endpoint is at **`http://localhost:3000/mcp/mapo`**, and the `mapo:mcp`
+line of the startup log prints it. Like every server route, it sits under the
+app's `app.baseURL`: an app served under `/backoffice/` answers at
+`/backoffice/mcp/mapo`. Behind a proxy, use the address you open the app with,
+for example `http://localhost/backoffice/mcp/mapo`.
 
 If you do not want it at all:
 
@@ -114,8 +118,33 @@ Restart Claude Code and check with `/mcp` that the `mapo` server is connected.
 
 ### Any client, over HTTP
 
-Point it at `http://localhost:3000/mcp/mapo` (Streamable HTTP). For clients that
-only speak stdio, keep the `mapo-mcp` entry above.
+Point it at `http://localhost:3000/mcp/mapo` (Streamable HTTP). In Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "mapo": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp/mapo"
+    }
+  }
+}
+```
+
+For clients that only speak stdio, keep the `mapo-mcp` entry above.
+
+### Apps on another port, behind a proxy or under a base URL
+
+The examples above assume the app answers at `http://localhost:3000/`. When it
+does not, take the endpoint from the `mapo:mcp` line of the startup log, or
+build it from the address you open the app with plus `mcp/mapo`. An app served
+by a proxy on port 80 under `/backoffice/` answers at
+`http://localhost/backoffice/mcp/mapo`.
+
+- Over HTTP, use that URL as the `url`.
+- Over stdio, pass it to the CLI so the live tools are forwarded there:
+  `"args": ["mapo-mcp", "serve", "--app", "http://localhost/backoffice/mcp/mapo"]`,
+  or set `MAPO_MCP_APP_URL`.
 
 ## 5. Verify
 
@@ -188,6 +217,12 @@ root. If it does not, step 3 was skipped: the binary only exists once
 **`/mcp/mapo` returns 404**
 The dev server is not running, or the app is a production build, or
 `mapo.mcp` is `false`.
+
+**`/mcp/mapo` redirects, or the live tools say the app is not answering**
+Clients follow the redirect as a GET and report `Method not allowed. Use POST
+for MCP requests.` The app has an `app.baseURL`, or runs behind a proxy: the
+endpoint is under the base URL, as the startup log prints it. See
+[Apps on another port, behind a proxy or under a base URL](#apps-on-another-port-behind-a-proxy-or-under-a-base-url).
 
 **Answers reference APIs that do not exist**
 Verify the tools were actually called. Models that answer from memory are the
