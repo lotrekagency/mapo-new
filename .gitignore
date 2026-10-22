@@ -9,16 +9,20 @@ dist
 .env
 .env.*
 !.env.example
-.vscode/
+.vscode/*
+!.vscode/mcp.json
 
-AGENTS.md
 TESTING.md
-CLAUDE.md
+# git matches case-insensitively on macOS: keep the docs page out of the rule above
+!/docs/**/testing.md
 /docs/roadmap
 /docs/DECISIONS.md
 
-.claude/
-.mcp.json
+# AI setup: the root configs are shared; app-level MCP configs and personal settings stay local
+**/.mcp.json
+!/.mcp.json
+.claude/settings.local.json
+
 .DS_Store
 **/.DS_Store
 /e2e

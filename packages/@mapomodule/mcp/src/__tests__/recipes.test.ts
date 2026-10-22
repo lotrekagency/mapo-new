@@ -21,6 +21,17 @@ describe("matchRecipes", () => {
     ["let editors reorder the navigation entries", "menu-manager"],
     ["port a v1 project to v2", "migration"],
     ["protect the dashboard route with permissions", "auth-permissions"],
+    ["how do the packages fit together", "concepts"],
+    ["show a field only when another field is checked", "conditional-fields"],
+    ["autosave a draft while the user edits", "form-draft"],
+    ["generate the fields from a json schema", "schema-to-form"],
+    ["put a hint below one form field with a slot", "form-slots"],
+    ["edit a repeater item fullscreen", "focus-mode"],
+    ["add my page to the sidebar with an icon", "sidebar-navigation"],
+    ["change the branding of the login page", "login-page"],
+    ["TS2307 cannot find module mapomodule/types", "imports"],
+    ["connect claude code or copilot through mcp", "ai-assistant"],
+    ["set up the camomilla session cookie", "camomilla"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

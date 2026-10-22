@@ -20,12 +20,16 @@ import {
   DOCS_URI_PREFIX,
   FIELD_URI_PREFIX,
   INDEX_URI,
+  OVERVIEW_URI,
   docResourceList,
   fieldResourceList,
   renderDocResource,
   renderFieldResource,
   renderKnowledgeIndex,
 } from "./runtime/core/resources.js";
+import { mcpEndpointUrl } from "./runtime/core/endpoint.js";
+import { MAPO_INSTRUCTIONS } from "./runtime/core/instructions.js";
+import { renderOverview } from "./runtime/core/overview.js";
 import { apiTools } from "./runtime/core/tools/api.js";
 import { appTools } from "./runtime/core/tools/app.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
@@ -55,7 +59,7 @@ function readVersion(): string {
 }
 
 /** Default endpoint of the Nuxt module, overridable with `--app`. */
-export const DEFAULT_APP_URL = "http://localhost:3000/mcp/mapo";
+export const DEFAULT_APP_URL = mcpEndpointUrl("http://localhost:3000");
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
@@ -129,8 +133,10 @@ function createAppProxy(appUrl: string) {
       const message = error instanceof Error ? error.message : String(error);
       return (
         `\`${name}\` needs the running app, and ${appUrl} is not answering (${message}).\n\n` +
-        "Start the dev server (`pnpm dev`) and call the tool again, or point the client " +
-        "directly at the app endpoint. Documentation and API tools work without it."
+        "Start the dev server (`pnpm dev`) and call the tool again. If the app runs on another " +
+        "port, behind a proxy or under an `app.baseURL`, pass its endpoint with `--app` or " +
+        "`MAPO_MCP_APP_URL` (for example `http://localhost/backoffice/mcp/mapo`): the dev server " +
+        "prints it at startup. Documentation and API tools work without it."
       );
     }
   };
@@ -144,14 +150,7 @@ export async function createStdioServer(
 ): Promise<McpServer> {
   const server = new McpServer(
     { name: "mapo", version: readVersion() },
-    {
-      instructions:
-        "Mapo admin framework (Nuxt 4). Start from mapo_list_recipes, then mapo_search_docs / " +
-        "mapo_get_doc for how-to, and mapo_component_api / mapo_list_field_types / " +
-        "mapo_composable_api for exact APIs — Mapo v2 differs substantially from v1, so never " +
-        "recall its API from memory. mapo_inspect_app and mapo_doctor describe the project itself " +
-        "and need its dev server running.",
-    },
+    { instructions: MAPO_INSTRUCTIONS },
   );
 
   const context = createToolContext(knowledgeDir, rootDir, schemaUrl);
@@ -253,6 +252,18 @@ function registerResources(server: McpServer, context: MapoToolContext): void {
     },
     (uri) =>
       markdown(uri, renderKnowledgeIndex(context.knowledge(), context.api())),
+  );
+
+  server.registerResource(
+    "mapo-overview",
+    OVERVIEW_URI,
+    {
+      title: "Mapo overview",
+      description:
+        "How Mapo fits together: the packages, the backend contract, declarative pages, the form engine and the customization layers.",
+      mimeType: "text/markdown",
+    },
+    (uri) => markdown(uri, renderOverview(context.knowledge())),
   );
 
   server.registerResource(

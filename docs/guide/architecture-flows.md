@@ -6,17 +6,19 @@ This page explains how Mapo's packages work together at runtime. Each flow shows
 
 ## Package map
 
+The packages and what each one does are listed in [Concepts](./concepts#the-packages). The flows below involve these runtime pieces:
+
 ```
-mapomodule                          ← real Nuxt module: installs @mapomodule/core if not present
-├── @mapomodule/core                      ← service layer (CRUD, auth, middleware, boot plugins)
-│   └── depends on @mapomodule/store      ← Pinia stores (auth, sidebar, snack, confirm)
-└── @mapomodule/mapo-integrations-camomilla  (optional, separate repo)   ← Nitro proxy middleware for Camomilla CMS
+mapomodule                                  ← meta-module: installs every @mapomodule/* module
+├── @mapomodule/core                        ← service layer (CRUD, auth, middleware, boot plugins)
+│   └── depends on @mapomodule/store        ← Pinia stores (auth, sidebar, snack, confirm)
+└── @mapomodule/mapo-integrations-camomilla ← optional, separate repo: Nitro proxy for Camomilla CMS
     └── independent of core/store
 ```
 
 ### Module relationships
 
-`mapomodule` is a thin **meta-module**: it installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, and `@mapomodule/form` transitively with resolver-based `installModule(...)` calls (pnpm strict compatible). It does not re-export anything — it simply ensures the full Mapo stack is registered with a single `modules[]` entry.
+`mapomodule` is a thin **meta-module**: it installs `@mapomodule/store`, `@mapomodule/i18n`, `@mapomodule/core`, `@mapomodule/uikit` and `@mapomodule/form` transitively with resolver-based `installModule(...)` calls (pnpm strict compatible), plus `@mapomodule/mcp` in development. It re-exports only types, through `mapomodule/types`: it simply ensures the full Mapo stack is registered with a single `modules[]` entry.
 
 `@mapomodule/core` depends on `@mapomodule/store` at **build time** via package.json `dependencies`. At runtime, stores are accessed through composables (`useAuthStore()`, `useSnackStore()`) which are auto-imported by Nuxt — there is no static import of the module entry from runtime code.
 

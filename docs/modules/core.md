@@ -7,7 +7,7 @@ The service layer of Mapo. Provides the CRUD factory, auth composable, route mid
 `@mapomodule/core` is included automatically when you install `mapomodule` (recommended). For standalone use:
 
 ```bash
-pnpm add @mapomodule/core
+pnpm add @mapomodule/core@next   # @next: Mapo v2 is in beta, latest is still v1
 ```
 
 ```ts

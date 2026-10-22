@@ -25,6 +25,22 @@ export interface Recipe {
 
 export const RECIPES: Recipe[] = [
   {
+    id: "concepts",
+    task: "Understand how Mapo fits together",
+    keywords: [
+      "overview",
+      "architecture",
+      "packages",
+      "concepts",
+      "mental model",
+      "how it works",
+    ],
+    doc: "guide/concepts.md",
+    seeAlso: ["guide/architecture-flows.md", "guide/getting-started.md"],
+    summary:
+      "The packages, the backend contract, declarative pages, the form engine and the customization layers.",
+  },
+  {
     id: "first-admin-page",
     task: "Create the first admin page",
     keywords: [
@@ -35,6 +51,7 @@ export const RECIPES: Recipe[] = [
       "definePageMeta",
       "dashboard",
       "sidebar entry",
+      "install",
     ],
     doc: "howto/first-admin-page.md",
     seeAlso: ["guide/getting-started.md"],
@@ -253,6 +270,7 @@ export const RECIPES: Recipe[] = [
       "dark mode",
       "tokens",
       "design",
+      "primary color",
     ],
     doc: "howto/theming.md",
     seeAlso: ["uikit/theming.md"],
@@ -287,6 +305,9 @@ export const RECIPES: Recipe[] = [
       "proxy",
       "useCrud",
       "rest",
+      "fastapi",
+      "laravel",
+      "jwt",
     ],
     doc: "howto/backend-integration.md",
     seeAlso: ["modules/camomilla.md", "modules/api.md"],
@@ -299,6 +320,198 @@ export const RECIPES: Recipe[] = [
     keywords: ["v1", "upgrade", "legacy", "vuex", "axios", "breaking changes"],
     doc: "migration/v1-to-v2.md",
     summary: "What changed between Mapo v1 and v2 and how to port each piece.",
+  },
+  {
+    id: "conditional-fields",
+    task: "Show or hide form fields based on other values",
+    keywords: [
+      "visible",
+      "conditional",
+      "whenAny",
+      "matchesField",
+      "depends on",
+      "progressive disclosure",
+    ],
+    doc: "uikit/form/progressive-disclosure.md",
+    seeAlso: ["howto/form-advanced.md"],
+    summary:
+      "visible and show predicates built with the when/matchesField matcher helpers.",
+  },
+  {
+    id: "form-draft",
+    task: "Autosave form drafts",
+    keywords: ["draft", "autosave", "useFormDraft", "restore", "unsaved"],
+    doc: "uikit/form/draft.md",
+    seeAlso: ["howto/crud-detail.md"],
+    summary:
+      "useFormDraft keeps unsaved edits in localStorage and offers to restore them on the next visit.",
+  },
+  {
+    id: "schema-to-form",
+    task: "Generate form fields from a JSON Schema",
+    keywords: [
+      "json schema",
+      "useFormFromSchema",
+      "openapi",
+      "drf-spectacular",
+      "pydantic",
+      "serializer",
+    ],
+    doc: "uikit/form/schema-to-form.md",
+    seeAlso: ["howto/form-advanced.md"],
+    summary:
+      "useFormFromSchema turns a JSON Schema (DRF, Pydantic) into field descriptors you can extend.",
+  },
+  {
+    id: "form-slots",
+    task: "Customize how a form field renders with slots",
+    keywords: [
+      "field slot",
+      "hint",
+      "above",
+      "below",
+      "replace a field",
+      "group slot",
+    ],
+    doc: "uikit/form/slots.md",
+    summary:
+      "Per-field, per-group and global slots that wrap, extend or replace how fields render.",
+  },
+  {
+    id: "focus-mode",
+    task: "Focus mode for repeater items and long fields",
+    keywords: [
+      "focus mode",
+      "useFocusMode",
+      "fullscreen",
+      "field expand",
+      "MapoFocusPortal",
+      "breadcrumb",
+    ],
+    doc: "uikit/form/focus-mode.md",
+    seeAlso: ["uikit/form/field-expand.md"],
+    summary:
+      "Open a repeater item in a fullscreen view, or expand a single field in place.",
+  },
+  {
+    id: "sidebar-navigation",
+    task: "Build the sidebar navigation",
+    keywords: [
+      "sidebar",
+      "nested menu",
+      "parent",
+      "icon",
+      "label",
+      "sidebarFooter",
+      "route meta",
+    ],
+    doc: "uikit/sidebar.md",
+    seeAlso: ["howto/first-admin-page.md"],
+    summary:
+      "Route metadata (label, icon, parent, sidebarFooter) builds the sidebar tree, with no menu config.",
+  },
+  {
+    id: "login-page",
+    task: "Customize the login page",
+    keywords: [
+      "MapoLogin",
+      "sign in",
+      "login form",
+      "login redirect",
+      "branding",
+    ],
+    doc: "uikit/login.md",
+    seeAlso: ["howto/auth-permissions.md"],
+    summary:
+      "The built-in /login page: its slots, the redirect after login and error handling.",
+  },
+  {
+    id: "imports",
+    task: "Know what to import and from where",
+    keywords: [
+      "import",
+      "auto-import",
+      "import type",
+      "mapomodule/types",
+      "TS2307",
+      "cannot find module",
+    ],
+    doc: "guide/imports.md",
+    seeAlso: ["guide/known-limitations.md"],
+    summary:
+      "Composables and components are auto-imported, types come from mapomodule/types, utils are imported explicitly.",
+  },
+  {
+    id: "troubleshooting",
+    task: "Troubleshoot compatibility and version problems",
+    keywords: [
+      "module order",
+      "nuxt ui first",
+      "error",
+      "tested versions",
+      "peer dependencies",
+      "dedupe",
+      "duplicate vue",
+    ],
+    doc: "guide/compatibility.md",
+    seeAlso: ["guide/known-limitations.md"],
+    summary:
+      "Tested versions, what to declare in the app, module order and the common problems.",
+  },
+  {
+    id: "utils",
+    task: "Merge, diff and format with the utility helpers",
+    keywords: [
+      "deepMerge",
+      "objectDiff",
+      "slugify",
+      "formatDate",
+      "humanFileSize",
+      "normalizeEndpoint",
+      "debounce",
+    ],
+    doc: "modules/utils.md",
+    seeAlso: ["modules/api.md"],
+    summary:
+      "Typed helpers from @mapomodule/utils: merging, diffing, formatting, slugs and endpoints.",
+  },
+  {
+    id: "camomilla",
+    task: "Use the Camomilla CMS integration",
+    keywords: [
+      "camomilla",
+      "path rewrite",
+      "session cookie",
+      "django cms",
+      "media adapter",
+    ],
+    doc: "modules/camomilla.md",
+    seeAlso: ["howto/backend-integration.md"],
+    summary:
+      "The Camomilla integration: proxy options, path rewriting, the media adapter and session cookies.",
+  },
+  {
+    id: "ai-assistant",
+    task: "Set up an AI coding assistant",
+    keywords: ["mcp", "claude", "copilot", "cursor", "agent", "mapo-mcp"],
+    doc: "howto/ai-assistant.md",
+    seeAlso: ["modules/mcp.md"],
+    summary:
+      "Connect Claude Code, Copilot or Cursor to the Mapo MCP server over stdio or HTTP.",
+  },
+  {
+    id: "form-devtools",
+    task: "Inspect forms in Nuxt DevTools",
+    keywords: [
+      "devtools",
+      "debug form",
+      "registry warning",
+      "inspect",
+      "_mapo",
+    ],
+    doc: "uikit/form/devtools.md",
+    summary:
+      "The Mapo Forms tab: the module config and the live field registry your forms read.",
   },
 ];
 

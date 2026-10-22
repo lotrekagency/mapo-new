@@ -1,33 +1,37 @@
 # @mapomodule/utils
 
-Typed utility helpers shared across all `@mapomodule/*` packages.
+Plain TypeScript helpers shared by the `@mapomodule/*` packages: object and path utilities, formatting, endpoint normalization, menu trees and JSON Schema conditionals. No Vue, no Nuxt, no side effects, so they are safe in server code and tests.
 
-## Utilities
+It is not a Nuxt module and nothing is auto-imported: import what you need.
 
-| Export              | Description                                                                                                |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `deepMerge`         | Recursively merges two plain objects                                                                       |
-| `getNestedValue`    | Reads a value from a dotted path (e.g. `"user.address.city"`)                                              |
-| `setNestedValue`    | Returns a new object with a value set at a dotted path                                                     |
-| `objectDiff`        | Returns only the keys that differ between two objects — used for differential PATCH requests               |
-| `formatDate`        | Formats a `Date` or ISO string with a token-based format string (`YYYY`, `MM`, `DD`, `HH`, `mm`, `ss`)     |
-| `debounce`          | Returns a debounced version of a function                                                                  |
-| `slotNamespace`     | Filters and strips a prefix from a Vue `Slots` object — used to forward a slot subset to a child component |
-| `buildRouteTree`    | Converts a flat `RouteRecordNormalized[]` into a nested `MenuNode[]` tree for sidebar rendering            |
-| `normalizeEndpoint` | Ensures an API endpoint string has exactly one leading and one trailing slash — used by `useCrud`          |
+```ts
+import { debounce, deepMerge, slugify } from "@mapomodule/utils";
+import { applyConditionals } from "@mapomodule/utils/jsonSchema";
+```
 
 ## Installation
 
 ```bash
-pnpm add @mapomodule/utils
+pnpm add @mapomodule/utils@next
 ```
 
-## Dev workflow
+Apps already get it through `mapomodule`, but with pnpm's strict layout an app can import it only if the package is declared in its own `dependencies`. Mapo v2 is published on the `next` dist-tag while it is in beta.
 
-```bash
-pnpm dev:utils   # from monorepo root — tsc --watch
-```
+## What's inside
 
----
+| Area                                                                      | Exports                                                                                                                               |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Objects                                                                   | `deepMerge`, `deepClone`, `objectDiff`, `filterObj`, `findPropPaths`                                                                  |
+| Nested paths                                                              | `getNestedValue`, `setNestedValue`, `setNestedValueMutating`                                                                          |
+| Files                                                                     | `isFile`, `isBlob`, `isFileOrBlob`, `filesInObject`                                                                                   |
+| Formatting                                                                | `formatDate`, `humanFileSize`, `slugify`                                                                                              |
+| Timing                                                                    | `debounce`                                                                                                                            |
+| Endpoints                                                                 | `normalizeEndpoint`, `splitEndpointParams`                                                                                            |
+| Slots and menus                                                           | `slotNamespace`, `buildRouteTree`, `calcMaxMenuNestDepth`, the `MenuNode` type                                                        |
+| JSON Schema (`@mapomodule/utils/jsonSchema`, also exported from the root) | `matchesSchema`, `applyConditionals`, `hasConditionals`, `resolveSchema`, `extractDefs`, `getDefaultForSchema`, the `JSONSchema` type |
 
-> The helpers in this package are ported from the Mapo v1 legacy codebase. As v2 development progresses, individual helpers may be added, removed, or replaced — and the package itself may be dissolved if its contents are better placed elsewhere.
+## Documentation
+
+- [@mapomodule/utils](https://lotrekagency.github.io/mapo-new/modules/utils): every helper with examples
+- [Composable & Function API Reference](https://lotrekagency.github.io/mapo-new/modules/api): signatures, including the JSON Schema helpers
+- [Import Guide](https://lotrekagency.github.io/mapo-new/guide/imports)

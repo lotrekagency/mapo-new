@@ -37,5 +37,5 @@ features:
     details: Auth, snackbar, confirm dialog, and sidebar state — all SSR-safe and cookie-persisted out of the box.
   - icon: 🚀
     title: Nuxt 4 Native
-    details: Built on Nuxt 4, Pinia, Nuxt UI v3, Tailwind v4, and ofetch. Zero Vuex, zero Axios, zero legacy.
+    details: Built on Nuxt 4, Pinia, Nuxt UI v4, Tailwind v4, and ofetch. Zero Vuex, zero Axios, zero legacy.
 ---

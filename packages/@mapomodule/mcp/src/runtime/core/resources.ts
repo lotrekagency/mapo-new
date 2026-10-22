@@ -13,6 +13,10 @@ export const DOCS_URI_PREFIX = "mapo://docs/";
 export const FIELD_URI_PREFIX = "mapo://fields/";
 export const INDEX_URI = "mapo://knowledge/index";
 export const MANIFEST_URI = "mapo://app/manifest";
+export const OVERVIEW_URI = "mapo://overview";
+
+/** The docs page that explains how Mapo fits together (see `overview.ts`). */
+export const OVERVIEW_DOC = "guide/concepts.md";
 
 /** Everything the knowledge base contains, as a compact browsable map. */
 export function renderKnowledgeIndex(
@@ -42,6 +46,8 @@ export function renderKnowledgeIndex(
     "# Mapo knowledge base",
     "",
     `Generated ${knowledge.generatedAt}.`,
+    "",
+    `Start with the overview: the \`${OVERVIEW_URI}\` resource (\`${OVERVIEW_DOC}\`).`,
     "",
     "## Recipes",
     recipes,

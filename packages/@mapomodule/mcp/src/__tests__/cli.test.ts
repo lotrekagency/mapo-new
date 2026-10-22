@@ -63,8 +63,24 @@ describeBuilt("mapo-mcp stdio server", () => {
     const uris = resources.map((resource) => resource.uri);
 
     expect(uris).toContain("mapo://knowledge/index");
+    expect(uris).toContain("mapo://overview");
     expect(uris.some((uri) => uri.startsWith("mapo://docs/"))).toBe(true);
     expect(uris.some((uri) => uri.startsWith("mapo://fields/"))).toBe(true);
+  });
+
+  it("sends the shared instructions on initialize", () => {
+    const instructions = client.getInstructions() ?? "";
+
+    expect(instructions).toContain("mapo_list_recipes");
+    expect(instructions).toContain("mapo://overview");
+  });
+
+  it("serves the overview page as a resource", async () => {
+    const result = await client.readResource({ uri: "mapo://overview" });
+    const content = result.contents[0] as TextResourceContent;
+
+    expect(content.mimeType).toBe("text/markdown");
+    expect(content.text).toContain("# Concepts");
   });
 
   it("reads a documentation page through its resource URI", async () => {

@@ -23,7 +23,7 @@ Minimum Camomilla version: **django-camomilla-cms >= 5.7.1**
 ## Installation
 
 ```bash
-pnpm add @mapomodule/mapo-integrations-camomilla
+pnpm add @mapomodule/mapo-integrations-camomilla@next   # @next: the v2 integration is in beta, latest is still v1
 ```
 
 ```ts
