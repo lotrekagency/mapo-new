@@ -4,6 +4,19 @@ This guide covers everything that changed between Mapo v1 (Nuxt 2 / Vue 2 / Vuex
 
 ---
 
+## Installing v2 in an existing app
+
+On npm, the `latest` tag of `mapomodule` still points to v1, so `pnpm update mapomodule` keeps a v1 app on v1. Install v2 from the `next` dist-tag, together with Nuxt UI, which v2 is built on:
+
+```bash
+pnpm add mapomodule@next @nuxt/ui
+pnpm add @mapomodule/mapo-integrations-camomilla@next   # only if you use Camomilla CMS
+```
+
+Do the same for any other `@mapomodule/*` package your app declares, then port the code with the [Breaking changes](#breaking-changes) below. [The `next` channel](/guide/getting-started#the-next-channel) explains how to upgrade later.
+
+---
+
 ## Monorepo tooling
 
 ### Package manager: Yarn → pnpm

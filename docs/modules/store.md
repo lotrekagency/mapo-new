@@ -7,7 +7,7 @@ Pinia stores for Mapo: auth, snackbar, confirm dialog, and sidebar. All stores a
 Included automatically via `@mapomodule/core` and `mapomodule`. For standalone use:
 
 ```bash
-pnpm add @mapomodule/store
+pnpm add @mapomodule/store@next   # @next: Mapo v2 is in beta, latest is still v1
 ```
 
 ```ts

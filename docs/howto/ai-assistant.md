@@ -60,7 +60,7 @@ The MCP package is installed as a dependency of `mapomodule`, and package
 managers only link the binaries of **direct** dependencies. Add it explicitly:
 
 ```bash
-pnpm add -D @mapomodule/mcp
+pnpm add -D @mapomodule/mcp@next   # @next: Mapo v2 is in beta
 ```
 
 Now `npx mapo-mcp serve` runs the local copy — no download, no version drift

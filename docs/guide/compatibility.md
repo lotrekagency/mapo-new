@@ -23,9 +23,11 @@ This page documents the exact package versions Mapo is tested against, which dep
 ## What to declare in your app
 
 ```bash
-pnpm add mapomodule @nuxt/ui
-pnpm add @mapomodule/mapo-integrations-camomilla   # only if you use Camomilla CMS
+pnpm add mapomodule@next @nuxt/ui
+pnpm add @mapomodule/mapo-integrations-camomilla@next   # only if you use Camomilla CMS
 ```
+
+Mapo v2 packages come from the `next` dist-tag: without `@next` you get Mapo v1. See [The `next` channel](./getting-started#the-next-channel).
 
 `mapomodule` is a meta-package. It transparently installs `@mapomodule/core`, `@mapomodule/store`, `@mapomodule/uikit`, `@mapomodule/form`, `@mapomodule/i18n`, and `@mapomodule/utils`. You don't need to add them separately.
 
@@ -78,6 +80,21 @@ export default defineNuxtConfig({
 ---
 
 ## Common problems
+
+### `mapomodule` 1.x installed instead of v2
+
+Your `package.json` lists `"mapomodule": "^1.0.0"`, or another `1.x` version.
+
+**Cause**: The package was installed without `@next`. On npm, the `latest` tag of `mapomodule` still points to Mapo v1, the Nuxt 2 version.
+
+**Fix**: Reinstall from the `next` dist-tag, together with every other Mapo package your app declares:
+
+```bash
+pnpm add mapomodule@next
+pnpm add @mapomodule/mapo-integrations-camomilla@next   # if you use it
+```
+
+---
 
 ### `getActivePinia()` was called but there was no active Pinia
 
