@@ -1,3 +1,13 @@
+# @mapomodule/mcp [1.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.1...@mapomodule/mcp@1.0.0-beta.2) (2026-10-22)
+
+### Bug Fixes
+
+- **mcp:** print the MCP endpoint under the app base URL ([633fa5e](https://github.com/lotrekagency/mapo-new/commit/633fa5e77910bfee329eb9c2670130b634e0cc11))
+
+### Features
+
+- **mcp:** describe Mapo through a shared overview and instructions ([a942208](https://github.com/lotrekagency/mapo-new/commit/a9422089f75855c83b19a6ed1b7bc3d4ffd6a692))
+
 # @mapomodule/mcp 1.0.0-beta.1 (2026-10-09)
 
 ### Features
