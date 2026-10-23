@@ -176,7 +176,10 @@
       "clearToReorder": "Svuota ricerca e ordinamento per riordinare",
       "noItems": "Nessun elemento trovato",
       "totalItems": "{total} elementi",
-      "perPage": "{n} / pagina"
+      "perPage": "{n} / pagina",
+      "sortAscending": "Ordina per {column}, crescente",
+      "sortDescending": "Ordina per {column}, decrescente",
+      "clearSorting": "Togli l'ordinamento per {column}"
     },
     "menuManager": {
       "menu": "Menu",

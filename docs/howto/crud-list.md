@@ -216,6 +216,8 @@ const columns: ListColumn<Article>[] = [
 ];
 ```
 
+A `sortable` column gets a header button that cycles ascending, descending and unsorted ([Sort by a column](/uikit/list#how-to-sort-by-a-column)).
+
 ---
 
 ## Custom cell rendering

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRenderer, h, reactive } from "vue";
-import type { App, Component, SetupContext } from "vue";
+import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoListTable from "../runtime/components/MapoListTable.vue";
 
@@ -65,8 +65,9 @@ const passthrough = (name: string): Component => ({
   },
 });
 
-// The pager stub declares Nuxt UI 4's contract: `UPagination` models `page`
-// (prop `page`, event `update:page`), not `modelValue`.
+// The stubs whose binding is under test declare the real component's contract.
+
+// `UPagination` models `page` (prop `page`, event `update:page`), not `modelValue`.
 let pager: { readonly page: number | undefined; select(page: number): void };
 
 const UPagination: Component = {
@@ -84,11 +85,33 @@ const UPagination: Component = {
   },
 };
 
+// `UTable` gets TanStack column defs; the tests render the headers from them.
+interface ColumnDef {
+  id?: string;
+  header?: string | (() => VNode);
+}
+let table: {
+  readonly columns: ColumnDef[];
+};
+
+const UTable: Component = {
+  name: "UTable",
+  props: { columns: Array },
+  setup(props: { columns?: ColumnDef[] }) {
+    table = {
+      get columns() {
+        return props.columns ?? [];
+      },
+    };
+    return () => h("table");
+  },
+};
+
 const stubs: Record<string, Component> = {
   UPagination,
+  UTable,
   ...Object.fromEntries(
     [
-      "UTable",
       "UInput",
       "USelect",
       "UIcon",
@@ -123,6 +146,26 @@ const rows = (count: number) =>
     id: i + 1,
     title: `Row ${i + 1}`,
   }));
+
+const lastListParams = () =>
+  crud.list.mock.lastCall?.[0] as Record<string, unknown>;
+
+const column = (id: string) => {
+  const found = table.columns.find((col) => col.id === id);
+  if (!found) throw new Error(`no column ${id}`);
+  return found;
+};
+
+/** The header button of a sortable column, as the table renders it. */
+const sortButton = (id: string) => {
+  const header = column(id).header;
+  if (typeof header !== "function") throw new Error(`${id} is not sortable`);
+  return header().props as {
+    "aria-label": string;
+    icon: string;
+    onClick: () => void;
+  };
+};
 
 const listProps = {
   endpoint: "/api/news/",
@@ -184,5 +227,61 @@ describe("MapoListTable pagination", () => {
       expect.objectContaining({ status: "draft", page: 1 }),
     );
     expect(pager.page).toBe(1);
+  });
+});
+
+describe("MapoListTable sorting", () => {
+  const sortableProps = {
+    endpoint: "/api/news/",
+    columns: [
+      { key: "title", label: "Title", sortable: true },
+      { key: "status", label: "Status" },
+    ],
+  };
+
+  it("cycles a sortable header through ascending, descending and unsorted", async () => {
+    mountTable(sortableProps);
+    await settle();
+    expect(sortButton("title")["aria-label"]).toBe(
+      "mapo.listTable.sortAscending",
+    );
+
+    sortButton("title").onClick();
+    await settle();
+    expect(lastListParams().ordering).toBe("title");
+    expect(router.replace).toHaveBeenLastCalledWith({
+      query: { ordering: "title" },
+    });
+    expect(sortButton("title")["aria-label"]).toBe(
+      "mapo.listTable.sortDescending",
+    );
+
+    sortButton("title").onClick();
+    await settle();
+    expect(lastListParams().ordering).toBe("-title");
+    expect(sortButton("title")["aria-label"]).toBe(
+      "mapo.listTable.clearSorting",
+    );
+
+    sortButton("title").onClick();
+    await settle();
+    expect(lastListParams()).not.toHaveProperty("ordering");
+    expect(router.replace).toHaveBeenLastCalledWith({ query: {} });
+  });
+
+  it("restores the order from the URL into the header", async () => {
+    route.query = { ordering: "-title" };
+    mountTable(sortableProps);
+    await settle();
+
+    expect(lastListParams().ordering).toBe("-title");
+    expect(sortButton("title").icon).toBe("i-lucide-arrow-down-wide-narrow");
+  });
+
+  it("keeps a plain header on a column that is not sortable", async () => {
+    mountTable(sortableProps);
+    await settle();
+
+    expect(column("status").header).toBe("Status");
   });
 });

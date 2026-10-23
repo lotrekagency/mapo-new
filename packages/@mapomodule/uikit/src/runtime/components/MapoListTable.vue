@@ -20,6 +20,7 @@ import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { debounce, splitEndpointParams } from "@mapomodule/utils";
 import { useRoute, useRouter } from "#app";
+import { nextSorting } from "../utils/listTable.js";
 
 const props = withDefaults(
   defineProps<{
@@ -683,6 +684,35 @@ const UCheckbox = resolveComponent("UCheckbox");
 const UButton = resolveComponent("UButton");
 const UIcon = resolveComponent("UIcon");
 
+// A sortable header is a button: the icon shows the current direction, the
+// accessible name says what the next click does (UTable sets no `aria-sort`).
+const SORT_ICONS = {
+  none: "i-lucide-arrow-up-down",
+  asc: "i-lucide-arrow-up-narrow-wide",
+  desc: "i-lucide-arrow-down-wide-narrow",
+};
+const SORT_NEXT_ACTION = {
+  none: "mapo.listTable.sortAscending",
+  asc: "mapo.listTable.sortDescending",
+  desc: "mapo.listTable.clearSorting",
+};
+
+function sortHeader(col: ListColumn<T>) {
+  const sort = sorting.value.find((s) => s.id === col.key);
+  const direction = !sort ? "none" : sort.desc ? "desc" : "asc";
+  return h(UButton, {
+    color: "neutral",
+    variant: "ghost",
+    label: col.label,
+    icon: SORT_ICONS[direction],
+    class: "-mx-2.5",
+    "aria-label": t(SORT_NEXT_ACTION[direction], { column: col.label }),
+    onClick: () => {
+      sorting.value = nextSorting(sorting.value, col.key);
+    },
+  });
+}
+
 const tableColumns = computed<TableColumn<T>[]>(() => {
   const cols: TableColumn<T>[] = [];
 
@@ -741,8 +771,10 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
     const col = props.columns[i]!;
     const isFirst = i === 0 && !!props.detailBase;
     cols.push({
+      // The sorting state is keyed by the column key.
+      id: col.key,
       accessorKey: col.key,
-      header: col.label,
+      header: col.sortable ? () => sortHeader(col) : col.label,
       cell: ({ row }: { row: { original: T } }) => {
         const cellSlot = slots[`cell.${col.key}`];
         if (cellSlot)

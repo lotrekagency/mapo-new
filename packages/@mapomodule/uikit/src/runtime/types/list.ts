@@ -3,6 +3,11 @@ export interface ListColumn<T = Record<string, unknown>> {
   /** Property name on the row object. Must be a key of `T`. */
   key: keyof T & string;
   label: string;
+  /**
+   * Turns the header into a button that cycles ascending, descending and
+   * unsorted. The list sends the order to the backend as `ordering`, or sorts
+   * in memory in offline and hybrid mode.
+   */
   sortable?: boolean;
   /** CSS class applied to the `<td>` cell. */
   class?: string;

@@ -139,12 +139,20 @@ const columns: ListColumn<News>[] = [
 
 Without the generic (`ListColumn[]`) the key is typed as `string` and any value is accepted — still works at runtime but you lose autocomplete and typo protection.
 
-| Field      | Description                                                               |
-| ---------- | ------------------------------------------------------------------------- |
-| `key`      | Property name on the row object (`keyof T & string` when `T` is provided) |
-| `label`    | Header text                                                               |
-| `sortable` | Adds a sort handle (server-side ordering via `?ordering=`)                |
-| `class`    | CSS class applied to the `<td>`                                           |
+| Field      | Description                                                                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `key`      | Property name on the row object (`keyof T & string` when `T` is provided)                                                  |
+| `label`    | Header text                                                                                                                |
+| `sortable` | Makes the header a button that cycles ascending → descending → unsorted (see [Sort by a column](#how-to-sort-by-a-column)) |
+| `class`    | CSS class applied to the `<td>`                                                                                            |
+
+## How to: sort by a column
+
+A `sortable` column has a button as its header. Each click moves the column from unsorted to ascending, then to descending, then back to unsorted; a click on another column replaces the sort. The icon shows the current direction, and the button's accessible name says what the next click does.
+
+In server mode the order goes to the backend as `?ordering=title` or `?ordering=-title`, and to the URL as `ordering`. In offline and hybrid mode the rows are sorted in memory.
+
+Drag reorder needs the natural order, so the drag handle is off while a column is sorted: the third click gives it back.
 
 ## How to: customize a cell
 
@@ -557,7 +565,7 @@ Use this for:
 
 ### Multi-column sort (offline / hybrid)
 
-In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid modes, sorting is performed in JS — multi-column sort is supported, each column acting as a tiebreaker for the previous one (matches TanStack's default behavior).
+In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid modes, sorting is performed in JS — multi-column sort is supported, each column acting as a tiebreaker for the previous one (matches TanStack's default behavior). A click on a header sorts by that column alone; a multi-column order comes from the URL (`?ordering=status,-published_at`).
 
 ---
 

@@ -176,7 +176,10 @@
       "clearToReorder": "Clear search & sorting to reorder",
       "noItems": "No items found",
       "totalItems": "{total} items",
-      "perPage": "{n} / page"
+      "perPage": "{n} / page",
+      "sortAscending": "Sort by {column}, ascending",
+      "sortDescending": "Sort by {column}, descending",
+      "clearSorting": "Remove sorting by {column}"
     },
     "menuManager": {
       "menu": "Menu",
