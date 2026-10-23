@@ -154,9 +154,11 @@ Several apps can be linked at once: `pnpm dev:link ../project-a ../project-b`.
 
 ### Things to know
 
+- The app gets the sources of the branch checked out here, not of the release it installed. If that branch lacks fixes that the release branch has, the app shows the difference: link from a branch that contains them.
 - The local sources run against the dependencies installed in the app. If a package now needs a dependency that the app lacks, the command prints a warning. Add the dependency to the app temporarily, or update `mapomodule` there.
 - Packages that the app does not install are skipped. For example, an app on an older `mapomodule` has no `@mapomodule/mcp`, and the meta-module then skips it.
 - App code that imports `@mapomodule/*` directly, such as `mapooverride/` components, gets the local sources too.
+- The linked packages ship TypeScript sources, and Nitro skips TypeScript under `node_modules`: the link lets Nitro transpile them, which server code such as the `@mapomodule/mcp` handlers needs. If the dev server never answers and the log shows a Nitro `RollupError` inside a linked package, the app is still running an older link: run `pnpm dev:link <app> --once` and restart it.
 - Some Docker setups don't forward file events into the container. If edits never reach the app, set `CHOKIDAR_USEPOLLING=1` in the backoffice service's environment.
 - A linked app also builds with the local sources, so restore it before running `nuxt build` on that checkout. Production images are not affected: they install `node_modules` from the registry.
 

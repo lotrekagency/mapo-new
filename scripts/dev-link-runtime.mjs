@@ -85,6 +85,21 @@ function configure(nuxt) {
     nuxt.options.build.transpile.push("@mapomodule/utils");
   }
 
+  // Nitro transpiles TypeScript only outside node_modules (Nuxt sets its
+  // esbuild `exclude` to a node_modules RegExp), and the linked
+  // `dist/runtime` holds TypeScript sources: keep the linked packages, but
+  // not their own node_modules, out of that exclude.
+  nuxt.hook("nitro:config", (config) => {
+    const options = ((config.esbuild ??= {}).options ??= {});
+    const names = link.linked.map(escapeRE).join("|");
+    const linked = `^(?![\\s\\S]*node_modules/(?:${names})/(?!node_modules/))`;
+    options.exclude = [options.exclude ?? /node_modules/].flat().map((pattern) =>
+      pattern instanceof RegExp
+        ? new RegExp(`${linked}[\\s\\S]*?(?:${pattern.source})`, pattern.flags)
+        : pattern,
+    );
+  });
+
   logger.info(
     `Using local sources from ${link.source} for ${link.linked.join(", ")}`,
   );
@@ -126,6 +141,10 @@ function setupFiles(src) {
   };
   if (existsSync(src)) walk(src);
   return files;
+}
+
+function escapeRE(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Node resolution, without loading anything: walks up from the package root. */
