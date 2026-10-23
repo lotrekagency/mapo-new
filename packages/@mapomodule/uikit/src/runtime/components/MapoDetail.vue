@@ -202,8 +202,21 @@ const errors = ref<Record<string, string[]>>({});
 // Start in loading state for existing items so MapoForm is never mounted with
 // empty data and then immediately unmounted when the spinner appears on mount.
 const isLoading = ref(String(props.id) !== "new");
-const isSaving = ref(false);
-const isDeleting = ref(false);
+
+/**
+ * The action under way, from the click until its work is done, navigation
+ * included: one at a time, so a second click cannot save again or go back one
+ * more step in the history. Named after the buttons.
+ */
+type DetailAction = "save" | "saveContinue" | "delete" | "back";
+const pendingAction = ref<DetailAction | null>(null);
+const isBusy = computed(() => pendingAction.value !== null);
+const isSaving = computed(() => {
+  const savingAndLeaving = pendingAction.value === "save";
+  const savingAndStaying = pendingAction.value === "saveContinue";
+  return savingAndLeaving || savingAndStaying;
+});
+const isDeleting = computed(() => pendingAction.value === "delete");
 const currentLang = ref(props.languages[0] ?? "");
 const draftBanner = ref<{
   savedAt: Date;
@@ -435,6 +448,10 @@ async function fetchModel() {
 // ─── Save ────────────────────────────────────────────────────────────────────
 
 async function save(andBack = false) {
+  // The built-in buttons are disabled meanwhile; a custom one bound to `save`
+  // may not be.
+  if (isBusy.value) return;
+
   const validationResults = formValidators.map((fn) => fn());
   const allValid = validationResults.every((r) => r.valid);
   if (!allValid) {
@@ -449,7 +466,8 @@ async function save(andBack = false) {
   }
 
   errors.value = {};
-  isSaving.value = true;
+  pendingAction.value = andBack ? "save" : "saveContinue";
+  let leaving = false;
   try {
     const multipartOpts = { multipart: props.multipart };
     let result: T;
@@ -485,7 +503,7 @@ async function save(andBack = false) {
         params: { id },
       });
     }
-    if (andBack) back();
+    if (andBack) leaving = leave();
   } catch (err: unknown) {
     const data = getErrorData(err);
     if (getErrorStatus(err) === 400 && data && typeof data === "object") {
@@ -499,7 +517,8 @@ async function save(andBack = false) {
       snack.show(detail ?? t("mapo.saveError"), "error");
     }
   } finally {
-    isSaving.value = false;
+    // Going back: still busy until the page is gone (see leave()).
+    if (!leaving) pendingAction.value = null;
   }
 }
 
@@ -511,6 +530,7 @@ function getPatch(): Partial<T> {
 // ─── Delete ──────────────────────────────────────────────────────────────────
 
 async function deleteItem() {
+  if (isBusy.value) return;
   const ok = await confirm.ask({
     title: t("mapo.delete"),
     message: t("mapo.detail.deleteQuestion"),
@@ -518,24 +538,52 @@ async function deleteItem() {
     dangerous: true,
   });
   if (!ok) return;
-  isDeleting.value = true;
+  pendingAction.value = "delete";
+  let leaving = false;
   try {
     await crud.delete(recordId());
     backup.value = deepClone(model.value) as T; // clear dirty so guard doesn't fire
     snack.show(t("mapo.deleteSuccess"), "success");
     emit("deleted");
-    back();
+    leaving = leave();
   } catch (err: unknown) {
     snack.show(getErrorDetail(err) ?? t("mapo.deleteError"), "error");
   } finally {
-    isDeleting.value = false;
+    if (!leaving) pendingAction.value = null;
   }
 }
 
 // ─── Navigation guard ────────────────────────────────────────────────────────
 
 function back() {
+  if (isBusy.value) return;
+  pendingAction.value = "back";
+  const leaving = leave();
+  if (!leaving) pendingAction.value = null;
+}
+
+/**
+ * Goes back one step and tells whether that is a navigation inside the app.
+ *
+ * router.back() does not wait for the navigation, and this page stays on screen
+ * until the previous route is ready. So the caller keeps its action pending
+ * until the page is gone; if the navigation fails (a guard kept the page, such
+ * as the unsaved-changes one), the action is released and the buttons work
+ * again.
+ */
+function leave(): boolean {
+  // Opened directly (a new tab, a bookmark): no page of the app to go back to,
+  // router.back() leaves the app or does nothing, and nothing would release
+  // the buttons.
+  const hasPreviousPage = router.options.history.state.back != null;
+  if (hasPreviousPage) {
+    const stopWatching = router.afterEach((_to, _from, failure) => {
+      stopWatching();
+      if (failure) pendingAction.value = null;
+    });
+  }
   router.back();
+  return hasPreviousPage;
 }
 
 async function guardUnsaved(): Promise<boolean> {
@@ -633,14 +681,19 @@ type SlotBindings = {
   currentLang: string;
   isNew: boolean;
   isLoading: boolean;
+  /** From the click until the save is done; after `save(true)`, until the page has gone back. */
   isSaving: boolean;
+  /** From the confirmation until the delete is done and the page has gone back. */
   isDeleting: boolean;
   isDirty: boolean;
   draftBanner: DraftBannerState;
   readonly: boolean;
   canDelete: boolean;
+  /** Ignored while a save, a delete or a navigation back is under way. */
   save: (andBack?: boolean) => Promise<void>;
+  /** Ignored while a save, a delete or a navigation back is under way. */
   deleteItem: () => Promise<void>;
+  /** Ignored while a save, a delete or a navigation back is under way. */
   back: () => void;
 };
 
@@ -787,7 +840,8 @@ defineSlots<{
       <!-- Sidebar column -->
       <div :class="sidebarColsClass">
         <div :style="sidebarStyle" class="space-y-4">
-          <!-- Action buttons (Save / Save&continue / Back — no delete here) -->
+          <!-- Action buttons (Save / Save&continue / Back — no delete here).
+               While one works, it spins and all of them are disabled. -->
           <slot name="side-buttons" v-bind="slotBindings">
             <UCard>
               <div class="flex flex-col gap-2">
@@ -795,7 +849,8 @@ defineSlots<{
                   <UButton
                     v-if="!effectiveReadonly"
                     block
-                    :loading="isSaving"
+                    :loading="pendingAction === 'save'"
+                    :disabled="isBusy"
                     icon="i-lucide-save"
                     @click="save(true)"
                   >
@@ -808,7 +863,8 @@ defineSlots<{
                     v-if="!effectiveReadonly"
                     block
                     variant="soft"
-                    :loading="isSaving"
+                    :loading="pendingAction === 'saveContinue'"
+                    :disabled="isBusy"
                     icon="i-lucide-save"
                     @click="save(false)"
                   >
@@ -823,6 +879,8 @@ defineSlots<{
                     block
                     variant="ghost"
                     icon="i-lucide-arrow-left"
+                    :loading="pendingAction === 'back'"
+                    :disabled="isBusy"
                     @click="back"
                   >
                     {{ t("mapo.back") }}
@@ -900,6 +958,7 @@ defineSlots<{
                   color="error"
                   variant="soft"
                   :loading="isDeleting"
+                  :disabled="isBusy"
                   icon="i-lucide-trash-2"
                   @click="deleteItem"
                 >
