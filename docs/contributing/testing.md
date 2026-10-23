@@ -118,6 +118,8 @@ The steps below use a backoffice that runs `nuxt dev` in Docker with its directo
    pnpm dev:link ../my-project
    ```
 
+   Nothing else needs to run here: the command copies `src/` as it is, so neither `pnpm build` nor `pnpm dev:packages` is needed. The exception is `@mapomodule/mcp`, whose knowledge base is copied from its `dist/knowledge`: if the app installs it, run `pnpm --filter @mapomodule/mcp build` first.
+
 3. Restart the backoffice once, from the project directory, so that it loads the linked modules:
 
    ```bash
