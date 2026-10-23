@@ -7,6 +7,7 @@ import {
   h,
   resolveComponent,
   useSlots,
+  onBeforeUnmount,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -268,6 +269,13 @@ const writeUrlState = debounce(() => {
 }, 150);
 
 watch([pagination, search, sorting], writeUrlState, { deep: true });
+
+// A debounced call still pending when the list goes away would act on the next
+// page: the URL write would put this list's query on it.
+onBeforeUnmount(() => {
+  onSearchInput.cancel();
+  writeUrlState.cancel();
+});
 
 // --- Row selection ---
 // Selection is keyed by primary key (lookup), not by row index, so pagination/sort/refresh

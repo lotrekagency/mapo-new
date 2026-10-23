@@ -142,7 +142,12 @@ Returns a debounced version of `fn` that delays invocation until `delay` ms have
 import { debounce } from "@mapomodule/utils";
 
 const onSearch = debounce((query: string) => fetchResults(query), 300);
+
+// Drop a call still pending when the component goes away.
+onBeforeUnmount(() => onSearch.cancel());
 ```
+
+The returned function has the type `Debounced<A>`: it takes the arguments of `fn` and has a `cancel()` method that drops the pending call, if any.
 
 ---
 

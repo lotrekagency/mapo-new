@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRenderer, h, onUnmounted, reactive } from "vue";
+import { createRenderer, h, nextTick, onUnmounted, reactive } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoListTable from "../runtime/components/MapoListTable.vue";
@@ -274,6 +274,19 @@ describe("MapoListTable pagination", () => {
       expect.objectContaining({ status: "draft", page: 1 }),
     );
     expect(pager.page).toBe(1);
+  });
+
+  it("drops a pending URL write when the list goes away", async () => {
+    mountTable(listProps);
+    await settle();
+
+    pager.select(2);
+    await nextTick(); // the watcher runs and arms the debounced URL write
+    app?.unmount();
+    app = undefined;
+    await settle();
+
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("uses paginationParams instead of page and page_size", async () => {

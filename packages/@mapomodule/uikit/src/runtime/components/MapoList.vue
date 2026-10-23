@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import { ref, computed, watch, useSlots } from "vue";
+import { ref, computed, watch, useSlots, onBeforeUnmount } from "vue";
 import type { Ref } from "vue";
 import type {
   ListColumn,
@@ -173,6 +173,9 @@ const writeUrlState = debounce(() => {
 }, 150);
 
 watch([activeTab, activeFilters], writeUrlState, { deep: true });
+
+// A URL write still pending when the list goes away would land on the next page.
+onBeforeUnmount(() => writeUrlState.cancel());
 
 // --- crudEndpoint: base path for mutations (no query string). ---
 const crudEndpoint = computed(
