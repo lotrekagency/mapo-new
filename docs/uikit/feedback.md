@@ -84,6 +84,8 @@ mapo: {
 
 `MapoConfirmDialog` renders a `<UModal>` driven by `useConfirmStore`. Call `confirm.ask(options)` and `await` the promise — it resolves `true` if the user confirms and `false` if they cancel.
 
+The modal is mounted only while a confirmation is open, so it always shows above the overlay that asked for it, such as the media editor drawer or another modal. Nuxt UI overlays have no z-index: they stack in the order they were mounted.
+
 ### Usage
 
 ```vue
