@@ -175,6 +175,7 @@
       "dragToReorder": "Trascina per riordinare",
       "clearToReorder": "Svuota ricerca e ordinamento per riordinare",
       "noItems": "Nessun elemento trovato",
+      "noResults": "Nessun risultato",
       "totalItems": "{total} elementi",
       "perPage": "{n} / pagina",
       "allRows": "Tutti",

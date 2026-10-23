@@ -869,6 +869,19 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
   return cols;
 });
 
+// A search or a filter with no match reads differently from an empty list.
+const emptyText = computed(() => {
+  const isSearching = !!search.value;
+  const isFiltering = Object.values(props.filterParams ?? {}).some(
+    (value) => value != null && value !== "",
+  );
+  return t(
+    isSearching || isFiltering
+      ? "mapo.listTable.noResults"
+      : "mapo.listTable.noItems",
+  );
+});
+
 // --- Pagination for UTable ---
 const paginationOptions = computed(() => ({
   manualPagination: true,
@@ -910,7 +923,7 @@ const sortingOptions = computed(() => ({
         :pagination-options="paginationOptions"
         :sorting="sorting"
         :sorting-options="sortingOptions"
-        :empty="t('mapo.listTable.noItems')"
+        :empty="emptyText"
         @update:pagination="pagination = $event ?? pagination"
         @update:sorting="sorting = $event ?? sorting"
       >
@@ -918,7 +931,7 @@ const sortingOptions = computed(() => ({
           <slot name="dtable.empty">
             <div class="flex flex-col items-center gap-2 py-8 text-muted">
               <UIcon name="i-lucide-inbox" class="h-8 w-8" />
-              <span class="text-sm">{{ t("mapo.listTable.noItems") }}</span>
+              <span class="text-sm">{{ emptyText }}</span>
             </div>
           </slot>
         </template>

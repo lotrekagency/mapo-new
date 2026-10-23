@@ -100,18 +100,26 @@ interface ColumnDef {
 let table: {
   readonly data: Record<string, unknown>[];
   readonly columns: ColumnDef[];
+  readonly empty: string | undefined;
 };
 
 const UTable: Component = {
   name: "UTable",
-  props: { data: Array, columns: Array },
-  setup(props: { data?: Record<string, unknown>[]; columns?: ColumnDef[] }) {
+  props: { data: Array, columns: Array, empty: String },
+  setup(props: {
+    data?: Record<string, unknown>[];
+    columns?: ColumnDef[];
+    empty?: string;
+  }) {
     table = {
       get data() {
         return props.data ?? [];
       },
       get columns() {
         return props.columns ?? [];
+      },
+      get empty() {
+        return props.empty;
       },
     };
     return () => h("table");
@@ -445,5 +453,23 @@ describe("MapoListTable all rows", () => {
 
     expect(lastListParams()).toEqual({});
     expect(pagerMounted).toBe(false);
+  });
+});
+
+describe("MapoListTable empty state", () => {
+  beforeEach(() => {
+    crud.list.mockResolvedValue({ results: [], count: 0 });
+  });
+
+  it("tells an empty list from a search with no match", async () => {
+    mountTable(listProps);
+    await settle();
+    expect(table.empty).toBe("mapo.listTable.noItems");
+
+    app?.unmount();
+    route.query = { search: "zzz" };
+    mountTable(listProps);
+    await settle();
+    expect(table.empty).toBe("mapo.listTable.noResults");
   });
 });
