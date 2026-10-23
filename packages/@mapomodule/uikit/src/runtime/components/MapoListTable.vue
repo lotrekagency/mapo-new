@@ -657,13 +657,23 @@ watch(
     search,
   ],
   ([newEndpoint, , newFilters], [oldEndpoint, , oldFilters]) => {
-    const contextChanged =
-      newEndpoint !== oldEndpoint || newFilters !== oldFilters;
-    if (contextChanged && pagination.value.pageIndex !== 0) {
-      pagination.value = { ...pagination.value, pageIndex: 0 };
-    } else {
+    // The immediate first run has no old values: it is the initial load, so it
+    // fetches the page restored from the URL.
+    const isFirstRun = oldFilters === undefined;
+    if (isFirstRun) {
       refresh();
+      return;
     }
+    const endpointChanged = newEndpoint !== oldEndpoint;
+    const filtersChanged = newFilters !== oldFilters;
+    const contextChanged = endpointChanged || filtersChanged;
+    const isOnFirstPage = pagination.value.pageIndex === 0;
+    // Moving to the first page runs this watcher again, and that run fetches.
+    if (contextChanged && !isOnFirstPage) {
+      pagination.value = { ...pagination.value, pageIndex: 0 };
+      return;
+    }
+    refresh();
   },
   { immediate: true, deep: true },
 );
@@ -870,14 +880,13 @@ const sortingOptions = computed(() => ({
     <!-- Pagination controls -->
     <div class="flex items-center justify-between text-sm text-muted">
       <span>{{ t("mapo.listTable.totalItems", { total }) }}</span>
+      <!-- Nuxt UI 4's UPagination models `page`: with `modelValue` it runs uncontrolled. -->
       <UPagination
-        :model-value="pagination.pageIndex + 1"
+        :page="pagination.pageIndex + 1"
         :total="total"
         :items-per-page="pagination.pageSize"
         size="sm"
-        @update:model-value="
-          pagination = { ...pagination, pageIndex: $event - 1 }
-        "
+        @update:page="pagination = { ...pagination, pageIndex: $event - 1 }"
       />
       <USelect
         :model-value="pagination.pageSize"

@@ -23,6 +23,7 @@ These are present on a clean checkout and are not caused by your change:
 
 - `pnpm lint` reports warnings (no errors) in `form` and `uikit`, mostly Vue template formatting rules.
 - `pnpm build` prints, for the apps: `SOURCEMAP_BROKEN` warnings from `@tailwindcss/vite`; a `[nuxt-i18n]` notice that `mapo-i18n.config.mjs` is not found in the app's `i18n/` folder; and `Overriding MapoMediaManagerDialog component`, because `@mapomodule/uikit` registers that component twice (once by name, once as global).
+- `pnpm exec vitest run` prints a Vite notice that `vitest.config.ts` has "ESM syntax in a file loaded as CommonJS", once for each test project.
 
 Any other warning is new: fix it or explain it in the hand-over.
 
@@ -34,8 +35,8 @@ Any other warning is new: fix it or explain it in the hand-over.
 
 - **Runner**: Vitest, in a Node environment.
 - **Location**: next to the code, in a `__tests__/` folder (`src/__tests__/` or `src/runtime/__tests__/`).
-- **Names**: `<subject>.test.ts` or `<subject>.spec.ts`.
-- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. `form`, `mcp` and `utils` have their own `vitest.config.ts`.
+- **Names**: `<subject>.test.ts` or `<subject>.spec.ts`; `<Component>.component.test.ts` for a test that mounts a `.vue` component (see [Component tests](#component-tests)).
+- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. It runs two projects: `component` for the `*.component.test.ts` files, `node` for everything else. `form`, `mcp` and `utils` have their own `vitest.config.ts`.
 
 Run a subset while you work:
 
@@ -45,6 +46,16 @@ pnpm exec vitest run packages/@mapomodule/store      # one folder, from the root
 pnpm --filter @mapomodule/utils exec vitest          # watch mode
 ```
 
+### Component tests
+
+A test that mounts a component and drives it through its props and events catches what a test of a pure function cannot: a prop bound under the wrong name, an event nobody listens to, a watcher that resets the state on the first load. The reference is `packages/@mapomodule/uikit/src/__tests__/MapoListTable.component.test.ts`.
+
+- **Environment.** The `component` project runs in Node but compiles modules for the client (`vitest.client-environment.ts`). Compiled for SSR, a `.vue` file can only be rendered to a string, and SSR stops every watcher after its first run.
+- **Mounting.** There is no DOM. The test mounts the component with Vue's `createRenderer` and nodes that are plain objects, so reactivity, watchers and events run as in the browser.
+- **Nuxt, stores and API.** In this project `#app` resolves to an empty placeholder, `packages/@mapomodule/uikit/src/__tests__/__mocks__/nuxt-app.ts`. Mock what the component calls with `vi.mock("#app", factory)`, and the stores and `useCrud` the same way.
+- **Child components.** Register a stub for every component the template resolves. Give the real props and events to the stubs whose binding is under test (`UPagination`: prop `page`, event `update:page`). A stub that accepts anything hides a binding bug.
+- **Timers.** Use fake timers (`vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })`) and settle with `vi.runAllTimersAsync()`, so the debounced URL writes run inside the test and none leaks into the next one.
+
 ### What needs a test
 
 - New logic with a branch, a loop, parsing or data mapping.
@@ -52,7 +63,7 @@ pnpm --filter @mapomodule/utils exec vitest          # watch mode
 - Every public helper in `@mapomodule/utils`.
 - Every new MCP tool, recipe, prompt or resource (see [Working on the MCP server](./mcp-server)).
 
-A change of markup or styling alone needs no unit test; it needs the live check below.
+A change of markup or styling alone needs no unit test; it needs the live check below. How a template binds a child's props and events is behaviour, not markup: it needs a component test.
 
 ## Live verification in the reference app
 
