@@ -58,10 +58,14 @@ const props = withDefaults(
      */
     permissionModel?: string;
     // Pagination
-    /** Initial page size. Default: 20. */
-    defaultPageSize?: number;
-    /** Page size options shown in the per-page selector. Default: [10, 20, 50, 100]. */
-    pageSizeOptions?: number[];
+    /** Initial page size: a number, or `"all"`. Default: 20. */
+    defaultPageSize?: number | "all";
+    /**
+     * Options of the per-page selector. `"all"` adds an option that requests
+     * the list without pagination params, like `clientSide` does: the backend
+     * has to return the whole collection then. Default: [10, 20, 50, 100].
+     */
+    pageSizeOptions?: (number | "all")[];
     /**
      * Custom response parser. Replaces the built-in DRF / flat-array detection.
      * Return `{ items, total }` from any shape your backend returns.

@@ -89,8 +89,8 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `languages`        | `string[]`                                               | —                | Languages for translatable quick-edit fields                                                                                                                                                                                                 |
 | `registry`         | `FieldRegistry`                                          | —                | Optional registry override (auto-injected otherwise)                                                                                                                                                                                         |
 | `detailBase`       | `string`                                                 | —                | If set, each row shows a link button → `${detailBase}/${row[lookup]}`                                                                                                                                                                        |
-| `defaultPageSize`  | `number`                                                 | `20`             | Initial page size on mount                                                                                                                                                                                                                   |
-| `pageSizeOptions`  | `number[]`                                               | `[10,20,50,100]` | Options in the per-page selector                                                                                                                                                                                                             |
+| `defaultPageSize`  | `number \| "all"`                                        | `20`             | Initial page size on mount; `"all"` shows every row (see [Show all rows](#show-all-rows))                                                                                                                                                    |
+| `pageSizeOptions`  | `(number \| "all")[]`                                    | `[10,20,50,100]` | Options in the per-page selector; `"all"` adds an option that shows every row                                                                                                                                                                |
 | `responseAdapter`  | `(raw: unknown) => { items: T[]; total: number }`        | —                | Custom response parser — replaces built-in DRF / flat-array detection                                                                                                                                                                        |
 | `paginationParams` | `(state: { page, pageSize }) => Record<string, unknown>` | —                | Custom pagination params factory — replaces default `{ page, page_size }`                                                                                                                                                                    |
 | `permissionModel`  | `string`                                                 | —                | Django model label (e.g. `"news.article"`) used to gate edit and delete row actions. When set, the pencil/trash icons are hidden if the current user lacks `change_*` / `delete_*` permissions. Omit to keep actions always visible.         |
@@ -235,7 +235,7 @@ URL params written by `<MapoList>` and `<MapoListTable>`:
 | Param             | Written by      | Description                                     |
 | ----------------- | --------------- | ----------------------------------------------- |
 | `page`            | `MapoListTable` | Current page number (1-based)                   |
-| `page_size`       | `MapoListTable` | Active page size                                |
+| `page_size`       | `MapoListTable` | Active page size; `all` for all rows            |
 | `search`          | `MapoListTable` | Current search query                            |
 | `ordering`        | `MapoListTable` | Active sort; comma-separated, `-` prefix = desc |
 | `f_<filterKey>`   | `MapoList`      | Active filter value(s); see encoding below      |
@@ -401,6 +401,20 @@ The drag uses `crud.updateOrder(movedId, targetId)` — a single request. The ba
   :page-size-options="[10, 25, 50]"
 />
 ```
+
+### Show all rows
+
+Add `"all"` to the options, or start from it with `default-page-size="all"`:
+
+```vue
+<MapoList
+  endpoint="/api/news/"
+  :columns="columns"
+  :page-size-options="[20, 50, 'all']"
+/>
+```
+
+The option (label `mapo.listTable.allRows`) requests the list without pagination params, like hybrid mode does, and hides the pager; the URL keeps `page_size=all`. The backend has to return the whole collection to a request without pagination params; a paginated DRF view returns its first page instead.
 
 ### Offset / limit backend
 
@@ -583,3 +597,4 @@ In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid
 - **`columns[].class` must be static** — Tailwind v4 requires literal class names; `:class="dynamic"` does not work in column defs.
 - **Hybrid mode + paginated BE** — `client-side` issues a single `list()` with no pagination params; if the backend paginates by default, you'll only get the first page. Bake a large page size into the endpoint URL (e.g. `?page_size=1000`) to receive the full set.
 - **Offline mode ignores `permissionModel`** — without a Django backend there are no permissions to gate against. Hide actions yourself via column slots if needed.
+- **`"all"` with a paginated DRF view** — the request carries no pagination params, so the view returns its first page. Offer `"all"` only for endpoints that return the whole collection unpaginated.

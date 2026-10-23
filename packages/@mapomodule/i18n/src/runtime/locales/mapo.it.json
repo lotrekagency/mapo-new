@@ -177,6 +177,7 @@
       "noItems": "Nessun elemento trovato",
       "totalItems": "{total} elementi",
       "perPage": "{n} / pagina",
+      "allRows": "Tutti",
       "sortAscending": "Ordina per {column}, crescente",
       "sortDescending": "Ordina per {column}, decrescente",
       "clearSorting": "Togli l'ordinamento per {column}"

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { nextSorting, orderingParam } from "../runtime/utils/listTable";
+import {
+  ALL_ROWS,
+  formatPageSize,
+  nextSorting,
+  orderingParam,
+  parsePageSize,
+  toPageSize,
+} from "../runtime/utils/listTable";
 
 describe("nextSorting", () => {
   it("cycles a column through ascending, descending and unsorted", () => {
@@ -34,6 +41,26 @@ describe("nextSorting", () => {
         "status",
       ),
     ).toEqual([{ id: "status", desc: true }]);
+  });
+});
+
+describe("page size helpers", () => {
+  it("stores the 'all' option as ALL_ROWS", () => {
+    expect(toPageSize("all")).toBe(ALL_ROWS);
+    expect(toPageSize(50)).toBe(50);
+  });
+
+  it("reads page_size from the URL", () => {
+    expect(parsePageSize("all", 20)).toBe(ALL_ROWS);
+    expect(parsePageSize("50", 20)).toBe(50);
+    expect(parsePageSize("-3", 20)).toBe(20);
+    expect(parsePageSize("abc", 20)).toBe(20);
+    expect(parsePageSize(undefined, 20)).toBe(20);
+  });
+
+  it("writes page_size to the URL", () => {
+    expect(formatPageSize(ALL_ROWS)).toBe("all");
+    expect(formatPageSize(50)).toBe("50");
   });
 });
 

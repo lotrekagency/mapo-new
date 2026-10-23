@@ -11,7 +11,8 @@
 // Open DevTools → Network: you will see zero requests when interacting with
 // the table. The "live array state" panel at the bottom reflects every change.
 //
-// The Team column reads a related object with a dotted key (`team.name`).
+// The Team column reads a related object with a dotted key (`team.name`), and
+// the per-page selector offers "All" (`"all"` in `page-size-options`).
 // ─────────────────────────────────────────────────────────────────────────────
 import { ref } from "vue";
 import type {
@@ -321,7 +322,7 @@ const priorityColors: Record<
         searchable
         draggable
         :default-page-size="5"
-        :page-size-options="[5, 10, 20]"
+        :page-size-options="[5, 10, 20, 'all']"
       >
         <template #[`cell.status`]="{ value }">
           <UBadge

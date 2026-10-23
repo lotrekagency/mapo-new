@@ -177,6 +177,7 @@
       "noItems": "No items found",
       "totalItems": "{total} items",
       "perPage": "{n} / page",
+      "allRows": "All",
       "sortAscending": "Sort by {column}, ascending",
       "sortDescending": "Sort by {column}, descending",
       "clearSorting": "Remove sorting by {column}"

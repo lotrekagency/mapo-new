@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRenderer, h, reactive } from "vue";
+import { createRenderer, h, onUnmounted, reactive } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoListTable from "../runtime/components/MapoListTable.vue";
+import { ALL_ROWS } from "../runtime/utils/listTable";
 
 // The table reads the route, the stores and the CRUD layer at setup: replace them
 // with in-memory doubles. `vi.hoisted` lets the mock factories below share them.
@@ -69,12 +70,17 @@ const passthrough = (name: string): Component => ({
 
 // `UPagination` models `page` (prop `page`, event `update:page`), not `modelValue`.
 let pager: { readonly page: number | undefined; select(page: number): void };
+let pagerMounted = false;
 
 const UPagination: Component = {
   name: "UPagination",
   props: { page: Number, total: Number, itemsPerPage: Number },
   emits: ["update:page"],
   setup(props: { page?: number }, { emit }: SetupContext<["update:page"]>) {
+    pagerMounted = true;
+    onUnmounted(() => {
+      pagerMounted = false;
+    });
     pager = {
       get page() {
         return props.page;
@@ -112,13 +118,41 @@ const UTable: Component = {
   },
 };
 
+// `USelect` is the per-page selector.
+interface SelectItem {
+  label: string;
+  value: number;
+}
+let pageSizeSelect: {
+  readonly items: SelectItem[];
+  select(value: number): void;
+};
+
+const USelect: Component = {
+  name: "USelect",
+  props: { modelValue: Number, items: Array },
+  emits: ["update:modelValue"],
+  setup(
+    props: { items?: SelectItem[] },
+    { emit }: SetupContext<["update:modelValue"]>,
+  ) {
+    pageSizeSelect = {
+      get items() {
+        return props.items ?? [];
+      },
+      select: (value) => emit("update:modelValue", value),
+    };
+    return () => h("select");
+  },
+};
+
 const stubs: Record<string, Component> = {
   UPagination,
   UTable,
+  USelect,
   ...Object.fromEntries(
     [
       "UInput",
-      "USelect",
       "UIcon",
       "UCheckbox",
       "UButton",
@@ -232,6 +266,25 @@ describe("MapoListTable pagination", () => {
       expect.objectContaining({ status: "draft", page: 1 }),
     );
     expect(pager.page).toBe(1);
+  });
+
+  it("uses paginationParams instead of page and page_size", async () => {
+    mountTable({
+      ...listProps,
+      paginationParams: ({
+        page,
+        pageSize,
+      }: {
+        page: number;
+        pageSize: number;
+      }) => ({
+        offset: (page - 1) * pageSize,
+        limit: pageSize,
+      }),
+    });
+    await settle();
+
+    expect(lastListParams()).toEqual({ offset: 0, limit: 20 });
   });
 });
 
@@ -362,5 +415,35 @@ describe("MapoListTable nested column keys", () => {
 
     const query = onSelectionQuery.mock.lastCall?.[0] as URLSearchParams;
     expect(query.toString()).toBe("page_size=20&ordering=-category__name");
+  });
+});
+
+describe("MapoListTable all rows", () => {
+  it("offers 'all' and then requests the list without pagination", async () => {
+    mountTable({ ...listProps, pageSizeOptions: [10, "all"] });
+    await settle();
+
+    expect(pageSizeSelect.items).toEqual([
+      { label: "mapo.listTable.perPage", value: 10 },
+      { label: "mapo.listTable.allRows", value: ALL_ROWS },
+    ]);
+
+    pageSizeSelect.select(ALL_ROWS);
+    await settle();
+
+    expect(lastListParams()).toEqual({});
+    expect(router.replace).toHaveBeenLastCalledWith({
+      query: { page_size: "all" },
+    });
+    expect(pagerMounted).toBe(false);
+  });
+
+  it("restores 'all' from the URL", async () => {
+    route.query = { page_size: "all" };
+    mountTable({ ...listProps, pageSizeOptions: [10, "all"] });
+    await settle();
+
+    expect(lastListParams()).toEqual({});
+    expect(pagerMounted).toBe(false);
   });
 });

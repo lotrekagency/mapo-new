@@ -24,7 +24,14 @@ import {
   splitEndpointParams,
 } from "@mapomodule/utils";
 import { useRoute, useRouter } from "#app";
-import { nextSorting, orderingParam } from "../utils/listTable.js";
+import {
+  ALL_ROWS,
+  formatPageSize,
+  nextSorting,
+  orderingParam,
+  parsePageSize,
+  toPageSize,
+} from "../utils/listTable.js";
 
 const props = withDefaults(
   defineProps<{
@@ -49,10 +56,14 @@ const props = withDefaults(
      * and tab params without baking them into the endpoint string.
      */
     filterParams?: Record<string, unknown>;
-    /** Initial page size. Default: 20. */
-    defaultPageSize?: number;
-    /** Page size options shown in the per-page selector. Default: [10, 20, 50, 100]. */
-    pageSizeOptions?: number[];
+    /** Initial page size: a number, or `"all"`. Default: 20. */
+    defaultPageSize?: number | "all";
+    /**
+     * Options of the per-page selector. `"all"` adds an option that requests
+     * the list without pagination params, like `clientSide` does: the backend
+     * has to return the whole collection then. Default: [10, 20, 50, 100].
+     */
+    pageSizeOptions?: (number | "all")[];
     /**
      * Custom response parser. When provided it replaces the built-in DRF / flat-array
      * detection. Return `{ items, total }` from any shape your backend returns.
@@ -194,14 +205,24 @@ function toPositiveNumber(value: unknown, fallback: number): number {
 }
 
 // --- Pagination (restored from URL) ---
+// "All rows" is stored as the ALL_ROWS page size and written as `page_size=all`.
+const defaultPageSize = toPageSize(props.defaultPageSize);
 const pagination = ref<PaginationState>({
   pageIndex: route.query.page
     ? Math.max(0, toPositiveNumber(route.query.page, 1) - 1)
     : 0,
   pageSize: route.query.page_size
-    ? toPositiveNumber(route.query.page_size, props.defaultPageSize)
-    : props.defaultPageSize,
+    ? parsePageSize(route.query.page_size, defaultPageSize)
+    : defaultPageSize,
 });
+const showsAllRows = computed(() => pagination.value.pageSize === ALL_ROWS);
+const pageSizeItems = computed(() =>
+  props.pageSizeOptions.map((option) =>
+    option === "all"
+      ? { label: t("mapo.listTable.allRows"), value: ALL_ROWS }
+      : { label: t("mapo.listTable.perPage", { n: option }), value: option },
+  ),
+);
 
 // --- Sorting (restored from URL) ---
 const sorting = ref<SortingState>(
@@ -233,8 +254,8 @@ const writeUrlState = debounce(() => {
   const page = pagination.value.pageIndex + 1;
   if (page > 1) query.page = String(page);
   else delete query.page;
-  if (pagination.value.pageSize !== props.defaultPageSize)
-    query.page_size = String(pagination.value.pageSize);
+  if (pagination.value.pageSize !== defaultPageSize)
+    query.page_size = formatPageSize(pagination.value.pageSize);
   else delete query.page_size;
   if (search.value) query.search = search.value;
   else delete query.search;
@@ -273,7 +294,8 @@ watch(selectedRows, (rows) => {
 
 function buildSelectionQuery(): URLSearchParams {
   const params = new URLSearchParams();
-  params.set("page_size", String(pagination.value.pageSize));
+  if (!showsAllRows.value)
+    params.set("page_size", String(pagination.value.pageSize));
   if (search.value) params.set("search", search.value);
   // The same ordering the list request sends.
   if (sorting.value.length)
@@ -596,7 +618,8 @@ async function refresh() {
     const params: Record<string, unknown> = {
       ...endpointParams,
       ...(props.filterParams ?? {}),
-      ...paginationP,
+      // "All rows" sends no pagination params: the backend returns the whole collection.
+      ...(showsAllRows.value ? {} : paginationP),
     };
     if (search.value) params.search = search.value;
     if (sorting.value.length) params.ordering = orderingParam(sorting.value);
@@ -918,6 +941,7 @@ const sortingOptions = computed(() => ({
       <span>{{ t("mapo.listTable.totalItems", { total }) }}</span>
       <!-- Nuxt UI 4's UPagination models `page`: with `modelValue` it runs uncontrolled. -->
       <UPagination
+        v-if="!showsAllRows"
         :page="pagination.pageIndex + 1"
         :total="total"
         :items-per-page="pagination.pageSize"
@@ -926,12 +950,7 @@ const sortingOptions = computed(() => ({
       />
       <USelect
         :model-value="pagination.pageSize"
-        :items="
-          pageSizeOptions.map((n) => ({
-            label: t('mapo.listTable.perPage', { n }),
-            value: n,
-          }))
-        "
+        :items="pageSizeItems"
         size="xs"
         class="w-28"
         @update:model-value="
