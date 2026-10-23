@@ -92,6 +92,32 @@ pnpm dev:uikit
 pnpm dev:example-e2e
 ```
 
+### Testing in a consumer app
+
+To try local changes in a project that installed `mapomodule` from npm, including a backoffice running in Docker, link this workspace into it with `pnpm dev:link` ([`scripts/dev-link.mjs`](scripts/dev-link.mjs)).
+
+The script finds every `mapomodule` and `@mapomodule/*` package installed in the app's `node_modules` and overlays it with the local sources: `src/` becomes a synced copy of the local `src/`, `dist/` becomes stubs that load it, and the published files move to `<package>/.mapo-dev-link/` until you restore them. The app's `package.json`, lockfile, `nuxt.config` and Docker files stay untouched, and the linked code resolves `vue`, `nuxt` and `pinia` from the app's own install. A `link:` dependency or `pnpm link` would load a second copy of them, and host binaries that fail in a Linux container.
+
+```bash
+# 1. install the app's dependencies once (with Docker: start the project)
+# 2. from this repository's root: link, then keep syncing until Ctrl+C
+pnpm dev:link ../my-project
+# 3. restart the app's Nuxt dev server once, e.g.
+docker compose restart mapo
+# 4. edit packages/*/src: runtime code hot-reloads, module setup code restarts Nuxt
+# 5. when done: put the published packages back and restart again
+pnpm dev:link ../my-project --restore
+```
+
+| Command                            | Effect                                 |
+| ---------------------------------- | -------------------------------------- |
+| `pnpm dev:link <app>...`           | Link, then keep syncing until `Ctrl+C` |
+| `pnpm dev:link <app>... --once`    | Link without watching                  |
+| `pnpm dev:link <app>... --status`  | Show which packages are linked         |
+| `pnpm dev:link <app>... --restore` | Put the published packages back        |
+
+`<app>` is the Nuxt app directory or a project root with one Mapo app below it (e.g. `backoffice/`), resolved from your current directory. Restore the app before running `nuxt build` on that checkout; production images install from the registry and are not affected. The full workflow, and what to do when edits do not reach a container: [Testing changes in a consumer app](docs/contributing/testing.md#testing-changes-in-a-consumer-app).
+
 ### Build, checks and tests
 
 | Script                 | What it does                                                                                                        |
@@ -129,7 +155,7 @@ apps/example/              core demo against a real Camomilla backend
 apps/example-theme/        theming and MapoOverride demo, no backend
 apps/example-custom-form/  core and form with Vuetify fields, no UIKit
 docs/                      the documentation site, also indexed by @mapomodule/mcp
-scripts/                   build helpers and the release announcement
+scripts/                   build helpers, `pnpm dev:link` and the release announcement
 .github/workflows/         CI, Docs Pages, CD
 AGENTS.md, .claude/        the AI agent setup: manuals, skills, subagents
 ```

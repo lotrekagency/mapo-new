@@ -48,7 +48,7 @@ Follow the project skill [`headless-frontend-dev`](.claude/skills/headless-front
 | `apps/*`                                                                                                                                          | Owned                         | Demo and reference apps; `example-e2e` is the test bed                       |
 | `docs/`                                                                                                                                           | Owned                         | The public site **and** the MCP knowledge base                               |
 | `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.mcp.json`, `.vscode/mcp.json`                                                                             | Owned                         | The AI setup ([ai-workflow](docs/contributing/ai-workflow.md)); keep it thin |
-| `scripts/`                                                                                                                                        | Change with care              | Build helpers that every SFC package runs; the release announcement          |
+| `scripts/`                                                                                                                                        | Change with care              | Build helpers every SFC package runs; `dev:link`; the release announcement   |
 | Root configs (`package.json`, `turbo.json`, `tsconfig*.json`, `eslint.config.mjs`, `vitest.config.ts`, `commitlint.config.mjs`, `.releaserc.cjs`) | Change with care              | They affect every package, CI and releases                                   |
 | `.github/workflows/`                                                                                                                              | Change with care              | `CD` publishes to npm                                                        |
 | `pnpm-lock.yaml`                                                                                                                                  | Only with a dependency change | Every install reads it                                                       |
@@ -76,7 +76,7 @@ apps/
   example-theme         theming and MapoOverride demo, no backend (:3001)
   example-custom-form   custom field registry demo with Vuetify fields
 docs/                   VitePress site (GitHub Pages) and the MCP knowledge source
-scripts/                clean-empty-vue-dts.mjs (form and uikit builds); release/ (Slack announcement, run by CD)
+scripts/                clean-empty-vue-dts.mjs (form and uikit builds); dev-link*.mjs (pnpm dev:link); release/ (Slack announcement, run by CD)
 .claude/                skills, subagents, shared permissions
 ```
 
@@ -137,6 +137,8 @@ pnpm docs:build             # when docs or the sidebar changed
 The warnings already present on a clean checkout are listed in [testing § known warnings](docs/contributing/testing.md#known-warnings).
 
 **Live check.** When a change affects rendering, routing, middleware, SSR or the MCP live tools, you may start `pnpm dev:example-e2e` in the background, verify (pages, status codes, the `/mcp/mapo` endpoint, `mapo_doctor`), and **stop the server afterwards**. Log in as `admin` / `admin`. Do not start `apps/example`: it needs a real backend. Visual checks you cannot do (breakpoints, dark mode, interactions) go in the closing report for the reviewer. Commands: [testing § live verification](docs/contributing/testing.md#live-verification-in-the-reference-app).
+
+**Consumer app check.** `pnpm dev:link <app>` runs the local sources inside a project that installed Mapo from npm ([testing § consumer app](docs/contributing/testing.md#testing-changes-in-a-consumer-app)). It writes into that project's `node_modules`, outside this repository: run it only when the user asks, and restore the app with `--restore` when done.
 
 The `mapo` MCP server in `.mcp.json` runs from this repository's build: after `pnpm build`, use it to check what an assistant in a consumer app would be told.
 

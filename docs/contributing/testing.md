@@ -1,6 +1,6 @@
 # Testing and verification
 
-What to run before a change is handed over, how unit tests are written, and how to check a change in the running reference app.
+What to run before a change is handed over, how unit tests are written, and how to check a change in the running reference app or in a project that installed Mapo from npm.
 
 ## The gates
 
@@ -86,6 +86,77 @@ cd apps/example-e2e
 npx nuxt prepare
 npx vue-tsc --noEmit -p .nuxt/tsconfig.app.json
 ```
+
+## Testing changes in a consumer app
+
+To try a fix in a real project before it is released, link this workspace into an app that installed `mapomodule` from npm. Run it from the root of this repository:
+
+```bash
+pnpm dev:link ../my-project
+```
+
+The path points at the project root or directly at its Nuxt app (e.g. `../my-project/backoffice`), and is resolved from your current directory. A project root works when exactly one directory below it depends on `mapomodule`. Apps inside this workspace are refused: they already use the local packages.
+
+The command (`scripts/dev-link.mjs`) finds every `mapomodule` and `@mapomodule/*` package installed in the app's `node_modules` (pnpm, yarn or npm layout) and overlays it with the local sources:
+
+- `src/` becomes a copy of the local `src/`, kept in sync while the command runs;
+- `dist/` becomes stubs that load `src/`;
+- the published `dist/` and `src/` move to `<package>/.mapo-dev-link/`, where `--restore` finds them.
+
+Everything happens inside the app's `node_modules`. The app's `package.json`, lockfile, `nuxt.config` and Docker files stay untouched, and the linked code resolves `vue`, `nuxt`, `pinia` and every other dependency from the app's own install.
+
+> **Why not `link:` or `pnpm link`?** A symlinked package resolves its dependencies from this repository's `node_modules`. The app would load a second copy of `vue`, `nuxt`, `pinia` and `vue-i18n` (broken stores and injections) and native binaries built for the host OS, which fail in a Linux container. Inside a container, the symlink target does not even exist.
+
+### Workflow
+
+The steps below use a backoffice that runs `nuxt dev` in Docker with its directory bind-mounted (`backoffice/` mounted on `/app`, Compose service `mapo`). Without Docker, restart `nuxt dev` wherever the steps restart the container.
+
+1. Start the project once, so that the container installs the backoffice dependencies. The command needs the app's `node_modules`.
+2. Link from the root of this repository and leave the command running:
+
+   ```bash
+   pnpm dev:link ../my-project
+   ```
+
+3. Restart the backoffice once, from the project directory, so that it loads the linked modules:
+
+   ```bash
+   docker compose restart mapo
+   ```
+
+   The log shows `[mapo:dev-link] Using local sources from …`.
+
+4. Edit `packages/*/src` here:
+   - runtime code (components, composables, stores, locales) hot-reloads in the browser;
+   - module setup code (`src/module.ts` and the files it imports) restarts Nuxt on its own.
+
+5. When you are done, stop the command with `Ctrl+C` (the link stays in place), then restore the published packages and restart the backoffice:
+
+   ```bash
+   pnpm dev:link ../my-project --restore
+   docker compose restart mapo
+   ```
+
+The container runs `yarn` or `pnpm install` at startup. That keeps the link, because the lockfile has not changed and nothing gets reinstalled. If the app's dependencies are reinstalled anyway, a running `pnpm dev:link` links them again; restart the backoffice afterwards.
+
+### Commands
+
+| Command                            | Effect                                 |
+| ---------------------------------- | -------------------------------------- |
+| `pnpm dev:link <app>...`           | Link, then keep syncing until `Ctrl+C` |
+| `pnpm dev:link <app>... --once`    | Link without watching                  |
+| `pnpm dev:link <app>... --status`  | Show which packages are linked         |
+| `pnpm dev:link <app>... --restore` | Put the published packages back        |
+
+Several apps can be linked at once: `pnpm dev:link ../project-a ../project-b`.
+
+### Things to know
+
+- The local sources run against the dependencies installed in the app. If a package now needs a dependency that the app lacks, the command prints a warning. Add the dependency to the app temporarily, or update `mapomodule` there.
+- Packages that the app does not install are skipped. For example, an app on an older `mapomodule` has no `@mapomodule/mcp`, and the meta-module then skips it.
+- App code that imports `@mapomodule/*` directly, such as `mapooverride/` components, gets the local sources too.
+- Some Docker setups don't forward file events into the container. If edits never reach the app, set `CHOKIDAR_USEPOLLING=1` in the backoffice service's environment.
+- A linked app also builds with the local sources, so restore it before running `nuxt build` on that checkout. Production images are not affected: they install `node_modules` from the registry.
 
 ## Browser end-to-end tests
 
