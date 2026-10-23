@@ -9,8 +9,9 @@ const props = withDefaults(
     errors?: Record<string, string[]>;
     noRouteChange?: boolean;
     /**
-     * Number of languages above which the select also shows a dropdown
-     * alongside the tab bar (for quick navigation). Default: `8`.
+     * Number of languages above which a searchable select appears next to the
+     * tab bar, for quick navigation. Default: `8`. `0` always shows it,
+     * `Infinity` never does.
      */
     langThreshold?: number;
   }>(),
@@ -69,6 +70,9 @@ function onSelectChange(v: unknown) {
 
 // ─── Select menu items ────────────────────────────────────────────────────────
 
+// A few languages fit in the tab bar; the select only helps once they overflow it.
+const showSelect = computed(() => props.langs.length > props.langThreshold);
+
 const selectItems = computed(() =>
   props.langs.map((lang) => ({
     label: lang.toUpperCase(),
@@ -106,26 +110,21 @@ watch(
   <div
     class="flex items-end gap-0 border-b border-gray-200 dark:border-gray-700 mt-2 mb-4"
   >
-    <!-- Language select — always visible, aligned at bottom of row -->
-    <USelectMenu
-      :model-value="modelValue"
-      :items="selectItems"
-      value-key="value"
-      label-key="label"
-      size="sm"
-      class="w-28 shrink-0 mb-px"
-      @update:model-value="onSelectChange"
-    >
-      <template #default="{ open }">
-        <UButton
-          size="sm"
-          variant="ghost"
-          color="neutral"
-          :trailing-icon="
-            open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'
-          "
-          class="w-full justify-between font-medium"
-        >
+    <!-- Language select — above langThreshold only, aligned at bottom of row -->
+    <template v-if="showSelect">
+      <USelectMenu
+        :model-value="modelValue"
+        :items="selectItems"
+        value-key="value"
+        label-key="label"
+        size="sm"
+        variant="ghost"
+        class="w-28 shrink-0 mb-px font-medium"
+        @update:model-value="onSelectChange"
+      >
+        <!-- The trigger is already a button with its own chevron: the slot
+             holds only what it shows, never another button. -->
+        <template #default>
           <span class="flex items-center gap-1">
             <span
               v-if="hasErrors(modelValue)"
@@ -133,12 +132,12 @@ watch(
             />
             {{ modelValue.toUpperCase() }}
           </span>
-        </UButton>
-      </template>
-    </USelectMenu>
+        </template>
+      </USelectMenu>
 
-    <!-- Divider -->
-    <div class="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-2 shrink-0" />
+      <!-- Divider -->
+      <div class="h-5 w-px bg-gray-200 dark:bg-gray-700 mx-2 shrink-0" />
+    </template>
 
     <!-- Tab bar — always shown, scrollable -->
     <div class="flex gap-1 overflow-x-auto scrollbar-none flex-1">

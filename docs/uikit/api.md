@@ -17,6 +17,7 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `fields`        | `FieldDescriptor<T>[]`  | — **required** | Fields for the main body form.                                                                                  |
 | `sidebarFields` | `FieldDescriptor<T>[]`  | `[]`           | Fields rendered in the sidebar form.                                                                            |
 | `languages`     | `string[]`              | `[]`           | Translation language codes (e.g. `['it', 'en']`).                                                               |
+| `langThreshold` | `number`                | `8`            | Show the language select next to the tabs above this many languages.                                            |
 | `modelName`     | `string \| null`        | `null`         | Human-readable model name shown in the page title.                                                              |
 | `sidebarCols`   | `number`                | `4`            | Sidebar column span (1–11 in a 12-col grid).                                                                    |
 | `sticky`        | `boolean`               | `true`         | Keep sidebar sticky while scrolling. Offset controlled by `--mapo-topbar-height` CSS variable (default `64px`). |
@@ -63,6 +64,7 @@ Language tab bar used inside `MapoDetail`. Can also be used standalone.
 | `langs`         | `string[]`                 | — **required** | Available language codes.                       |
 | `errors`        | `Record<string, string[]>` | `{}`           | Validation errors keyed by field path.          |
 | `noRouteChange` | `boolean`                  | `false`        | Do not update the URL query on language change. |
+| `langThreshold` | `number`                   | `8`            | Show the select above this many languages.      |
 
 ### Emits
 

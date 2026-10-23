@@ -153,14 +153,14 @@ A derived form knows types, labels, relations and what is read-only — but noth
 
 `<MapoDetailLangSwitch>` renders above the body. Each tab shows a red error badge when at least one field inside `translations.<lang>.*` has an error. The `?lang=` query param is kept in sync — language deep-links work out of the box.
 
-**Many languages** — when the number of languages exceeds `langThreshold` (default `8`), the tab bar is automatically replaced with a searchable `USelectMenu`. The threshold is configurable:
+**Many languages** — when the number of languages exceeds `langThreshold` (default `8`), a searchable `USelectMenu` appears next to the tab bar for quick navigation; the tabs stay. Up to the threshold, the tab bar is the only switcher. The threshold is configurable:
 
 ```vue
-<!-- Force select menu from 4+ languages -->
+<!-- Add the select from 5 languages up -->
 <MapoDetail :languages="langs" :lang-threshold="4" … />
 ```
 
-Pass `:lang-threshold="Infinity"` to always use the tab bar regardless of how many languages there are.
+Pass `:lang-threshold="0"` to always show the select, or `:lang-threshold="Infinity"` to never show it.
 
 ## How to: customize the sidebar buttons
 

@@ -65,6 +65,12 @@ const props = withDefaults(
     sidebarFields?: AnyFieldDescriptor<T>[];
     /** Translation language codes (e.g. ['it', 'en']). */
     languages?: string[];
+    /**
+     * Number of languages above which the language switcher adds a searchable
+     * select next to its tabs. Default `8` (from MapoDetailLangSwitch); `0`
+     * always shows it.
+     */
+    langThreshold?: number;
     /** Human readable model name shown in the page title. */
     modelName?: string | null;
     /** Sidebar column span (1–11 in a 12-col grid). */
@@ -123,6 +129,7 @@ const props = withDefaults(
     schemaFieldOptions: undefined,
     sidebarFields: () => [],
     languages: () => [],
+    langThreshold: undefined,
     sidebarCols: 4,
     sticky: true,
     usePatch: true,
@@ -747,6 +754,7 @@ defineSlots<{
             v-model="currentLang"
             :langs="activeLangs"
             :errors="errors"
+            :lang-threshold="langThreshold"
           />
         </slot>
 
