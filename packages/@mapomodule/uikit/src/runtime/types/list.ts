@@ -1,7 +1,10 @@
 /** Defines a single column in the list table. */
 export interface ListColumn<T = Record<string, unknown>> {
-  /** Property name on the row object. Must be a key of `T`. */
-  key: keyof T & string;
+  /**
+   * Property of the row to show, a key of `T`. A dotted path (`category.name`)
+   * reads a field of a related object; it starts with a key of `T`.
+   */
+  key: (keyof T & string) | `${keyof T & string}.${string}`;
   label: string;
   /**
    * Turns the header into a button that cycles ascending, descending and

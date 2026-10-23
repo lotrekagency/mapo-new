@@ -75,7 +75,7 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `endpoint`         | `string`                                                 | —                | REST collection endpoint. Required in **server** and **hybrid** modes; ignored when `items` is set. May include static query params (e.g. `?ordering=-date`) — they are merged into every `list()` call. CRUD operations use the clean path. |
 | `items`            | `T[]`                                                    | —                | Drives **offline** mode. Pass via `v-model:items` if you want mutations (drag, delete, quick-edit) reflected back into your local array.                                                                                                     |
 | `clientSide`       | `boolean`                                                | `false`          | Enables **hybrid** mode (only when `endpoint` is set and `items` is not). Fetches the full dataset once, runs filter/sort/page client-side. Mutations still hit the backend, then refetch.                                                   |
-| `columns`          | `ListColumn<T>[]`                                        | —                | Column definitions. Pass the model type as generic (`ListColumn<News>[]`) to enforce that `key` is a real property of `T`.                                                                                                                   |
+| `columns`          | `ListColumn<T>[]`                                        | —                | Column definitions. Pass the model type as generic (`ListColumn<News>[]`) to enforce that `key` is a real property of `T`. A dotted key (`category.name`) reads a field of a related object.                                                 |
 | `lookup`           | `string`                                                 | `'id'`           | Key used as primary key (selection, links, drag)                                                                                                                                                                                             |
 | `filters`          | `FilterDescriptor[]`                                     | `[]`             | Filter dropdown items                                                                                                                                                                                                                        |
 | `actions`          | `ActionDescriptor<T>[]`                                  | `[]`             | Bulk actions shown when rows are selected                                                                                                                                                                                                    |
@@ -139,12 +139,18 @@ const columns: ListColumn<News>[] = [
 
 Without the generic (`ListColumn[]`) the key is typed as `string` and any value is accepted — still works at runtime but you lose autocomplete and typo protection.
 
-| Field      | Description                                                                                                                |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `key`      | Property name on the row object (`keyof T & string` when `T` is provided)                                                  |
-| `label`    | Header text                                                                                                                |
-| `sortable` | Makes the header a button that cycles ascending → descending → unsorted (see [Sort by a column](#how-to-sort-by-a-column)) |
-| `class`    | CSS class applied to the `<td>`                                                                                            |
+| Field      | Description                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `key`      | Property on the row object (`keyof T & string` when `T` is provided), or a dotted path into a related object (`category.name`) |
+| `label`    | Header text                                                                                                                    |
+| `sortable` | Makes the header a button that cycles ascending → descending → unsorted (see [Sort by a column](#how-to-sort-by-a-column))     |
+| `class`    | CSS class applied to the `<td>`                                                                                                |
+
+### Columns of a related object
+
+A dotted `key` reads a field of a related object: `{ key: "category.name", label: "Category" }` shows `row.category.name`, and `—` when the row has no category. Its cell slot is ``#[`cell.category.name`]``. With a typed `ListColumn<T>`, the first segment must be a key of `T`.
+
+Sorting on it sends the Django lookup (`?ordering=category__name`), the way DRF's `OrderingFilter` reaches a field of a related object; in offline and hybrid mode, search, filters and sort read the nested value.
 
 ## How to: sort by a column
 

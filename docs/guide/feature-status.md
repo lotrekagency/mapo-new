@@ -64,6 +64,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `<MapoList>` shell                         | Composes `<MapoListHead>`, `<MapoListFilters>`, `<MapoListActions>`, `<MapoListTabs>`, `<MapoListTable>`, `<MapoListQuickEdit>` |
 | Server-side pagination / search / ordering | Default mode: filters, tabs, and pagination all pass as `list()` params — never baked into the endpoint string                  |
 | Sortable column headers                    | `sortable: true` makes the header a button: ascending → descending → unsorted                                                   |
+| Columns of related objects                 | Dotted keys (`category.name`) for cells, search, filters and sort; ordering sent as `category__name`                            |
 | Offline mode (`v-model:items`)             | No backend: search / filter / tab / sort / paginate / drag-reorder / delete / quick-edit all run in memory on the parent array  |
 | Hybrid mode (`client-side` prop)           | Single fetch on mount; filters / sort / paginate run client-side. Mutations (delete, drag, quick-edit) hit BE then refetch      |
 | Multi-column sort (offline / hybrid)       | Sorting columns applied in order, each as a tiebreaker for the previous one (matches TanStack default)                          |

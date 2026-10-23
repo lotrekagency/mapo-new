@@ -85,20 +85,25 @@ const UPagination: Component = {
   },
 };
 
-// `UTable` gets TanStack column defs; the tests render the headers from them.
+// `UTable` gets TanStack column defs; the tests render headers and cells from them.
 interface ColumnDef {
   id?: string;
   header?: string | (() => VNode);
+  cell?: (context: { row: { original: object; index: number } }) => unknown;
 }
 let table: {
+  readonly data: Record<string, unknown>[];
   readonly columns: ColumnDef[];
 };
 
 const UTable: Component = {
   name: "UTable",
-  props: { columns: Array },
-  setup(props: { columns?: ColumnDef[] }) {
+  props: { data: Array, columns: Array },
+  setup(props: { data?: Record<string, unknown>[]; columns?: ColumnDef[] }) {
     table = {
+      get data() {
+        return props.data ?? [];
+      },
       get columns() {
         return props.columns ?? [];
       },
@@ -283,5 +288,79 @@ describe("MapoListTable sorting", () => {
     await settle();
 
     expect(column("status").header).toBe("Status");
+  });
+});
+
+describe("MapoListTable nested column keys", () => {
+  const analyses = [
+    { id: 1, title: "Glucose", category: { name: "Blood" } },
+    { id: 2, title: "Urea", category: { name: "Urine" } },
+    { id: 3, title: "Iron", category: null },
+  ];
+  const nestedColumns = [
+    { key: "title", label: "Title" },
+    { key: "category.name", label: "Category", sortable: true },
+  ];
+
+  it("shows a related object's field and sorts on it with a Django lookup", async () => {
+    crud.list.mockResolvedValue({ results: analyses, count: 3 });
+    mountTable({ endpoint: "/api/analyses/", columns: nestedColumns });
+    await settle();
+
+    const cell = column("category.name").cell!;
+    expect(cell({ row: { original: analyses[0]!, index: 0 } })).toBe("Blood");
+    expect(cell({ row: { original: analyses[2]!, index: 2 } })).toBe("—");
+
+    sortButton("category.name").onClick();
+    await settle();
+    expect(lastListParams().ordering).toBe("category__name");
+  });
+
+  const shownTitles = () => table.data.map((row) => row.title);
+
+  it("sorts nested values in offline mode", async () => {
+    mountTable({ items: analyses, columns: nestedColumns });
+    await settle();
+
+    sortButton("category.name").onClick();
+    sortButton("category.name").onClick(); // descending
+    await settle();
+
+    // A row without the related object goes last, as for any empty value.
+    expect(shownTitles()).toEqual(["Urea", "Glucose", "Iron"]);
+  });
+
+  it("searches nested values in offline mode", async () => {
+    route.query = { search: "blood" };
+    mountTable({ items: analyses, columns: nestedColumns });
+    await settle();
+
+    expect(shownTitles()).toEqual(["Glucose"]);
+  });
+
+  it("hands bulk actions the same ordering as the list request", async () => {
+    const onSelectionQuery = vi.fn();
+    crud.list.mockResolvedValue({ results: analyses, count: 3 });
+    mountTable({
+      endpoint: "/api/analyses/",
+      columns: nestedColumns,
+      "onUpdate:selectionQuery": onSelectionQuery,
+    });
+    await settle();
+
+    sortButton("category.name").onClick();
+    sortButton("category.name").onClick(); // descending
+    await settle();
+    // Select a row, as before running a bulk action.
+    const checkbox = column("__select__").cell!({
+      row: { original: analyses[0]!, index: 0 },
+    }) as VNode;
+    (checkbox.props as { "onUpdate:modelValue": () => void })[
+      "onUpdate:modelValue"
+    ]();
+    await settle();
+
+    const query = onSelectionQuery.mock.lastCall?.[0] as URLSearchParams;
+    expect(query.toString()).toBe("page_size=20&ordering=-category__name");
   });
 });

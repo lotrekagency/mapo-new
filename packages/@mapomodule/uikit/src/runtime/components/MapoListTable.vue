@@ -18,9 +18,13 @@ import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
-import { debounce, splitEndpointParams } from "@mapomodule/utils";
+import {
+  debounce,
+  getNestedValue,
+  splitEndpointParams,
+} from "@mapomodule/utils";
 import { useRoute, useRouter } from "#app";
-import { nextSorting } from "../utils/listTable.js";
+import { nextSorting, orderingParam } from "../utils/listTable.js";
 
 const props = withDefaults(
   defineProps<{
@@ -71,6 +75,7 @@ const props = withDefaults(
      * still hit the backend, then re-fetch. Ignored when `items` is provided.
      */
     clientSide?: boolean;
+    /** Column definitions. A dotted `key` (`category.name`) reads a field of a related object. */
     columns: ListColumn<T>[];
     lookup?: string;
     searchable?: boolean;
@@ -136,10 +141,11 @@ defineSlots<
 
 const slots = useSlots();
 
-// T extends object but not Record<string,unknown>, so dynamic key access needs a cast.
-// Casting the key to keyof T returns the union of all property types rather than `unknown`,
-// which is both accurate and avoids any implicit-any errors at the call sites.
-const atKey = (item: T, key: string): T[keyof T] => item[key as keyof T];
+// A key can be a dotted path into a related object (`category.name`). The cast to
+// T[keyof T] gives the call sites the union of the row's property types rather
+// than `unknown`.
+const atKey = (item: T, key: string): T[keyof T] =>
+  getNestedValue(item, key) as T[keyof T];
 
 const { t } = useI18n();
 const snack = useSnackStore();
@@ -269,9 +275,9 @@ function buildSelectionQuery(): URLSearchParams {
   const params = new URLSearchParams();
   params.set("page_size", String(pagination.value.pageSize));
   if (search.value) params.set("search", search.value);
-  sorting.value.forEach((s) =>
-    params.set("ordering", `${s.desc ? "-" : ""}${s.id}`),
-  );
+  // The same ordering the list request sends.
+  if (sorting.value.length)
+    params.set("ordering", orderingParam(sorting.value));
   return params;
 }
 
@@ -477,7 +483,7 @@ function applyOffline(source: T[]) {
     const q = search.value.toLowerCase();
     arr = arr.filter((row) =>
       props.columns.some((c) =>
-        String(row[c.key] ?? "")
+        String(atKey(row, c.key) ?? "")
           .toLowerCase()
           .includes(q),
       ),
@@ -593,10 +599,7 @@ async function refresh() {
       ...paginationP,
     };
     if (search.value) params.search = search.value;
-    if (sorting.value.length)
-      params.ordering = sorting.value
-        .map((s) => `${s.desc ? "-" : ""}${s.id}`)
-        .join(",");
+    if (sorting.value.length) params.ordering = orderingParam(sorting.value);
 
     const res = await crud.list(params as Record<string, string>);
 
@@ -771,7 +774,8 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
     const col = props.columns[i]!;
     const isFirst = i === 0 && !!props.detailBase;
     cols.push({
-      // The sorting state is keyed by the column key.
+      // TanStack would turn a dotted key into `category_name`; the sorting
+      // state uses the column key, so the id must be the key itself.
       id: col.key,
       accessorKey: col.key,
       header: col.sortable ? () => sortHeader(col) : col.label,

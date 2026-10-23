@@ -18,3 +18,14 @@ export function nextSorting(
   if (!current.desc) return [{ id: columnId, desc: true }];
   return [];
 }
+
+/**
+ * The `ordering` param for a sorting: comma-separated keys, `-` for descending.
+ * A dotted key becomes a Django lookup (`category.name` → `category__name`),
+ * the way DRF's OrderingFilter reaches a field of a related object.
+ */
+export function orderingParam(sorting: TableSort[]): string {
+  return sorting
+    .map((sort) => `${sort.desc ? "-" : ""}${sort.id.split(".").join("__")}`)
+    .join(",");
+}

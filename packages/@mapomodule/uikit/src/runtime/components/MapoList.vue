@@ -30,6 +30,7 @@ const props = withDefaults(
      * Ignored when `items` is provided.
      */
     clientSide?: boolean;
+    /** Column definitions. A dotted `key` (`category.name`) reads a field of a related object. */
     columns: ListColumn<T>[];
     lookup?: string;
     // Filters

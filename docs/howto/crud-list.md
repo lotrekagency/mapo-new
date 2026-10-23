@@ -216,7 +216,7 @@ const columns: ListColumn<Article>[] = [
 ];
 ```
 
-A `sortable` column gets a header button that cycles ascending, descending and unsorted ([Sort by a column](/uikit/list#how-to-sort-by-a-column)).
+A `sortable` column gets a header button that cycles ascending, descending and unsorted ([Sort by a column](/uikit/list#how-to-sort-by-a-column)). A dotted key such as `"category.name"` shows a field of a related object; with a typed `ListColumn<T>` its first segment is checked against `T` ([Columns of a related object](/uikit/list#columns-of-a-related-object)).
 
 ---
 

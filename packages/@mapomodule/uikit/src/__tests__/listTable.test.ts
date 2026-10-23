@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextSorting } from "../runtime/utils/listTable";
+import { nextSorting, orderingParam } from "../runtime/utils/listTable";
 
 describe("nextSorting", () => {
   it("cycles a column through ascending, descending and unsorted", () => {
@@ -34,5 +34,22 @@ describe("nextSorting", () => {
         "status",
       ),
     ).toEqual([{ id: "status", desc: true }]);
+  });
+});
+
+describe("orderingParam", () => {
+  it("joins the keys, with `-` for descending", () => {
+    expect(
+      orderingParam([
+        { id: "title", desc: true },
+        { id: "published_at", desc: false },
+      ]),
+    ).toBe("-title,published_at");
+  });
+
+  it("writes a related object's field as a Django lookup", () => {
+    expect(orderingParam([{ id: "parent.category.name", desc: true }])).toBe(
+      "-parent__category__name",
+    );
   });
 });
