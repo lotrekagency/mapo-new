@@ -847,6 +847,7 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
             variant: "ghost",
             color: "neutral",
             icon: "i-lucide-pencil",
+            "aria-label": t("mapo.edit"),
             onClick: () =>
               openQuickEdit(
                 atKey(row.original, props.lookup) as string | number,
@@ -861,6 +862,7 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
             variant: "ghost",
             color: "error",
             icon: "i-lucide-trash-2",
+            "aria-label": t("mapo.delete"),
             onClick: () => deleteRow(row.original),
           }),
         );

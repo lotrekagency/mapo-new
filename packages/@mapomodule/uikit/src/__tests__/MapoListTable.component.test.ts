@@ -469,7 +469,7 @@ describe("MapoListTable all rows", () => {
   });
 });
 
-describe("MapoListTable empty state", () => {
+describe("MapoListTable empty state and row actions", () => {
   beforeEach(() => {
     crud.list.mockResolvedValue({ results: [], count: 0 });
   });
@@ -484,5 +484,21 @@ describe("MapoListTable empty state", () => {
     mountTable(listProps);
     await settle();
     expect(table.empty).toBe("mapo.listTable.noResults");
+  });
+
+  it("names the icon-only row buttons", async () => {
+    mountTable({
+      ...listProps,
+      editFields: [{ key: "title", type: "text" }],
+    });
+    await settle();
+
+    const actions = column("__actions__").cell!({
+      row: { original: { id: 1, title: "Row 1" }, index: 0 },
+    }) as VNode;
+    const labels = (actions.children as VNode[]).map(
+      (button) => (button.props as { "aria-label": string })["aria-label"],
+    );
+    expect(labels).toEqual(["mapo.edit", "mapo.delete"]);
   });
 });
