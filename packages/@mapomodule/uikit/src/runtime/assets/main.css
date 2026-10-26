@@ -56,4 +56,13 @@
   #__nuxt > * {
     height: 100%;
   }
+
+  /* Tailwind v4 leaves buttons with the browser's arrow and Nuxt UI adds no
+     cursor-pointer, so only links (a UButton with `to`) showed the hand. This
+     is the rule Tailwind's upgrade guide suggests. A disabled button keeps Nuxt
+     UI's `cursor-not-allowed`: a utility, so it wins over this base rule. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }

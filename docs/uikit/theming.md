@@ -14,6 +14,8 @@ The uikit module injects its own CSS entry point at build time:
 
 This is `unshift`-ed into `nuxt.options.css` so it loads before your app's CSS. Any CSS you add afterwards wins.
 
+The same file sets a few base rules: the height chain of the layout, the `--mapo-topbar-height` token, and the pointer cursor on enabled buttons (`button` and `[role="button"]`), which Tailwind v4 dropped and Nuxt UI does not add. Disabled buttons keep Nuxt UI's `not-allowed` cursor. To go back to the arrow, repeat the rule with `cursor: default` inside `@layer base` in your CSS: it loads after Mapo's, so it wins, and Nuxt UI's utilities still apply. An unlayered rule would also override the `not-allowed` cursor.
+
 ## Overriding the theme with a CSS file
 
 Pass a path to any CSS file via the `uikit.css` option. It is appended **after** the base CSS, so your rules always win:
