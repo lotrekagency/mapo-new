@@ -24,15 +24,20 @@ interface Page {
 
 const route = useRoute();
 
+// A value of its own: the select's items cannot use an empty string, which
+// Reka UI keeps for "nothing selected".
+const NO_TEMPLATE = "none";
+
 const model = ref<Page>({
-  template: String(route.query.template ?? ""),
+  template: String(route.query.template ?? NO_TEMPLATE),
   title: "",
   intro: "",
   meta_title: "",
   meta_description: "",
 });
 
-const hasTemplate = ({ model }: { model: Page }) => model.template !== "";
+const hasTemplate = ({ model }: { model: Page }) =>
+  model.template !== NO_TEMPLATE;
 
 // No `tab` on the first two: they make up the General tab.
 const fields: FieldDescriptor<Page>[] = [
@@ -55,7 +60,7 @@ const sideFields: FieldDescriptor<Page>[] = [
     label: "Template",
     attrs: {
       items: [
-        { label: "No template", value: "" },
+        { label: "No template", value: NO_TEMPLATE },
         { label: "Home", value: "home" },
         { label: "Landing", value: "landing" },
       ],
