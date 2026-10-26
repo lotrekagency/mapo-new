@@ -55,6 +55,15 @@ const pendingCount = computed(
   () => entries.value.filter((e) => e.status === "pending").length,
 );
 
+// The text metadata of a pending file, labelled like MapoMediaEditor's fields.
+// Labels, not placeholders: title and alt text start from the file name, so a
+// placeholder would never show what they are.
+const textFields = computed(() => [
+  { key: "title" as const, label: t("mapo.title") },
+  { key: "alt_text" as const, label: t("mapo.altTag") },
+  { key: "description" as const, label: t("mapo.description") },
+]);
+
 // Destination options: the current folder plus its subfolders (legacy parity).
 const folderOptions = computed(() => [
   {
@@ -260,32 +269,27 @@ onUnmounted(clearAll);
                 </span>
               </div>
 
-              <!-- Metadata inputs (only for pending) -->
+              <!-- Metadata inputs (only for pending). The inputs take their
+                   size from UFormField. -->
               <div
                 v-if="entry.status === 'pending'"
                 class="grid grid-cols-2 gap-1.5"
               >
-                <UInput
-                  v-model="entry.title"
+                <UFormField
+                  v-for="field in textFields"
+                  :key="field.key"
+                  :label="field.label"
                   size="xs"
-                  :placeholder="t('mapo.title')"
-                />
-                <UInput
-                  v-model="entry.alt_text"
-                  size="xs"
-                  :placeholder="t('mapo.altTag')"
-                />
-                <UInput
-                  v-model="entry.description"
-                  size="xs"
-                  :placeholder="t('mapo.description')"
-                />
-                <USelect
-                  v-model="entry.folder"
-                  :items="folderOptions"
-                  size="xs"
-                  :placeholder="t('mapo.folder')"
-                />
+                >
+                  <UInput v-model="entry[field.key]" class="w-full" />
+                </UFormField>
+                <UFormField :label="t('mapo.folder')" size="xs">
+                  <USelect
+                    v-model="entry.folder"
+                    :items="folderOptions"
+                    class="w-full"
+                  />
+                </UFormField>
               </div>
 
               <!-- Progress bar -->
