@@ -220,7 +220,7 @@ What exists: [`docs/guide/feature-status.md`](docs/guide/feature-status.md). Kno
 ### Code
 
 1. `MapoFormField` recreates the async field component whenever the descriptor object changes; caching the async component per loader would fix the remount.
-2. `MapoWygEditor` renders two root elements, so attributes and listeners passed to it are dropped with a Vue warning, and `blur` never marks editor fields as touched.
+2. `MapoWygEditor` never marks editor fields as touched: the `blur` listener from `MapoFormField` lands on its root `div`, which never has the focus (the Tiptap content does).
 3. `MapoConfirmDialog` has no accessible name: its title is a plain heading inside the modal content.
 4. `@mapomodule/uikit` registers `MapoMediaManagerDialog` twice (by name and as global), so every app build prints an override warning.
 5. Lint reports a few hundred warnings in `form` and `uikit` (no errors).

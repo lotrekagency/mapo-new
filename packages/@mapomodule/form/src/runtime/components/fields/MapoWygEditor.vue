@@ -287,15 +287,18 @@ function onImageConfirm(
     >
       {{ err }}
     </p>
-  </div>
 
-  <!-- Image picker dialog — only rendered when MapoMediaManagerDialog is globally available -->
-  <component
-    :is="MediaManagerDialog"
-    v-if="hasMediaManager"
-    v-model="imagePickerOpen"
-    selection-mode="single"
-    mime="image/*"
-    @confirm="onImageConfirm"
-  />
+    <!-- Image picker dialog — only rendered when MapoMediaManagerDialog is
+         globally available. Inside the root on purpose: a second root would
+         drop what MapoFormField passes down (`flex-1`, `id`, `style`), and the
+         editor would shrink to its toolbar. As a modal it renders in <body>. -->
+    <component
+      :is="MediaManagerDialog"
+      v-if="hasMediaManager"
+      v-model="imagePickerOpen"
+      selection-mode="single"
+      mime="image/*"
+      @confirm="onImageConfirm"
+    />
+  </div>
 </template>
