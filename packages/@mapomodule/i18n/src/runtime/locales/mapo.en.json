@@ -88,7 +88,8 @@
     },
     "form": {
       "required": "This field is required.",
-      "tabErrors": "This tab contains errors"
+      "tabErrors": "This tab contains errors",
+      "defaultTab": "General"
     },
     "fksField": {
       "searchSelect": "Search and select...",

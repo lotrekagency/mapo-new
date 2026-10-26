@@ -88,7 +88,8 @@
     },
     "form": {
       "required": "Questo campo è obbligatorio.",
-      "tabErrors": "Questa scheda contiene errori"
+      "tabErrors": "Questa scheda contiene errori",
+      "defaultTab": "Generale"
     },
     "fksField": {
       "searchSelect": "Cerca e seleziona...",
