@@ -142,10 +142,13 @@ function onImageConfirm(
 </script>
 
 <template>
+  <!-- An input surface of its own, like the Nuxt UI inputs next to it
+       (`bg-default`, `accented` border): without it the text area takes the
+       page background and disappears on a tinted page. -->
   <div
-    class="mapo-wyg-editor rounded border"
+    class="mapo-wyg-editor rounded-md border bg-default"
     :class="[
-      errors?.length ? 'border-red-300' : 'border-gray-200',
+      errors?.length ? 'border-red-300' : 'border-accented',
       readonly || disabled ? 'opacity-60' : '',
     ]"
   >

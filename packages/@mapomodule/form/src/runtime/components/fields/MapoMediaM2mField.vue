@@ -95,12 +95,13 @@ function onDragEnd() {
         </div>
       </div>
 
-      <!-- Add button -->
+      <!-- Add button: outlined like MapoMediaField's trigger, so it keeps its
+           own surface on a tinted page. -->
       <UButton
         v-if="!readonly && !disabled"
         icon="i-lucide-plus"
         size="sm"
-        variant="soft"
+        variant="outline"
         color="neutral"
         @click="dialogOpen = true"
       >
