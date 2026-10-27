@@ -7,6 +7,7 @@ definePageMeta({
   label: "Child A",
   icon: "i-lucide-file",
   parent: "sidebar-parent", // links this route under the parent in the sidebar tree
+  sidebarOrder: 20,
   middleware: ["auth"],
 });
 </script>
@@ -17,7 +18,8 @@ definePageMeta({
     <p class="text-muted text-sm mb-6">
       This page has
       <code class="bg-elevated px-1 rounded">parent: 'sidebar-parent'</code>. It
-      should appear nested under "Sidebar Nesting" in the sidebar.
+      appears below Child B because its
+      <code class="bg-elevated px-1 rounded">sidebarOrder</code> is higher.
     </p>
 
     <UCard>
@@ -28,6 +30,7 @@ definePageMeta({
       </template>
       <ul class="space-y-2 text-sm text-muted list-disc list-inside">
         <li>"Child A" is indented under "Sidebar Nesting" in the sidebar</li>
+        <li>"Child A" appears below Child B because its order is higher</li>
         <li>"Child A" is highlighted as the active item</li>
         <li>
           "Sidebar Nesting" (parent) is expanded and partially highlighted

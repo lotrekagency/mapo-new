@@ -46,6 +46,36 @@ describe("buildRouteTree", () => {
     expect(tree[0].children[0].label).toBe("New User");
   });
 
+  it("sorts explicitly ordered siblings before unordered siblings", () => {
+    const routes = [
+      makeRoute("/articles", { label: "Articles", sidebarOrder: 20 }),
+      makeRoute("/dashboard", { label: "Dashboard" }),
+      makeRoute("/users", { label: "Users", sidebarOrder: 10 }),
+      makeRoute("/articles/archive", {
+        label: "Archive",
+        parent: "/articles",
+        sidebarOrder: 20,
+      }),
+      makeRoute("/articles/new", {
+        label: "New Article",
+        parent: "/articles",
+        sidebarOrder: 10,
+      }),
+    ];
+
+    const tree = buildRouteTree(routes);
+
+    expect(tree.map((node) => node.link)).toEqual([
+      "/users",
+      "/articles",
+      "/dashboard",
+    ]);
+    expect(tree[1].children.map((node) => node.link)).toEqual([
+      "/articles/new",
+      "/articles/archive",
+    ]);
+  });
+
   it("skips routes without a label", () => {
     const routes = [
       makeRoute("/hidden", {}),

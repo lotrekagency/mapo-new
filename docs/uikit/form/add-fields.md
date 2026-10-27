@@ -155,6 +155,27 @@ With **multiple templates** (heterogeneous items):
 
 The chosen template is stored in `item._template`.
 
+A template value can also be a `RepeaterTemplate` object, which adds a label, description, icon, preview and category. The add control then shows these, and each item shows a badge with the template label and icon in its header:
+
+```ts
+attrs: {
+  picker: 'auto', // 'select' | 'modal' | 'auto' (modal when more than 3 templates)
+  templates: {
+    hero: {
+      label: 'Hero',
+      description: 'Large title with a background image',
+      icon: 'i-lucide-image',
+      category: 'Layout',
+      wireframe: true, // schematic preview; `image: '/previews/hero.png'` wins over it
+      fields: [{ key: 'title', type: 'text' }, { key: 'image_url', type: 'text' }],
+    },
+    quote: [{ key: 'text', type: 'textarea' }], // bare arrays still work
+  },
+}
+```
+
+With the modal picker the user can search blocks and filter by category; holding Shift while choosing a block keeps the modal open to add several in a row. See [`RepeaterTemplate`](./api.md#repeatertemplate).
+
 The repeater uses stable per-item UIDs (a `WeakMap<item, string>`), so reordering, undo, and splices never reuse a child component on the wrong item — even when several items share the same shape.
 
 ## Custom field (non-built-in type)

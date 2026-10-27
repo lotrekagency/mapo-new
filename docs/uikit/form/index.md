@@ -56,7 +56,7 @@ const fields: FieldDescriptor<Article>[] = [
 ];
 ```
 
-If more than one `tab` is present, tab navigation is rendered with a red badge on tabs that contain errors.
+If more than one `tab` is present, tab navigation is rendered with a red badge on tabs that contain errors. Tab bars wrap onto additional lines when their tabs no longer fit horizontally.
 
 Fields without a `tab` go to a tab of their own, labelled **General** (`mapo.form.defaultTab`), as soon as another field has a `tab`. To rename it, override that key in the app's catalog, or give those fields a `tab`.
 

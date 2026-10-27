@@ -31,6 +31,7 @@ definePageMeta({
           "Sidebar Nesting" is a top-level item with a caret/expand indicator
         </li>
         <li>Clicking it expands to show "Child A" and "Child B" beneath it</li>
+        <li>"Child B" appears first because it has the lower sidebarOrder</li>
         <li>
           This page (/sidebar-parent) is the parent; children live under it
         </li>

@@ -174,15 +174,16 @@ Use `app.vue` to inject a custom logo and topbar controls across all admin pages
 
 ## Route meta reference
 
-| Field           | Type                              | Description                                   |
-| --------------- | --------------------------------- | --------------------------------------------- |
-| `layout`        | `"mapo-default"`                  | Activates the admin shell                     |
-| `label`         | `string`                          | Sidebar display text                          |
-| `icon`          | `string`                          | Iconify icon name (e.g. `i-lucide-newspaper`) |
-| `hidden`        | `boolean`                         | Excludes the page from sidebar                |
-| `sidebarFooter` | `boolean`                         | Moves entry to sidebar footer                 |
-| `parent`        | `string`                          | Path of parent route for nesting              |
-| `middleware`    | `string[]`                        | Route middleware — use `["auth"]` to protect  |
-| `permissions`   | `{ model: string }` or `string[]` | Permission requirements                       |
+| Field           | Type                              | Description                                             |
+| --------------- | --------------------------------- | ------------------------------------------------------- |
+| `layout`        | `"mapo-default"`                  | Activates the admin shell                               |
+| `label`         | `string`                          | Sidebar display text                                    |
+| `icon`          | `string`                          | Iconify icon name (e.g. `i-lucide-newspaper`)           |
+| `hidden`        | `boolean`                         | Excludes the page from sidebar                          |
+| `sidebarFooter` | `boolean`                         | Moves entry to sidebar footer                           |
+| `parent`        | `string`                          | Path of parent route for nesting                        |
+| `sidebarOrder`  | `number`                          | Sorts siblings first-to-last; lower values appear first |
+| `middleware`    | `string[]`                        | Route middleware — use `["auth"]` to protect            |
+| `permissions`   | `{ model: string }` or `string[]` | Permission requirements                                 |
 
 → See also: [CRUD list view](./crud-list), [Auth & permissions](./auth-permissions)

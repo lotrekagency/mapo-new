@@ -133,6 +133,24 @@ export const RECIPES: Recipe[] = [
       "Every built-in field type, the component behind it and its attrs.",
   },
   {
+    id: "block-editor",
+    task: "Build a block editor with a block picker (repeater with templates)",
+    keywords: [
+      "block editor",
+      "block picker",
+      "repeater templates",
+      "page builder",
+      "RepeaterTemplate",
+      "picker",
+      "content blocks",
+    ],
+    doc: "howto/form-advanced.md",
+    heading: "Describe blocks and choose them in a picker",
+    seeAlso: ["uikit/form/api.md", "uikit/form/add-fields.md"],
+    summary:
+      "attrs.templates with label, icon, image and category, and attrs.picker (select or modal).",
+  },
+  {
     id: "custom-field",
     task: "Create and register a custom field type",
     keywords: [
@@ -403,12 +421,14 @@ export const RECIPES: Recipe[] = [
       "icon",
       "label",
       "sidebarFooter",
+      "sidebarOrder",
+      "reorder menu",
       "route meta",
     ],
     doc: "uikit/sidebar.md",
     seeAlso: ["howto/first-admin-page.md"],
     summary:
-      "Route metadata (label, icon, parent, sidebarFooter) builds the sidebar tree, with no menu config.",
+      "Route metadata builds the sidebar tree without menu config; use sidebarOrder to sort sibling entries.",
   },
   {
     id: "login-page",

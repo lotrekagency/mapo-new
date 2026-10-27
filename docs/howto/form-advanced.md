@@ -125,15 +125,48 @@ Use `templates` to let the user choose a block type on creation:
 
 The chosen template name is stored in `item._template`. On backend, serialize this as a polymorphic JSON field.
 
+### Describe blocks and choose them in a picker
+
+Give a template a `RepeaterTemplate` object instead of a field array to add a label, description, icon, preview and category. With more than 3 templates the add control opens a modal gallery (search, category chips, cards); force one style with `picker: 'select' | 'modal'`.
+
+```ts
+attrs: {
+  picker: "auto",
+  templates: {
+    hero: {
+      label: "Hero",
+      description: "Large title with a background image",
+      icon: "i-lucide-image",
+      category: "Layout",
+      image: "/previews/hero.png", // wins over `wireframe`, which wins over `icon`
+      fields: [
+        { key: "title", type: "text", label: "Title" },
+        { key: "image_url", type: "file", label: "Image" },
+      ],
+    },
+    quote: {
+      label: "Quote",
+      icon: "i-lucide-quote",
+      category: "Content",
+      wireframe: true, // schematic preview built from the fields
+      fields: [{ key: "quote", type: "textarea", label: "Quote text" }],
+    },
+  },
+}
+```
+
+Holding Shift while choosing a block keeps the modal open, so several blocks can be added in a row. Items show a badge with the template label and icon in their header (not in the compressed mini-card). Bare field arrays and `RepeaterTemplate` objects can be mixed.
+
 ### Repeater attrs reference
 
-| Attr             | Type                                | Description                              |
-| ---------------- | ----------------------------------- | ---------------------------------------- |
-| `fields`         | `FieldDescriptor[]`                 | Fields for every item (simple mode)      |
-| `templates`      | `Record<string, FieldDescriptor[]>` | Per-type fields (block editor mode)      |
-| `previewLabel`   | `(item) => string`                  | Label shown in the collapsed item header |
-| `confirmDelete`  | `boolean`                           | Show confirm dialog before removal       |
-| `allowDuplicate` | `boolean`                           | Show a "clone" button per item           |
+| Attr             | Type                                                    | Description                                                   |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
+| `fields`         | `FieldDescriptor[]`                                     | Fields for every item (simple mode)                           |
+| `templates`      | `Record<string, FieldDescriptor[] \| RepeaterTemplate>` | Per-type fields or template with metadata (block editor mode) |
+| `picker`         | `'auto' \| 'select' \| 'modal'`                         | Template chooser; `auto` = modal above 3 templates (default)  |
+| `previewLabel`   | `(item) => string`                                      | Label shown in the collapsed item header                      |
+| `confirmDelete`  | `boolean`                                               | Show confirm dialog before removal                            |
+| `allowDuplicate` | `boolean`                                               | Show a "clone" button per item                                |
 
 ## Client-side validation
 

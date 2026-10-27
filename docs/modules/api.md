@@ -333,7 +333,7 @@ Type guards.
 | --------- | ------------------------- | ------------------------------------ |
 | `routes`  | `RouteRecordNormalized[]` | Vue Router normalized route records. |
 
-**Returns:** `MenuNode[]` — Tree of navigation nodes built from route `meta` fields (`label`, `icon`, `parent`, `hidden`, `sidebarFooter`).
+**Returns:** `MenuNode[]` — Tree of navigation nodes built from route `meta` fields (`label`, `icon`, `parent`, `hidden`, `sidebarFooter`, `sidebarOrder`). At each level, finite `sidebarOrder` values sort ascending before unordered routes; ties and unordered siblings preserve router order. Sorting applies recursively.
 
 ---
 
