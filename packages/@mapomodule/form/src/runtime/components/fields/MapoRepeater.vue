@@ -4,8 +4,14 @@ import { useI18n } from "vue-i18n";
 import { VueDraggable } from "vue-draggable-plus";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import type { RepeaterDescriptor } from "../../types/index.js";
+import {
+  normalizeTemplates,
+  reachesMax,
+  shouldUseModalPicker,
+} from "../../utils/repeaterTemplates.js";
 import { injectMapoForm } from "../../composables/useMapoForm.js";
 import MapoRepeaterItem from "./MapoRepeaterItem.vue";
+import MapoRepeaterBlockPicker from "./MapoRepeaterBlockPicker.vue";
 
 const props = defineProps<{
   modelValue: unknown;
@@ -67,11 +73,39 @@ function undo() {
 // ─── Template selection ──────────────────────────────────────────────────────
 
 const templates = computed(() => attrs.value.templates);
-const templateKeys = computed(() =>
-  templates.value ? Object.keys(templates.value) : [],
+
+// Bare field arrays and RepeaterTemplate objects are both accepted.
+const templateList = computed(() => normalizeTemplates(templates.value));
+const templateByKey = computed(
+  () => new Map(templateList.value.map((tpl) => [tpl.key, tpl])),
 );
+const templateKeys = computed(() => templateList.value.map((tpl) => tpl.key));
 const hasTemplates = computed(() => templateKeys.value.length > 0);
 const selectedTemplate = ref<string>("");
+
+const useModalPicker = computed(() =>
+  shouldUseModalPicker(attrs.value.picker, templateKeys.value.length),
+);
+const pickerOpen = ref(false);
+
+const selectItems = computed(() =>
+  templateList.value.map((tpl) => ({
+    label: tpl.label,
+    value: tpl.key,
+    description: tpl.description,
+    icon: tpl.icon,
+  })),
+);
+
+function templateLabelFor(item: Record<string, unknown>): string | undefined {
+  const key = item._template as string | undefined;
+  if (!key) return undefined;
+  return templateByKey.value.get(key)?.label ?? key;
+}
+
+function templateIconFor(item: Record<string, unknown>): string | undefined {
+  return templateByKey.value.get(item._template as string)?.icon;
+}
 
 // Async-safe: when templates load after mount, auto-pick the first one.
 watchEffect(() => {
@@ -81,9 +115,9 @@ watchEffect(() => {
 });
 
 function fieldsForItem(item: Record<string, unknown>) {
-  if (!templates.value) return props.descriptor.fields ?? [];
+  if (!hasTemplates.value) return props.descriptor.fields ?? [];
   const key = (item._template as string) ?? selectedTemplate.value;
-  return templates.value[key] ?? props.descriptor.fields ?? [];
+  return templateByKey.value.get(key)?.fields ?? props.descriptor.fields ?? [];
 }
 
 // ─── Item CRUD ───────────────────────────────────────────────────────────────
@@ -122,13 +156,26 @@ async function askConfirm(message: string, title?: string): Promise<boolean> {
   }
 }
 
-function addItem() {
+function addItem(templateKey?: string) {
   if (!canAdd.value) return;
   pushUndo();
   const newItem: Record<string, unknown> = hasTemplates.value
-    ? { _template: selectedTemplate.value }
+    ? { _template: templateKey ?? selectedTemplate.value }
     : {};
   emitItems([...items.value, newItem]);
+}
+
+function onAddClick() {
+  if (useModalPicker.value) pickerOpen.value = true;
+  else addItem();
+}
+
+function onPickTemplate(key: string, keepOpen: boolean) {
+  // `items` still holds the pre-add array here, so count the new item explicitly.
+  const full = reachesMax(items.value.length, attrs.value.maxItems);
+  selectedTemplate.value = key;
+  addItem(key);
+  if (!keepOpen || full) pickerOpen.value = false;
 }
 
 async function deleteItem(index: number) {
@@ -372,26 +419,37 @@ const errorPrefix = (index: number) =>
           @click="toggleSelectionMode"
         />
 
-        <!-- Template selector -->
+        <!-- Template selector (dropdown mode; the modal picker opens from "Add") -->
         <USelectMenu
-          v-if="hasTemplates"
+          v-if="hasTemplates && !useModalPicker"
           v-model="selectedTemplate"
-          :items="templateKeys"
+          :items="selectItems"
+          value-key="value"
+          :search-input="templateKeys.length > 6"
+          :aria-label="t('mapo.repeater.blockType')"
           size="xs"
-          class="w-32"
+          class="w-48"
         />
 
         <UButton
           size="sm"
           color="primary"
-          icon="i-lucide-plus"
+          :icon="useModalPicker ? 'i-lucide-layout-grid' : 'i-lucide-plus'"
           :disabled="!canAdd"
-          @click="addItem"
+          @click="onAddClick"
         >
-          {{ t("mapo.add") }}
+          {{ useModalPicker ? t("mapo.repeater.addBlock") : t("mapo.add") }}
         </UButton>
       </div>
     </div>
+
+    <MapoRepeaterBlockPicker
+      v-if="useModalPicker"
+      v-model:open="pickerOpen"
+      :templates="templateList"
+      :disabled="!canAdd"
+      @select="onPickTemplate"
+    />
 
     <!-- ── Bulk actions bar (visible when there is a selection) ───────────── -->
     <Transition name="slide-down">
@@ -469,6 +527,8 @@ const errorPrefix = (index: number) =>
         <MapoRepeaterItem
           v-for="(item, index) in items"
           :key="`${uidFor(item)}-${collapseVersion}`"
+          :template-label="templateLabelFor(item)"
+          :template-icon="templateIconFor(item)"
           :uid="uidFor(item)"
           :item="item"
           :fields="fieldsForItem(item)"
@@ -501,6 +561,8 @@ const errorPrefix = (index: number) =>
         <MapoRepeaterItem
           v-for="(item, index) in items"
           :key="`${uidFor(item)}-${collapseVersion}`"
+          :template-label="templateLabelFor(item)"
+          :template-icon="templateIconFor(item)"
           :uid="uidFor(item)"
           :item="item"
           :fields="fieldsForItem(item)"

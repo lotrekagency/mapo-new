@@ -27,6 +27,7 @@ describe("matchRecipes", () => {
     ["generate the fields from a json schema", "schema-to-form"],
     ["put a hint below one form field with a slot", "form-slots"],
     ["edit a repeater item fullscreen", "focus-mode"],
+    ["let editors choose a content block from a block picker", "block-editor"],
     ["add my page to the sidebar with an icon", "sidebar-navigation"],
     ["change the branding of the login page", "login-page"],
     ["TS2307 cannot find module mapomodule/types", "imports"],

@@ -35,6 +35,10 @@ const props = defineProps<{
   selected?: boolean;
   /** true = bulk selection mode is active in the parent repeater. */
   selectionMode?: boolean;
+  /** Display name of the item's template (repeaters with `attrs.templates`). */
+  templateLabel?: string;
+  /** Icon of the item's template. */
+  templateIcon?: string;
 }>();
 
 const emit = defineEmits<{
@@ -291,6 +295,16 @@ function enterFocusMode() {
           selectionMode ? toggleSelectFromEvent($event) : (expanded = !expanded)
         "
       >
+        <UBadge
+          v-if="templateLabel"
+          color="neutral"
+          variant="subtle"
+          size="xs"
+          :icon="templateIcon"
+          class="shrink-0"
+        >
+          {{ templateLabel }}
+        </UBadge>
         <span class="truncate">{{ label }}</span>
         <UBadge v-if="hasErrors" color="error" variant="soft" size="xs">
           errors

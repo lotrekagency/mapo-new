@@ -135,7 +135,14 @@
       "moveDown": "Sposta giù",
       "position": "Posizione",
       "editFullScreen": "Modifica a schermo intero",
-      "empty": "Nessun elemento. Clicca \"Aggiungi\" per iniziare."
+      "empty": "Nessun elemento. Clicca \"Aggiungi\" per iniziare.",
+      "addBlock": "Aggiungi blocco",
+      "chooseBlock": "Scegli un blocco",
+      "searchBlocks": "Cerca blocchi...",
+      "allCategories": "Tutti",
+      "noBlocksFound": "Nessun blocco trovato.",
+      "keepOpenHint": "Tieni premuto Shift per aggiungere più blocchi",
+      "blockType": "Tipo di blocco"
     },
     "seoPreview": {
       "seoTitle": "Titolo SEO",
