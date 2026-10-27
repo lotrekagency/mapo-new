@@ -88,7 +88,8 @@
     },
     "form": {
       "required": "Questo campo è obbligatorio.",
-      "tabErrors": "Questa scheda contiene errori"
+      "tabErrors": "Questa scheda contiene errori",
+      "defaultTab": "Generale"
     },
     "fksField": {
       "searchSelect": "Cerca e seleziona...",
@@ -175,8 +176,13 @@
       "dragToReorder": "Trascina per riordinare",
       "clearToReorder": "Svuota ricerca e ordinamento per riordinare",
       "noItems": "Nessun elemento trovato",
+      "noResults": "Nessun risultato",
       "totalItems": "{total} elementi",
-      "perPage": "{n} / pagina"
+      "perPage": "{n} / pagina",
+      "allRows": "Tutti",
+      "sortAscending": "Ordina per {column}, crescente",
+      "sortDescending": "Ordina per {column}, decrescente",
+      "clearSorting": "Togli l'ordinamento per {column}"
     },
     "menuManager": {
       "menu": "Menu",

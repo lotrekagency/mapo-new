@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import { ref, computed, watch, useSlots } from "vue";
+import { ref, computed, watch, useSlots, onBeforeUnmount } from "vue";
 import type { Ref } from "vue";
 import type {
   ListColumn,
@@ -30,6 +30,7 @@ const props = withDefaults(
      * Ignored when `items` is provided.
      */
     clientSide?: boolean;
+    /** Column definitions. A dotted `key` (`category.name`) reads a field of a related object. */
     columns: ListColumn<T>[];
     lookup?: string;
     // Filters
@@ -57,10 +58,14 @@ const props = withDefaults(
      */
     permissionModel?: string;
     // Pagination
-    /** Initial page size. Default: 20. */
-    defaultPageSize?: number;
-    /** Page size options shown in the per-page selector. Default: [10, 20, 50, 100]. */
-    pageSizeOptions?: number[];
+    /** Initial page size: a number, or `"all"`. Default: 20. */
+    defaultPageSize?: number | "all";
+    /**
+     * Options of the per-page selector. `"all"` adds an option that requests
+     * the list without pagination params, like `clientSide` does: the backend
+     * has to return the whole collection then. Default: [10, 20, 50, 100].
+     */
+    pageSizeOptions?: (number | "all")[];
     /**
      * Custom response parser. Replaces the built-in DRF / flat-array detection.
      * Return `{ items, total }` from any shape your backend returns.
@@ -168,6 +173,9 @@ const writeUrlState = debounce(() => {
 }, 150);
 
 watch([activeTab, activeFilters], writeUrlState, { deep: true });
+
+// A URL write still pending when the list goes away would land on the next page.
+onBeforeUnmount(() => writeUrlState.cancel());
 
 // --- crudEndpoint: base path for mutations (no query string). ---
 const crudEndpoint = computed(

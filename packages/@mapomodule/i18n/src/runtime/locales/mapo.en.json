@@ -88,7 +88,8 @@
     },
     "form": {
       "required": "This field is required.",
-      "tabErrors": "This tab contains errors"
+      "tabErrors": "This tab contains errors",
+      "defaultTab": "General"
     },
     "fksField": {
       "searchSelect": "Search and select...",
@@ -175,8 +176,13 @@
       "dragToReorder": "Drag to reorder",
       "clearToReorder": "Clear search & sorting to reorder",
       "noItems": "No items found",
+      "noResults": "No results",
       "totalItems": "{total} items",
-      "perPage": "{n} / page"
+      "perPage": "{n} / page",
+      "allRows": "All",
+      "sortAscending": "Sort by {column}, ascending",
+      "sortDescending": "Sort by {column}, descending",
+      "clearSorting": "Remove sorting by {column}"
     },
     "menuManager": {
       "menu": "Menu",

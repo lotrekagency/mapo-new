@@ -92,6 +92,17 @@ pnpm dev:uikit
 pnpm dev:example-e2e
 ```
 
+### Testing in a consumer app
+
+`pnpm dev:link` ([`scripts/dev-link.mjs`](scripts/dev-link.mjs)) runs this workspace's sources inside a project that installed `mapomodule` from npm, including a backoffice in Docker. It overlays the `mapomodule` and `@mapomodule/*` packages in the app's `node_modules` and keeps them in sync; the app's `package.json`, lockfile and Docker files stay untouched.
+
+```bash
+pnpm dev:link ../my-project            # link, then keep syncing until Ctrl+C
+pnpm dev:link ../my-project --restore  # put the published packages back
+```
+
+Workflow, options and caveats: [Testing changes in a consumer app](docs/contributing/testing.md#testing-changes-in-a-consumer-app).
+
 ### Build, checks and tests
 
 | Script                 | What it does                                                                                                        |
@@ -129,7 +140,7 @@ apps/example/              core demo against a real Camomilla backend
 apps/example-theme/        theming and MapoOverride demo, no backend
 apps/example-custom-form/  core and form with Vuetify fields, no UIKit
 docs/                      the documentation site, also indexed by @mapomodule/mcp
-scripts/                   build helpers and the release announcement
+scripts/                   build helpers, `pnpm dev:link` and the release announcement
 .github/workflows/         CI, Docs Pages, CD
 AGENTS.md, .claude/        the AI agent setup: manuals, skills, subagents
 ```

@@ -10,6 +10,9 @@
 //
 // Open DevTools → Network: you will see zero requests when interacting with
 // the table. The "live array state" panel at the bottom reflects every change.
+//
+// The Team column reads a related object with a dotted key (`team.name`), and
+// the per-page selector offers "All" (`"all"` in `page-size-options`).
 // ─────────────────────────────────────────────────────────────────────────────
 import { ref } from "vue";
 import type {
@@ -31,6 +34,7 @@ interface Task {
   id: number;
   title: string;
   assignee: string;
+  team: { name: string };
   status: "todo" | "doing" | "done" | "archived";
   priority: "low" | "medium" | "high";
   estimate: number;
@@ -44,6 +48,7 @@ const tasks = ref<Task[]>([
     id: 1,
     title: "Refactor list table",
     assignee: "Anna",
+    team: { name: "Frontend" },
     status: "doing",
     priority: "high",
     estimate: 5,
@@ -53,6 +58,7 @@ const tasks = ref<Task[]>([
     id: 2,
     title: "Write offline mode docs",
     assignee: "Bruno",
+    team: { name: "Docs" },
     status: "todo",
     priority: "medium",
     estimate: 2,
@@ -62,6 +68,7 @@ const tasks = ref<Task[]>([
     id: 3,
     title: "Add language switch slot",
     assignee: "Carla",
+    team: { name: "Design" },
     status: "done",
     priority: "low",
     estimate: 1,
@@ -71,6 +78,7 @@ const tasks = ref<Task[]>([
     id: 4,
     title: "Migrate auth middleware",
     assignee: "Davide",
+    team: { name: "Platform" },
     status: "done",
     priority: "high",
     estimate: 8,
@@ -80,6 +88,7 @@ const tasks = ref<Task[]>([
     id: 5,
     title: "Topbar dropdown polish",
     assignee: "Anna",
+    team: { name: "Frontend" },
     status: "archived",
     priority: "low",
     estimate: 1,
@@ -89,6 +98,7 @@ const tasks = ref<Task[]>([
     id: 6,
     title: "Sidebar drag reorder",
     assignee: "Bruno",
+    team: { name: "Docs" },
     status: "todo",
     priority: "high",
     estimate: 5,
@@ -98,6 +108,7 @@ const tasks = ref<Task[]>([
     id: 7,
     title: "Quick-edit i18n",
     assignee: "Carla",
+    team: { name: "Design" },
     status: "doing",
     priority: "medium",
     estimate: 3,
@@ -107,6 +118,7 @@ const tasks = ref<Task[]>([
     id: 8,
     title: "Move CRUD types to core",
     assignee: "Davide",
+    team: { name: "Platform" },
     status: "done",
     priority: "medium",
     estimate: 2,
@@ -116,6 +128,7 @@ const tasks = ref<Task[]>([
     id: 9,
     title: "MediaManager skeleton",
     assignee: "Anna",
+    team: { name: "Frontend" },
     status: "todo",
     priority: "high",
     estimate: 8,
@@ -125,6 +138,7 @@ const tasks = ref<Task[]>([
     id: 10,
     title: "Confirm dialog focus trap",
     assignee: "Bruno",
+    team: { name: "Docs" },
     status: "doing",
     priority: "low",
     estimate: 1,
@@ -134,6 +148,7 @@ const tasks = ref<Task[]>([
     id: 11,
     title: "Snackbar queue",
     assignee: "Carla",
+    team: { name: "Design" },
     status: "done",
     priority: "low",
     estimate: 1,
@@ -143,6 +158,7 @@ const tasks = ref<Task[]>([
     id: 12,
     title: "Permissions composable",
     assignee: "Davide",
+    team: { name: "Platform" },
     status: "done",
     priority: "medium",
     estimate: 3,
@@ -152,6 +168,7 @@ const tasks = ref<Task[]>([
     id: 13,
     title: "Route meta linter",
     assignee: "Anna",
+    team: { name: "Frontend" },
     status: "archived",
     priority: "low",
     estimate: 2,
@@ -161,6 +178,7 @@ const tasks = ref<Task[]>([
     id: 14,
     title: "Drag handle keyboard a11y",
     assignee: "Bruno",
+    team: { name: "Docs" },
     status: "todo",
     priority: "medium",
     estimate: 3,
@@ -170,6 +188,7 @@ const tasks = ref<Task[]>([
     id: 15,
     title: "Date picker filter range",
     assignee: "Carla",
+    team: { name: "Design" },
     status: "doing",
     priority: "high",
     estimate: 5,
@@ -180,6 +199,7 @@ const tasks = ref<Task[]>([
 const columns: ListColumn<Task>[] = [
   { key: "title", label: "Title", sortable: true, class: "font-medium" },
   { key: "assignee", label: "Assignee", sortable: true },
+  { key: "team.name", label: "Team", sortable: true },
   { key: "status", label: "Status", sortable: false },
   { key: "priority", label: "Priority", sortable: true, class: "text-center" },
   { key: "estimate", label: "Est.", sortable: true, class: "text-right" },
@@ -302,7 +322,7 @@ const priorityColors: Record<
         searchable
         draggable
         :default-page-size="5"
-        :page-size-options="[5, 10, 20]"
+        :page-size-options="[5, 10, 20, 'all']"
       >
         <template #[`cell.status`]="{ value }">
           <UBadge

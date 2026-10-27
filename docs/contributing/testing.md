@@ -1,6 +1,6 @@
 # Testing and verification
 
-What to run before a change is handed over, how unit tests are written, and how to check a change in the running reference app.
+What to run before a change is handed over, how unit tests are written, and how to check a change in the running reference app or in a project that installed Mapo from npm.
 
 ## The gates
 
@@ -23,6 +23,7 @@ These are present on a clean checkout and are not caused by your change:
 
 - `pnpm lint` reports warnings (no errors) in `form` and `uikit`, mostly Vue template formatting rules.
 - `pnpm build` prints, for the apps: `SOURCEMAP_BROKEN` warnings from `@tailwindcss/vite`; a `[nuxt-i18n]` notice that `mapo-i18n.config.mjs` is not found in the app's `i18n/` folder; and `Overriding MapoMediaManagerDialog component`, because `@mapomodule/uikit` registers that component twice (once by name, once as global).
+- `pnpm exec vitest run` prints a Vite notice that `vitest.config.ts` has "ESM syntax in a file loaded as CommonJS", once for each test project.
 
 Any other warning is new: fix it or explain it in the hand-over.
 
@@ -34,8 +35,8 @@ Any other warning is new: fix it or explain it in the hand-over.
 
 - **Runner**: Vitest, in a Node environment.
 - **Location**: next to the code, in a `__tests__/` folder (`src/__tests__/` or `src/runtime/__tests__/`).
-- **Names**: `<subject>.test.ts` or `<subject>.spec.ts`.
-- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. `form`, `mcp` and `utils` have their own `vitest.config.ts`.
+- **Names**: `<subject>.test.ts` or `<subject>.spec.ts`; `<Component>.component.test.ts` for a test that mounts a `.vue` component (see [Component tests](#component-tests)).
+- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. It runs two projects: `component` for the `*.component.test.ts` files, `node` for everything else. `form`, `mcp` and `utils` have their own `vitest.config.ts`.
 
 Run a subset while you work:
 
@@ -45,6 +46,16 @@ pnpm exec vitest run packages/@mapomodule/store      # one folder, from the root
 pnpm --filter @mapomodule/utils exec vitest          # watch mode
 ```
 
+### Component tests
+
+A test that mounts a component and drives it through its props and events catches what a test of a pure function cannot: a prop bound under the wrong name, an event nobody listens to, a watcher that resets the state on the first load. The reference is `packages/@mapomodule/uikit/src/__tests__/MapoListTable.component.test.ts`.
+
+- **Environment.** The `component` project runs in Node but compiles modules for the client (`vitest.client-environment.ts`). Compiled for SSR, a `.vue` file can only be rendered to a string, and SSR stops every watcher after its first run.
+- **Mounting.** There is no DOM. The test mounts the component with Vue's `createRenderer` and nodes that are plain objects, so reactivity, watchers and events run as in the browser.
+- **Nuxt, stores and API.** In this project `#app` resolves to an empty placeholder, `packages/@mapomodule/uikit/src/__tests__/__mocks__/nuxt-app.ts`. Mock what the component calls with `vi.mock("#app", factory)`, and the stores and `useCrud` the same way.
+- **Child components.** Register a stub for every component the template resolves. Give the real props and events to the stubs whose binding is under test (`UPagination`: prop `page`, event `update:page`). A stub that accepts anything hides a binding bug.
+- **Timers.** Use fake timers (`vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })`) and settle with `vi.runAllTimersAsync()`, so the debounced URL writes run inside the test and none leaks into the next one.
+
 ### What needs a test
 
 - New logic with a branch, a loop, parsing or data mapping.
@@ -52,7 +63,7 @@ pnpm --filter @mapomodule/utils exec vitest          # watch mode
 - Every public helper in `@mapomodule/utils`.
 - Every new MCP tool, recipe, prompt or resource (see [Working on the MCP server](./mcp-server)).
 
-A change of markup or styling alone needs no unit test; it needs the live check below.
+A change of markup or styling alone needs no unit test; it needs the live check below. How a template binds a child's props and events is behaviour, not markup: it needs a component test.
 
 ## Live verification in the reference app
 
@@ -86,6 +97,81 @@ cd apps/example-e2e
 npx nuxt prepare
 npx vue-tsc --noEmit -p .nuxt/tsconfig.app.json
 ```
+
+## Testing changes in a consumer app
+
+To try a fix in a real project before it is released, link this workspace into an app that installed `mapomodule` from npm. Run it from the root of this repository:
+
+```bash
+pnpm dev:link ../my-project
+```
+
+The path points at the project root or directly at its Nuxt app (e.g. `../my-project/backoffice`), and is resolved from your current directory. A project root works when exactly one directory below it depends on `mapomodule`. Apps inside this workspace are refused: they already use the local packages.
+
+The command (`scripts/dev-link.mjs`) finds every `mapomodule` and `@mapomodule/*` package installed in the app's `node_modules` (pnpm, yarn or npm layout) and overlays it with the local sources:
+
+- `src/` becomes a copy of the local `src/`, kept in sync while the command runs;
+- `dist/` becomes stubs that load `src/`;
+- the published `dist/` and `src/` move to `<package>/.mapo-dev-link/`, where `--restore` finds them.
+
+Everything happens inside the app's `node_modules`. The app's `package.json`, lockfile, `nuxt.config` and Docker files stay untouched, and the linked code resolves `vue`, `nuxt`, `pinia` and every other dependency from the app's own install.
+
+> **Why not `link:` or `pnpm link`?** A symlinked package resolves its dependencies from this repository's `node_modules`. The app would load a second copy of `vue`, `nuxt`, `pinia` and `vue-i18n` (broken stores and injections) and native binaries built for the host OS, which fail in a Linux container. Inside a container, the symlink target does not even exist.
+
+### Workflow
+
+The steps below use a backoffice that runs `nuxt dev` in Docker with its directory bind-mounted (`backoffice/` mounted on `/app`, Compose service `mapo`). Without Docker, restart `nuxt dev` wherever the steps restart the container.
+
+1. Start the project once, so that the container installs the backoffice dependencies. The command needs the app's `node_modules`.
+2. Link from the root of this repository and leave the command running:
+
+   ```bash
+   pnpm dev:link ../my-project
+   ```
+
+   Nothing else needs to run here: the command copies `src/` as it is, so neither `pnpm build` nor `pnpm dev:packages` is needed. The exception is `@mapomodule/mcp`, whose knowledge base is copied from its `dist/knowledge`: if the app installs it, run `pnpm --filter @mapomodule/mcp build` first.
+
+3. Restart the backoffice once, from the project directory, so that it loads the linked modules:
+
+   ```bash
+   docker compose restart mapo
+   ```
+
+   The log shows `[mapo:dev-link] Using local sources from …`.
+
+4. Edit `packages/*/src` here:
+   - runtime code (components, composables, stores, locales) hot-reloads in the browser;
+   - module setup code (`src/module.ts` and the files it imports) restarts Nuxt on its own.
+
+5. When you are done, stop the command with `Ctrl+C` (the link stays in place), then restore the published packages and restart the backoffice:
+
+   ```bash
+   pnpm dev:link ../my-project --restore
+   docker compose restart mapo
+   ```
+
+The container runs `yarn` or `pnpm install` at startup. That keeps the link, because the lockfile has not changed and nothing gets reinstalled. If the app's dependencies are reinstalled anyway, a running `pnpm dev:link` links them again; restart the backoffice afterwards.
+
+### Commands
+
+| Command                            | Effect                                 |
+| ---------------------------------- | -------------------------------------- |
+| `pnpm dev:link <app>...`           | Link, then keep syncing until `Ctrl+C` |
+| `pnpm dev:link <app>... --once`    | Link without watching                  |
+| `pnpm dev:link <app>... --status`  | Show which packages are linked         |
+| `pnpm dev:link <app>... --restore` | Put the published packages back        |
+
+Several apps can be linked at once: `pnpm dev:link ../project-a ../project-b`.
+
+### Things to know
+
+- The app gets the sources of the branch checked out here, not of the release it installed. If that branch lacks fixes that the release branch has, the app shows the difference: link from a branch that contains them.
+- The local sources run against the dependencies installed in the app. If a package now needs a dependency that the app lacks, the command prints a warning. Add the dependency to the app temporarily, or update `mapomodule` there.
+- Packages that the app does not install are skipped. For example, an app on an older `mapomodule` has no `@mapomodule/mcp`, and the meta-module then skips it.
+- App code that imports `@mapomodule/*` directly, such as `mapooverride/` components, gets the local sources too.
+- The linked packages ship TypeScript sources, and Nitro skips TypeScript under `node_modules`: the link lets Nitro transpile them, which server code such as the `@mapomodule/mcp` handlers needs. If the dev server never answers and the log shows a Nitro `RollupError` inside a linked package, the app is still running an older link: run `pnpm dev:link <app> --once` and restart it.
+- Some Docker setups don't forward file events into the container. If edits never reach the app, set `CHOKIDAR_USEPOLLING=1` in the backoffice service's environment.
+- A linked app also builds with the local sources, so restore it before running `nuxt build` on that checkout. Production images are not affected: they install `node_modules` from the registry.
 
 ## Browser end-to-end tests
 

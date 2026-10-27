@@ -45,7 +45,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@nuxtjs/i18n": "^10.4.1",
+    "@nuxtjs/i18n": "^10.6.0",
     "defu": "^6.1.4"
   },
   "peerDependencies": {

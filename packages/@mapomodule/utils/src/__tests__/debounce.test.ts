@@ -41,4 +41,22 @@ describe("debounce", () => {
     vi.advanceTimersByTime(100);
     expect(fn).toHaveBeenCalledOnce();
   });
+
+  it("drops the pending call on cancel", () => {
+    const fn = vi.fn();
+    const debounced = debounce(fn, 100);
+    debounced();
+    debounced.cancel();
+    vi.advanceTimersByTime(100);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("keeps working after a cancel", () => {
+    const fn = vi.fn();
+    const debounced = debounce(fn, 100);
+    debounced.cancel(); // nothing pending: a no-op
+    debounced("again");
+    vi.advanceTimersByTime(100);
+    expect(fn).toHaveBeenCalledWith("again");
+  });
 });

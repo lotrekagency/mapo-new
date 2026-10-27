@@ -137,6 +137,10 @@ export default defineNuxtModule<MapoI18nOptions>({
     // Generated vue-i18n config: `fallbackLocale` follows `defaultLocale` so
     // locales without Mapo catalogs (e.g. a consumer-added "fr") still render
     // Mapo strings instead of raw keys.
+    // It lives in the build dir, hence @nuxtjs/i18n >= 10.6 in package.json:
+    // older versions accept its HMR updates by the path relative to the build
+    // dir, here a bare "mapo-i18n.config.mjs" that Vite cannot resolve, and the
+    // dev server answers 500 on every page.
     const vueI18nConfig = addTemplate({
       filename: "mapo-i18n.config.mjs",
       write: true,

@@ -26,6 +26,7 @@
     "dev:mapomodule": "pnpm --filter mapomodule dev",
     "dev:form": "pnpm --filter @mapomodule/form dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
+    "dev:link": "node scripts/dev-link.mjs",
     "prepare": "husky",
     "postinstall": "pnpm -r --filter './packages/**' dev:prepare",
     "release": "pnpm build:release && multi-semantic-release --ignore-private-packages",

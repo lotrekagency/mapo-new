@@ -48,10 +48,12 @@ function clear() {
     <MapoMediaUnavailable v-if="!available" />
 
     <template v-else>
-      <!-- Selected media preview -->
+      <!-- Selected media preview. It and the trigger below paint their own
+           surface, like an input: `soft` buttons and transparent cards take
+           the page background and vanish on a tinted page. -->
       <div
         v-if="current"
-        class="flex items-center gap-3 rounded-lg border border-default p-2"
+        class="flex items-center gap-3 rounded-lg border border-default bg-default p-2"
       >
         <MapoMediaPreview :media="current" size="sm" />
         <div class="flex-1 min-w-0">
@@ -77,7 +79,7 @@ function clear() {
         v-if="!readonly && !disabled"
         :icon="current ? 'i-lucide-refresh-cw' : 'i-lucide-image-plus'"
         size="sm"
-        variant="soft"
+        variant="outline"
         color="neutral"
         :block="!current"
         @click="dialogOpen = true"
