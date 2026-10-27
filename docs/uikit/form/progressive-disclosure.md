@@ -110,6 +110,8 @@ const fields = [
 | `visible` | `v-if`     | the field must NOT be sent if the user cannot see it        |
 | `show`    | `v-show`   | you only want to hide UI; the value should still be tracked |
 
+In a form with tabs, a tab whose fields are all hidden by either predicate leaves the tab bar until one of them shows: see [Tab and group layout](./index.md#tab-and-group-layout).
+
 ```ts
 {
   key: 'discount_code',

@@ -39,6 +39,8 @@ pnpm nuxt prepare
 
 If you run `pnpm build` on a package during development, re-run its `dev:prepare` and then `nuxt prepare` on the app.
 
+To try your changes in a project that installed Mapo from npm, including a backoffice running in Docker, link this workspace into it with `pnpm dev:link`: see [Testing changes in a consumer app](./testing#testing-changes-in-a-consumer-app).
+
 ## Where things live
 
 | Path                        | What it holds                                                                     |
@@ -50,7 +52,7 @@ If you run `pnpm build` on a package during development, re-run its `dev:prepare
 | `apps/example-theme/`       | Theming and MapoOverride demo, no backend                                         |
 | `apps/example-custom-form/` | Custom field registry demo (Vuetify fields)                                       |
 | `docs/`                     | This site, and the knowledge base of the MCP server                               |
-| `scripts/`                  | Build helpers shared by the packages, and the release announcement on Slack       |
+| `scripts/`                  | Build helpers, `pnpm dev:link`, and the release announcement on Slack             |
 
 How the packages relate is explained in [Concepts](/guide/concepts#the-packages).
 

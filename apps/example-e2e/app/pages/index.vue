@@ -32,6 +32,11 @@ const sections = [
         desc: "when/whenAny/whenNot/matchesField/isOneOf/greaterThan",
       },
       {
+        label: "Form Tabs",
+        to: "/form/tabs",
+        desc: "General tab for fields without tab, tabs hidden while empty",
+      },
+      {
         label: "Repeater",
         to: "/form/repeater",
         desc: "add/remove/reorder/duplicate/miniCard/bulk/undo/readonly",

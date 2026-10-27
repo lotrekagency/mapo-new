@@ -7,6 +7,7 @@ import {
   h,
   resolveComponent,
   useSlots,
+  onBeforeUnmount,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -18,8 +19,20 @@ import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
-import { debounce, splitEndpointParams } from "@mapomodule/utils";
+import {
+  debounce,
+  getNestedValue,
+  splitEndpointParams,
+} from "@mapomodule/utils";
 import { useRoute, useRouter } from "#app";
+import {
+  ALL_ROWS,
+  formatPageSize,
+  nextSorting,
+  orderingParam,
+  parsePageSize,
+  toPageSize,
+} from "../utils/listTable.js";
 
 const props = withDefaults(
   defineProps<{
@@ -44,10 +57,14 @@ const props = withDefaults(
      * and tab params without baking them into the endpoint string.
      */
     filterParams?: Record<string, unknown>;
-    /** Initial page size. Default: 20. */
-    defaultPageSize?: number;
-    /** Page size options shown in the per-page selector. Default: [10, 20, 50, 100]. */
-    pageSizeOptions?: number[];
+    /** Initial page size: a number, or `"all"`. Default: 20. */
+    defaultPageSize?: number | "all";
+    /**
+     * Options of the per-page selector. `"all"` adds an option that requests
+     * the list without pagination params, like `clientSide` does: the backend
+     * has to return the whole collection then. Default: [10, 20, 50, 100].
+     */
+    pageSizeOptions?: (number | "all")[];
     /**
      * Custom response parser. When provided it replaces the built-in DRF / flat-array
      * detection. Return `{ items, total }` from any shape your backend returns.
@@ -70,6 +87,7 @@ const props = withDefaults(
      * still hit the backend, then re-fetch. Ignored when `items` is provided.
      */
     clientSide?: boolean;
+    /** Column definitions. A dotted `key` (`category.name`) reads a field of a related object. */
     columns: ListColumn<T>[];
     lookup?: string;
     searchable?: boolean;
@@ -135,10 +153,11 @@ defineSlots<
 
 const slots = useSlots();
 
-// T extends object but not Record<string,unknown>, so dynamic key access needs a cast.
-// Casting the key to keyof T returns the union of all property types rather than `unknown`,
-// which is both accurate and avoids any implicit-any errors at the call sites.
-const atKey = (item: T, key: string): T[keyof T] => item[key as keyof T];
+// A key can be a dotted path into a related object (`category.name`). The cast to
+// T[keyof T] gives the call sites the union of the row's property types rather
+// than `unknown`.
+const atKey = (item: T, key: string): T[keyof T] =>
+  getNestedValue(item, key) as T[keyof T];
 
 const { t } = useI18n();
 const snack = useSnackStore();
@@ -187,14 +206,24 @@ function toPositiveNumber(value: unknown, fallback: number): number {
 }
 
 // --- Pagination (restored from URL) ---
+// "All rows" is stored as the ALL_ROWS page size and written as `page_size=all`.
+const defaultPageSize = toPageSize(props.defaultPageSize);
 const pagination = ref<PaginationState>({
   pageIndex: route.query.page
     ? Math.max(0, toPositiveNumber(route.query.page, 1) - 1)
     : 0,
   pageSize: route.query.page_size
-    ? toPositiveNumber(route.query.page_size, props.defaultPageSize)
-    : props.defaultPageSize,
+    ? parsePageSize(route.query.page_size, defaultPageSize)
+    : defaultPageSize,
 });
+const showsAllRows = computed(() => pagination.value.pageSize === ALL_ROWS);
+const pageSizeItems = computed(() =>
+  props.pageSizeOptions.map((option) =>
+    option === "all"
+      ? { label: t("mapo.listTable.allRows"), value: ALL_ROWS }
+      : { label: t("mapo.listTable.perPage", { n: option }), value: option },
+  ),
+);
 
 // --- Sorting (restored from URL) ---
 const sorting = ref<SortingState>(
@@ -226,8 +255,8 @@ const writeUrlState = debounce(() => {
   const page = pagination.value.pageIndex + 1;
   if (page > 1) query.page = String(page);
   else delete query.page;
-  if (pagination.value.pageSize !== props.defaultPageSize)
-    query.page_size = String(pagination.value.pageSize);
+  if (pagination.value.pageSize !== defaultPageSize)
+    query.page_size = formatPageSize(pagination.value.pageSize);
   else delete query.page_size;
   if (search.value) query.search = search.value;
   else delete query.search;
@@ -240,6 +269,13 @@ const writeUrlState = debounce(() => {
 }, 150);
 
 watch([pagination, search, sorting], writeUrlState, { deep: true });
+
+// A debounced call still pending when the list goes away would act on the next
+// page: the URL write would put this list's query on it.
+onBeforeUnmount(() => {
+  onSearchInput.cancel();
+  writeUrlState.cancel();
+});
 
 // --- Row selection ---
 // Selection is keyed by primary key (lookup), not by row index, so pagination/sort/refresh
@@ -266,11 +302,12 @@ watch(selectedRows, (rows) => {
 
 function buildSelectionQuery(): URLSearchParams {
   const params = new URLSearchParams();
-  params.set("page_size", String(pagination.value.pageSize));
+  if (!showsAllRows.value)
+    params.set("page_size", String(pagination.value.pageSize));
   if (search.value) params.set("search", search.value);
-  sorting.value.forEach((s) =>
-    params.set("ordering", `${s.desc ? "-" : ""}${s.id}`),
-  );
+  // The same ordering the list request sends.
+  if (sorting.value.length)
+    params.set("ordering", orderingParam(sorting.value));
   return params;
 }
 
@@ -476,7 +513,7 @@ function applyOffline(source: T[]) {
     const q = search.value.toLowerCase();
     arr = arr.filter((row) =>
       props.columns.some((c) =>
-        String(row[c.key] ?? "")
+        String(atKey(row, c.key) ?? "")
           .toLowerCase()
           .includes(q),
       ),
@@ -589,13 +626,11 @@ async function refresh() {
     const params: Record<string, unknown> = {
       ...endpointParams,
       ...(props.filterParams ?? {}),
-      ...paginationP,
+      // "All rows" sends no pagination params: the backend returns the whole collection.
+      ...(showsAllRows.value ? {} : paginationP),
     };
     if (search.value) params.search = search.value;
-    if (sorting.value.length)
-      params.ordering = sorting.value
-        .map((s) => `${s.desc ? "-" : ""}${s.id}`)
-        .join(",");
+    if (sorting.value.length) params.ordering = orderingParam(sorting.value);
 
     const res = await crud.list(params as Record<string, string>);
 
@@ -657,13 +692,23 @@ watch(
     search,
   ],
   ([newEndpoint, , newFilters], [oldEndpoint, , oldFilters]) => {
-    const contextChanged =
-      newEndpoint !== oldEndpoint || newFilters !== oldFilters;
-    if (contextChanged && pagination.value.pageIndex !== 0) {
-      pagination.value = { ...pagination.value, pageIndex: 0 };
-    } else {
+    // The immediate first run has no old values: it is the initial load, so it
+    // fetches the page restored from the URL.
+    const isFirstRun = oldFilters === undefined;
+    if (isFirstRun) {
       refresh();
+      return;
     }
+    const endpointChanged = newEndpoint !== oldEndpoint;
+    const filtersChanged = newFilters !== oldFilters;
+    const contextChanged = endpointChanged || filtersChanged;
+    const isOnFirstPage = pagination.value.pageIndex === 0;
+    // Moving to the first page runs this watcher again, and that run fetches.
+    if (contextChanged && !isOnFirstPage) {
+      pagination.value = { ...pagination.value, pageIndex: 0 };
+      return;
+    }
+    refresh();
   },
   { immediate: true, deep: true },
 );
@@ -672,6 +717,35 @@ watch(
 const UCheckbox = resolveComponent("UCheckbox");
 const UButton = resolveComponent("UButton");
 const UIcon = resolveComponent("UIcon");
+
+// A sortable header is a button: the icon shows the current direction, the
+// accessible name says what the next click does (UTable sets no `aria-sort`).
+const SORT_ICONS = {
+  none: "i-lucide-arrow-up-down",
+  asc: "i-lucide-arrow-up-narrow-wide",
+  desc: "i-lucide-arrow-down-wide-narrow",
+};
+const SORT_NEXT_ACTION = {
+  none: "mapo.listTable.sortAscending",
+  asc: "mapo.listTable.sortDescending",
+  desc: "mapo.listTable.clearSorting",
+};
+
+function sortHeader(col: ListColumn<T>) {
+  const sort = sorting.value.find((s) => s.id === col.key);
+  const direction = !sort ? "none" : sort.desc ? "desc" : "asc";
+  return h(UButton, {
+    color: "neutral",
+    variant: "ghost",
+    label: col.label,
+    icon: SORT_ICONS[direction],
+    class: "-mx-2.5",
+    "aria-label": t(SORT_NEXT_ACTION[direction], { column: col.label }),
+    onClick: () => {
+      sorting.value = nextSorting(sorting.value, col.key);
+    },
+  });
+}
 
 const tableColumns = computed<TableColumn<T>[]>(() => {
   const cols: TableColumn<T>[] = [];
@@ -731,8 +805,11 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
     const col = props.columns[i]!;
     const isFirst = i === 0 && !!props.detailBase;
     cols.push({
+      // TanStack would turn a dotted key into `category_name`; the sorting
+      // state uses the column key, so the id must be the key itself.
+      id: col.key,
       accessorKey: col.key,
-      header: col.label,
+      header: col.sortable ? () => sortHeader(col) : col.label,
       cell: ({ row }: { row: { original: T } }) => {
         const cellSlot = slots[`cell.${col.key}`];
         if (cellSlot)
@@ -770,6 +847,7 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
             variant: "ghost",
             color: "neutral",
             icon: "i-lucide-pencil",
+            "aria-label": t("mapo.edit"),
             onClick: () =>
               openQuickEdit(
                 atKey(row.original, props.lookup) as string | number,
@@ -784,6 +862,7 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
             variant: "ghost",
             color: "error",
             icon: "i-lucide-trash-2",
+            "aria-label": t("mapo.delete"),
             onClick: () => deleteRow(row.original),
           }),
         );
@@ -798,6 +877,19 @@ const tableColumns = computed<TableColumn<T>[]>(() => {
   } as TableColumn<T>);
 
   return cols;
+});
+
+// A search or a filter with no match reads differently from an empty list.
+const emptyText = computed(() => {
+  const isSearching = !!search.value;
+  const isFiltering = Object.values(props.filterParams ?? {}).some(
+    (value) => value != null && value !== "",
+  );
+  return t(
+    isSearching || isFiltering
+      ? "mapo.listTable.noResults"
+      : "mapo.listTable.noItems",
+  );
 });
 
 // --- Pagination for UTable ---
@@ -841,7 +933,7 @@ const sortingOptions = computed(() => ({
         :pagination-options="paginationOptions"
         :sorting="sorting"
         :sorting-options="sortingOptions"
-        :empty="t('mapo.listTable.noItems')"
+        :empty="emptyText"
         @update:pagination="pagination = $event ?? pagination"
         @update:sorting="sorting = $event ?? sorting"
       >
@@ -849,7 +941,7 @@ const sortingOptions = computed(() => ({
           <slot name="dtable.empty">
             <div class="flex flex-col items-center gap-2 py-8 text-muted">
               <UIcon name="i-lucide-inbox" class="h-8 w-8" />
-              <span class="text-sm">{{ t("mapo.listTable.noItems") }}</span>
+              <span class="text-sm">{{ emptyText }}</span>
             </div>
           </slot>
         </template>
@@ -870,23 +962,18 @@ const sortingOptions = computed(() => ({
     <!-- Pagination controls -->
     <div class="flex items-center justify-between text-sm text-muted">
       <span>{{ t("mapo.listTable.totalItems", { total }) }}</span>
+      <!-- Nuxt UI 4's UPagination models `page`: with `modelValue` it runs uncontrolled. -->
       <UPagination
-        :model-value="pagination.pageIndex + 1"
+        v-if="!showsAllRows"
+        :page="pagination.pageIndex + 1"
         :total="total"
         :items-per-page="pagination.pageSize"
         size="sm"
-        @update:model-value="
-          pagination = { ...pagination, pageIndex: $event - 1 }
-        "
+        @update:page="pagination = { ...pagination, pageIndex: $event - 1 }"
       />
       <USelect
         :model-value="pagination.pageSize"
-        :items="
-          pageSizeOptions.map((n) => ({
-            label: t('mapo.listTable.perPage', { n }),
-            value: n,
-          }))
-        "
+        :items="pageSizeItems"
         size="xs"
         class="w-28"
         @update:model-value="

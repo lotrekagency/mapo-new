@@ -153,14 +153,14 @@ A derived form knows types, labels, relations and what is read-only — but noth
 
 `<MapoDetailLangSwitch>` renders above the body. Each tab shows a red error badge when at least one field inside `translations.<lang>.*` has an error. The `?lang=` query param is kept in sync — language deep-links work out of the box.
 
-**Many languages** — when the number of languages exceeds `langThreshold` (default `8`), the tab bar is automatically replaced with a searchable `USelectMenu`. The threshold is configurable:
+**Many languages** — when the number of languages exceeds `langThreshold` (default `8`), a searchable `USelectMenu` appears next to the tab bar for quick navigation; the tabs stay. Up to the threshold, the tab bar is the only switcher. The threshold is configurable:
 
 ```vue
-<!-- Force select menu from 4+ languages -->
+<!-- Add the select from 5 languages up -->
 <MapoDetail :languages="langs" :lang-threshold="4" … />
 ```
 
-Pass `:lang-threshold="Infinity"` to always use the tab bar regardless of how many languages there are.
+Pass `:lang-threshold="0"` to always show the select, or `:lang-threshold="Infinity"` to never show it.
 
 ## How to: customize the sidebar buttons
 
@@ -168,6 +168,8 @@ The sidebar renders two separate areas:
 
 1. **Action card** (`#side-buttons`) — Save, Save & continue, Back.
 2. **Danger card** (`#side-danger`) — Delete, shown only for existing records, visually separated at the bottom of the sidebar.
+
+**One action at a time.** From the click until its work is done, the button clicked shows a spinner and the others are disabled. Save and Delete then go back one step, and their work ends only when the previous page has replaced this one: until then `isSaving` and `isDeleting` stay `true`. If that navigation is cancelled, for example by the unsaved-changes guard, the buttons work again. Meanwhile the `save`, `deleteItem` and `back` bindings ignore further calls, so a custom button bound to them cannot save twice or go back two steps.
 
 Override individual buttons with the matching slot:
 
@@ -192,12 +194,12 @@ Replace the whole action card (Save/Back) or the danger card entirely:
 
 ```vue
 <!-- Replace Save/Back card -->
-<template #side-buttons="{ save, isDirty, isSaving }">
+<template #side-buttons="{ save, back, isDirty, isSaving }">
   <UCard>
     <UButton :loading="isSaving" :disabled="!isDirty" block @click="save"
       >Publish</UButton
     >
-    <UButton variant="ghost" block @click="$router.back()">Back</UButton>
+    <UButton variant="ghost" block @click="back">Back</UButton>
   </UCard>
 </template>
 
@@ -364,8 +366,8 @@ interface DetailSlotProps<T> {
   currentLang: string;
   isNew: boolean;
   isLoading: boolean;
-  isSaving: boolean;
-  isDeleting: boolean;
+  isSaving: boolean; // from the click until the save is done; after save(true), until the page has gone back
+  isDeleting: boolean; // from the confirmation until the delete is done and the page has gone back
   isDirty: boolean;
   readonly: boolean; // true when the form is read-only (forced or permission-denied)
   canDelete: boolean; // false when permissionModel is set and the user lacks delete_*
@@ -374,6 +376,7 @@ interface DetailSlotProps<T> {
     restore: () => void;
     discard: () => void;
   } | null;
+  // The three actions ignore calls while a save, a delete or a navigation back is under way.
   save: (andBack?: boolean) => Promise<void>;
   deleteItem: () => Promise<void>;
   back: () => void;

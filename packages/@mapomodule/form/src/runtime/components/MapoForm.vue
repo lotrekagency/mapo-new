@@ -2,6 +2,7 @@
 import { computed, useSlots, watchEffect, inject, onUnmounted } from "vue";
 import type { Ref } from "vue";
 import { useNuxtApp, useRuntimeConfig } from "#app";
+import { useI18n } from "vue-i18n";
 import type {
   AnyFieldDescriptor,
   FieldRegistry,
@@ -135,6 +136,12 @@ provideCurrentLang(currentLangRef);
 
 // ─── Group fields by tab/group ───────────────────────────────────────────────
 
+const { t } = useI18n();
+
+// Fields without a `tab` go here. It becomes a tab of its own only when other
+// fields have one, and then it shows as "General" (`mapo.form.defaultTab`).
+const DEFAULT_TAB = "__default__";
+
 function getOrCreateTab(map: Map<string, TabEntry>, name: string): TabEntry {
   if (!map.has(name)) {
     map.set(name, { name, groups: new Map(), children: new Map() });
@@ -151,7 +158,7 @@ const grouped = computed<Map<string, TabEntry>>(() => {
     // Normalise: 'a/b', ['a','b'], or 'a' all become a string[]
     const rawTab = field.tab;
     const tabPath: string[] = !rawTab
-      ? ["__default__"]
+      ? [DEFAULT_TAB]
       : Array.isArray(rawTab)
         ? rawTab
         : rawTab.split("/");
@@ -179,17 +186,23 @@ const grouped = computed<Map<string, TabEntry>>(() => {
     }
   }
 
+  const defaultTab = tabs.get(DEFAULT_TAB);
+  if (defaultTab) defaultTab.label = t("mapo.form.defaultTab");
+
   return tabs;
 });
 
 const hasTabs = computed(() => {
   const keys = [...grouped.value.keys()];
-  return keys.length > 1 || (keys.length === 1 && keys[0] !== "__default__");
+  const hasFields = keys.length > 0;
+  if (!hasFields) return false;
+  const hasSeveralTabs = keys.length > 1;
+  const hasNamedTab = keys[0] !== DEFAULT_TAB;
+  return hasSeveralTabs || hasNamedTab;
 });
 
 const defaultGroups = computed(
-  () =>
-    grouped.value.get("__default__")?.groups ?? new Map<string, GroupEntry>(),
+  () => grouped.value.get(DEFAULT_TAB)?.groups ?? new Map<string, GroupEntry>(),
 );
 
 const tabList = computed<TabEntry[]>(() => [...grouped.value.values()]);

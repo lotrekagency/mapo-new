@@ -17,6 +17,7 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `fields`        | `FieldDescriptor<T>[]`  | — **required** | Fields for the main body form.                                                                                  |
 | `sidebarFields` | `FieldDescriptor<T>[]`  | `[]`           | Fields rendered in the sidebar form.                                                                            |
 | `languages`     | `string[]`              | `[]`           | Translation language codes (e.g. `['it', 'en']`).                                                               |
+| `langThreshold` | `number`                | `8`            | Show the language select next to the tabs above this many languages.                                            |
 | `modelName`     | `string \| null`        | `null`         | Human-readable model name shown in the page title.                                                              |
 | `sidebarCols`   | `number`                | `4`            | Sidebar column span (1–11 in a 12-col grid).                                                                    |
 | `sticky`        | `boolean`               | `true`         | Keep sidebar sticky while scrolling. Offset controlled by `--mapo-topbar-height` CSS variable (default `64px`). |
@@ -63,6 +64,7 @@ Language tab bar used inside `MapoDetail`. Can also be used standalone.
 | `langs`         | `string[]`                 | — **required** | Available language codes.                       |
 | `errors`        | `Record<string, string[]>` | `{}`           | Validation errors keyed by field path.          |
 | `noRouteChange` | `boolean`                  | `false`        | Do not update the URL query on language change. |
+| `langThreshold` | `number`                   | `8`            | Show the select above this many languages.      |
 
 ### Emits
 
@@ -78,23 +80,25 @@ Paginated, filterable, sortable data table with quick-edit, bulk actions, and ta
 
 ### Props
 
-| Prop            | Type                     | Default        | Description                                                          |
-| --------------- | ------------------------ | -------------- | -------------------------------------------------------------------- |
-| `endpoint`      | `string`                 | — **required** | API endpoint for data fetching.                                      |
-| `columns`       | `ListColumn[]`           | — **required** | Column definitions.                                                  |
-| `lookup`        | `string`                 | `'id'`         | Primary key field name.                                              |
-| `filters`       | `FilterDescriptor[]`     | `[]`           | Available filter definitions.                                        |
-| `actions`       | `ActionDescriptor<T>[]`  | `[]`           | Bulk action definitions.                                             |
-| `tabs`          | `ListTabItem[]`          | `[]`           | Tab definitions for list segmentation.                               |
-| `defaultTab`    | `string`                 | —              | Default active tab value.                                            |
-| `tabQueryParam` | `string`                 | `'tab'`        | URL query parameter name for the active tab.                         |
-| `searchable`    | `boolean`                | `true`         | Show the search input.                                               |
-| `draggable`     | `boolean`                | `false`        | Enable drag-and-drop row reordering.                                 |
-| `positionField` | `string`                 | `'position'`   | Model field updated on drag reorder.                                 |
-| `editFields`    | `FieldDescriptor<T>[]`   | `[]`           | Fields shown in the quick-edit modal.                                |
-| `languages`     | `string[]`               | —              | Language codes for quick-edit i18n.                                  |
-| `registry`      | `Partial<FieldRegistry>` | —              | Field registry for quick-edit.                                       |
-| `detailBase`    | `string`                 | —              | Base path for the per-row detail link (e.g. `'/news'` → `/news/42`). |
+| Prop              | Type                     | Default             | Description                                                          |
+| ----------------- | ------------------------ | ------------------- | -------------------------------------------------------------------- |
+| `endpoint`        | `string`                 | — **required**      | API endpoint for data fetching.                                      |
+| `columns`         | `ListColumn[]`           | — **required**      | Column definitions.                                                  |
+| `lookup`          | `string`                 | `'id'`              | Primary key field name.                                              |
+| `filters`         | `FilterDescriptor[]`     | `[]`                | Available filter definitions.                                        |
+| `actions`         | `ActionDescriptor<T>[]`  | `[]`                | Bulk action definitions.                                             |
+| `tabs`            | `ListTabItem[]`          | `[]`                | Tab definitions for list segmentation.                               |
+| `defaultTab`      | `string`                 | —                   | Default active tab value.                                            |
+| `tabQueryParam`   | `string`                 | `'tab'`             | URL query parameter name for the active tab.                         |
+| `searchable`      | `boolean`                | `true`              | Show the search input.                                               |
+| `draggable`       | `boolean`                | `false`             | Enable drag-and-drop row reordering.                                 |
+| `positionField`   | `string`                 | `'position'`        | Model field updated on drag reorder.                                 |
+| `editFields`      | `FieldDescriptor<T>[]`   | `[]`                | Fields shown in the quick-edit modal.                                |
+| `languages`       | `string[]`               | —                   | Language codes for quick-edit i18n.                                  |
+| `registry`        | `Partial<FieldRegistry>` | —                   | Field registry for quick-edit.                                       |
+| `detailBase`      | `string`                 | —                   | Base path for the per-row detail link (e.g. `'/news'` → `/news/42`). |
+| `defaultPageSize` | `number \| "all"`        | `20`                | Initial page size.                                                   |
+| `pageSizeOptions` | `(number \| "all")[]`    | `[10, 20, 50, 100]` | Per-page options; `"all"` shows every row.                           |
 
 ### Slots
 
@@ -122,18 +126,20 @@ Inner table component used by `MapoList`. Useful if you need the table alone wit
 
 ### Props
 
-| Prop            | Type                     | Default        | Description                      |
-| --------------- | ------------------------ | -------------- | -------------------------------- |
-| `endpoint`      | `string`                 | — **required** | API endpoint.                    |
-| `columns`       | `ListColumn[]`           | — **required** | Column definitions.              |
-| `lookup`        | `string`                 | `'id'`         | Primary key field name.          |
-| `searchable`    | `boolean`                | `true`         | Show the search input.           |
-| `draggable`     | `boolean`                | `false`        | Enable drag-and-drop reordering. |
-| `positionField` | `string`                 | `'position'`   | Field updated on drag reorder.   |
-| `editFields`    | `FieldDescriptor<T>[]`   | `[]`           | Quick-edit form fields.          |
-| `languages`     | `string[]`               | —              | Language codes for quick-edit.   |
-| `registry`      | `Partial<FieldRegistry>` | —              | Field registry for quick-edit.   |
-| `detailBase`    | `string`                 | —              | Base path for row detail links.  |
+| Prop              | Type                     | Default             | Description                                |
+| ----------------- | ------------------------ | ------------------- | ------------------------------------------ |
+| `endpoint`        | `string`                 | — **required**      | API endpoint.                              |
+| `columns`         | `ListColumn[]`           | — **required**      | Column definitions.                        |
+| `lookup`          | `string`                 | `'id'`              | Primary key field name.                    |
+| `searchable`      | `boolean`                | `true`              | Show the search input.                     |
+| `draggable`       | `boolean`                | `false`             | Enable drag-and-drop reordering.           |
+| `positionField`   | `string`                 | `'position'`        | Field updated on drag reorder.             |
+| `editFields`      | `FieldDescriptor<T>[]`   | `[]`                | Quick-edit form fields.                    |
+| `languages`       | `string[]`               | —                   | Language codes for quick-edit.             |
+| `registry`        | `Partial<FieldRegistry>` | —                   | Field registry for quick-edit.             |
+| `detailBase`      | `string`                 | —                   | Base path for row detail links.            |
+| `defaultPageSize` | `number \| "all"`        | `20`                | Initial page size.                         |
+| `pageSizeOptions` | `(number \| "all")[]`    | `[10, 20, 50, 100]` | Per-page options; `"all"` shows every row. |
 
 ### Emits
 

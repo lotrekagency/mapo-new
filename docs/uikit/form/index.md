@@ -58,6 +58,10 @@ const fields: FieldDescriptor<Article>[] = [
 
 If more than one `tab` is present, tab navigation is rendered with a red badge on tabs that contain errors.
 
+Fields without a `tab` go to a tab of their own, labelled **General** (`mapo.form.defaultTab`), as soon as another field has a `tab`. To rename it, override that key in the app's catalog, or give those fields a `tab`.
+
+A tab whose fields are all hidden by `visible` or `show` stays out of the tab bar until one of them shows, so an editor never opens an empty panel. While the tab the user picked is hidden, the first shown tab is open. A tab filled through its own slots (`tab.<name>`, `tab.<name>.before`, `tab.<name>.after`) always shows.
+
 Tabs can be nested using an array path or a `/`-separated string:
 
 ```ts

@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { TabEntry } from "../types/layout.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { pickActiveTab, tabHasShownFields } from "../utils/tabVisibility.js";
 import MapoFormGroup from "./MapoFormGroup.vue";
 import MapoFormFlatSection from "./MapoFormFlatSection.vue";
 
@@ -10,9 +11,29 @@ const { t } = useI18n();
 
 const props = defineProps<{ tabs: TabEntry[] }>();
 
-defineSlots<Record<string, unknown>>();
+const slots = defineSlots<Record<string, unknown>>();
 
-const activeTab = ref(props.tabs[0]?.name ?? "");
+const form = injectMapoForm<Record<string, unknown>>()!;
+
+// A tab whose fields are all hidden by `visible` or `show` would open on an
+// empty panel, so it leaves the tab bar until one of them shows. Content passed
+// through the tab's own slots counts as something to show.
+function tabHasContent(tab: TabEntry): boolean {
+  const hasPanelSlot = Boolean(slots[`tab.${tab.name}`]);
+  const hasBeforeSlot = Boolean(slots[`tab.${tab.name}.before`]);
+  const hasAfterSlot = Boolean(slots[`tab.${tab.name}.after`]);
+  if (hasPanelSlot || hasBeforeSlot || hasAfterSlot) return true;
+  return tabHasShownFields(tab, form.model.value);
+}
+
+const shownTabs = computed(() => props.tabs.filter(tabHasContent));
+
+// The tab the user clicked; until then, or while it is hidden, the first shown
+// tab is open.
+const pickedTab = ref<string | null>(null);
+const activeTab = computed(() =>
+  pickActiveTab(shownTabs.value, pickedTab.value),
+);
 
 // Recursively check if a tab (or any of its descendants) contains errors.
 function tabHasErrors(tab: TabEntry, errorKeys: Set<string>): boolean {
@@ -26,7 +47,6 @@ function tabHasErrors(tab: TabEntry, errorKeys: Set<string>): boolean {
 }
 
 // Highlight tabs containing errors.
-const form = injectMapoForm()!;
 const tabsWithErrors = computed(() => {
   const errorKeys = new Set(Object.keys(form.errors.value));
   return new Set(
@@ -40,7 +60,7 @@ const tabsWithErrors = computed(() => {
     <!-- Tab bar -->
     <div class="flex gap-1 border-b border-gray-200 pb-px">
       <button
-        v-for="tab in tabs"
+        v-for="tab in shownTabs"
         :key="tab.name"
         type="button"
         class="relative flex items-center gap-1.5 rounded-t px-4 py-2 text-sm font-medium transition-colors"
@@ -49,7 +69,7 @@ const tabsWithErrors = computed(() => {
             ? 'border-b-2 border-primary-500 text-primary-600'
             : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
         ]"
-        @click="activeTab = tab.name"
+        @click="pickedTab = tab.name"
       >
         <slot :name="`tab.${tab.name}.label`" :tab="tab">
           {{ tab.label ?? tab.name }}

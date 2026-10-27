@@ -58,3 +58,4 @@ Then check it live in `apps/example-e2e` (lists, media, menus, sidebar pages), a
 - **`Overriding MapoMediaManagerDialog component` in every app build** → `module.ts` registers that component twice: in the `components` list and again as `global`. It is a known warning (open thread in the root manual).
 - **The built-in login page shows instead of the app's** → the module adds `/login` and `/` only when the app has no page on that exact path; check the app's file name.
 - **`MapoConfirmDialog` has no accessible name** → its title is a plain heading in the modal content (open thread in the root manual).
+- **A dialog opens under a drawer or another modal** → Nuxt UI overlays have no z-index and stack by the order their portals enter `<body>`, which is when they mount. An overlay mounted ahead of time, in a layout, sits under the ones a page opens later: mount it when it opens, as `MapoConfirmDialog` does.

@@ -142,10 +142,13 @@ function onImageConfirm(
 </script>
 
 <template>
+  <!-- An input surface of its own, like the Nuxt UI inputs next to it
+       (`bg-default`, `accented` border): without it the text area takes the
+       page background and disappears on a tinted page. -->
   <div
-    class="mapo-wyg-editor rounded border"
+    class="mapo-wyg-editor rounded-md border bg-default"
     :class="[
-      errors?.length ? 'border-red-300' : 'border-gray-200',
+      errors?.length ? 'border-red-300' : 'border-accented',
       readonly || disabled ? 'opacity-60' : '',
     ]"
   >
@@ -284,15 +287,18 @@ function onImageConfirm(
     >
       {{ err }}
     </p>
-  </div>
 
-  <!-- Image picker dialog — only rendered when MapoMediaManagerDialog is globally available -->
-  <component
-    :is="MediaManagerDialog"
-    v-if="hasMediaManager"
-    v-model="imagePickerOpen"
-    selection-mode="single"
-    mime="image/*"
-    @confirm="onImageConfirm"
-  />
+    <!-- Image picker dialog — only rendered when MapoMediaManagerDialog is
+         globally available. Inside the root on purpose: a second root would
+         drop what MapoFormField passes down (`flex-1`, `id`, `style`), and the
+         editor would shrink to its toolbar. As a modal it renders in <body>. -->
+    <component
+      :is="MediaManagerDialog"
+      v-if="hasMediaManager"
+      v-model="imagePickerOpen"
+      selection-mode="single"
+      mime="image/*"
+      @confirm="onImageConfirm"
+    />
+  </div>
 </template>

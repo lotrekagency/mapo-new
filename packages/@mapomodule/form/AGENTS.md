@@ -55,6 +55,6 @@ Then check the change in `apps/example-e2e/app/pages/form/` (one page per form s
 ## Gotchas
 
 - **A field remounts and loses focus when the parent re-renders** → `MapoFormField` creates the async component inside a `computed`, so a new descriptor object means a new component. Keep descriptor objects stable; the fix (caching per loader) is an open thread in the root manual.
-- **Typing in an editor field is slow in dev and Vue warns about extraneous attributes** → `MapoWygEditor` has two root elements (open thread).
+- **An editor field shows its client error only on submit, never on blur** → `MapoWygEditor` gets `@blur` on its root `div`, which never has the focus (open thread). Keep it a single-root component: a second root drops the `flex-1`, `id` and `style` that `MapoFormField` passes, and the editor shrinks to its toolbar.
 - **A type renders `MapoUnknownField`** → it is not in the registry the app sees: check `defineFormField()` ran in a plugin, or the spelling of `type`.
 - **Types collapse to `any` in apps** → the build's `clean-empty-vue-dts.mjs` step was skipped.

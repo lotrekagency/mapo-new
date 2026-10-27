@@ -75,7 +75,7 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `endpoint`         | `string`                                                 | —                | REST collection endpoint. Required in **server** and **hybrid** modes; ignored when `items` is set. May include static query params (e.g. `?ordering=-date`) — they are merged into every `list()` call. CRUD operations use the clean path. |
 | `items`            | `T[]`                                                    | —                | Drives **offline** mode. Pass via `v-model:items` if you want mutations (drag, delete, quick-edit) reflected back into your local array.                                                                                                     |
 | `clientSide`       | `boolean`                                                | `false`          | Enables **hybrid** mode (only when `endpoint` is set and `items` is not). Fetches the full dataset once, runs filter/sort/page client-side. Mutations still hit the backend, then refetch.                                                   |
-| `columns`          | `ListColumn<T>[]`                                        | —                | Column definitions. Pass the model type as generic (`ListColumn<News>[]`) to enforce that `key` is a real property of `T`.                                                                                                                   |
+| `columns`          | `ListColumn<T>[]`                                        | —                | Column definitions. Pass the model type as generic (`ListColumn<News>[]`) to enforce that `key` is a real property of `T`. A dotted key (`category.name`) reads a field of a related object.                                                 |
 | `lookup`           | `string`                                                 | `'id'`           | Key used as primary key (selection, links, drag)                                                                                                                                                                                             |
 | `filters`          | `FilterDescriptor[]`                                     | `[]`             | Filter dropdown items                                                                                                                                                                                                                        |
 | `actions`          | `ActionDescriptor<T>[]`                                  | `[]`             | Bulk actions shown when rows are selected                                                                                                                                                                                                    |
@@ -89,8 +89,8 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `languages`        | `string[]`                                               | —                | Languages for translatable quick-edit fields                                                                                                                                                                                                 |
 | `registry`         | `FieldRegistry`                                          | —                | Optional registry override (auto-injected otherwise)                                                                                                                                                                                         |
 | `detailBase`       | `string`                                                 | —                | If set, each row shows a link button → `${detailBase}/${row[lookup]}`                                                                                                                                                                        |
-| `defaultPageSize`  | `number`                                                 | `20`             | Initial page size on mount                                                                                                                                                                                                                   |
-| `pageSizeOptions`  | `number[]`                                               | `[10,20,50,100]` | Options in the per-page selector                                                                                                                                                                                                             |
+| `defaultPageSize`  | `number \| "all"`                                        | `20`             | Initial page size on mount; `"all"` shows every row (see [Show all rows](#show-all-rows))                                                                                                                                                    |
+| `pageSizeOptions`  | `(number \| "all")[]`                                    | `[10,20,50,100]` | Options in the per-page selector; `"all"` adds an option that shows every row                                                                                                                                                                |
 | `responseAdapter`  | `(raw: unknown) => { items: T[]; total: number }`        | —                | Custom response parser — replaces built-in DRF / flat-array detection                                                                                                                                                                        |
 | `paginationParams` | `(state: { page, pageSize }) => Record<string, unknown>` | —                | Custom pagination params factory — replaces default `{ page, page_size }`                                                                                                                                                                    |
 | `permissionModel`  | `string`                                                 | —                | Django model label (e.g. `"news.article"`) used to gate edit and delete row actions. When set, the pencil/trash icons are hidden if the current user lacks `change_*` / `delete_*` permissions. Omit to keep actions always visible.         |
@@ -139,12 +139,26 @@ const columns: ListColumn<News>[] = [
 
 Without the generic (`ListColumn[]`) the key is typed as `string` and any value is accepted — still works at runtime but you lose autocomplete and typo protection.
 
-| Field      | Description                                                               |
-| ---------- | ------------------------------------------------------------------------- |
-| `key`      | Property name on the row object (`keyof T & string` when `T` is provided) |
-| `label`    | Header text                                                               |
-| `sortable` | Adds a sort handle (server-side ordering via `?ordering=`)                |
-| `class`    | CSS class applied to the `<td>`                                           |
+| Field      | Description                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `key`      | Property on the row object (`keyof T & string` when `T` is provided), or a dotted path into a related object (`category.name`) |
+| `label`    | Header text                                                                                                                    |
+| `sortable` | Makes the header a button that cycles ascending → descending → unsorted (see [Sort by a column](#how-to-sort-by-a-column))     |
+| `class`    | CSS class applied to the `<td>`                                                                                                |
+
+### Columns of a related object
+
+A dotted `key` reads a field of a related object: `{ key: "category.name", label: "Category" }` shows `row.category.name`, and `—` when the row has no category. Its cell slot is ``#[`cell.category.name`]``. With a typed `ListColumn<T>`, the first segment must be a key of `T`.
+
+Sorting on it sends the Django lookup (`?ordering=category__name`), the way DRF's `OrderingFilter` reaches a field of a related object; in offline and hybrid mode, search, filters and sort read the nested value.
+
+## How to: sort by a column
+
+A `sortable` column has a button as its header. Each click moves the column from unsorted to ascending, then to descending, then back to unsorted; a click on another column replaces the sort. The icon shows the current direction, and the button's accessible name says what the next click does.
+
+In server mode the order goes to the backend as `?ordering=title` or `?ordering=-title`, and to the URL as `ordering`. In offline and hybrid mode the rows are sorted in memory.
+
+Drag reorder needs the natural order, so the drag handle is off while a column is sorted: the third click gives it back.
 
 ## How to: customize a cell
 
@@ -221,7 +235,7 @@ URL params written by `<MapoList>` and `<MapoListTable>`:
 | Param             | Written by      | Description                                     |
 | ----------------- | --------------- | ----------------------------------------------- |
 | `page`            | `MapoListTable` | Current page number (1-based)                   |
-| `page_size`       | `MapoListTable` | Active page size                                |
+| `page_size`       | `MapoListTable` | Active page size; `all` for all rows            |
 | `search`          | `MapoListTable` | Current search query                            |
 | `ordering`        | `MapoListTable` | Active sort; comma-separated, `-` prefix = desc |
 | `f_<filterKey>`   | `MapoList`      | Active filter value(s); see encoding below      |
@@ -387,6 +401,20 @@ The drag uses `crud.updateOrder(movedId, targetId)` — a single request. The ba
   :page-size-options="[10, 25, 50]"
 />
 ```
+
+### Show all rows
+
+Add `"all"` to the options, or start from it with `default-page-size="all"`:
+
+```vue
+<MapoList
+  endpoint="/api/news/"
+  :columns="columns"
+  :page-size-options="[20, 50, 'all']"
+/>
+```
+
+The option (label `mapo.listTable.allRows`) requests the list without pagination params, like hybrid mode does, and hides the pager; the URL keeps `page_size=all`. The backend has to return the whole collection to a request without pagination params; a paginated DRF view returns its first page instead.
 
 ### Offset / limit backend
 
@@ -557,7 +585,7 @@ Use this for:
 
 ### Multi-column sort (offline / hybrid)
 
-In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid modes, sorting is performed in JS — multi-column sort is supported, each column acting as a tiebreaker for the previous one (matches TanStack's default behavior).
+In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid modes, sorting is performed in JS — multi-column sort is supported, each column acting as a tiebreaker for the previous one (matches TanStack's default behavior). A click on a header sorts by that column alone; a multi-column order comes from the URL (`?ordering=status,-published_at`).
 
 ---
 
@@ -569,3 +597,4 @@ In server mode the sort is sent to the BE as `?ordering=`. In offline and hybrid
 - **`columns[].class` must be static** — Tailwind v4 requires literal class names; `:class="dynamic"` does not work in column defs.
 - **Hybrid mode + paginated BE** — `client-side` issues a single `list()` with no pagination params; if the backend paginates by default, you'll only get the first page. Bake a large page size into the endpoint URL (e.g. `?page_size=1000`) to receive the full set.
 - **Offline mode ignores `permissionModel`** — without a Django backend there are no permissions to gate against. Hide actions yourself via column slots if needed.
+- **`"all"` with a paginated DRF view** — the request carries no pagination params, so the view returns its first page. Offer `"all"` only for endpoints that return the whole collection unpaginated.

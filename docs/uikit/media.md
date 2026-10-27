@@ -56,7 +56,8 @@ useMediaStore (Pinia)
     │     ├── MapoMediaBreadcrumbs← path navigation
     │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination
     │     ├── MapoMediaEditor     ← side drawer for metadata
-    │     └── MapoMediaUploader   ← drop area + per-file progress
+    │     └── MapoMediaUploader   ← drop area + per-file title, alt text,
+    │                                description, folder + progress
     │
     └── MapoMediaManagerDialog    ← UModal wrapper (picker mode)
 
