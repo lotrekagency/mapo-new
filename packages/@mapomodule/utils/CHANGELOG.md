@@ -1,3 +1,9 @@
+# @mapomodule/utils [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.5...@mapomodule/utils@2.0.0-beta.6) (2026-10-27)
+
+### Bug Fixes
+
+- **uikit:** drop pending list URL writes when the list unmounts ([0677e73](https://github.com/lotrekagency/mapo-new/commit/0677e737670c99d7ceb5b8b8491de1658053b5e1))
+
 # @mapomodule/utils [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/utils@2.0.0-beta.4...@mapomodule/utils@2.0.0-beta.5) (2026-09-01)
 
 ### Bug Fixes
