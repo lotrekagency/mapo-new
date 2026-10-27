@@ -1,3 +1,9 @@
+# @mapomodule/i18n [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.3...@mapomodule/i18n@2.0.0-beta.4) (2026-10-27)
+
+### Features
+
+- enhance MapoRepeater with template support and block picker ([0c0c4af](https://github.com/lotrekagency/mapo-new/commit/0c0c4af06e88fc38ea30aa66d45d9951eec87f64))
+
 # @mapomodule/i18n [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.2...@mapomodule/i18n@2.0.0-beta.3) (2026-10-27)
 
 ### Bug Fixes
