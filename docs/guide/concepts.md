@@ -95,7 +95,7 @@ definePageMeta({
 
 - **List pages** use `MapoList`: server-side pagination, search, sorting, filters, tabs, bulk actions and quick edit. → [CRUD list view](/howto/crud-list)
 - **Detail pages** use `MapoDetail`: it loads the record, renders the form, saves a differential `PATCH` and maps 400 errors onto fields. `id="new"` creates. → [CRUD detail / form](/howto/crud-detail)
-- **Route metadata** (`label`, `icon`, `parent`, `sidebarFooter`, `permissions`, `roles`) drives the sidebar and the guards. → [Sidebar](/uikit/sidebar)
+- **Route metadata** (`label`, `icon`, `parent`, `sidebarFooter`, `sidebarOrder`, `permissions`, `roles`) drives the sidebar and the guards. Use `sidebarOrder` to reorder sibling entries. → [Sidebar](/uikit/sidebar)
 
 ## The form engine
 

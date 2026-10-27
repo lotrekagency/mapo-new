@@ -20,16 +20,17 @@ definePageMeta({
 
 All fields below are fully typed — editor autocomplete is available after the first `nuxt dev` run.
 
-| Field           | Type                            | Description                                                                                                               |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `label`         | `string`                        | Display text. **Required** for the route to appear in the menu.                                                           |
-| `icon`          | `string`                        | Any Nuxt UI / Iconify icon name (`i-lucide-*`, `i-heroicons-*`, etc.). Defaults to `mdi-alpha-{firstLetter}-box-outline`. |
-| `hidden`        | `boolean`                       | When `true`, excludes the route from the sidebar even if `label` is set.                                                  |
-| `sidebarFooter` | `boolean`                       | When `true`, the item appears in the sidebar footer section instead of the main nav.                                      |
-| `parent`        | `string`                        | Path of the parent route. Makes this item a child of the given route in the tree.                                         |
-| `permissions`   | `{ model: string } \| string[]` | Passed to the `permissions` middleware. See [Permissions](/modules/core#permissions-field--two-formats).                  |
-| `roles`         | `string[]`                      | Passed to the `roles` middleware. Blocks navigation if the user's group is not in the list.                               |
-| `middleware`    | `string \| string[]`            | Middleware names applied to this route. Read by `useCanAccessRoute` to determine sidebar visibility.                      |
+| Field           | Type                            | Description                                                                                                                                                        |
+| --------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label`         | `string`                        | Display text. **Required** for the route to appear in the menu.                                                                                                    |
+| `icon`          | `string`                        | Any Nuxt UI / Iconify icon name (`i-lucide-*`, `i-heroicons-*`, etc.). Defaults to `mdi-alpha-{firstLetter}-box-outline`.                                          |
+| `hidden`        | `boolean`                       | When `true`, excludes the route from the sidebar even if `label` is set.                                                                                           |
+| `sidebarFooter` | `boolean`                       | When `true`, the item appears in the sidebar footer section instead of the main nav.                                                                               |
+| `parent`        | `string`                        | Path of the parent route. Makes this item a child of the given route in the tree.                                                                                  |
+| `sidebarOrder`  | `number`                        | Sorts this route among siblings. Finite values are ascending and appear before routes without a value; ties and unordered routes preserve Nuxt/router route order. |
+| `permissions`   | `{ model: string } \| string[]` | Passed to the `permissions` middleware. See [Permissions](/modules/core#permissions-field--two-formats).                                                           |
+| `roles`         | `string[]`                      | Passed to the `roles` middleware. Blocks navigation if the user's group is not in the list.                                                                        |
+| `middleware`    | `string \| string[]`            | Middleware names applied to this route. Read by `useCanAccessRoute` to determine sidebar visibility.                                                               |
 
 ### Hiding a page from the menu
 
@@ -77,6 +78,36 @@ definePageMeta({
 ```
 
 The parent item renders as a collapsible group. Child items are indented under it.
+
+## Ordering menu entries
+
+Set `sidebarOrder` in `definePageMeta` to control a route's position among its siblings. Lower finite numbers appear first; a numeric order always appears before an unordered sibling. Equal values and siblings without an order keep their Nuxt/router route order. Ordering is applied recursively to child groups. If no sibling has an order, the existing route order is unchanged.
+
+```vue
+<!-- pages/dashboard.vue -->
+<script setup lang="ts">
+definePageMeta({
+  layout: "mapo-default",
+  label: "Dashboard",
+  icon: "i-lucide-house",
+  sidebarOrder: 10,
+});
+</script>
+```
+
+```vue
+<!-- pages/articles/index.vue -->
+<script setup lang="ts">
+definePageMeta({
+  layout: "mapo-default",
+  label: "Articles",
+  icon: "i-lucide-file-text",
+  sidebarOrder: 20,
+});
+</script>
+```
+
+Routes without `sidebarOrder` follow the ordered entries in their original route order. For nested menus, set `sidebarOrder` on each child route to order that group independently.
 
 ## Footer items
 
@@ -232,7 +263,8 @@ Leaf items render as `<NuxtLink>` with `active-class="bg-primary/10 text-primary
 1. Skips routes without a `label` meta field
 2. Builds a flat `Map<path, MenuNode>`
 3. Attaches nodes to their parent via the `meta.parent` path
-4. Returns top-level roots (no parent, or parent not found)
+4. Sorts each sibling group by finite `meta.sidebarOrder` values, then preserves route order for ties and unordered siblings
+5. Returns top-level roots (no parent, or parent not found)
 
 This runs reactively on the computed property in `MapoSidebarList` — adding a new route with a `label` automatically appears in the menu without any manual registration.
 

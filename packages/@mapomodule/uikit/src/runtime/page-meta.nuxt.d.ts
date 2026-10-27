@@ -10,6 +10,8 @@ declare module "#app" {
     parent?: string;
     /** Pin this page to the sidebar footer instead of the main navigation list. */
     sidebarFooter?: boolean;
+    /** Sort this page among siblings in the sidebar; lower values appear first. */
+    sidebarOrder?: number;
   }
 }
 
@@ -29,6 +31,8 @@ declare module "vue-router" {
     parent?: string;
     /** Pin this page to the sidebar footer instead of the main navigation list. */
     sidebarFooter?: boolean;
+    /** Sort this page among siblings in the sidebar; lower values appear first. */
+    sidebarOrder?: number;
   }
 }
 

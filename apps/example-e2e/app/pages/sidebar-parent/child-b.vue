@@ -7,6 +7,7 @@ definePageMeta({
   label: "Child B",
   icon: "i-lucide-file-text",
   parent: "sidebar-parent",
+  sidebarOrder: 10,
   middleware: ["auth"],
 });
 </script>
@@ -15,8 +16,9 @@ definePageMeta({
   <UContainer class="py-8 max-w-xl">
     <h1 class="text-2xl font-bold mb-2 text-highlighted">Child B</h1>
     <p class="text-muted text-sm mb-6">
-      Second child of "Sidebar Nesting". Only this item should be highlighted;
-      Child A should not be.
+      Child B appears before Child A because its
+      <code class="bg-elevated px-1 rounded">sidebarOrder</code> is lower. Only
+      this item should be highlighted; Child A should not be.
     </p>
 
     <UCard>
@@ -26,6 +28,7 @@ definePageMeta({
         >
       </template>
       <ul class="space-y-2 text-sm text-muted list-disc list-inside">
+        <li>"Child B" appears above Child A despite its route name</li>
         <li>"Child B" is highlighted as active</li>
         <li>"Child A" is NOT highlighted</li>
         <li>Parent "Sidebar Nesting" is still expanded</li>

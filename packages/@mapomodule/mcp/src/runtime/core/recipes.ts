@@ -421,12 +421,14 @@ export const RECIPES: Recipe[] = [
       "icon",
       "label",
       "sidebarFooter",
+      "sidebarOrder",
+      "reorder menu",
       "route meta",
     ],
     doc: "uikit/sidebar.md",
     seeAlso: ["howto/first-admin-page.md"],
     summary:
-      "Route metadata (label, icon, parent, sidebarFooter) builds the sidebar tree, with no menu config.",
+      "Route metadata builds the sidebar tree without menu config; use sidebarOrder to sort sibling entries.",
   },
   {
     id: "login-page",

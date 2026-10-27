@@ -37,6 +37,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | `MapoSidebar`              | Drawer + mini mode, cookie-persisted state, full slot API                                                                            |
 | Auto-generated sidebar nav | Built from `route.meta.label` — no manual config needed                                                                              |
 | Nested menu                | `meta.parent` creates hierarchical groups                                                                                            |
+| Sidebar ordering           | Finite `meta.sidebarOrder` values sort siblings ascending before unordered routes; applies recursively                               |
 | Footer items               | `meta.sidebarFooter: true` moves item to sidebar footer                                                                              |
 | `MapoTopbar`               | Drawer toggle + left / center / right slots                                                                                          |
 | `MapoLogin`                | Split-panel form, field-level error mapping (backend 400 `{username,password}`), redirect-aware, slots: `brand` / `panel` / `footer` |
