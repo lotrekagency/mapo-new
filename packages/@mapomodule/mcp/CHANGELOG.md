@@ -1,3 +1,10 @@
+# @mapomodule/mcp [1.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.2...@mapomodule/mcp@1.0.0-beta.3) (2026-10-27)
+
+### Features
+
+- enhance MapoRepeater with template support and block picker ([0c0c4af](https://github.com/lotrekagency/mapo-new/commit/0c0c4af06e88fc38ea30aa66d45d9951eec87f64))
+- **uikit:** support sidebar route ordering ([551fc40](https://github.com/lotrekagency/mapo-new/commit/551fc4001d4d2c3e589af30346e6c87714313edb))
+
 # @mapomodule/mcp [1.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.1...@mapomodule/mcp@1.0.0-beta.2) (2026-10-22)
 
 ### Bug Fixes
