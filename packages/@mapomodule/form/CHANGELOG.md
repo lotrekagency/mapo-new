@@ -1,3 +1,17 @@
+# @mapomodule/form [2.0.0-beta.11](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.10...@mapomodule/form@2.0.0-beta.11) (2026-10-27)
+
+### Bug Fixes
+
+- **form:** give the editor and the media pickers a surface of their own ([0207a46](https://github.com/lotrekagency/mapo-new/commit/0207a46a4de628b4419e44838618eb36a634c8a0))
+- **form:** keep the editor a single-root component, so it fills its column ([7050443](https://github.com/lotrekagency/mapo-new/commit/705044325564020cad601530c7a28d0df02c664a))
+- **form:** name the tab of fields without a tab, and hide tabs with nothing to show ([b7be712](https://github.com/lotrekagency/mapo-new/commit/b7be712867dc0e4305a7e504444387ba61fd3167))
+- **i18n:** require @nuxtjs/i18n 10.6, which resolves the generated vue-i18n config in dev ([5545bcc](https://github.com/lotrekagency/mapo-new/commit/5545bccf4986373e5ee470e72aa65893561ab9b9))
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.3
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.6
+
 # @mapomodule/form [2.0.0-beta.10](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.9...@mapomodule/form@2.0.0-beta.10) (2026-09-01)
 
 ### Bug Fixes
