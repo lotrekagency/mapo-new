@@ -1,3 +1,16 @@
+# @mapomodule/i18n [2.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.2...@mapomodule/i18n@2.0.0-beta.3) (2026-10-27)
+
+### Bug Fixes
+
+- **form:** name the tab of fields without a tab, and hide tabs with nothing to show ([b7be712](https://github.com/lotrekagency/mapo-new/commit/b7be712867dc0e4305a7e504444387ba61fd3167))
+- **i18n:** require @nuxtjs/i18n 10.6, which resolves the generated vue-i18n config in dev ([5545bcc](https://github.com/lotrekagency/mapo-new/commit/5545bccf4986373e5ee470e72aa65893561ab9b9))
+- **uikit:** sort lists from the column headers ([e4e84aa](https://github.com/lotrekagency/mapo-new/commit/e4e84aa701b52725f21c3d9c335b8852facb1805))
+
+### Features
+
+- **uikit:** add an "all rows" page size to MapoList ([2924396](https://github.com/lotrekagency/mapo-new/commit/29243964e57ba5e88e315c7186693eda24acae58))
+- **uikit:** say "No results" when a search or a filter finds nothing ([d7f6ffa](https://github.com/lotrekagency/mapo-new/commit/d7f6ffa9b2f997e517d8b9598a5e6b1f55e5eaec))
+
 # @mapomodule/i18n [2.0.0-beta.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.1...@mapomodule/i18n@2.0.0-beta.2) (2026-08-27)
 
 ### Bug Fixes
