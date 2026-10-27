@@ -16,7 +16,7 @@ definePageMeta({
 </script>
 ```
 
-All Mapo-specific `definePageMeta` fields are fully typed — `label`, `icon`, `hidden`, `parent`, `sidebarFooter` (from `@mapomodule/uikit`) and `permissions`, `roles` (from `@mapomodule/core`) — and will appear in editor autocomplete as soon as the dev server has run once and generated `.nuxt/types/`.
+All Mapo-specific `definePageMeta` fields are fully typed — `label`, `icon`, `hidden`, `parent`, `sidebarFooter`, `sidebarOrder` (from `@mapomodule/uikit`) and `permissions`, `roles` (from `@mapomodule/core`) — and will appear in editor autocomplete as soon as the dev server has run once and generated `.nuxt/types/`.
 
 For pages that should not use the admin shell (e.g. the login page), set `layout: false`:
 

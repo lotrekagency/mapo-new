@@ -58,12 +58,12 @@ const tabsWithErrors = computed(() => {
 <template>
   <div class="mapo-form-tabs">
     <!-- Tab bar -->
-    <div class="flex gap-1 border-b border-gray-200 pb-px">
+    <div class="flex flex-wrap gap-1 border-b border-gray-200 pb-px">
       <button
         v-for="tab in shownTabs"
         :key="tab.name"
         type="button"
-        class="relative flex items-center gap-1.5 rounded-t px-4 py-2 text-sm font-medium transition-colors"
+        class="relative flex max-w-full items-center gap-1.5 rounded-t px-4 py-2 text-sm font-medium transition-colors"
         :class="[
           activeTab === tab.name
             ? 'border-b-2 border-primary-500 text-primary-600'

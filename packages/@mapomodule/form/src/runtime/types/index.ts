@@ -21,6 +21,7 @@ export type {
   SeoDescriptor,
   MapDescriptor,
   RepeaterDescriptor,
+  RepeaterTemplate,
   MediaDescriptor,
   MediaM2mDescriptor,
   EnhancedMediaDescriptor,

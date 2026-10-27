@@ -135,7 +135,14 @@
       "moveDown": "Move down",
       "position": "Position",
       "editFullScreen": "Edit full screen",
-      "empty": "No items. Click \"Add\" to start."
+      "empty": "No items. Click \"Add\" to start.",
+      "addBlock": "Add block",
+      "chooseBlock": "Choose a block",
+      "searchBlocks": "Search blocks...",
+      "allCategories": "All",
+      "noBlocksFound": "No blocks found.",
+      "keepOpenHint": "Hold Shift to add several blocks",
+      "blockType": "Block type"
     },
     "seoPreview": {
       "seoTitle": "SEO title",

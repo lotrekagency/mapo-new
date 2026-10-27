@@ -167,7 +167,7 @@ const listSlots = slotNamespace(slots, "list:");
 
 ## `buildRouteTree(routes)`
 
-Converts a flat `RouteRecordNormalized[]` array into a nested `MenuNode[]` tree, using `route.meta.parent` to establish parent–child relationships. Used by the sidebar to build the navigation tree.
+Converts a flat `RouteRecordNormalized[]` array into a nested `MenuNode[]` tree, using `route.meta.parent` to establish parent–child relationships. At each level, finite numeric `route.meta.sidebarOrder` values sort ascending before routes without an order; equal values and unordered siblings preserve router order. This applies recursively. Used by the sidebar to build the navigation tree.
 
 ```ts
 import { buildRouteTree } from "@mapomodule/utils";

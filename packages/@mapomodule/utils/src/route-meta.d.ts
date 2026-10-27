@@ -5,6 +5,7 @@ declare module "vue-router" {
     hidden?: boolean;
     parent?: string;
     sidebarFooter?: boolean;
+    sidebarOrder?: number;
   }
 }
 

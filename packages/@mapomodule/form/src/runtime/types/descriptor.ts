@@ -303,6 +303,36 @@ export interface MapDescriptor<
   };
 }
 
+/**
+ * A repeater block template with presentation metadata.
+ * Use it instead of a bare field array to describe the block in the picker.
+ */
+export interface RepeaterTemplate {
+  /** Field descriptors of the block. */
+  fields: AnyFieldDescriptor[];
+  /** Human-readable name. Defaults to the template key. */
+  label?: string;
+  /** Short explanation of what the block is for. */
+  description?: string;
+  /** Iconify name (e.g. `i-lucide-image`). Used as the preview fallback and in the item header. */
+  icon?: string;
+  /** Preview image URL, shown in the picker card. Takes precedence over `wireframe` and `icon`. */
+  image?: string;
+  /** Draw a schematic preview generated from the template fields (used when there is no `image`). */
+  wireframe?: boolean;
+  /** Group name: the picker shows one filter chip per category. */
+  category?: string;
+}
+
+/** A {@link RepeaterTemplate} normalized for display, with its key and defaults applied. @internal */
+export interface NormalizedRepeaterTemplate extends Omit<
+  RepeaterTemplate,
+  "label"
+> {
+  key: string;
+  label: string;
+}
+
 /** Descriptor for a drag-and-drop repeater with nested field descriptors. */
 export interface RepeaterDescriptor<
   T = Record<string, unknown>,
@@ -314,8 +344,18 @@ export interface RepeaterDescriptor<
    */
   fields?: AnyFieldDescriptor[];
   attrs?: {
-    /** Multiple templates for heterogeneous items (`oneOf` discriminated union). */
-    templates?: Record<string, AnyFieldDescriptor[]>;
+    /**
+     * Multiple templates for heterogeneous items (`oneOf` discriminated union).
+     * A value is either a bare field array or a {@link RepeaterTemplate} with label,
+     * description, icon, preview image and category.
+     */
+    templates?: Record<string, AnyFieldDescriptor[] | RepeaterTemplate>;
+    /**
+     * How the user chooses a template when adding an item: `select` (dropdown),
+     * `modal` (card gallery with search) or `auto`. Default: `auto`, which uses the
+     * modal when there are more than 3 templates.
+     */
+    picker?: "auto" | "select" | "modal";
     /** Label shown when an item is collapsed. Receives the item and its index. */
     previewLabel?: (item: unknown, index: number) => string;
     confirmDelete?: boolean;

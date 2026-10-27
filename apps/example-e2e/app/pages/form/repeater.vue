@@ -130,6 +130,55 @@ const repeaterD: RepeaterDescriptor<MinModel> = {
   attrs: { minItems: 2, confirmDelete: false },
 };
 
+// ── Fixture E: block picker (template metadata + modal) ──────────────────────
+interface PickerModel {
+  blocks: Array<{ _template: string; title?: string; body?: string }>;
+}
+const modelE = ref<PickerModel>({ blocks: [] });
+const repeaterE: RepeaterDescriptor<PickerModel> = {
+  key: "blocks",
+  type: "repeater",
+  label: "Page blocks (modal picker)",
+  attrs: {
+    picker: "auto",
+    templates: {
+      hero: {
+        label: "Hero",
+        description: "Large headline with image and call to action.",
+        icon: "i-lucide-panels-top-left",
+        category: "Header",
+        wireframe: true,
+        fields: [
+          { key: "title", type: "text", label: "Title" },
+          { key: "image", type: "media", label: "Image" },
+        ],
+      },
+      text: {
+        label: "Text",
+        description: "Rich text paragraph.",
+        icon: "i-lucide-text",
+        category: "Content",
+        wireframe: true,
+        fields: [
+          { key: "title", type: "text", label: "Title" },
+          { key: "body", type: "textarea", label: "Body" },
+        ],
+      },
+      gallery: {
+        label: "Gallery",
+        description: "Grid of images.",
+        icon: "i-lucide-images",
+        category: "Media",
+        fields: [{ key: "title", type: "text", label: "Title" }],
+      },
+      // A bare field array still works: label falls back to the key.
+      cta: [{ key: "title", type: "text", label: "Title" }],
+    },
+    previewLabel: (item: unknown) =>
+      (item as { title?: string }).title || "Untitled",
+  },
+};
+
 // ── Dirty tracking integration ────────────────────────────────────────────────
 const formA = useMapoForm({
   model: modelA,
@@ -231,6 +280,26 @@ const formA = useMapoForm({
       <MapoForm
         v-model="modelD"
         :fields="[repeaterD]"
+        :errors="{}"
+        :registry="$mapoFormRegistry"
+      />
+    </UCard>
+
+    <!-- Fixture E: block picker modal -->
+    <UCard>
+      <template #header>
+        <span class="font-semibold text-sm text-highlighted"
+          >E — Block picker (4 templates → modal)</span
+        >
+      </template>
+      <p class="text-xs text-muted mb-3">
+        More than 3 templates: "Add block" opens a gallery with search and
+        category filters. Cards show wireframe, icon or image. Hold Shift to add
+        several blocks. Each item shows its block type as a badge.
+      </p>
+      <MapoForm
+        v-model="modelE"
+        :fields="[repeaterE]"
         :errors="{}"
         :registry="$mapoFormRegistry"
       />

@@ -16,6 +16,7 @@ export type MenuRouteMeta = Record<PropertyKey, unknown> & {
   hidden?: boolean;
   parent?: string;
   sidebarFooter?: boolean;
+  sidebarOrder?: number;
 };
 
 /** Structural subset of `RouteRecordNormalized` used to build the menu. */
@@ -31,6 +32,25 @@ export interface MenuNode {
   children: MenuNode[];
   meta: MenuRouteMeta;
   sidebarFooter: boolean;
+}
+
+function sortMenuNodes(nodes: MenuNode[]): void {
+  nodes.sort((a, b) => {
+    const aOrder = a.meta.sidebarOrder;
+    const bOrder = b.meta.sidebarOrder;
+    if (typeof aOrder === "number" && Number.isFinite(aOrder)) {
+      if (typeof bOrder === "number" && Number.isFinite(bOrder)) {
+        return aOrder - bOrder;
+      }
+      return -1;
+    }
+    if (typeof bOrder === "number" && Number.isFinite(bOrder)) return 1;
+    return 0;
+  });
+
+  for (const node of nodes) {
+    sortMenuNodes(node.children);
+  }
 }
 
 /** Return the maximum nesting depth of a MenuNode tree (root = depth 1). */
@@ -86,5 +106,6 @@ export function buildRouteTree(routes: MenuRouteRecord[]): MenuNode[] {
     roots.push(node);
   }
 
+  sortMenuNodes(roots);
   return roots;
 }
