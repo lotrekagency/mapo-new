@@ -1,3 +1,16 @@
+# @mapomodule/uikit [2.0.0-beta.15](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.14...@mapomodule/uikit@2.0.0-beta.15) (2026-10-27)
+
+### Features
+
+- **uikit:** support sidebar route ordering ([551fc40](https://github.com/lotrekagency/mapo-new/commit/551fc4001d4d2c3e589af30346e6c87714313edb))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.12
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.4
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.7
+- **@mapomodule/core:** upgraded to 2.0.0-beta.11
+
 # @mapomodule/uikit [2.0.0-beta.14](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.13...@mapomodule/uikit@2.0.0-beta.14) (2026-10-27)
 
 ### Bug Fixes
