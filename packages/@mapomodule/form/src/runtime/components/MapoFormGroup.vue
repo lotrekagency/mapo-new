@@ -217,12 +217,12 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
       <!-- Sub-tab bar + content (when subtabs are present) -->
       <div v-if="subtabs && subtabs.size > 0" class="px-5 pb-5 pt-4">
         <!-- Sub-tab bar -->
-        <div class="flex gap-1 border-b border-gray-200 mb-4">
+        <div class="mb-4 flex flex-wrap gap-1 border-b border-gray-200">
           <button
             v-for="[subtabName] of subtabs"
             :key="subtabName"
             type="button"
-            class="relative px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none"
+            class="relative max-w-full px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none"
             :class="[
               activeSubtab === subtabName
                 ? 'text-primary-600 border-b-2 border-primary-600 -mb-px'
