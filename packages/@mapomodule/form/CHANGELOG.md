@@ -1,3 +1,18 @@
+# @mapomodule/form [2.0.0-beta.12](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.11...@mapomodule/form@2.0.0-beta.12) (2026-10-27)
+
+### Bug Fixes
+
+- **tabs:** allow tab bars to wrap onto additional lines when overflowing ([54b8ee7](https://github.com/lotrekagency/mapo-new/commit/54b8ee7adccbc1721e532e61218c6d078ea36ba9))
+
+### Features
+
+- enhance MapoRepeater with template support and block picker ([0c0c4af](https://github.com/lotrekagency/mapo-new/commit/0c0c4af06e88fc38ea30aa66d45d9951eec87f64))
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.4
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.7
+
 # @mapomodule/form [2.0.0-beta.11](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.10...@mapomodule/form@2.0.0-beta.11) (2026-10-27)
 
 ### Bug Fixes
