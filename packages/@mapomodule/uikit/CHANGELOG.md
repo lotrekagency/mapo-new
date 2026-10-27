@@ -1,3 +1,31 @@
+# @mapomodule/uikit [2.0.0-beta.14](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.13...@mapomodule/uikit@2.0.0-beta.14) (2026-10-27)
+
+### Bug Fixes
+
+- **i18n:** require @nuxtjs/i18n 10.6, which resolves the generated vue-i18n config in dev ([5545bcc](https://github.com/lotrekagency/mapo-new/commit/5545bccf4986373e5ee470e72aa65893561ab9b9))
+- **uikit:** drop pending list URL writes when the list unmounts ([0677e73](https://github.com/lotrekagency/mapo-new/commit/0677e737670c99d7ceb5b8b8491de1658053b5e1))
+- **uikit:** keep the detail actions busy until the page has gone back ([ad22c9d](https://github.com/lotrekagency/mapo-new/commit/ad22c9d43e861334c059b3228aa06a9d90558fc2))
+- **uikit:** label the metadata fields of a file waiting for upload ([efd673e](https://github.com/lotrekagency/mapo-new/commit/efd673e1ec38874db79ccdd120ced2eb1233520c))
+- **uikit:** make the list pager change page and keep the page from the URL ([240f36c](https://github.com/lotrekagency/mapo-new/commit/240f36c642bf3805cb8d856d116f378cc4e6c323))
+- **uikit:** name the icon-only row buttons ([180301b](https://github.com/lotrekagency/mapo-new/commit/180301b3988316bf31a212845df477e438d30175))
+- **uikit:** open the confirm dialog above the overlay that asks for it ([1b0317a](https://github.com/lotrekagency/mapo-new/commit/1b0317a35ddfd3010356115106e46222f5427e26))
+- **uikit:** show the language select only above langThreshold, with one chevron ([4eff7ae](https://github.com/lotrekagency/mapo-new/commit/4eff7ae561f815558a93c3e8b959f505a267b70b))
+- **uikit:** show the pointer cursor on enabled buttons ([294591a](https://github.com/lotrekagency/mapo-new/commit/294591a20e68ee506038e9957d8b3b1165ecec0d))
+- **uikit:** sort lists from the column headers ([e4e84aa](https://github.com/lotrekagency/mapo-new/commit/e4e84aa701b52725f21c3d9c335b8852facb1805))
+
+### Features
+
+- **uikit:** add an "all rows" page size to MapoList ([2924396](https://github.com/lotrekagency/mapo-new/commit/29243964e57ba5e88e315c7186693eda24acae58))
+- **uikit:** say "No results" when a search or a filter finds nothing ([d7f6ffa](https://github.com/lotrekagency/mapo-new/commit/d7f6ffa9b2f997e517d8b9598a5e6b1f55e5eaec))
+- **uikit:** show fields of related objects in list columns ([3c4a419](https://github.com/lotrekagency/mapo-new/commit/3c4a4196700a00f1adcf7bb5331e45cbac94af98))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.11
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.3
+- **@mapomodule/utils:** upgraded to 2.0.0-beta.6
+- **@mapomodule/core:** upgraded to 2.0.0-beta.10
+
 # @mapomodule/uikit [2.0.0-beta.13](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.12...@mapomodule/uikit@2.0.0-beta.13) (2026-09-02)
 
 ### Bug Fixes
