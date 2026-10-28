@@ -127,7 +127,18 @@ const form = injectMapoForm();
 // form?.languages         → list of languages
 ```
 
-`injectMapoForm` is auto-imported when `@mapomodule/form` is installed.
+`injectMapoForm` is not auto-imported: import it from `@mapomodule/form/runtime/composables/useMapoForm`.
+
+## Reading the field's annotation
+
+A custom field shows the [annotation](./annotations) mark next to its label without any code. To use the annotation inside the field too, read it with the auto-imported `useFieldAnnotation()`:
+
+```ts
+const annotation = useFieldAnnotation(() => props.descriptor);
+// annotation.value?.label, .color, .description, .actions
+```
+
+It follows the same rule as the mark and works inside repeater items too. [A complete field](./annotations#a-complete-field) shows how to highlight the control and offer the actions.
 
 ## Tip: reusing built-in Mapo fields
 

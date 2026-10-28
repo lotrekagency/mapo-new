@@ -71,6 +71,11 @@ const sections = [
         to: "/form/field-expand",
         desc: "expandable: true — compact + expanded views",
       },
+      {
+        label: "Field Annotations",
+        to: "/form/annotations",
+        desc: "Marks with popovers next to labels, badges on tabs and repeater items",
+      },
     ],
   },
   {

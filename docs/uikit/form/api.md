@@ -16,16 +16,17 @@ Descriptor typing guidance:
 
 ### Props
 
-| Prop          | Type                       | Default        | Description                                                                  |
-| ------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------- |
-| `modelValue`  | `T`                        | — **required** | The form data object (v-model).                                              |
-| `fields`      | `AnyFieldDescriptor<T>[]`  | — **required** | Array of field descriptors defining the form layout.                         |
-| `errors`      | `Record<string, string[]>` | `{}`           | Server-side validation errors keyed by field path.                           |
-| `languages`   | `string[]`                 | `[]`           | Available language codes for translated fields.                              |
-| `currentLang` | `string`                   | `''`           | Active language code. Controlled externally (by `MapoDetail`).               |
-| `readonly`    | `boolean`                  | `false`        | Make all fields read-only.                                                   |
-| `immediate`   | `boolean`                  | `false`        | Run client validators immediately without waiting for the first submit.      |
-| `registry`    | `FieldRegistry`            | —              | Field component registry. Auto-injected from `$mapoFormRegistry` if omitted. |
+| Prop          | Type                       | Default        | Description                                                                                                                    |
+| ------------- | -------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `modelValue`  | `T`                        | — **required** | The form data object (v-model).                                                                                                |
+| `fields`      | `AnyFieldDescriptor<T>[]`  | — **required** | Array of field descriptors defining the form layout.                                                                           |
+| `errors`      | `Record<string, string[]>` | `{}`           | Server-side validation errors keyed by field path.                                                                             |
+| `languages`   | `string[]`                 | `[]`           | Available language codes for translated fields.                                                                                |
+| `currentLang` | `string`                   | `''`           | Active language code. Controlled externally (by `MapoDetail`).                                                                 |
+| `readonly`    | `boolean`                  | `false`        | Make all fields read-only.                                                                                                     |
+| `immediate`   | `boolean`                  | `false`        | Run client validators immediately without waiting for the first submit.                                                        |
+| `registry`    | `FieldRegistry`            | —              | Field component registry. Auto-injected from `$mapoFormRegistry` if omitted.                                                   |
+| `annotations` | `FieldAnnotations`         | —              | Marks next to the field labels and counts on the tabs, keyed by the path of the value. See [Field annotations](./annotations). |
 
 ### Emits
 
@@ -64,14 +65,15 @@ Low-level wrapper that resolves a `FieldDescriptor` to its registered component,
 
 ### Slots
 
-| Slot                  | Description                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `field.{key}.label`   | Override the field label. Receives `{ descriptor, label, model, currentLang }`.            |
-| `field.{key}.before`  | Content rendered before the field wrapper. Receives `{ descriptor, model, currentLang }`.  |
-| `field.{key}.prepend` | Content prepended inside the field control. Receives `{ descriptor, model, currentLang }`. |
-| `field.{key}.append`  | Content appended inside the field control. Receives `{ descriptor, model, currentLang }`.  |
-| `field.{key}.hint`    | Override the hint text. Receives `{ descriptor, model, currentLang }`.                     |
-| `field.{key}.after`   | Content rendered after the field wrapper. Receives `{ descriptor, model, currentLang }`.   |
+| Slot                     | Description                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `field.{key}.label`      | Override the field label. Receives `{ descriptor, label, annotation }`; `annotation` is the field's mark, if any. |
+| `field.{key}.annotation` | Replace the description in the popover of the field's mark. Receives `{ annotation, descriptor }`.                |
+| `field.{key}.before`     | Content rendered before the field wrapper. Receives `{ descriptor, model }`.                                      |
+| `field.{key}.prepend`    | Content prepended inside the field control. Receives `{ descriptor, model }`.                                     |
+| `field.{key}.append`     | Content appended inside the field control. Receives `{ descriptor, model }`.                                      |
+| `field.{key}.hint`       | Override the hint text. Receives `{ descriptor, model }`.                                                         |
+| `field.{key}.after`      | Content rendered after the field wrapper. Receives `{ descriptor, model }`.                                       |
 
 ---
 
@@ -110,13 +112,31 @@ Forwards all `field.*` slot names to each `MapoFormField` child (same forwarding
 
 ## MapoFormTabs
 
-Tab-based layout for organizing fields into named sections.
+Tab-based layout for organizing fields into named sections. A tab shows a red dot when one of its fields has an error, and one badge per icon and color of the [annotations](./annotations) of its fields.
 
 ### Props
 
 | Prop   | Type         | Default        | Description                                          |
 | ------ | ------------ | -------------- | ---------------------------------------------------- |
 | `tabs` | `TabEntry[]` | — **required** | Tab definitions. Each entry has `{ label, fields }`. |
+
+---
+
+## MapoFormAnnotation
+
+The mark of an annotated field: a small button with the annotation's icon and color, named by its label, that opens a popover with the title, the description and the actions. `MapoFormField` renders it next to the label; use it in a custom `field.{key}.label` slot to keep the mark. See [Field annotations](./annotations).
+
+### Props
+
+| Prop         | Type              | Default        | Description                                                                       |
+| ------------ | ----------------- | -------------- | --------------------------------------------------------------------------------- |
+| `annotation` | `FieldAnnotation` | — **required** | The mark to show: icon and color on the button, texts and actions in the popover. |
+
+### Slots
+
+| Slot   | Description                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------- |
+| `body` | Replaces the description, between the popover title and its actions. Receives `{ annotation }`. |
 
 ---
 

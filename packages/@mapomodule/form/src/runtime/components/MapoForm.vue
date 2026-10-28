@@ -5,6 +5,7 @@ import { useNuxtApp, useRuntimeConfig } from "#app";
 import { useI18n } from "vue-i18n";
 import type {
   AnyFieldDescriptor,
+  FieldAnnotations,
   FieldRegistry,
   MapoFormRuntimeConfig,
 } from "../types/index.js";
@@ -30,6 +31,12 @@ const props = withDefaults(
      * Pass it explicitly only for headless forms or one-off registry swaps.
      */
     registry?: FieldRegistry;
+    /**
+     * Marks shown next to the field labels and counted on the tabs, keyed by
+     * the path of the value (`title`, `translations.it.title`, `blocks.0.title`).
+     * Changing the map updates the marks without remounting the fields.
+     */
+    annotations?: FieldAnnotations;
   }>(),
   {
     errors: () => ({}),
@@ -38,6 +45,7 @@ const props = withDefaults(
     readonly: false,
     immediate: false,
     registry: undefined,
+    annotations: undefined,
   },
 );
 
@@ -87,6 +95,7 @@ const form = useMapoForm({
   immediate: props.immediate,
   debounce: globalDebounce,
   registry: injectedRegistry.value,
+  annotations: computed(() => props.annotations),
 });
 
 // Inherit the parent form's submitted state (provided automatically by useMapoForm)

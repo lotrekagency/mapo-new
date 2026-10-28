@@ -412,6 +412,27 @@ export const RECIPES: Recipe[] = [
       "Open a repeater item in a fullscreen view, or expand a single field in place.",
   },
   {
+    id: "field-annotations",
+    task: "Annotate the fields an assistant filled or that need a review",
+    keywords: [
+      "annotations",
+      "annotate",
+      "mark a field",
+      "field badge",
+      "tab count",
+      "suggested value",
+      "imported value",
+      "review note",
+      "outside the descriptor",
+      "MapoFormAnnotation",
+      "useFieldAnnotation",
+    ],
+    doc: "uikit/form/annotations.md",
+    seeAlso: ["uikit/form/slots.md", "uikit/form/api.md"],
+    summary:
+      "A reactive map keyed by value path on MapoForm, MapoDetail or useMapoForm: a mark with a popover next to the label and badges on tabs and repeater items, without remounting the fields.",
+  },
+  {
     id: "sidebar-navigation",
     task: "Build the sidebar navigation",
     keywords: [

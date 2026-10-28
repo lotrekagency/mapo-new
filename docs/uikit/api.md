@@ -24,6 +24,7 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `usePatch`      | `boolean`               | `true`         | Send `PATCH` (diff only) on update instead of `PUT`.                                                            |
 | `readonly`      | `boolean`               | `false`        | Force read-only mode globally.                                                                                  |
 | `registry`      | `FieldRegistry \| null` | `null`         | Field registry. Falls back to `$mapoFormRegistry` if omitted.                                                   |
+| `annotations`   | `FieldAnnotations`      | —              | Marks on the fields of the body and the sidebar forms. See [Field annotations](./form/annotations).             |
 
 ### Emits
 

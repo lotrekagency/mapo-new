@@ -3,11 +3,14 @@ import { ref, computed, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import type {
   AnyFieldDescriptor,
+  FieldAnnotations,
   FieldRegistry,
   RepeaterDescriptor,
 } from "../../types/index.js";
 import { useMapoForm, injectMapoForm } from "../../composables/useMapoForm.js";
 import { useFocusMode } from "../../composables/useFocusMode.js";
+import { annotationGroups, entriesUnder } from "../../utils/annotations.js";
+import MapoFormAnnotationBadges from "../MapoFormAnnotationBadges.vue";
 import MapoFormField from "../MapoFormField.vue";
 
 const { t } = useI18n();
@@ -87,14 +90,9 @@ watch(
 );
 
 // Filter parent errors down to this item: "blocks.0.title" → "title".
-const itemErrors = computed<Record<string, string[]>>(() => {
-  const result: Record<string, string[]> = {};
-  const prefix = `${props.errorPrefix}.`;
-  for (const [k, v] of Object.entries(props.parentErrors)) {
-    if (k.startsWith(prefix)) result[k.slice(prefix.length)] = v;
-  }
-  return result;
-});
+const itemErrors = computed<Record<string, string[]>>(() =>
+  entriesUnder(props.parentErrors, props.errorPrefix),
+);
 
 const hasErrors = computed(() => Object.keys(itemErrors.value).length > 0);
 
@@ -109,6 +107,11 @@ const readonly = computed(() => props.readonly);
 // Capture the parent context BEFORE useMapoForm provides a new one for this subtree.
 const parentCtx = injectMapoForm<Record<string, unknown>>();
 
+// The parent's annotations under this item, keyed as the item's fields see them.
+const itemAnnotations = computed<FieldAnnotations>(() =>
+  entriesUnder(parentCtx?.annotations?.value ?? {}, props.errorPrefix),
+);
+
 // `notifyErrors: false` so each item does not duplicate the root form's error toast.
 const form = useMapoForm<Record<string, unknown>>({
   model: localModel,
@@ -120,6 +123,7 @@ const form = useMapoForm<Record<string, unknown>>({
   debounce: parentCtx?.debounce ?? 300,
   notifyErrors: false,
   registry: props.registry,
+  annotations: itemAnnotations,
 });
 
 // Inherit readonly + submitted from the root form so its submit() reveals item-level
@@ -128,6 +132,17 @@ watchEffect(() => {
   form.readonly.value = props.readonly;
   if (parentCtx) form.ctx.submitted.value = parentCtx.submitted.value;
 });
+
+// An item starts collapsed: the badges on its header and mini-card tell which
+// item holds marks, as the error badge does for errors.
+const itemAnnotationGroups = computed(() =>
+  annotationGroups(
+    props.fields,
+    itemAnnotations.value,
+    localModel.value,
+    props.currentLang,
+  ),
+);
 
 // ─── Preview label ────────────────────────────────────────────────────────────
 
@@ -173,6 +188,7 @@ function enterFocusMode() {
     fields: props.fields,
     model: { ...localModel.value },
     errors: itemErrors,
+    annotations: itemAnnotations,
     onUpdate: (val) => {
       localModel.value = { ...val };
       emit("update:item", localModel.value);
@@ -247,6 +263,7 @@ function enterFocusMode() {
       <UBadge v-if="hasErrors" color="error" variant="soft" size="xs">
         errors
       </UBadge>
+      <MapoFormAnnotationBadges :groups="itemAnnotationGroups" size="xs" />
 
       <!-- Quick actions (delete only in mini mode) -->
       <div class="flex items-center gap-1">
@@ -309,6 +326,7 @@ function enterFocusMode() {
         <UBadge v-if="hasErrors" color="error" variant="soft" size="xs">
           errors
         </UBadge>
+        <MapoFormAnnotationBadges :groups="itemAnnotationGroups" size="xs" />
       </button>
 
       <!-- Action buttons. All buttons stop propagation so the row-click selection handler

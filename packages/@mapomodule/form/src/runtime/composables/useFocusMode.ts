@@ -6,7 +6,11 @@ import {
   type DeepReadonly,
   type ShallowRef,
 } from "vue";
-import type { AnyFieldDescriptor, FieldRegistry } from "../types/index.js";
+import type {
+  AnyFieldDescriptor,
+  FieldAnnotations,
+  FieldRegistry,
+} from "../types/index.js";
 
 /** Describes the currently focused repeater item in focus mode. */
 export interface FocusTarget {
@@ -22,6 +26,8 @@ export interface FocusTarget {
   model: Record<string, unknown>;
   /** Errors for this item (already filtered). */
   errors: Ref<Record<string, string[]>>;
+  /** Annotations for this item (already filtered), keyed by the item's paths. */
+  annotations?: Readonly<Ref<FieldAnnotations>>;
   /** Callback invoked when the item model is updated. */
   onUpdate: (val: Record<string, unknown>) => void;
   /** Field component registry passed to the sub-form. */

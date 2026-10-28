@@ -9,16 +9,28 @@
  * // In layouts/default.vue
  * <MapoFocusPortal />
  */
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed, ref, onMounted, onUnmounted, unref } from "vue";
 import { watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFocusMode } from "../composables/useFocusMode.js";
+import type { FieldAnnotations } from "../types/index.js";
 import MapoForm from "./MapoForm.vue";
 
 const { t } = useI18n();
 const { focusTarget, exit } = useFocusMode();
 
 const isOpen = computed(() => focusTarget.value !== null);
+
+// `useFocusMode()` hands the target out through `readonly()`, which unwraps the
+// refs it holds: `errors` and `annotations` arrive as plain values, so reading
+// `.value` on them gives `undefined`. `unref` accepts both shapes.
+const focusErrors = computed(
+  () =>
+    unref(focusTarget.value?.errors) as Record<string, string[]> | undefined,
+);
+const focusAnnotations = computed(
+  () => unref(focusTarget.value?.annotations) as FieldAnnotations | undefined,
+);
 const canUseDocument = typeof document !== "undefined";
 
 // Close on ESC.
@@ -102,10 +114,11 @@ function onUpdate(val: Record<string, unknown>) {
             <MapoForm
               :model-value="localModel"
               :fields="focusTarget.fields as any"
-              :errors="focusTarget.errors.value as any"
+              :errors="focusErrors"
               :languages="focusTarget.languages as any"
               :current-lang="focusTarget.currentLang"
               :registry="focusTarget.registry as any"
+              :annotations="focusAnnotations"
               @update:model-value="onUpdate"
             />
           </div>

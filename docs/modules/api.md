@@ -422,16 +422,17 @@ Type guards.
 
 Core composable powering `MapoForm`. Provides dirty tracking, validation, and submit flows.
 
-| Option        | Type                             | Default        | Description                             |
-| ------------- | -------------------------------- | -------------- | --------------------------------------- |
-| `model`       | `Ref<T>`                         | — **required** | Reactive form model.                    |
-| `fields`      | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive). |
-| `errors`      | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.          |
-| `languages`   | `string[]`                       | `[]`           | Available language codes.               |
-| `currentLang` | `Ref<string>`                    | `ref('')`      | Active language ref.                    |
-| `immediate`   | `boolean`                        | `false`        | Validate immediately on mount.          |
-| `debounce`    | `number`                         | `300`          | Global validator debounce (ms).         |
-| `registry`    | `FieldRegistry`                  | — **required** | Field component registry.               |
+| Option        | Type                             | Default        | Description                                                                                            |
+| ------------- | -------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `model`       | `Ref<T>`                         | — **required** | Reactive form model.                                                                                   |
+| `fields`      | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive).                                                                |
+| `errors`      | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.                                                                         |
+| `languages`   | `string[]`                       | `[]`           | Available language codes.                                                                              |
+| `currentLang` | `Ref<string>`                    | `ref('')`      | Active language ref.                                                                                   |
+| `immediate`   | `boolean`                        | `false`        | Validate immediately on mount.                                                                         |
+| `debounce`    | `number`                         | `300`          | Global validator debounce (ms).                                                                        |
+| `registry`    | `FieldRegistry`                  | — **required** | Field component registry.                                                                              |
+| `annotations` | `MaybeRef<FieldAnnotations>`     | —              | Marks on the fields, keyed by the path of the value. See [Field annotations](/uikit/form/annotations). |
 
 **Returns:**
 
@@ -518,6 +519,18 @@ Shared state for the `MapoFocusPortal` / `MapoRepeater` focus-mode integration.
 | `isActive`    | `Ref<boolean>`                                  | `true` when focus mode is active.               |
 | `enter`       | `(target: FocusTarget) => void`                 | Open focus mode on a specific item.             |
 | `exit`        | `() => void`                                    | Close focus mode and restore the previous view. |
+
+---
+
+### `useFieldAnnotation(descriptor)`
+
+The annotation of a field, the one its mark shows. Call it in a custom field component to highlight the field, show the annotation's text or offer its actions inside the field. See [Field annotations](/uikit/form/annotations#read-the-annotation-in-a-custom-field).
+
+| Parameter    | Type                                   | Description                                |
+| ------------ | -------------------------------------- | ------------------------------------------ |
+| `descriptor` | `MaybeRefOrGetter<AnyFieldDescriptor>` | The field's descriptor, or a getter of it. |
+
+**Returns:** `ComputedRef<FieldAnnotation | undefined>` — the entry at the path of the field's value; for a translatable field, otherwise the entry at its bare key. Inside a repeater item it reads the item's annotations; outside a form it is always `undefined`.
 
 ---
 

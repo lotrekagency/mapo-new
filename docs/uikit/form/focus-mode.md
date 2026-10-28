@@ -59,6 +59,7 @@ focusMode.enter({
   fields: itemFields,
   model: itemModelRef,
   errors: itemErrorsRef,
+  annotations: itemAnnotationsRef, // optional: the item's field annotations
   onUpdate: (val) => {
     /* update the item in the parent */
   },

@@ -1,64 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createRenderer,
-  h,
-  onMounted,
-  onUnmounted,
-  provide,
-  ref,
-  shallowRef,
-} from "vue";
-import type { App, Component, ShallowRef } from "vue";
+import { h, onMounted, onUnmounted, provide, ref, shallowRef } from "vue";
+import type { App, Component, Ref, SetupContext, ShallowRef } from "vue";
 
 import MapoFormField from "../runtime/components/MapoFormField.vue";
 import { FORM_KEY } from "../runtime/composables/useMapoForm.js";
+import { useFieldAnnotation } from "../runtime/composables/useFieldAnnotation.js";
 import type { MapoFormContext } from "../runtime/composables/useMapoForm.js";
 import type {
   AnyFieldDescriptor,
+  FieldAnnotation,
+  FieldAnnotations,
   FieldRegistry,
 } from "../runtime/types/index.js";
+import { createApp, headlessNode } from "./headlessRenderer.js";
+import type { HeadlessNode } from "./headlessRenderer.js";
 
 // `useMapoForm.ts` pulls in `nuxt/app` through `useMapoT`, which cannot resolve
 // outside a Nuxt build. The field only injects the form context.
 vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
   useMapoT: () => (key: string) => key,
 }));
-
-// Tests run in Node without a DOM. A renderer whose nodes are plain objects is
-// enough to mount the component with real reactivity, watchers and events.
-interface HeadlessNode {
-  parent: HeadlessNode | null;
-  children: HeadlessNode[];
-  // `v-show` reads and writes `style.display` on the field's root.
-  style: Record<string, string>;
-}
-
-const headlessNode = (): HeadlessNode => ({
-  parent: null,
-  children: [],
-  style: {},
-});
-
-const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
-  createElement: headlessNode,
-  createText: headlessNode,
-  createComment: headlessNode,
-  setText: () => {},
-  setElementText: () => {},
-  patchProp: () => {},
-  insert(child, parent, anchor) {
-    child.parent = parent;
-    const at = anchor ? parent.children.indexOf(anchor) : -1;
-    parent.children.splice(at < 0 ? parent.children.length : at, 0, child);
-  },
-  remove(child) {
-    child.parent?.children.splice(child.parent.children.indexOf(child), 1);
-    child.parent = null;
-  },
-  parentNode: (node) => node.parent,
-  nextSibling: (node) =>
-    node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
-});
 
 /** What a test observes of a field component: its lifecycle and what it renders. */
 interface FieldProbe {
@@ -111,15 +72,21 @@ const registryOf = (mapping: FieldRegistry["mapping"]): FieldRegistry => ({
   accessor: {},
 });
 
+interface FormOptions {
+  annotations?: Ref<FieldAnnotations>;
+  currentLang?: string;
+}
+
 function formContext(
   registry: FieldRegistry,
+  options: FormOptions,
 ): MapoFormContext<Record<string, unknown>> {
   return {
     model: ref<Record<string, unknown>>({ title: "Chi siamo" }),
     fields: [],
     errors: ref({}),
     languages: [],
-    currentLang: ref(""),
+    currentLang: ref(options.currentLang ?? ""),
     readonly: ref(false),
     immediate: true,
     debounce: 0,
@@ -129,12 +96,61 @@ function formContext(
     markTouched: vi.fn(),
     isTouched: () => false,
     submitted: ref(false),
+    annotations: options.annotations ?? ref({}),
   };
 }
 
 // The label renders `UIcon` only for async validation or expandable fields, but
 // the template resolves it on every render.
 const UIcon: Component = { render: () => h("i") };
+
+// `UPopover` renders its trigger and, as if open, its content.
+const UPopover: Component = {
+  name: "UPopover",
+  setup(_props: unknown, { slots }: SetupContext) {
+    return () =>
+      h("div", null, [slots.default?.({ open: true }), slots.content?.()]);
+  },
+};
+
+// `UButton` declares what the mark binds: `icon` and `color` as props, the
+// accessible name as an attribute.
+interface ButtonStub {
+  readonly icon: unknown;
+  readonly color: unknown;
+  readonly ariaLabel: unknown;
+}
+const buttons: ButtonStub[] = [];
+
+const UButton: Component = {
+  name: "UButton",
+  inheritAttrs: false,
+  props: { icon: String, color: String, label: String },
+  setup(
+    props: { icon?: string; color?: string },
+    { attrs, slots }: SetupContext,
+  ) {
+    const stub: ButtonStub = {
+      get icon() {
+        return props.icon;
+      },
+      get color() {
+        return props.color;
+      },
+      get ariaLabel() {
+        return attrs["aria-label"];
+      },
+    };
+    buttons.push(stub);
+    onUnmounted(() => {
+      buttons.splice(buttons.indexOf(stub), 1);
+    });
+    return () => h("button", null, slots.default?.());
+  },
+};
+
+/** The marks next to the labels: the buttons with an accessible name. */
+const marks = () => buttons.filter((button) => button.ariaLabel);
 
 let apps: App<HeadlessNode>[] = [];
 
@@ -145,16 +161,20 @@ let apps: App<HeadlessNode>[] = [];
 function mountField(
   registry: FieldRegistry,
   descriptor: ShallowRef<AnyFieldDescriptor>,
+  options: FormOptions = {},
+  slots: Record<string, (bindings: never) => unknown> = {},
 ) {
-  const context = formContext(registry);
+  const context = formContext(registry, options);
   const host: Component = {
     setup() {
       provide(FORM_KEY, context);
-      return () => h(MapoFormField, { descriptor: descriptor.value });
+      return () => h(MapoFormField, { descriptor: descriptor.value }, slots);
     },
   };
   const app = createApp(host);
   app.component("UIcon", UIcon);
+  app.component("UPopover", UPopover);
+  app.component("UButton", UButton);
   app.mount(headlessNode());
   apps.push(app);
 }
@@ -224,5 +244,169 @@ describe("MapoFormField component", () => {
     mountField(registry, shallowRef({ key: "subtitle", type: "text" }));
 
     expect(text.probe.mounted).toBe(2);
+  });
+});
+
+describe("MapoFormField annotations", () => {
+  const ai: FieldAnnotation = {
+    label: "Suggested by AI",
+    icon: "i-lucide-sparkles",
+    color: "info",
+  };
+  const toCheck: FieldAnnotation = { ...ai, label: "To check", dot: true };
+
+  it("follows the annotation map and keeps the field mounted", async () => {
+    const text = fieldType("TextField");
+    const annotations = ref<FieldAnnotations>({ title: ai });
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef({ key: "title", type: "text" }),
+      { annotations },
+    );
+    await settle();
+    expect(marks()).toEqual([
+      {
+        icon: "i-lucide-sparkles",
+        color: "info",
+        ariaLabel: "Suggested by AI",
+      },
+    ]);
+
+    annotations.value = { title: toCheck };
+    await settle();
+    expect(marks().map((mark) => mark.ariaLabel)).toEqual(["To check"]);
+
+    annotations.value = {};
+    await settle();
+    expect(marks()).toEqual([]);
+    expect(text.probe.mounted).toBe(1);
+    expect(text.probe.unmounted).toBe(0);
+  });
+
+  it("marks a translatable field in the current language, or by its bare key", async () => {
+    const text = fieldType("TextField");
+    const annotations = ref<FieldAnnotations>({
+      "translations.it.title": toCheck,
+    });
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef({ key: "title", type: "text", translatable: true }),
+      { annotations, currentLang: "it" },
+    );
+    await settle();
+    expect(marks().map((mark) => mark.ariaLabel)).toEqual(["To check"]);
+
+    annotations.value = { title: ai };
+    await settle();
+    expect(marks().map((mark) => mark.ariaLabel)).toEqual(["Suggested by AI"]);
+
+    annotations.value = { "translations.en.title": ai };
+    await settle();
+    expect(marks()).toEqual([]);
+  });
+
+  it("gives the annotation to the label slot and the popover body slot", async () => {
+    const text = fieldType("TextField");
+    const labelSlot = vi.fn(() => []);
+    const bodySlot = vi.fn(() => []);
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef({ key: "title", type: "text" }),
+      { annotations: ref({ title: ai }) },
+      { "field.title.annotation": bodySlot },
+    );
+    await settle();
+    expect(bodySlot).toHaveBeenLastCalledWith(
+      expect.objectContaining({ annotation: ai }),
+    );
+
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef({ key: "title", type: "text" }),
+      { annotations: ref({ title: ai }) },
+      { "field.title.label": labelSlot },
+    );
+    await settle();
+    expect(labelSlot).toHaveBeenLastCalledWith(
+      expect.objectContaining({ annotation: ai }),
+    );
+  });
+});
+
+describe("useFieldAnnotation", () => {
+  const ai: FieldAnnotation = { label: "Suggested by AI", color: "info" };
+  const toCheck: FieldAnnotation = { label: "To check", dot: true };
+
+  /** A custom field that keeps the annotation it reads at every render. */
+  function annotatedFieldType() {
+    const seen: { annotation: FieldAnnotation | undefined } = {
+      annotation: undefined,
+    };
+    const component: Component = {
+      name: "AnnotatedField",
+      props: { descriptor: { type: Object, required: true } },
+      setup(props: { descriptor?: AnyFieldDescriptor }) {
+        const annotation = useFieldAnnotation(
+          () => props.descriptor as AnyFieldDescriptor,
+        );
+        return () => {
+          seen.annotation = annotation.value;
+          return h("input");
+        };
+      },
+    };
+    const module = { __esModule: true, default: component };
+    return { seen, loader: () => Promise.resolve(module) };
+  }
+
+  it("lets a custom field read the annotation its mark shows", async () => {
+    const field = annotatedFieldType();
+    const annotations = ref<FieldAnnotations>({ title: ai });
+    mountField(
+      registryOf({ custom: field.loader }),
+      shallowRef({ key: "title", type: "custom" }),
+      { annotations },
+    );
+    await settle();
+    expect(field.seen.annotation).toEqual(ai);
+    expect(marks().map((mark) => mark.ariaLabel)).toEqual(["Suggested by AI"]);
+
+    annotations.value = { title: toCheck };
+    await settle();
+    expect(field.seen.annotation).toEqual(toCheck);
+
+    annotations.value = {};
+    await settle();
+    expect(field.seen.annotation).toBeUndefined();
+  });
+
+  it("applies the current language and the bare key, as the mark does", async () => {
+    const field = annotatedFieldType();
+    mountField(
+      registryOf({ custom: field.loader }),
+      shallowRef({ key: "title", type: "custom", translatable: true }),
+      { annotations: ref({ title: ai }), currentLang: "it" },
+    );
+    await settle();
+
+    expect(field.seen.annotation).toEqual(ai);
+  });
+
+  it("is undefined outside a form", () => {
+    let read: FieldAnnotation | undefined = ai;
+    const standalone: Component = {
+      setup() {
+        const annotation = useFieldAnnotation({ key: "title", type: "text" });
+        return () => {
+          read = annotation.value;
+          return h("input");
+        };
+      },
+    };
+    const app = createApp(standalone);
+    app.mount(headlessNode());
+    apps.push(app);
+
+    expect(read).toBeUndefined();
   });
 });

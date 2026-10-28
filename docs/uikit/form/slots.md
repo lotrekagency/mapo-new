@@ -20,15 +20,16 @@ Slots are addressed by field key. They propagate automatically through `MapoForm
 
 For every field with `key: 'myField'`, the following slots are available:
 
-| Slot                     | Position                                                   |
-| ------------------------ | ---------------------------------------------------------- |
-| `#field.myField`         | Replaces the entire field component (last-resort override) |
-| `#field.myField.label`   | Replaces the label                                         |
-| `#field.myField.before`  | Before the field widget, inside its grid column            |
-| `#field.myField.after`   | After the field widget, inside its grid column             |
-| `#field.myField.prepend` | Inside the field, leading (NUI `leading` slot)             |
-| `#field.myField.append`  | Inside the field, trailing (NUI `trailing` slot)           |
-| `#field.myField.hint`    | Helper text under the field                                |
+| Slot                        | Position                                                       |
+| --------------------------- | -------------------------------------------------------------- |
+| `#field.myField`            | Replaces the entire field component (last-resort override)     |
+| `#field.myField.label`      | Replaces the label                                             |
+| `#field.myField.before`     | Before the field widget, inside its grid column                |
+| `#field.myField.after`      | After the field widget, inside its grid column                 |
+| `#field.myField.prepend`    | Inside the field, leading (NUI `leading` slot)                 |
+| `#field.myField.append`     | Inside the field, trailing (NUI `trailing` slot)               |
+| `#field.myField.hint`       | Helper text under the field                                    |
+| `#field.myField.annotation` | Body of the popover of the field's [annotation](./annotations) |
 
 ### Slot props
 
@@ -41,6 +42,8 @@ Every `field.*` slot receives the following bindings:
 | `currentLang` | `string`          | The active language code (empty string when i18n is unused). |
 
 `model` and `currentLang` are injected from the parent `MapoForm` context via `provide/inject` — they are always up to date even inside nested `MapoFormGroup` / `MapoFormFlatSection` sections.
+
+The slots that `MapoFormField` renders bind the descriptor as `descriptor`: `.before`, `.prepend`, `.append`, `.hint` and `.after` receive `{ descriptor, model }`, `.label` receives `{ descriptor, label, annotation }`, and `.annotation` receives `{ annotation, descriptor }`.
 
 ```vue
 <MapoForm v-model="article" :fields="fields">

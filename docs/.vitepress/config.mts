@@ -93,6 +93,7 @@ export default defineConfig({
           { text: 'Progressive Disclosure', link: '/uikit/form/progressive-disclosure' },
           { text: 'Focus Mode', link: '/uikit/form/focus-mode' },
           { text: 'Field Expand', link: '/uikit/form/field-expand' },
+          { text: 'Field annotations', link: '/uikit/form/annotations' },
           { text: 'Draft autosave', link: '/uikit/form/draft' },
           { text: 'From JSON Schema', link: '/uikit/form/schema-to-form' },
           { text: 'useMapoForm() — reference', link: '/uikit/form/composable' },

@@ -23,7 +23,11 @@ import {
 } from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
-import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import type {
+  AnyFieldDescriptor,
+  FieldAnnotations,
+  FieldRegistry,
+} from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { languagesFromMetadata } from "../utils/langInfo";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
@@ -122,6 +126,12 @@ const props = withDefaults(
      * the auto-derived list.
      */
     forceLanguages?: string[];
+    /**
+     * Marks shown next to the field labels and counted on the tabs, in the body
+     * and in the sidebar forms, keyed by the path of the value (`title`,
+     * `translations.it.title`, `blocks.0.title`). See `MapoForm`.
+     */
+    annotations?: FieldAnnotations;
   }>(),
   {
     fields: undefined,
@@ -142,6 +152,7 @@ const props = withDefaults(
     permissionModel: undefined,
     previewField: undefined,
     forceLanguages: undefined,
+    annotations: undefined,
   },
 );
 
@@ -823,6 +834,7 @@ defineSlots<{
             :current-lang="currentLang"
             :registry="registry"
             :readonly="effectiveReadonly"
+            :annotations="annotations"
           >
             <template
               v-for="slotName in formSlotNames"
@@ -905,6 +917,7 @@ defineSlots<{
                 :current-lang="currentLang"
                 :registry="registry"
                 :readonly="effectiveReadonly"
+                :annotations="annotations"
               >
                 <template
                   v-for="slotName in formSlotNames"
@@ -924,6 +937,7 @@ defineSlots<{
               :current-lang="currentLang"
               :registry="registry"
               :readonly="effectiveReadonly"
+              :annotations="annotations"
             >
               <template
                 v-for="slotName in formSlotNames"

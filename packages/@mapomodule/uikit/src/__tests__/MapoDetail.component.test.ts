@@ -132,13 +132,29 @@ const UButton: Component = {
   },
 };
 
+// `MapoForm` keeps the props of each instance, body and sidebar alike.
+const forms: { annotations?: object }[] = [];
+
+const MapoForm: Component = {
+  name: "MapoForm",
+  inheritAttrs: false,
+  props: { annotations: Object },
+  setup(props: { annotations?: object }, { slots }: SetupContext) {
+    forms.push(props);
+    onUnmounted(() => {
+      forms.splice(forms.indexOf(props), 1);
+    });
+    return () => h("div", null, slots.default?.());
+  },
+};
+
 const stubs: Record<string, Component> = {
   UButton,
   UCard: passthrough("UCard"),
   UAlert: passthrough("UAlert"),
   UIcon: passthrough("UIcon"),
   UModal: passthrough("UModal"),
-  MapoForm: passthrough("MapoForm"),
+  MapoForm,
   MapoDetailLangSwitch: passthrough("MapoDetailLangSwitch"),
 };
 
@@ -156,10 +172,13 @@ interface ActionBindings {
 
 let app: App<HeadlessNode> | undefined;
 
-function mountDetail(slots: Record<string, (bindings: never) => VNode[]> = {}) {
+function mountDetail(
+  slots: Record<string, (bindings: never) => VNode[]> = {},
+  extraProps: Record<string, unknown> = {},
+) {
+  const props = { endpoint: "/api/news/", id: 5, ...extraProps };
   const root: Component = {
-    render: () =>
-      h(MapoDetail as Component, { endpoint: "/api/news/", id: 5 }, slots),
+    render: () => h(MapoDetail as Component, props, slots),
   };
   app = createApp(root);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
@@ -289,5 +308,19 @@ describe("MapoDetail actions", () => {
     expect(crud.delete).toHaveBeenCalledTimes(1);
     expect(confirm.ask).toHaveBeenCalledTimes(1);
     expect(button("mapo.delete").loading).toBe(true);
+  });
+});
+
+describe("MapoDetail annotations", () => {
+  it("passes the annotations to the body and the sidebar forms", async () => {
+    const annotations = { title: { label: "Suggested by AI" } };
+    mountDetail(
+      {},
+      { annotations, sidebarFields: [{ key: "status", type: "text" }] },
+    );
+    await settle();
+
+    expect(forms).toHaveLength(2);
+    for (const form of forms) expect(form.annotations).toEqual(annotations);
   });
 });

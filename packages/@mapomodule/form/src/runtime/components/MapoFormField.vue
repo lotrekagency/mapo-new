@@ -9,8 +9,11 @@ import {
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import { toFieldComponent } from "../utils/fieldComponent.js";
+import { valuePath } from "../utils/annotations.js";
+import { useFieldAnnotation } from "../composables/useFieldAnnotation.js";
 import { getNestedValue, debounce } from "@mapomodule/utils";
 import MapoUnknownField from "./MapoUnknownField.vue";
+import MapoFormAnnotation from "./MapoFormAnnotation.vue";
 
 // `any` accepts descriptors typed against any model (e.g. AnyFieldDescriptor<Article>)
 // in headless usage; the renderer itself only reads model-agnostic metadata.
@@ -42,13 +45,8 @@ const showField = computed(() => {
 
 // ─── Value ───────────────────────────────────────────────────────────────────
 
-const path = computed(() => {
-  const lang = currentLang.value;
-  if (props.descriptor.translatable && lang) {
-    return `translations.${lang}.${props.descriptor.key as string}`;
-  }
-  return props.descriptor.key as string;
-});
+// The same rule the tab badges count with, so marks and counts agree.
+const path = computed(() => valuePath(props.descriptor, currentLang.value));
 
 const accessor = computed(() =>
   resolveFieldAccessor(props.descriptor, registry),
@@ -208,6 +206,13 @@ const label = computed(
 );
 const fieldId = computed(() => `field-${props.descriptor.key as string}`);
 
+// ─── Annotation ──────────────────────────────────────────────────────────────
+
+// Read from the form context, never from the descriptor: changing the map
+// updates the mark and leaves the field component mounted. A custom field
+// reads the same annotation with the same composable.
+const annotation = useFieldAnnotation(() => props.descriptor);
+
 // ─── Group expand ────────────────────────────────────────────────────────────
 
 const groupExpand = inject<{
@@ -245,6 +250,7 @@ function toggleExpand() {
       :name="`field.${descriptor.key as string}.label`"
       :descriptor="descriptor"
       :label="label"
+      :annotation="annotation"
     >
       <label
         :for="fieldId"
@@ -254,6 +260,18 @@ function toggleExpand() {
         <span v-if="descriptor.required" class="text-red-500" aria-hidden="true"
           >*</span
         >
+        <MapoFormAnnotation v-if="annotation" :annotation="annotation">
+          <template
+            v-if="$slots[`field.${descriptor.key as string}.annotation`]"
+            #body
+          >
+            <slot
+              :name="`field.${descriptor.key as string}.annotation`"
+              :descriptor="descriptor"
+              :annotation="annotation"
+            />
+          </template>
+        </MapoFormAnnotation>
         <UIcon
           v-if="asyncTrailingIcon"
           :name="asyncTrailingIcon"

@@ -18,9 +18,10 @@ src/
   runtime/plugins/form-registry.ts   provides $mapoFormRegistry (defaults + app config)
   runtime/components/           shell components; fields/ (Mapo*Field.vue) and fields/nui/ (Nuxt UI wrappers)
   runtime/composables/          useMapoForm, useFormFromSchema, useFormDraft, useFocusMode, useProgressiveDisclosure,
-                                defineFormField, useUnsavedChangesGuard, useMediaManager, useCurrentLang
+                                defineFormField, useUnsavedChangesGuard, useMediaManager, useCurrentLang,
+                                useFieldAnnotation
   runtime/utils/                flattenFieldGroups, repeaterTemplates, tabVisibility, fieldComponent (one async
-                                component per registry loader)
+                                component per registry loader), annotations (lookup by value path, tab badges)
   __tests__/                    Vitest suites, with the #imports mock used by the root config
 ```
 
@@ -36,13 +37,14 @@ src/
 
 ## Change together
 
-| You change                      | Also change                                                                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| A field type                    | The procedure page above, end to end                                                          |
-| A composable's signature        | `docs/uikit/form/composable.md` or the feature page, `docs/modules/api.md` if listed there    |
-| A shell component's props/slots | `docs/uikit/form/api.md`, `docs/uikit/form/slots.md`                                          |
-| `useFormFromSchema` mapping     | `docs/uikit/form/schema-to-form.md`; check `mcp/src/runtime/core/openapi.ts` stays consistent |
-| Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`          |
+| You change                      | Also change                                                                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A field type                    | The procedure page above, end to end                                                                                                                       |
+| A composable's signature        | `docs/uikit/form/composable.md` or the feature page, `docs/modules/api.md` if listed there                                                                 |
+| A shell component's props/slots | `docs/uikit/form/api.md`, `docs/uikit/form/slots.md`                                                                                                       |
+| `useFormFromSchema` mapping     | `docs/uikit/form/schema-to-form.md`; check `mcp/src/runtime/core/openapi.ts` stays consistent                                                              |
+| Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`                                                                       |
+| Field annotations               | `docs/uikit/form/annotations.md`, `docs/uikit/form/api.md`, `useFieldAnnotation` in `docs/modules/api.md`; the `annotations` prop of `MapoDetail` in uikit |
 
 ## Verify
 

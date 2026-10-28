@@ -52,4 +52,8 @@ export type {
   FieldComponentEntry,
   FieldRegistry,
   PartialFieldRegistry,
+  FieldAnnotation,
+  FieldAnnotationAction,
+  FieldAnnotationColor,
+  FieldAnnotations,
 } from "./runtime/types/index.js";

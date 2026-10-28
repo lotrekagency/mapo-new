@@ -89,6 +89,7 @@
     "form": {
       "required": "Questo campo è obbligatorio.",
       "tabErrors": "Questa scheda contiene errori",
+      "annotationCount": "{n} campo segnato: {labels} | {n} campi segnati: {labels}",
       "defaultTab": "Generale"
     },
     "fksField": {

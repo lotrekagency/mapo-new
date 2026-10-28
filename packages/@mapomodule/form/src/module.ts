@@ -110,6 +110,7 @@ export {};
       "MapoFormField",
       "MapoFormGroup",
       "MapoFormTabs",
+      "MapoFormAnnotation",
       "MapoUnknownField",
       "MapoFocusPortal",
     ];
@@ -156,6 +157,10 @@ export {};
       {
         name: "useFormDraft",
         from: resolver.resolve("./runtime/composables/useFormDraft"),
+      },
+      {
+        name: "useFieldAnnotation",
+        from: resolver.resolve("./runtime/composables/useFieldAnnotation"),
       },
       {
         name: "useFocusMode",

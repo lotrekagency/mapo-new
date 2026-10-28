@@ -4,6 +4,8 @@ import { useI18n } from "vue-i18n";
 import type { TabEntry } from "../types/layout.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import { pickActiveTab, tabHasShownFields } from "../utils/tabVisibility.js";
+import { tabAnnotationGroups } from "../utils/annotations.js";
+import MapoFormAnnotationBadges from "./MapoFormAnnotationBadges.vue";
 import MapoFormGroup from "./MapoFormGroup.vue";
 import MapoFormFlatSection from "./MapoFormFlatSection.vue";
 
@@ -46,6 +48,23 @@ function tabHasErrors(tab: TabEntry, errorKeys: Set<string>): boolean {
   );
 }
 
+// One badge per icon and color of the annotations in each tab, so a tab tells
+// what its fields hold before it is opened.
+const annotationGroups = computed(
+  () =>
+    new Map(
+      props.tabs.map((tab) => [
+        tab.name,
+        tabAnnotationGroups(
+          tab,
+          form.annotations?.value ?? {},
+          form.model.value,
+          form.currentLang.value,
+        ),
+      ]),
+    ),
+);
+
 // Highlight tabs containing errors.
 const tabsWithErrors = computed(() => {
   const errorKeys = new Set(Object.keys(form.errors.value));
@@ -74,6 +93,9 @@ const tabsWithErrors = computed(() => {
         <slot :name="`tab.${tab.name}.label`" :tab="tab">
           {{ tab.label ?? tab.name }}
         </slot>
+        <MapoFormAnnotationBadges
+          :groups="annotationGroups.get(tab.name) ?? []"
+        />
         <span
           v-if="tabsWithErrors.has(tab.name)"
           class="inline-block h-1.5 w-1.5 rounded-full bg-red-500"

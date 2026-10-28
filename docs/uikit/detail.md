@@ -75,6 +75,7 @@ The page now supports:
 | `permissionModel`              | `string`                         | —             | Django model label (e.g. `"news.article"`). When set, save buttons are hidden if the user lacks `add_*` / `change_*`, and the delete card is hidden without `delete_*`. Superusers are never blocked. |
 | `previewField`                 | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
 | `forceLanguages`               | `string[]`                       | —             | Override the language list regardless of the `languages` prop or the `lang_info` returned by the endpoint's OPTIONS response. Useful for per-model language subsets.                                  |
+| `annotations`                  | `FieldAnnotations`               | —             | Marks on the fields of the body and the sidebar forms, keyed by the path of the value. See [Field annotations](./form/annotations).                                                                   |
 
 The `registry` prop is optional — `<MapoDetail>` resolves `$mapoFormRegistry` automatically.
 
@@ -400,6 +401,7 @@ interface DetailSlotProps<T> {
 | `#field.<key>`                                           | Replace the entire field cell                                                                                                                              |
 | `#field.<key>.before` / `#field.<key>.after`             | Content injected before / after the field widget within its grid column                                                                                    |
 | `#field.<key>.label` / `.hint` / `.append` / `.prepend`  | UFormField sub-slots forwarded to `<MapoForm>`                                                                                                             |
+| `#field.<key>.annotation`                                | Body of the popover of the field's [annotation](./form/annotations), forwarded to `<MapoForm>`                                                             |
 | `#group.<name>.before` / `#group.<name>.after`           | Content injected before / after a named group card                                                                                                         |
 
 ## How to: gate with permissions
