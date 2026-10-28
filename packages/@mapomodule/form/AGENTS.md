@@ -43,7 +43,7 @@ src/
 | A field type                    | The procedure page above, end to end                                                                                                                       |
 | A composable's signature        | `docs/uikit/form/composable.md` or the feature page, `docs/modules/api.md` if listed there                                                                 |
 | A shell component's props/slots | `docs/uikit/form/api.md`, `docs/uikit/form/slots.md`                                                                                                       |
-| `useFormFromSchema` mapping     | `fieldsToJsonSchema`, which writes what it reads; `schema-to-form.md`; check `mcp/src/runtime/core/openapi.ts` stays consistent                            |
+| `useFormFromSchema` mapping     | `fieldsToJsonSchema` and the normalizers in `utils/src/jsonSchema/`, which write what it reads; `schema-to-form.md`; the MCP's `openapi.ts`                |
 | `FieldExtensions`               | The section in `docs/uikit/form/custom-fields.md`; `property` of `fieldsToJsonSchema` if the schema should carry it                                        |
 | Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`                                                                       |
 | Field annotations               | `docs/uikit/form/annotations.md`, `docs/uikit/form/api.md`, `useFieldAnnotation` in `docs/modules/api.md`; the `annotations` prop of `MapoDetail` in uikit |

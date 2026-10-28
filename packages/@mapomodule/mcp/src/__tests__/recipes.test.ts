@@ -26,6 +26,7 @@ describe("matchRecipes", () => {
     ["autosave a draft while the user edits", "form-draft"],
     ["generate the fields from a json schema", "schema-to-form"],
     ["describe my form as a json schema", "form-to-schema"],
+    ["read the DRF OPTIONS metadata into form fields", "schema-sources"],
     [
       "add a typed property of my own to every field descriptor",
       "descriptor-extensions",

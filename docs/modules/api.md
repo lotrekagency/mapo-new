@@ -416,6 +416,59 @@ Type guards.
 
 ---
 
+### `metadataToJsonSchema(metadata, options?)`
+
+Reads an endpoint's `OPTIONS` response as JSON Schema: the `schema` it publishes (Camomilla), otherwise its Django REST Framework metadata. `<MapoDetail>` uses it with `experimentalFieldsFromSchema`. See [From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi).
+
+| Parameter  | Type                 | Description                                  |
+| ---------- | -------------------- | -------------------------------------------- |
+| `metadata` | `unknown`            | The `OPTIONS` response, as received.         |
+| `options`  | `DrfMetadataOptions` | Passed to `drfMetadataToJsonSchema` (below). |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the response describes no fields.
+
+---
+
+### `drfMetadataToJsonSchema(metadata, options?)`
+
+Reads DRF's standard `OPTIONS` metadata (`SimpleMetadata`) as JSON Schema in the dialect `useFormFromSchema` reads. A field DRF calls `field`, such as a relation, becomes a placeholder type, `field:<key>`.
+
+| Parameter          | Type                                              | Description                                                                                |
+| ------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `metadata`         | `unknown`                                         | The `OPTIONS` response, as received.                                                       |
+| `options.method`   | `"POST" \| "PUT"`                                 | The action to read. Default: `POST`, then `PUT`.                                           |
+| `options.types`    | `Record<string, (field, key) => JSONSchema>`      | The schema of each DRF type, merged over the built-in ones.                                |
+| `options.property` | `(schema, field, key) => JSONSchema \| undefined` | Rewrites the schema of each field, nested ones included; `undefined` leaves the field out. |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the response has no fields for the action: DRF publishes `POST` only to users who can create.
+
+---
+
+### `openApiToJsonSchema(document, model, options?)`
+
+Reads a component of an OpenAPI 3 document as JSON Schema in the dialect `useFormFromSchema` reads. `$ref`s are followed; a property pointing to another object component is a relation with the endpoint that lists it, or a placeholder without one.
+
+| Parameter           | Type                                               | Description                                                                            |
+| ------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `document`          | `unknown`                                          | The OpenAPI document, as received.                                                     |
+| `model`             | `string`                                           | The component name, as `openApiModels` lists it.                                       |
+| `options.endpoints` | `Record<string, string>`                           | The endpoint of each component the paths do not tell.                                  |
+| `options.property`  | `(schema, source, key) => JSONSchema \| undefined` | Rewrites the schema of each property, nested ones included; `undefined` leaves it out. |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the document has no such component.
+
+---
+
+### `openApiModels(document)`
+
+| Parameter  | Type      | Description                        |
+| ---------- | --------- | ---------------------------------- |
+| `document` | `unknown` | The OpenAPI document, as received. |
+
+**Returns:** `OpenApiModel[]` — every object component (`name`, `title`, `description`), with the collection `endpoint` that lists it when the paths tell, sorted by name.
+
+---
+
 ## Form — `@mapomodule/form`
 
 ### `useMapoForm(options)`

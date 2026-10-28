@@ -1,7 +1,6 @@
+import { ATTRS_KEYWORD, FIELD_KEYWORD } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
 import {
-  ATTRS_KEYWORD,
-  FIELD_KEYWORD,
   KEYWORD_ATTRS,
   TEMPLATE_PROPERTY,
   isUnsafeAttr,

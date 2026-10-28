@@ -30,4 +30,18 @@ export {
   resolveSchema,
   extractDefs,
   getDefaultForSchema,
+  FIELD_KEYWORD,
+  ATTRS_KEYWORD,
+  placeholderType,
+  drfMetadataToJsonSchema,
+  metadataToJsonSchema,
+  openApiModels,
+  openApiToJsonSchema,
+} from "./jsonSchema/index.js";
+export type {
+  DrfFieldInfo,
+  DrfMetadataOptions,
+  DrfTypeSchema,
+  OpenApiModel,
+  OpenApiOptions,
 } from "./jsonSchema/index.js";

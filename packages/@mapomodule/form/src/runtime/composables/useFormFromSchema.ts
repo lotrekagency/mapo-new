@@ -1,4 +1,10 @@
-import { resolveSchema, extractDefs, matchesSchema } from "@mapomodule/utils";
+import {
+  ATTRS_KEYWORD,
+  FIELD_KEYWORD,
+  resolveSchema,
+  extractDefs,
+  matchesSchema,
+} from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
 import type {
   AnyFieldDescriptor,
@@ -7,13 +13,10 @@ import type {
 } from "../types/index.js";
 
 // ─── Mapo keywords ───────────────────────────────────────────────────────────
-// `fieldsToJsonSchema()` writes them, so that its schema reads back into the
-// same descriptors. A backend may publish them too.
+// `x-mapo-field` and `x-mapo-attrs` come from `@mapomodule/utils`, shared with
+// the DRF and OpenAPI normalizers. `fieldsToJsonSchema()` writes them, so that
+// its schema reads back into the same descriptors.
 
-/** The field type, when the other keywords would map to another one. @internal */
-export const FIELD_KEYWORD = "x-mapo-field";
-/** The field's `attrs` that no other keyword expresses. @internal */
-export const ATTRS_KEYWORD = "x-mapo-attrs";
 /** The property where a repeater item keeps its template key. @internal */
 export const TEMPLATE_PROPERTY = "_template";
 

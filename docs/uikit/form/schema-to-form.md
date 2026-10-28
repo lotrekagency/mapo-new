@@ -68,6 +68,99 @@ Other keywords ride along onto the descriptor rather than choosing a type:
 | `endpoint`, `multiple` (with `type: relation`) | `attrs.endpoint`, `attrs.multiple`; a relation also gets `returnObject: true`                                                                               |
 | `x-mapo-attrs: { … }`                          | merged into `attrs` last, so its values win                                                                                                                 |
 
+## From DRF metadata and OpenAPI
+
+Two normalizers in `@mapomodule/utils` read what a Django REST Framework backend already publishes, and write the dialect of the tables above, so `useFormFromSchema` turns it into fields:
+
+- `drfMetadataToJsonSchema(metadata, options?)` reads the `OPTIONS` response of an endpoint: DRF's standard metadata, `actions.POST`;
+- `openApiToJsonSchema(document, model, options?)` reads a component of an OpenAPI 3 document, such as the one DRF-spectacular serves. `openApiModels(document)` lists the components, each with the endpoint that lists it.
+
+`metadataToJsonSchema(metadata, options?)` reads an `OPTIONS` response either way: the `schema` it publishes, as Camomilla does, otherwise its DRF metadata. It is what `<MapoDetail>` reads with `experimentalFieldsFromSchema` ([Detail page](/uikit/detail#how-to-derive-the-fields-from-the-backend-schema-experimental)).
+
+```ts
+import {
+  drfMetadataToJsonSchema,
+  openApiToJsonSchema,
+} from "@mapomodule/utils/jsonSchema";
+
+// DRF metadata, from the endpoint itself
+const metadata = await useCrud("/api/events/").options();
+const fromMetadata = drfMetadataToJsonSchema(metadata);
+
+// OpenAPI, from the schema endpoint
+const document = await $fetch("/api/schema/?format=json");
+const fromOpenApi = openApiToJsonSchema(document, "Event");
+
+const fields = fromMetadata ? useFormFromSchema(fromMetadata) : [];
+```
+
+Both return `undefined` when there is nothing to read: DRF publishes `actions.POST` only to users who can create, and a document may not have the component.
+
+### DRF metadata
+
+| DRF `type`                    | Schema                                                           | → FieldType                                                |
+| ----------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| `string`, `regex`             | `type: string`, with `minLength` / `maxLength`                   | `text` (`textarea` above 255 characters)                   |
+| `email`                       | `format: email`                                                  | `email`                                                    |
+| `url`                         | `format: uri`                                                    | `url`                                                      |
+| `slug`                        | `type: string` with the slug `pattern`                           | `text`                                                     |
+| `integer`, `float`, `decimal` | `integer` or `number`, with `minimum` / `maximum`                | `number`                                                   |
+| `boolean`                     | `type: boolean`                                                  | `boolean`                                                  |
+| `date`, `datetime`, `time`    | `format: date`, `date-time`, `time`                              | `date`, `datetime`, `time`                                 |
+| `duration`                    | `format: duration`                                               | `text`                                                     |
+| `choice`                      | `oneOf` of `{ const, title }` from `choices`                     | `select` with the labels                                   |
+| `multiple choice`             | an array of those choices                                        | `select` with `multiple: true`                             |
+| `file upload`, `image upload` | `format: binary`; `accept: "image/*"` for an image               | `file`                                                     |
+| `list`                        | an array of its `child`; `min_length` / `max_length` count items | `select` with `multiple: true`, or a `repeater` of objects |
+| `nested object`               | an object of its `children`                                      | `object:<key>`                                             |
+| `field`, and any other type   | a placeholder, `x-mapo-field: "field:<key>"`                     | `field:<key>`                                              |
+
+`label` becomes `title`, `help_text` `description`, and `read_only` `readOnly`; `required` lists the required fields that are not read-only. `method: "PUT"` reads the update metadata of a detail endpoint instead.
+
+### OpenAPI
+
+- `$ref`s are followed, also through the `allOf: [{ $ref }]` wrapper DRF-spectacular writes around a nullable relation, and the members of an `allOf` composition are merged.
+- A property that points to another object component is a relation: `type: relation` with the endpoint that lists that component, read from the document's `paths`; an array of them is an `m2m`. Without an endpoint it becomes a placeholder.
+- `nullable: true` becomes a type list, a `decimal` sent as a string a number, and a property with no type, such as a JSON field, a placeholder.
+- Labels come from `title`, otherwise from the property name: `published_at` → "Published at".
+
+With DRF-spectacular's `COMPONENT_SPLIT_REQUEST`, read the `…Request` component: it describes what a client sends.
+
+### Placeholders
+
+DRF says `"type": "field"` for relations (`PrimaryKeyRelatedField`, `ManyRelatedField`) and for any field it does not name, without an endpoint or the shape of the value. A text input would send an id, or a list of ids, back as a string. The normalizers write a placeholder type instead, `field:<key>`: the form renders `MapoUnknownField`, which edits the value as JSON, keeps its type, and shows the developer what is left to describe.
+
+Describe a placeholder in one of these ways:
+
+- the `overrides` of `useFormFromSchema` (`schemaFieldOptions` on `<MapoDetail>`): `{ author: { type: "fks", attrs: { endpoint: "/api/users/" } } }`;
+- the `property` or `types` option of the normalizer (below);
+- `defineFormField("field:author", …)`, a component for that placeholder in every form.
+
+### Customise the reading
+
+Everything the normalizers decide can be changed from outside:
+
+| Option                          | Of                        | What it does                                                                                                                               |
+| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `property(schema, source, key)` | both                      | Rewrites the schema of each field, nested ones included; `undefined` leaves the field out                                                  |
+| `types`                         | `drfMetadataToJsonSchema` | The schema of each DRF type, merged over the built-in ones: a type a custom metadata class publishes, or another reading of a built-in one |
+| `method`                        | `drfMetadataToJsonSchema` | `"POST"` or `"PUT"`; by default `POST`, then `PUT`                                                                                         |
+| `endpoints`                     | `openApiToJsonSchema`     | The endpoint of each component the paths do not tell                                                                                       |
+| `schemaFromMetadata`            | `<MapoDetail>`            | Replaces the reading of the `OPTIONS` response, for example with `metadataToJsonSchema` and options                                        |
+
+```ts
+const schema = drfMetadataToJsonSchema(metadata, {
+  types: {
+    // A type your metadata class publishes
+    "rich text": () => ({ type: "string", contentMediaType: "text/html" }),
+  },
+  property: (schema, field, key) =>
+    key === "author"
+      ? { title: schema.title, type: "relation", endpoint: "/api/users/" }
+      : schema,
+});
+```
+
 ## From form to JSON Schema
 
 `fieldsToJsonSchema(fields, options?)` describes a form as a JSON Schema of type `object`: one property per field, named by its key, in the dialect of the tables above. `useFormFromSchema` reads it back into equivalent descriptors. Use it to hand the structure of a form to anything that speaks JSON Schema: a validator, a code generator, an assistant that fills the form, or storage that keeps a form as JSON.
@@ -268,15 +361,19 @@ fields.find((f) => f.key === "seo")!.tab = "SEO";
 
 ## How to: use it with DRF-spectacular
 
-DRF-spectacular emits OpenAPI 3. Point at the JSON Schema embedded in the OpenAPI doc:
+DRF-spectacular emits OpenAPI 3. Read the component with `openApiToJsonSchema`, which follows its `$ref`s and finds the endpoints of its relations; `useFormFromSchema` resolves only `$defs`:
 
 ```ts
-const openApiSchema = await $fetch("/api/schema/?format=json");
-const articleSchema = openApiSchema.components.schemas.Article;
+import { openApiToJsonSchema } from "@mapomodule/utils/jsonSchema";
 
-const fields = useFormFromSchema(articleSchema, {
-  exclude: ["id", "created_at", "updated_at"],
-});
+const document = await $fetch("/api/schema/?format=json");
+const articleSchema = openApiToJsonSchema(document, "Article");
+
+const fields = articleSchema
+  ? useFormFromSchema(articleSchema, {
+      exclude: ["id", "created_at", "updated_at"],
+    })
+  : [];
 ```
 
 ## How to: use it with Pydantic v2

@@ -59,7 +59,8 @@ The page now supports:
 | `endpoint`                     | `string`                         | —             | REST endpoint for `useCrud`                                                                                                                                                                           |
 | `id`                           | `string \| number`               | —             | Record id; pass `'new'` for create mode                                                                                                                                                               |
 | `fields`                       | `FieldDescriptor<T>[]`           | —             | Body form fields. Optional only when `experimentalFieldsFromSchema` supplies them.                                                                                                                    |
-| `experimentalFieldsFromSchema` | `boolean`                        | `false`       | Derive the body fields from the `schema` on the endpoint's OPTIONS response when `fields` is not given.                                                                                               |
+| `experimentalFieldsFromSchema` | `boolean`                        | `false`       | Derive the body fields from the endpoint's OPTIONS response (a published `schema`, otherwise DRF metadata) when `fields` is not given.                                                                |
+| `schemaFromMetadata`           | `(metadata) => JSONSchema`       | —             | Replaces how the OPTIONS response becomes the schema of the derived fields. Default: `metadataToJsonSchema`.                                                                                          |
 | `schemaFieldOptions`           | `UseFormFromSchemaOptions`       | —             | Passed straight to `useFormFromSchema` when deriving.                                                                                                                                                 |
 | `sidebarFields`                | `FieldDescriptor<T>[]`           | `[]`          | Sidebar form fields                                                                                                                                                                                   |
 | `languages`                    | `string[]`                       | `[]`          | Translation language codes (e.g. `['it', 'en']`)                                                                                                                                                      |
@@ -139,12 +140,44 @@ The split is purely visual; both groups share the same model. `getPatch()` diffs
 />
 ```
 
-With `experimentalFieldsFromSchema` on and no `fields` prop, `<MapoDetail>` builds the body form from the `schema` published on the endpoint's `OPTIONS` response. `schemaFieldOptions` is forwarded to `useFormFromSchema` untouched.
+With `experimentalFieldsFromSchema` on and no `fields` prop, `<MapoDetail>` builds the body form from the endpoint's `OPTIONS` response: the `schema` it publishes (camomilla >= 6.6), otherwise Django REST Framework's standard metadata (`actions.POST`). `schemaFieldOptions` is forwarded to `useFormFromSchema` untouched.
 
 A derived form knows types, labels, relations and what is read-only — but nothing editorial: no tabs, no column widths, no rich-text vs textarea, no sidebar split, and no opinion about field order beyond the serializer's. Treat it as a scaffold to start from, not a finished panel.
 
-- Requires a backend that publishes `schema` on OPTIONS (camomilla >= 6.6).
+- Works with a backend that publishes `schema` on OPTIONS, or with DRF's default metadata. DRF lists `actions.POST` only to users who can create: for the others the form has no derived fields.
+- DRF calls relations `"type": "field"`, without an endpoint: they arrive as placeholder fields, edited as JSON, until you describe them ([Placeholders](/uikit/form/schema-to-form#placeholders)).
 - An explicit `fields` prop always wins — the derived set never overrides a hand-built form.
+
+To change how the response is read, pass `schemaFromMetadata`. Here a relation DRF does not describe becomes a picker:
+
+```vue
+<script setup lang="ts">
+import { metadataToJsonSchema } from "@mapomodule/utils/jsonSchema";
+
+const schemaFromMetadata = (metadata: Record<string, unknown>) =>
+  metadataToJsonSchema(metadata, {
+    property: (schema, _field, key) =>
+      key === "category"
+        ? {
+            title: schema.title,
+            type: "relation",
+            endpoint: "/api/categories/",
+          }
+        : schema,
+  });
+</script>
+
+<template>
+  <MapoDetail
+    endpoint="/api/articles/"
+    :id="route.params.id"
+    experimental-fields-from-schema
+    :schema-from-metadata="schemaFromMetadata"
+  />
+</template>
+```
+
+The options of the normalizers are in [From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi).
 
 ## How to: handle multilingual content
 

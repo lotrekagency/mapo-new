@@ -57,6 +57,11 @@ const sections = [
         desc: "useFormFromSchema and fieldsToJsonSchema — JSON Schema ↔ FieldDescriptor[]",
       },
       {
+        label: "DRF metadata → form",
+        to: "/form/drf-metadata/1",
+        desc: "MapoDetail experimentalFieldsFromSchema on DRF OPTIONS metadata, schemaFromMetadata",
+      },
+      {
         label: "Custom Fields",
         to: "/form/custom-fields",
         desc: "defineFormField, registry, accessor, unknown type fallback",

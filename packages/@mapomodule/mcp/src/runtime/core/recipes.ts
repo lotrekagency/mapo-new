@@ -399,6 +399,25 @@ export const RECIPES: Recipe[] = [
       "fieldsToJsonSchema writes a form's descriptors as JSON Schema, and useFormFromSchema reads it back into the same descriptors.",
   },
   {
+    id: "schema-sources",
+    task: "Build a form from DRF OPTIONS metadata or an OpenAPI document",
+    keywords: [
+      "drf metadata",
+      "options metadata",
+      "actions.POST",
+      "drfMetadataToJsonSchema",
+      "openApiToJsonSchema",
+      "metadataToJsonSchema",
+      "schemaFromMetadata",
+      "placeholder field",
+    ],
+    doc: "uikit/form/schema-to-form.md",
+    heading: "From DRF metadata and OpenAPI",
+    seeAlso: ["uikit/detail.md"],
+    summary:
+      "drfMetadataToJsonSchema and openApiToJsonSchema read what a DRF backend publishes as JSON Schema; MapoDetail derives its fields from the OPTIONS metadata.",
+  },
+  {
     id: "descriptor-extensions",
     task: "Add typed properties of your own to field descriptors",
     keywords: [

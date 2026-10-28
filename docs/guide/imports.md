@@ -117,6 +117,9 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `buildRouteTree`                                | utility     | `import { buildRouteTree } from '@mapomodule/utils'`                       | —                            |
 | `resolveSchema`                                 | json-schema | `import { resolveSchema } from '@mapomodule/utils/jsonSchema'`             | —                            |
 | `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`               | —                            |
+| `metadataToJsonSchema`                          | json-schema | `import { metadataToJsonSchema } from '@mapomodule/utils/jsonSchema'`      | OPTIONS → JSON Schema        |
+| `drfMetadataToJsonSchema`                       | json-schema | `import { drfMetadataToJsonSchema } from '@mapomodule/utils/jsonSchema'`   | DRF metadata                 |
+| `openApiToJsonSchema`                           | json-schema | `import { openApiToJsonSchema } from '@mapomodule/utils/jsonSchema'`       | OpenAPI component            |
 | `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`                  | strict built-in union        |
 | `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`               | includes custom field types  |
 | `FieldExtensions`                               | type        | `declare module 'mapomodule/types' { interface FieldExtensions {} }`       | your descriptor properties   |

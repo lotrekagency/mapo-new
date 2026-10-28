@@ -133,13 +133,17 @@ const UButton: Component = {
 };
 
 // `MapoForm` keeps the props of each instance, body and sidebar alike.
-const forms: { annotations?: object }[] = [];
+interface FormProps {
+  annotations?: object;
+  fields?: { key: string; type: string; attrs?: Record<string, unknown> }[];
+}
+const forms: FormProps[] = [];
 
 const MapoForm: Component = {
   name: "MapoForm",
   inheritAttrs: false,
-  props: { annotations: Object },
-  setup(props: { annotations?: object }, { slots }: SetupContext) {
+  props: { annotations: Object, fields: Array },
+  setup(props: FormProps, { slots }: SetupContext) {
     forms.push(props);
     onUnmounted(() => {
       forms.splice(forms.indexOf(props), 1);
@@ -322,5 +326,60 @@ describe("MapoDetail annotations", () => {
 
     expect(forms).toHaveLength(2);
     for (const form of forms) expect(form.annotations).toEqual(annotations);
+  });
+});
+
+describe("MapoDetail schema mode", () => {
+  // What Django REST Framework serves on OPTIONS, with no `schema`.
+  const drfMetadata = {
+    name: "News List",
+    actions: {
+      POST: {
+        title: { type: "string", required: true, label: "Title" },
+        status: {
+          type: "choice",
+          label: "Status",
+          choices: [{ value: "draft", display_name: "Draft" }],
+        },
+        author: { type: "field", required: true, label: "Author" },
+      },
+    },
+  };
+
+  it("builds the body fields from DRF metadata", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    mountDetail({}, { experimentalFieldsFromSchema: true });
+    await settle();
+
+    const body = forms[0]!.fields!;
+    expect(body.map((field) => [field.key, field.type])).toEqual([
+      ["title", "text"],
+      ["status", "select"],
+      ["author", "field:author"],
+    ]);
+    expect(body[1]!.attrs?.options).toEqual([
+      { text: "Draft", value: "draft" },
+    ]);
+  });
+
+  it("reads the OPTIONS response with schemaFromMetadata when given", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    const schemaFromMetadata = vi.fn(() => ({
+      type: "object",
+      properties: { headline: { type: "string", title: "Headline" } },
+    }));
+    mountDetail({}, { experimentalFieldsFromSchema: true, schemaFromMetadata });
+    await settle();
+
+    expect(schemaFromMetadata).toHaveBeenCalledWith(drfMetadata);
+    expect(forms[0]!.fields!.map((field) => field.key)).toEqual(["headline"]);
+  });
+
+  it("derives nothing without the opt-in", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    mountDetail();
+    await settle();
+
+    expect(forms[0]!.fields).toEqual([]);
   });
 });

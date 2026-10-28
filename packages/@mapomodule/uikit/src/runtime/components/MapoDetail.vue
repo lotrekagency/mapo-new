@@ -14,7 +14,12 @@ import {
 } from "vue";
 import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
 import { useI18n } from "vue-i18n";
-import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
+import {
+  objectDiff,
+  debounce,
+  deepClone,
+  metadataToJsonSchema,
+} from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import {
   getErrorData,
@@ -51,7 +56,7 @@ const props = withDefaults(
      */
     fields?: AnyFieldDescriptor<T>[];
     /**
-     * EXPERIMENTAL. Build the body fields from the endpoint's OPTIONS schema
+     * EXPERIMENTAL. Build the body fields from the endpoint's OPTIONS response
      * when `fields` is not given.
      *
      * Off by default and deliberately opt-in: a derived form knows types,
@@ -60,9 +65,22 @@ const props = withDefaults(
      * opinion about field order beyond the serializer's. Treat it as a
      * scaffold to start from, not a finished panel.
      *
-     * Requires a backend that publishes `schema` on OPTIONS (camomilla >= 6.6).
+     * Reads the `schema` the endpoint publishes on OPTIONS (camomilla >= 6.6)
+     * or, without one, Django REST Framework's standard metadata
+     * (`actions.POST`, which DRF serves to users who can create).
+     * `schemaFromMetadata` changes how.
      */
     experimentalFieldsFromSchema?: boolean;
+    /**
+     * Turns the OPTIONS response into the JSON Schema the body fields are
+     * built from, with `experimentalFieldsFromSchema`. Default:
+     * `metadataToJsonSchema` from `@mapomodule/utils`, which reads a published
+     * `schema`, then DRF metadata. Call it with options, or return your own
+     * schema; `undefined` derives no fields.
+     */
+    schemaFromMetadata?: (
+      metadata: Record<string, unknown>,
+    ) => JSONSchema | undefined;
     /** Passed straight to useFormFromSchema when deriving. */
     schemaFieldOptions?: UseFormFromSchemaOptions;
     /** Fields for the sidebar form (optional). */
@@ -136,6 +154,7 @@ const props = withDefaults(
   {
     fields: undefined,
     experimentalFieldsFromSchema: false,
+    schemaFromMetadata: undefined,
     schemaFieldOptions: undefined,
     sidebarFields: () => [],
     languages: () => [],
@@ -427,7 +446,8 @@ async function describeEndpoint() {
 
   if (wantsLangs) derivedLangs.value = languagesFromMetadata(metadata);
   if (wantsFields) {
-    const schema = metadata.schema as JSONSchema | undefined;
+    const toSchema = props.schemaFromMetadata ?? metadataToJsonSchema;
+    const schema = toSchema(metadata);
     if (schema?.properties) {
       derivedFields.value = useFormFromSchema(
         schema,
