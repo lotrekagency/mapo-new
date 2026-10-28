@@ -150,6 +150,10 @@ const fields = [{ key: "rating", type: "star-rating", is: StarRatingField }];
 
 `descriptor.is` has absolute priority over the registry for that field.
 
+::: tip Declare `is` once
+Import the component, or declare its lazy loader, at module level. Written inline in a computed `fields` array, it is a new component at every recompute: the field is mounted again and loses the focus. Registry entries do not need this care, because each loader is wrapped once.
+:::
+
 ## Accessor
 
 Accessors transform the value before it reaches the component (`get`) and after the component emits an update (`set`):

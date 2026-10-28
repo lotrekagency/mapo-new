@@ -9,6 +9,7 @@ export type {
   FieldAccessor,
   FieldDescriptor,
   AnyFieldDescriptor,
+  FieldExtensions,
   TextDescriptor,
   NumberDescriptor,
   BooleanDescriptor,
@@ -29,6 +30,13 @@ export type {
 } from "./descriptor.js";
 
 export type { MediaLink, MediaItem, EnhancedMediaValue } from "./media.js";
+
+export type {
+  FieldAnnotation,
+  FieldAnnotationAction,
+  FieldAnnotationColor,
+  FieldAnnotations,
+} from "./annotation.js";
 
 export type {
   FieldComponentEntry,

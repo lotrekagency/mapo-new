@@ -54,7 +54,17 @@ const sections = [
       {
         label: "Schema → Form",
         to: "/form/schema-to-form",
-        desc: "useFormFromSchema — JSON Schema to FieldDescriptor[]",
+        desc: "useFormFromSchema and fieldsToJsonSchema — JSON Schema ↔ FieldDescriptor[]",
+      },
+      {
+        label: "DRF metadata → form",
+        to: "/form/drf-metadata/1",
+        desc: "MapoDetail experimentalFieldsFromSchema on DRF OPTIONS metadata, schemaFromMetadata",
+      },
+      {
+        label: "Detail context",
+        to: "/form/detail-context/1",
+        desc: "useMapoDetail, defineDetailExtension, the extensions prop, fields in the slots",
       },
       {
         label: "Custom Fields",
@@ -70,6 +80,11 @@ const sections = [
         label: "Field Expand",
         to: "/form/field-expand",
         desc: "expandable: true — compact + expanded views",
+      },
+      {
+        label: "Field Annotations",
+        to: "/form/annotations",
+        desc: "Marks with popovers next to labels, badges on tabs and repeater items",
       },
     ],
   },

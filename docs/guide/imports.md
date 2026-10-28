@@ -28,10 +28,13 @@ const { fetch, loading } = useMapoFetch();
 | `usePermissions`                                | ✅            | `@mapomodule/store` |
 | `useMapoForm`                                   | ✅            | `@mapomodule/form`  |
 | `useFormFromSchema`                             | ✅            | `@mapomodule/form`  |
+| `fieldsToJsonSchema`                            | ✅            | `@mapomodule/form`  |
 | `useFormDraft`                                  | ✅            | `@mapomodule/form`  |
 | `useUnsavedChangesGuard`                        | ✅            | `@mapomodule/form`  |
 | `useFocusMode`                                  | ✅            | `@mapomodule/form`  |
 | `defineFormField`                               | ✅            | `@mapomodule/form`  |
+| `useMapoDetail`                                 | ✅            | `@mapomodule/uikit` |
+| `defineDetailExtension`                         | ✅            | `@mapomodule/uikit` |
 | `when` / `whenAny` / `whenNot` / `matchesField` | ✅            | `@mapomodule/form`  |
 
 > Only `@mapomodule/utils` functions (`debounce`, `deepMerge`, `objectDiff`, `formatDate`, etc.) are **not** auto-imported and require an explicit import.
@@ -97,10 +100,13 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `usePermissions`                                | composable  | auto-imported                                                              | —                            |
 | `useMapoForm`                                   | composable  | auto-imported                                                              | —                            |
 | `useFormFromSchema`                             | composable  | auto-imported                                                              | —                            |
+| `fieldsToJsonSchema`                            | function    | auto-imported; also exported from `mapomodule/types`                       | —                            |
 | `useFormDraft`                                  | composable  | auto-imported                                                              | —                            |
 | `useUnsavedChangesGuard`                        | composable  | auto-imported                                                              | —                            |
 | `useFocusMode`                                  | composable  | auto-imported                                                              | —                            |
 | `defineFormField`                               | function    | auto-imported                                                              | call from a Nuxt plugin      |
+| `useMapoDetail`                                 | composable  | auto-imported                                                              | inside a `MapoDetail`        |
+| `defineDetailExtension`                         | function    | auto-imported                                                              | call from a Nuxt plugin      |
 | `when` / `whenAny` / `whenNot` / `matchesField` | helpers     | auto-imported                                                              | progressive disclosure       |
 | `isOneOf` / `isNoneOf` / `isEmpty` / …          | matchers    | auto-imported                                                              | use with `matchesField`      |
 | `debounce`                                      | utility     | `import { debounce } from '@mapomodule/utils'`                             | not a composable             |
@@ -115,8 +121,13 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `buildRouteTree`                                | utility     | `import { buildRouteTree } from '@mapomodule/utils'`                       | —                            |
 | `resolveSchema`                                 | json-schema | `import { resolveSchema } from '@mapomodule/utils/jsonSchema'`             | —                            |
 | `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`               | —                            |
+| `metadataToJsonSchema`                          | json-schema | `import { metadataToJsonSchema } from '@mapomodule/utils/jsonSchema'`      | OPTIONS → JSON Schema        |
+| `drfMetadataToJsonSchema`                       | json-schema | `import { drfMetadataToJsonSchema } from '@mapomodule/utils/jsonSchema'`   | DRF metadata                 |
+| `openApiToJsonSchema`                           | json-schema | `import { openApiToJsonSchema } from '@mapomodule/utils/jsonSchema'`       | OpenAPI component            |
 | `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`                  | strict built-in union        |
 | `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`               | includes custom field types  |
+| `FieldExtensions`                               | type        | `declare module 'mapomodule/types' { interface FieldExtensions {} }`       | your descriptor properties   |
+| `MapoDetailContext<T>`                          | type        | `import type { MapoDetailContext } from 'mapomodule/types'`                | what `useMapoDetail` returns |
 | `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`                    | —                            |
 | `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`                       | generic preserved            |
 | `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`                   | —                            |

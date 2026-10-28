@@ -14,11 +14,12 @@ src/
                              /login and / pages, the media adapter plugin, useMediaStore, MapoOverride hook
   index.ts                   public types (resolved as @mapomodule/uikit/types)
   runtime/components/        Mapo*.vue
+  runtime/composables/       useMapoDetail (the detail context), defineDetailExtension (detail extensions)
   runtime/layouts/           default.vue (mapo-default), empty.vue (mapo-empty)
   runtime/pages/             login.vue, index.vue: added only when the app has no page on that path
   runtime/stores/media.ts    useMediaStore
   runtime/adapters/          defaultMediaAdapter; integrations override it with a later plugin
-  runtime/types/             list, media and menu types
+  runtime/types/             list, media, menu and detail (context, extensions) types
   runtime/assets/main.css    Tailwind sources and safelist, shared with @mapomodule/form
 ```
 
@@ -34,13 +35,14 @@ src/
 
 ## Change together
 
-| You change                           | Also change                                                                                   |
-| ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| A component's props, events or slots | `docs/uikit/api.md`, its narrative page in `docs/uikit/`, MCP recipes if a task changes       |
-| The layout slots                     | `docs/uikit/layout.md`, `docs/howto/theming.md`, the MCP `mapo-theme` prompt if it names them |
-| `mapo.uikit` options                 | `docs/uikit/theming.md`, `docs/guide/concepts.md` if the config shape changes                 |
-| The media adapter contract           | `docs/uikit/media.md`, `docs/howto/media-manager.md`                                          |
-| Route meta handling (sidebar)        | `docs/uikit/sidebar.md`; the page-meta types in `runtime/page-meta.nuxt.d.ts`                 |
+| You change                           | Also change                                                                                          |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| A component's props, events or slots | `docs/uikit/api.md`, its narrative page in `docs/uikit/`, MCP recipes if a task changes              |
+| The detail context or extensions     | `docs/uikit/detail.md` (context and extensions sections), `docs/uikit/api.md`, `docs/modules/api.md` |
+| The layout slots                     | `docs/uikit/layout.md`, `docs/howto/theming.md`, the MCP `mapo-theme` prompt if it names them        |
+| `mapo.uikit` options                 | `docs/uikit/theming.md`, `docs/guide/concepts.md` if the config shape changes                        |
+| The media adapter contract           | `docs/uikit/media.md`, `docs/howto/media-manager.md`                                                 |
+| Route meta handling (sidebar)        | `docs/uikit/sidebar.md`; the page-meta types in `runtime/page-meta.nuxt.d.ts`                        |
 
 ## Verify
 

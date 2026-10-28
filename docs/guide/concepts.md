@@ -106,8 +106,9 @@ The `type` is resolved through the **field registry**, which maps each type to a
 - A type that is not registered renders `MapoUnknownField` instead of failing silently.
 - `defineFormField()` registers a custom type. Registering an existing type replaces it and prints a development warning unless you pass `{ override: true }`. → [Registry](/uikit/form/registry)
 - `MapoDetail` renders forms for you; `MapoForm` and `useMapoForm()` run the same engine on your own state. → [Standalone form](/howto/form-standalone)
-- `useFormFromSchema()` builds descriptors from a JSON Schema, such as a DRF serializer. → [From JSON Schema](/uikit/form/schema-to-form)
-- Validation, translatable fields, conditional fields, drafts, focus mode and slots each have their own page under **Form Engine**.
+- `useFormFromSchema()` builds descriptors from a JSON Schema, and `fieldsToJsonSchema()` describes a form as a JSON Schema that reads back into the same descriptors. `@mapomodule/utils` reads DRF's `OPTIONS` metadata and OpenAPI documents into that JSON Schema, and `MapoDetail` derives its fields from the metadata with `experimentalFieldsFromSchema`. → [JSON Schema and forms](/uikit/form/schema-to-form)
+- `FieldExtensions` adds typed properties of your own to every descriptor; the form engine ignores them, and the code that declares them reads them. → [Custom fields](/uikit/form/custom-fields#add-your-own-descriptor-properties)
+- Validation, translatable fields, conditional fields, drafts, focus mode, slots and field annotations each have their own page under **Form Engine**.
 
 ## Customization layers
 
@@ -116,7 +117,8 @@ Pick the lightest layer that does the job:
 1. **CSS tokens** (`mapo.uikit.css`) for colours, radius and dark mode.
 2. **Nuxt UI defaults** (`mapo.uikit.ui`) for component variants across the app.
 3. **Slots** on the layout and on Mapo components for structural additions.
-4. **MapoOverride**: a file at `app/mapooverride/<Component>.vue` replaces that Mapo component at build time. You then own its updates.
+4. **Detail extensions**: `defineDetailExtension()` adds an action or a section to every `MapoDetail` without touching the pages; inside, `useMapoDetail()` reads the record, its fields and its state.
+5. **MapoOverride**: a file at `app/mapooverride/<Component>.vue` replaces that Mapo component at build time. You then own its updates.
 
 → [Theming & customization](/howto/theming), [MapoOverride](/uikit/mapoverride)
 

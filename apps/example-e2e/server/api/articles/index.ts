@@ -1,4 +1,5 @@
 import { getArticles, createArticle } from "../../utils/articleDb";
+import { articleMetadata } from "../../utils/articleMetadata";
 
 function toPositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -65,6 +66,9 @@ export default defineEventHandler(async (event) => {
       translations: body.translations ?? {},
     });
   }
+
+  // DRF's standard metadata, read by MapoDetail's schema mode.
+  if (method === "OPTIONS") return articleMetadata();
 
   throw createError({ statusCode: 405, message: "Method not allowed" });
 });

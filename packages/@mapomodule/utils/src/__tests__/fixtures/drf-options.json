@@ -1,0 +1,216 @@
+{
+  "name": "Event List",
+  "description": "Events of the festival.",
+  "renders": ["application/json", "text/html"],
+  "parses": [
+    "application/json",
+    "application/x-www-form-urlencoded",
+    "multipart/form-data"
+  ],
+  "actions": {
+    "POST": {
+      "id": {
+        "type": "integer",
+        "required": false,
+        "read_only": true,
+        "label": "ID"
+      },
+      "title": {
+        "type": "string",
+        "required": true,
+        "read_only": false,
+        "label": "Title",
+        "max_length": 200
+      },
+      "slug": {
+        "type": "slug",
+        "required": false,
+        "read_only": false,
+        "label": "Slug",
+        "help_text": "Leave it empty to build it from the title.",
+        "max_length": 50
+      },
+      "status": {
+        "type": "choice",
+        "required": false,
+        "read_only": false,
+        "label": "Status",
+        "choices": [
+          { "value": "draft", "display_name": "Draft" },
+          { "value": "published", "display_name": "Published" }
+        ]
+      },
+      "size": {
+        "type": "choice",
+        "required": false,
+        "read_only": false,
+        "label": "Size",
+        "choices": [
+          { "value": "S", "display_name": "S" },
+          { "value": "M", "display_name": "M" }
+        ]
+      },
+      "contact": {
+        "type": "email",
+        "required": false,
+        "read_only": false,
+        "label": "Contact",
+        "max_length": 254
+      },
+      "website": {
+        "type": "url",
+        "required": false,
+        "read_only": false,
+        "label": "Website",
+        "max_length": 200
+      },
+      "seats": {
+        "type": "integer",
+        "required": false,
+        "read_only": false,
+        "label": "Seats",
+        "min_value": 1,
+        "max_value": 500
+      },
+      "price": {
+        "type": "decimal",
+        "required": false,
+        "read_only": false,
+        "label": "Price",
+        "min_value": "0.00",
+        "max_digits": 6,
+        "decimal_places": 2
+      },
+      "rating": {
+        "type": "float",
+        "required": false,
+        "read_only": false,
+        "label": "Rating"
+      },
+      "is_public": {
+        "type": "boolean",
+        "required": false,
+        "read_only": false,
+        "label": "Public"
+      },
+      "starts_at": {
+        "type": "datetime",
+        "required": true,
+        "read_only": false,
+        "label": "Starts at"
+      },
+      "day": {
+        "type": "date",
+        "required": false,
+        "read_only": false,
+        "label": "Day"
+      },
+      "opens": {
+        "type": "time",
+        "required": false,
+        "read_only": false,
+        "label": "Opens"
+      },
+      "length": {
+        "type": "duration",
+        "required": false,
+        "read_only": false,
+        "label": "Length"
+      },
+      "poster": {
+        "type": "image upload",
+        "required": false,
+        "read_only": false,
+        "label": "Poster",
+        "max_length": 100
+      },
+      "attachment": {
+        "type": "file upload",
+        "required": false,
+        "read_only": false,
+        "label": "Attachment",
+        "max_length": 100
+      },
+      "venue": {
+        "type": "field",
+        "required": true,
+        "read_only": false,
+        "label": "Venue"
+      },
+      "speakers": {
+        "type": "field",
+        "required": false,
+        "read_only": false,
+        "label": "Speakers"
+      },
+      "topics": {
+        "type": "multiple choice",
+        "required": false,
+        "read_only": false,
+        "label": "Topics",
+        "choices": [
+          { "value": "art", "display_name": "Art" },
+          { "value": "music", "display_name": "Music" }
+        ]
+      },
+      "keywords": {
+        "type": "list",
+        "required": false,
+        "read_only": false,
+        "label": "Keywords",
+        "max_length": 5,
+        "child": {
+          "type": "string",
+          "required": true,
+          "read_only": false,
+          "max_length": 30
+        }
+      },
+      "partners": {
+        "type": "list",
+        "required": false,
+        "read_only": false,
+        "label": "Partners",
+        "child": { "type": "field", "required": true, "read_only": false }
+      },
+      "address": {
+        "type": "nested object",
+        "required": false,
+        "read_only": false,
+        "label": "Address",
+        "children": {
+          "street": {
+            "type": "string",
+            "required": true,
+            "read_only": false,
+            "label": "Street"
+          },
+          "city": {
+            "type": "string",
+            "required": false,
+            "read_only": false,
+            "label": "City"
+          }
+        }
+      },
+      "extra": {
+        "type": "nested object",
+        "required": false,
+        "read_only": false,
+        "label": "Extra"
+      },
+      "summary": {
+        "type": "rich text",
+        "required": false,
+        "read_only": false,
+        "label": "Summary"
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "read_only": true,
+        "label": "Created at"
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@
 // runtime field changes, getPatch(), resetDirty(), exposed methods via ref.
 // E2E plan: e2e/form/form-engine.md
 import type { FieldDescriptor } from "@mapomodule/form/types";
+import { slugify } from "@mapomodule/utils";
 
 definePageMeta({
   layout: "mapo-default",
@@ -68,6 +69,24 @@ function resetDirty() {
   form.resetDirty();
   patchResult.value = null;
 }
+
+// Fields computed from the model: each change of the title builds new
+// descriptor objects, and the field being typed in keeps its focus.
+interface PostModel {
+  title: string;
+  slug: string;
+}
+
+const post = ref<PostModel>({ title: "", slug: "" });
+const postFields = computed<FieldDescriptor<PostModel>[]>(() => [
+  { key: "title", type: "text", label: "Title" },
+  {
+    key: "slug",
+    type: "text",
+    label: "Slug",
+    attrs: { placeholder: slugify(post.value.title) || "about-us" },
+  },
+]);
 </script>
 
 <template>
@@ -203,6 +222,20 @@ function resetDirty() {
         :registry="$mapoFormRegistry"
         :immediate="true"
       />
+    </UCard>
+
+    <!-- Fields rebuilt at every change: the title keeps the focus while you type -->
+    <UCard>
+      <template #header>
+        <span class="font-semibold text-sm text-highlighted"
+          >Fields computed from the model</span
+        >
+      </template>
+      <p class="text-xs text-muted mb-3">
+        The slug placeholder follows the title: every keystroke builds new field
+        descriptors, and the title keeps the focus.
+      </p>
+      <MapoForm v-model="post" :fields="postFields" :immediate="true" />
     </UCard>
   </div>
 </template>

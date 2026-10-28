@@ -111,6 +111,7 @@ The v2 form engine starts from a different premise: **the form is data, not a te
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 4 — JSON Schema bridge (optional)                    │
 │  useFormFromSchema(schema) → FieldDescriptor[]              │
+│  fieldsToJsonSchema(fields) → JSON Schema, and back         │
 │  Generates descriptors automatically from Pydantic / DRF    │
 └──────────────────────────┬──────────────────────────────────┘
                            │ produces
@@ -174,6 +175,8 @@ Important: `AnyFieldDescriptor` is a typing escape hatch, not a compile-time reg
 
 So for built-in-only forms, prefer `FieldDescriptor<T>[]` to keep stricter editor errors.
 
+Properties of your own, such as a help text that a custom field shows, are declared on `FieldExtensions` and checked the same way: see [Add your own descriptor properties](./custom-fields#add-your-own-descriptor-properties).
+
 The generic `<T>` type-checks `key` against your model, but also accepts dotted strings for nested fields (`'blocks.0.title'`) or dynamic models. Typo errors in field names are caught by the IDE, not after deploy.
 
 ### The pipeline of every field
@@ -185,6 +188,8 @@ When `<MapoFormField>` renders a field, it walks this cascade:
 2. registry.mapping[type]?  → use the mapped component
 3. Unknown type?            → MapoUnknownField (yellow placeholder)
 ```
+
+A lazy entry (`() => import(...)`) becomes an async component once per loader, shared by every form in the app. When a descriptor is replaced by a new object of the same type, as a computed `fields` array does at every change, the mounted field is updated, not replaced: it keeps the focus and its state. A type already loaded renders at once in any later field or form.
 
 Then for each field:
 
@@ -233,7 +238,8 @@ The system never breaks on malformed descriptors or unknown types. In **developm
 - [Client-side validation →](./validation)
 - [Translated fields (i18n) →](./i18n)
 - [Slots and customization →](./slots)
+- [Field annotations →](./annotations)
 - [Registry and custom fields →](./registry)
 - [Reusable field sets →](./reusable-fields)
 - [`useMapoForm()` headless →](./composable)
-- [From JSON Schema to form →](./schema-to-form)
+- [JSON Schema and forms →](./schema-to-form)

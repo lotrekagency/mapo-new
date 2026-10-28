@@ -78,3 +78,21 @@ export function wireframeShapes(
 export function reachesMax(current: number, maxItems?: number): boolean {
   return !!maxItems && current + 1 >= maxItems;
 }
+
+/**
+ * The fields an item renders: those of its template, picked by `item._template`
+ * or, for an item without one, by `fallbackKey`; the repeater's own `fields`
+ * when it has no templates or the key matches none.
+ */
+export function repeaterItemFields(
+  descriptor: RepeaterDescriptor,
+  templates: NormalizedRepeaterTemplate[],
+  item: Record<string, unknown>,
+  fallbackKey: string | undefined,
+): AnyFieldDescriptor[] {
+  const ownFields = descriptor.fields ?? [];
+  const hasTemplates = templates.length > 0;
+  if (!hasTemplates) return ownFields;
+  const key = (item._template as string | undefined) ?? fallbackKey;
+  return templates.find((tpl) => tpl.key === key)?.fields ?? ownFields;
+}

@@ -170,6 +170,7 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoThemeToggle",
       // ─── CRUD / Detail / List ─────────────────────────────────────────────
       "MapoDetail",
+      "MapoDetailExtensions",
       "MapoDetailLangSwitch",
       "MapoList",
       "MapoListHead",
@@ -257,6 +258,15 @@ export default defineNuxtModule<MapoUikitOptions>({
         name: "useMediaStore",
         from: resolver.resolve("./runtime/stores/media"),
       },
+      // The detail context and its extensions
+      {
+        name: "useMapoDetail",
+        from: resolver.resolve("./runtime/composables/useMapoDetail"),
+      },
+      {
+        name: "defineDetailExtension",
+        from: resolver.resolve("./runtime/composables/defineDetailExtension"),
+      },
     ]);
 
     // MapoOverride* system: if the consuming app has a `mapooverride/` directory
@@ -281,6 +291,8 @@ export default defineNuxtModule<MapoUikitOptions>({
       // Add a catch-all route for the login page that renders the MapoLogin component.
       // This allows the login page to be rendered without requiring the consuming app
       // to create its own login page and route.
+      // The layout lives in `meta`, not in a `definePageMeta()` inside the page:
+      // apps load these pages from node_modules, where Nuxt adds no auto-imports.
       if (!pages.some((p) => p.path === "/login"))
         pages.push({
           name: "mapo-login",

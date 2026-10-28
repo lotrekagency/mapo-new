@@ -15,8 +15,13 @@ import {
   objectDiff,
   debounce,
 } from "@mapomodule/utils";
-import type { AnyFieldDescriptor, FieldRegistry } from "../types/index.js";
+import type {
+  AnyFieldDescriptor,
+  FieldAnnotations,
+  FieldRegistry,
+} from "../types/index.js";
 import { resolveFieldAccessor } from "../types/index.js";
+import { valuePath } from "../utils/annotations.js";
 import { useCurrentLang } from "./useCurrentLang.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
@@ -46,6 +51,12 @@ export interface UseMapoFormOptions<T extends object> {
    * Example: `"article:42"` → `mapo:draft:article:42`.
    */
   draftKey?: MaybeRef<string | undefined>;
+  /**
+   * Marks shown next to the labels of the fields, keyed by the path of the
+   * value (`title`, `translations.it.title`, `blocks.0.title`). Changing the
+   * map updates the marks without remounting the fields.
+   */
+  annotations?: MaybeRef<FieldAnnotations | undefined>;
 }
 
 /** State exposed when a pending draft is found in localStorage. */
@@ -71,6 +82,8 @@ export interface MapoFormContext<T extends object> {
   markTouched: (key: string) => void;
   isTouched: (key: string) => boolean;
   submitted: Ref<boolean>;
+  /** Optional, so a context built by hand without marks keeps working. */
+  annotations?: Readonly<Ref<FieldAnnotations>>;
 }
 
 function safeClone<X>(v: X): X {
@@ -251,11 +264,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   });
 
   function resolvePath(descriptor: AnyFieldDescriptor<T>): string {
-    const lang = currentLang.value;
-    if (descriptor.translatable && lang) {
-      return `translations.${lang}.${descriptor.key}`;
-    }
-    return descriptor.key as string;
+    return valuePath(descriptor as AnyFieldDescriptor, currentLang.value);
   }
 
   function initLang(lang: string) {
@@ -427,6 +436,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     markTouched,
     isTouched,
     submitted,
+    annotations: computed(() => toValue(options.annotations) ?? {}),
   };
 
   // Public API: accepts either a string key or a full descriptor, making it ergonomic

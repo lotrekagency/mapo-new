@@ -1,0 +1,172 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Festival API", "version": "1.0.0" },
+  "paths": {
+    "/api/events/": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Event" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/{id}/": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Event" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/venues/": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Venue" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/speakers/": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Speaker" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Event": {
+        "type": "object",
+        "description": "A festival event.",
+        "required": ["title", "status"],
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "title": { "type": "string", "maxLength": 200 },
+          "status": { "$ref": "#/components/schemas/StatusEnum" },
+          "price": {
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?\\d{0,4}(?:\\.\\d{0,2})?$"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "contact": { "type": "string", "format": "email" },
+          "website": { "type": "string", "format": "uri" },
+          "poster": { "type": "string", "format": "binary" },
+          "venue": {
+            "allOf": [{ "$ref": "#/components/schemas/Venue" }],
+            "nullable": true
+          },
+          "speakers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Speaker" }
+          },
+          "organizer": {
+            "allOf": [{ "$ref": "#/components/schemas/Organizer" }],
+            "readOnly": true
+          },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" },
+            "maxItems": 5
+          },
+          "metadata": {},
+          "schedule": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label"],
+              "properties": {
+                "time": { "type": "string", "format": "time" },
+                "label": { "type": "string" }
+              }
+            }
+          },
+          "password": { "type": "string", "writeOnly": true },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "title": "Created"
+          }
+        }
+      },
+      "StatusEnum": { "type": "string", "enum": ["draft", "published"] },
+      "Venue": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string" }
+        }
+      },
+      "Speaker": {
+        "type": "object",
+        "title": "Speaker",
+        "description": "Someone who talks at an event.",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string" }
+        }
+      },
+      "Organizer": {
+        "type": "object",
+        "properties": { "id": { "type": "integer" } }
+      },
+      "PublicEvent": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Event" },
+          {
+            "type": "object",
+            "required": ["slug"],
+            "properties": { "slug": { "type": "string" } }
+          }
+        ]
+      }
+    }
+  }
+}

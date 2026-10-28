@@ -36,7 +36,7 @@ Any other warning is new: fix it or explain it in the hand-over.
 - **Runner**: Vitest, in a Node environment.
 - **Location**: next to the code, in a `__tests__/` folder (`src/__tests__/` or `src/runtime/__tests__/`).
 - **Names**: `<subject>.test.ts` or `<subject>.spec.ts`; `<Component>.component.test.ts` for a test that mounts a `.vue` component (see [Component tests](#component-tests)).
-- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. It runs two projects: `component` for the `*.component.test.ts` files, `node` for everything else. `form`, `mcp` and `utils` have their own `vitest.config.ts`.
+- **Config**: the root `vitest.config.ts` aliases the Nuxt virtual module `#imports` to a mock in `packages/@mapomodule/form/src/__tests__/__mocks__/nuxt-imports.ts` and defines `import.meta.server` as `true`. It runs two projects: `component` for the `*.component.test.ts` files, `node` for everything else. `form`, `mcp` and `utils` have their own `vitest.config.ts`, used by their `test` script; the `form` one skips the `*.component.test.ts` files, which need the root config.
 
 Run a subset while you work:
 

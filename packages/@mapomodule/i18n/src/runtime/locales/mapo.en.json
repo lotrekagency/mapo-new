@@ -89,6 +89,7 @@
     "form": {
       "required": "This field is required.",
       "tabErrors": "This tab contains errors",
+      "annotationCount": "{n} marked field: {labels} | {n} marked fields: {labels}",
       "defaultTab": "General"
     },
     "fksField": {

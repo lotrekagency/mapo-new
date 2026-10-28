@@ -96,6 +96,40 @@ export const RECIPES: Recipe[] = [
       "MapoDetail wired to useCrud, with body/sidebar field descriptors and save flow.",
   },
   {
+    id: "detail-context",
+    task: "Use the record and state of a detail page from a component inside it",
+    keywords: [
+      "useMapoDetail",
+      "detail context",
+      "inside MapoDetail",
+      "current record",
+      "record being edited",
+      "shared OPTIONS",
+    ],
+    doc: "uikit/detail.md",
+    heading: "How to: read the detail from a component inside it",
+    seeAlso: ["uikit/form/annotations.md"],
+    summary:
+      "useMapoDetail() gives a component inside MapoDetail the record, the fields rendered, languages, state, save() and an annotations channel.",
+  },
+  {
+    id: "detail-extensions",
+    task: "Add an action or a section to every detail page",
+    keywords: [
+      "defineDetailExtension",
+      "detail extension",
+      "every detail page",
+      "action above save",
+      "MapoDetailExtensions",
+      "extensions prop",
+    ],
+    doc: "uikit/detail.md",
+    heading: "How to: add an action to every detail page",
+    seeAlso: ["uikit/api.md"],
+    summary:
+      "defineDetailExtension(), from a plugin, adds a component above Save or above the form of every MapoDetail; pages pick them with the extensions prop.",
+  },
+  {
     id: "standalone-form",
     task: "Use the form engine outside a detail page",
     keywords: [
@@ -381,6 +415,60 @@ export const RECIPES: Recipe[] = [
       "useFormFromSchema turns a JSON Schema (DRF, Pydantic) into field descriptors you can extend.",
   },
   {
+    id: "form-to-schema",
+    task: "Describe a form as JSON Schema",
+    keywords: [
+      "fieldsToJsonSchema",
+      "form to json schema",
+      "export the fields",
+      "serialize the form",
+      "round trip",
+      "x-mapo-field",
+      "x-mapo-attrs",
+    ],
+    doc: "uikit/form/schema-to-form.md",
+    heading: "From form to JSON Schema",
+    seeAlso: ["uikit/form/custom-fields.md"],
+    summary:
+      "fieldsToJsonSchema writes a form's descriptors as JSON Schema, and useFormFromSchema reads it back into the same descriptors.",
+  },
+  {
+    id: "schema-sources",
+    task: "Build a form from DRF OPTIONS metadata or an OpenAPI document",
+    keywords: [
+      "drf metadata",
+      "options metadata",
+      "actions.POST",
+      "drfMetadataToJsonSchema",
+      "openApiToJsonSchema",
+      "metadataToJsonSchema",
+      "schemaFromMetadata",
+      "placeholder field",
+    ],
+    doc: "uikit/form/schema-to-form.md",
+    heading: "From DRF metadata and OpenAPI",
+    seeAlso: ["uikit/detail.md"],
+    summary:
+      "drfMetadataToJsonSchema and openApiToJsonSchema read what a DRF backend publishes as JSON Schema; MapoDetail derives its fields from the OPTIONS metadata.",
+  },
+  {
+    id: "descriptor-extensions",
+    task: "Add typed properties of your own to field descriptors",
+    keywords: [
+      "FieldExtensions",
+      "extend the descriptor",
+      "declare module",
+      "module augmentation",
+      "custom descriptor property",
+      "typed property",
+    ],
+    doc: "uikit/form/custom-fields.md",
+    heading: "Add your own descriptor properties",
+    seeAlso: ["uikit/form/schema-to-form.md"],
+    summary:
+      "FieldExtensions adds typed properties of your own to every descriptor through module augmentation; the property option of fieldsToJsonSchema writes them into the schema.",
+  },
+  {
     id: "form-slots",
     task: "Customize how a form field renders with slots",
     keywords: [
@@ -410,6 +498,27 @@ export const RECIPES: Recipe[] = [
     seeAlso: ["uikit/form/field-expand.md"],
     summary:
       "Open a repeater item in a fullscreen view, or expand a single field in place.",
+  },
+  {
+    id: "field-annotations",
+    task: "Annotate the fields an assistant filled or that need a review",
+    keywords: [
+      "annotations",
+      "annotate",
+      "mark a field",
+      "field badge",
+      "tab count",
+      "suggested value",
+      "imported value",
+      "review note",
+      "outside the descriptor",
+      "MapoFormAnnotation",
+      "useFieldAnnotation",
+    ],
+    doc: "uikit/form/annotations.md",
+    seeAlso: ["uikit/form/slots.md", "uikit/form/api.md"],
+    summary:
+      "A reactive map keyed by value path on MapoForm, MapoDetail or useMapoForm: a mark with a popover next to the label and badges on tabs and repeater items, without remounting the fields.",
   },
   {
     id: "sidebar-navigation",

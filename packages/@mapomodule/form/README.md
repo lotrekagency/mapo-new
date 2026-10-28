@@ -51,15 +51,16 @@ The built-in types cover text and numbers, choices, dates and times, files, rela
 
 Components and composables are auto-imported.
 
-| API                                                        | Purpose                                                                                                                                                                                     |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MapoForm`                                                 | Renders a `FieldDescriptor[]` on your model, with tabs, collapsible groups, a responsive grid and slots                                                                                     |
-| `useMapoForm(options)`                                     | The same engine headless: dirty state, client validation, `getPatch()`, `submit()`, drafts. Pass `registry` explicitly                                                                      |
-| `defineFormField(type, component, opts?)`                  | Registers a custom field type from a plugin: a component or a lazy `import()`, with optional default `attrs` and accessor. Re-registering a type warns unless you pass `{ override: true }` |
-| `useFormFromSchema(schema, opts?)`                         | Builds descriptors from a JSON Schema, such as a DRF-spectacular or Pydantic schema                                                                                                         |
-| `when`, `whenAny`, `whenNot`, `matchesField`, `isOneOf`, … | Build `visible` conditions declaratively                                                                                                                                                    |
-| `useFormDraft`, `useFocusMode`, `useCurrentLang`           | Draft autosave, focus mode, the language being edited                                                                                                                                       |
-| `$mapoFormRegistry`                                        | The global registry: type → component, default `attrs`, accessor                                                                                                                            |
+| API                                                                    | Purpose                                                                                                                                                                                     |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MapoForm`                                                             | Renders a `FieldDescriptor[]` on your model, with tabs, collapsible groups, a responsive grid, slots and field annotations                                                                  |
+| `useMapoForm(options)`                                                 | The same engine headless: dirty state, client validation, `getPatch()`, `submit()`, drafts. Pass `registry` explicitly                                                                      |
+| `defineFormField(type, component, opts?)`                              | Registers a custom field type from a plugin: a component or a lazy `import()`, with optional default `attrs` and accessor. Re-registering a type warns unless you pass `{ override: true }` |
+| `useFormFromSchema(schema, opts?)`, `fieldsToJsonSchema(fields)`       | Builds descriptors from a JSON Schema, such as a DRF-spectacular or Pydantic schema, and describes a form as a JSON Schema that reads back into it                                          |
+| `FieldExtensions`                                                      | Declare typed descriptor properties of your own with `declare module "mapomodule/types"`                                                                                                    |
+| `when`, `whenAny`, `whenNot`, `matchesField`, `isOneOf`, …             | Build `visible` conditions declaratively                                                                                                                                                    |
+| `useFormDraft`, `useFocusMode`, `useCurrentLang`, `useFieldAnnotation` | Draft autosave, focus mode, the language being edited, the annotation of a field                                                                                                            |
+| `$mapoFormRegistry`                                                    | The global registry: type → component, default `attrs`, accessor                                                                                                                            |
 
 A custom field is any component that accepts the `modelValue`, `descriptor`, `errors`, `readonly` and `disabled` props and emits `update:modelValue`.
 
@@ -68,7 +69,7 @@ A custom field is any component that accepts the `modelValue`, `descriptor`, `er
 - [Form Engine](https://lotrekagency.github.io/mapo-new/uikit/form/): your first form, tabs and groups, how the engine works
 - [All field types](https://lotrekagency.github.io/mapo-new/uikit/form/add-fields)
 - [Field registry](https://lotrekagency.github.io/mapo-new/uikit/form/registry) and [Custom fields](https://lotrekagency.github.io/mapo-new/uikit/form/custom-fields)
-- [Validation](https://lotrekagency.github.io/mapo-new/uikit/form/validation), [Multilingual fields](https://lotrekagency.github.io/mapo-new/uikit/form/i18n), [Draft autosave](https://lotrekagency.github.io/mapo-new/uikit/form/draft), [Progressive Disclosure](https://lotrekagency.github.io/mapo-new/uikit/form/progressive-disclosure)
+- [Validation](https://lotrekagency.github.io/mapo-new/uikit/form/validation), [Multilingual fields](https://lotrekagency.github.io/mapo-new/uikit/form/i18n), [Draft autosave](https://lotrekagency.github.io/mapo-new/uikit/form/draft), [Progressive Disclosure](https://lotrekagency.github.io/mapo-new/uikit/form/progressive-disclosure), [Field annotations](https://lotrekagency.github.io/mapo-new/uikit/form/annotations)
 - [`useMapoForm()` reference](https://lotrekagency.github.io/mapo-new/uikit/form/composable)
-- [From JSON Schema to form](https://lotrekagency.github.io/mapo-new/uikit/form/schema-to-form)
+- [JSON Schema and forms](https://lotrekagency.github.io/mapo-new/uikit/form/schema-to-form)
 - [Form Engine — Component API Reference](https://lotrekagency.github.io/mapo-new/uikit/form/api)

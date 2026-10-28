@@ -26,10 +26,12 @@
  *   ✅ custom slot: field.slug (URL preview + copy)
  *   ✅ custom slots: title, side-top, body-bottom, side-bottom
  *   ✅ usePatch (PATCH diff on update), readonly toggle
+ *   ✅ field annotations on body, sidebar and repeater item fields (toggle)
  */
 import { navigateTo } from "#app";
 import { flattenFieldGroups } from "@mapomodule/form/types";
 import type {
+  FieldAnnotations,
   FieldDescriptor,
   MediaItem,
   EnhancedMediaValue,
@@ -330,6 +332,29 @@ const LANGUAGES = [
 ];
 
 const isReadonly = ref(false);
+
+// Sample marks for the annotations demo: a translatable field marked in every
+// language, a sidebar field and a field inside the first gallery item.
+const showAnnotations = ref(false);
+const sampleAnnotations: FieldAnnotations = {
+  title: {
+    label: "Imported from the old site",
+    icon: "i-lucide-download",
+    color: "info",
+    description: "Check the capitalisation before publishing.",
+  },
+  internal_notes: {
+    label: "Changed by the editor",
+    icon: "i-lucide-pencil",
+    color: "warning",
+    dot: true,
+  },
+  "gallery.0.caption": {
+    label: "Imported from the old site",
+    icon: "i-lucide-download",
+    color: "info",
+  },
+};
 const slotSlug = "field.slug";
 const slotFieldTitleBefore = "field.title.before";
 const slotFieldExcerptAfter = "field.excerpt.after";
@@ -2540,6 +2565,8 @@ const sidebarFields = flattenFieldGroups<Article>([
   <div class="p-4 max-w-[1400px] mx-auto">
     <!-- Readonly demo toggle -->
     <div class="flex items-center justify-end mb-3 gap-2">
+      <span class="text-xs text-muted">Annotations demo</span>
+      <USwitch v-model="showAnnotations" size="sm" />
       <span class="text-xs text-muted">Read-only demo</span>
       <USwitch v-model="isReadonly" size="sm" color="warning" />
     </div>
@@ -2555,6 +2582,7 @@ const sidebarFields = flattenFieldGroups<Article>([
       :use-patch="true"
       :readonly="isReadonly"
       :draft="true"
+      :annotations="showAnnotations ? sampleAnnotations : undefined"
       @saved="snack.show('Article saved!', 'success')"
       @deleted="navigateTo('/form')"
     >

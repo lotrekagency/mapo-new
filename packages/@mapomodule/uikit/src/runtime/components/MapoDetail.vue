@@ -14,7 +14,12 @@ import {
 } from "vue";
 import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
 import { useI18n } from "vue-i18n";
-import { objectDiff, debounce, deepClone } from "@mapomodule/utils";
+import {
+  objectDiff,
+  debounce,
+  deepClone,
+  metadataToJsonSchema,
+} from "@mapomodule/utils";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import {
   getErrorData,
@@ -23,11 +28,17 @@ import {
 } from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
-import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
+import type {
+  AnyFieldDescriptor,
+  FieldAnnotations,
+  FieldRegistry,
+  UseFormFromSchemaOptions,
+} from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { languagesFromMetadata } from "../utils/langInfo";
+import { DETAIL_KEY } from "../composables/useMapoDetail";
+import type { MapoDetailContext } from "../types/detail";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
-import type { UseFormFromSchemaOptions } from "@mapomodule/form/runtime/composables/useFormFromSchema";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { MultipartPolicy } from "@mapomodule/core";
 
@@ -47,7 +58,7 @@ const props = withDefaults(
      */
     fields?: AnyFieldDescriptor<T>[];
     /**
-     * EXPERIMENTAL. Build the body fields from the endpoint's OPTIONS schema
+     * EXPERIMENTAL. Build the body fields from the endpoint's OPTIONS response
      * when `fields` is not given.
      *
      * Off by default and deliberately opt-in: a derived form knows types,
@@ -56,9 +67,22 @@ const props = withDefaults(
      * opinion about field order beyond the serializer's. Treat it as a
      * scaffold to start from, not a finished panel.
      *
-     * Requires a backend that publishes `schema` on OPTIONS (camomilla >= 6.6).
+     * Reads the `schema` the endpoint publishes on OPTIONS (camomilla >= 6.6)
+     * or, without one, Django REST Framework's standard metadata
+     * (`actions.POST`, which DRF serves to users who can create).
+     * `schemaFromMetadata` changes how.
      */
     experimentalFieldsFromSchema?: boolean;
+    /**
+     * Turns the OPTIONS response into the JSON Schema the body fields are
+     * built from, with `experimentalFieldsFromSchema`. Default:
+     * `metadataToJsonSchema` from `@mapomodule/utils`, which reads a published
+     * `schema`, then DRF metadata. Call it with options, or return your own
+     * schema; `undefined` derives no fields.
+     */
+    schemaFromMetadata?: (
+      metadata: Record<string, unknown>,
+    ) => JSONSchema | undefined;
     /** Passed straight to useFormFromSchema when deriving. */
     schemaFieldOptions?: UseFormFromSchemaOptions;
     /** Fields for the sidebar form (optional). */
@@ -122,10 +146,22 @@ const props = withDefaults(
      * the auto-derived list.
      */
     forceLanguages?: string[];
+    /**
+     * Marks shown next to the field labels and counted on the tabs, in the body
+     * and in the sidebar forms, keyed by the path of the value (`title`,
+     * `translations.it.title`, `blocks.0.title`). See `MapoForm`.
+     */
+    annotations?: FieldAnnotations;
+    /**
+     * Which extensions registered with `defineDetailExtension()` the page
+     * shows: all (`true`), none (`false`) or the listed keys.
+     */
+    extensions?: boolean | string[];
   }>(),
   {
     fields: undefined,
     experimentalFieldsFromSchema: false,
+    schemaFromMetadata: undefined,
     schemaFieldOptions: undefined,
     sidebarFields: () => [],
     languages: () => [],
@@ -142,6 +178,8 @@ const props = withDefaults(
     permissionModel: undefined,
     previewField: undefined,
     forceLanguages: undefined,
+    annotations: undefined,
+    extensions: true,
   },
 );
 
@@ -405,18 +443,15 @@ async function describeEndpoint() {
     props.experimentalFieldsFromSchema && !props.fields?.length;
   if (!wantsLangs && !wantsFields) return;
 
-  let metadata: Record<string, unknown>;
-  try {
-    metadata = (await crud.options()) as Record<string, unknown>;
-  } catch {
-    // A backend without OPTIONS metadata is not an error worth surfacing: it
-    // just means nothing is auto-derived.
-    return;
-  }
+  const metadata = await describe();
+  // A backend without OPTIONS metadata is not an error worth surfacing: it
+  // just means nothing is auto-derived.
+  if (!metadata) return;
 
   if (wantsLangs) derivedLangs.value = languagesFromMetadata(metadata);
   if (wantsFields) {
-    const schema = metadata.schema as JSONSchema | undefined;
+    const toSchema = props.schemaFromMetadata ?? metadataToJsonSchema;
+    const schema = toSchema(metadata);
     if (schema?.properties) {
       derivedFields.value = useFormFromSchema(
         schema,
@@ -636,6 +671,55 @@ onBeforeUnmount(() => {
   }
 });
 
+// ─── Context ─────────────────────────────────────────────────────────────────
+// What the components inside the detail read with useMapoDetail(): its slots,
+// its forms and the extensions registered with defineDetailExtension().
+
+/** Marks set from inside the detail; the `annotations` prop wins on a path. */
+const innerAnnotations = ref<FieldAnnotations>({});
+const formAnnotations = computed<FieldAnnotations>(() => ({
+  ...innerAnnotations.value,
+  ...(props.annotations ?? {}),
+}));
+
+let metadataRequest: Promise<Record<string, unknown> | undefined> | undefined;
+
+/** The endpoint's OPTIONS response, requested once and shared. */
+function describe(): Promise<Record<string, unknown> | undefined> {
+  metadataRequest ??= crud.options().then(
+    (response) =>
+      typeof response === "object" && response !== null
+        ? (response as Record<string, unknown>)
+        : undefined,
+    () => undefined,
+  );
+  return metadataRequest;
+}
+
+const context: MapoDetailContext<T> = {
+  endpoint: computed(() => props.endpoint),
+  id: computed(() => props.id),
+  isNew,
+  model,
+  fields: activeFields,
+  sidebarFields: computed(() => props.sidebarFields ?? []),
+  languages: activeLangs,
+  currentLang,
+  registry,
+  errors,
+  readonly: effectiveReadonly,
+  isLoading,
+  isSaving,
+  isBusy,
+  isDirty,
+  annotations: innerAnnotations,
+  extensions: computed(() => props.extensions),
+  save,
+  back,
+  metadata: describe,
+};
+provide(DETAIL_KEY, context as unknown as MapoDetailContext);
+
 // ─── Slot bindings ───────────────────────────────────────────────────────────
 
 // Forward field-level (`field.*`), group-level (`group.*`) and tab-level (`tab.*`,
@@ -654,6 +738,8 @@ const formSlotNames = computed(() =>
 
 const slotBindings = computed(() => ({
   model: model.value,
+  fields: activeFields.value,
+  sidebarFields: props.sidebarFields ?? [],
   errors: errors.value,
   currentLang: currentLang.value,
   isNew: isNew.value,
@@ -677,6 +763,10 @@ type DraftBannerState = {
 
 type SlotBindings = {
   model: T;
+  /** The body fields rendered: the `fields` prop, or the ones derived from the schema. */
+  fields: AnyFieldDescriptor<T>[];
+  /** The sidebar fields rendered. */
+  sidebarFields: AnyFieldDescriptor<T>[];
   errors: Record<string, string[]>;
   currentLang: string;
   isNew: boolean;
@@ -811,6 +901,8 @@ defineSlots<{
           />
         </slot>
 
+        <MapoDetailExtensions placement="body-top" />
+
         <slot name="body-top" v-bind="slotBindings" />
 
         <!-- Main form -->
@@ -823,6 +915,7 @@ defineSlots<{
             :current-lang="currentLang"
             :registry="registry"
             :readonly="effectiveReadonly"
+            :annotations="formAnnotations"
           >
             <template
               v-for="slotName in formSlotNames"
@@ -845,6 +938,8 @@ defineSlots<{
           <slot name="side-buttons" v-bind="slotBindings">
             <UCard>
               <div class="flex flex-col gap-2">
+                <MapoDetailExtensions placement="actions" />
+
                 <slot name="button-save" v-bind="slotBindings">
                   <UButton
                     v-if="!effectiveReadonly"
@@ -905,6 +1000,7 @@ defineSlots<{
                 :current-lang="currentLang"
                 :registry="registry"
                 :readonly="effectiveReadonly"
+                :annotations="formAnnotations"
               >
                 <template
                   v-for="slotName in formSlotNames"
@@ -924,6 +1020,7 @@ defineSlots<{
               :current-lang="currentLang"
               :registry="registry"
               :readonly="effectiveReadonly"
+              :annotations="formAnnotations"
             >
               <template
                 v-for="slotName in formSlotNames"

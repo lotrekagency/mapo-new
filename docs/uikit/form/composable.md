@@ -16,6 +16,7 @@ const form = useMapoForm<T>({
   notifyErrors?: boolean,       // default true; false = no toast for server errors
   registry:     FieldRegistry,
   draftKey?:    MaybeRef<string | undefined>,    // enable draft persistence
+  annotations?: MaybeRef<FieldAnnotations | undefined>, // marks on the fields, see Field annotations
 })
 ```
 

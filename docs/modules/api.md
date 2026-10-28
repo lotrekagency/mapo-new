@@ -416,22 +416,76 @@ Type guards.
 
 ---
 
+### `metadataToJsonSchema(metadata, options?)`
+
+Reads an endpoint's `OPTIONS` response as JSON Schema: the `schema` it publishes (Camomilla), otherwise its Django REST Framework metadata. `<MapoDetail>` uses it with `experimentalFieldsFromSchema`. See [From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi).
+
+| Parameter  | Type                 | Description                                  |
+| ---------- | -------------------- | -------------------------------------------- |
+| `metadata` | `unknown`            | The `OPTIONS` response, as received.         |
+| `options`  | `DrfMetadataOptions` | Passed to `drfMetadataToJsonSchema` (below). |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the response describes no fields.
+
+---
+
+### `drfMetadataToJsonSchema(metadata, options?)`
+
+Reads DRF's standard `OPTIONS` metadata (`SimpleMetadata`) as JSON Schema in the dialect `useFormFromSchema` reads. A field DRF calls `field`, such as a relation, becomes a placeholder type, `field:<key>`.
+
+| Parameter          | Type                                              | Description                                                                                |
+| ------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `metadata`         | `unknown`                                         | The `OPTIONS` response, as received.                                                       |
+| `options.method`   | `"POST" \| "PUT"`                                 | The action to read. Default: `POST`, then `PUT`.                                           |
+| `options.types`    | `Record<string, (field, key) => JSONSchema>`      | The schema of each DRF type, merged over the built-in ones.                                |
+| `options.property` | `(schema, field, key) => JSONSchema \| undefined` | Rewrites the schema of each field, nested ones included; `undefined` leaves the field out. |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the response has no fields for the action: DRF publishes `POST` only to users who can create.
+
+---
+
+### `openApiToJsonSchema(document, model, options?)`
+
+Reads a component of an OpenAPI 3 document as JSON Schema in the dialect `useFormFromSchema` reads. `$ref`s are followed; a property pointing to another object component is a relation with the endpoint that lists it, or a placeholder without one.
+
+| Parameter           | Type                                               | Description                                                                            |
+| ------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `document`          | `unknown`                                          | The OpenAPI document, as received.                                                     |
+| `model`             | `string`                                           | The component name, as `openApiModels` lists it.                                       |
+| `options.endpoints` | `Record<string, string>`                           | The endpoint of each component the paths do not tell.                                  |
+| `options.property`  | `(schema, source, key) => JSONSchema \| undefined` | Rewrites the schema of each property, nested ones included; `undefined` leaves it out. |
+
+**Returns:** `JSONSchema | undefined` — `undefined` when the document has no such component.
+
+---
+
+### `openApiModels(document)`
+
+| Parameter  | Type      | Description                        |
+| ---------- | --------- | ---------------------------------- |
+| `document` | `unknown` | The OpenAPI document, as received. |
+
+**Returns:** `OpenApiModel[]` — every object component (`name`, `title`, `description`), with the collection `endpoint` that lists it when the paths tell, sorted by name.
+
+---
+
 ## Form — `@mapomodule/form`
 
 ### `useMapoForm(options)`
 
 Core composable powering `MapoForm`. Provides dirty tracking, validation, and submit flows.
 
-| Option        | Type                             | Default        | Description                             |
-| ------------- | -------------------------------- | -------------- | --------------------------------------- |
-| `model`       | `Ref<T>`                         | — **required** | Reactive form model.                    |
-| `fields`      | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive). |
-| `errors`      | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.          |
-| `languages`   | `string[]`                       | `[]`           | Available language codes.               |
-| `currentLang` | `Ref<string>`                    | `ref('')`      | Active language ref.                    |
-| `immediate`   | `boolean`                        | `false`        | Validate immediately on mount.          |
-| `debounce`    | `number`                         | `300`          | Global validator debounce (ms).         |
-| `registry`    | `FieldRegistry`                  | — **required** | Field component registry.               |
+| Option        | Type                             | Default        | Description                                                                                            |
+| ------------- | -------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `model`       | `Ref<T>`                         | — **required** | Reactive form model.                                                                                   |
+| `fields`      | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive).                                                                |
+| `errors`      | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.                                                                         |
+| `languages`   | `string[]`                       | `[]`           | Available language codes.                                                                              |
+| `currentLang` | `Ref<string>`                    | `ref('')`      | Active language ref.                                                                                   |
+| `immediate`   | `boolean`                        | `false`        | Validate immediately on mount.                                                                         |
+| `debounce`    | `number`                         | `300`          | Global validator debounce (ms).                                                                        |
+| `registry`    | `FieldRegistry`                  | — **required** | Field component registry.                                                                              |
+| `annotations` | `MaybeRef<FieldAnnotations>`     | —              | Marks on the fields, keyed by the path of the value. See [Field annotations](/uikit/form/annotations). |
 
 **Returns:**
 
@@ -455,7 +509,7 @@ Core composable powering `MapoForm`. Provides dirty tracking, validation, and su
 
 ### `useFormFromSchema(schema, options?)`
 
-Generates a `FieldDescriptor[]` array from a JSON Schema document.
+Generates a `FieldDescriptor[]` array from a JSON Schema document. It also reads back the schemas `fieldsToJsonSchema` writes.
 
 | Parameter           | Type                                       | Default        | Description                                                    |
 | ------------------- | ------------------------------------------ | -------------- | -------------------------------------------------------------- |
@@ -464,6 +518,19 @@ Generates a `FieldDescriptor[]` array from a JSON Schema document.
 | `options.overrides` | `Record<string, Partial<FieldDescriptor>>` | `{}`           | Per-field descriptor overrides applied after schema mapping.   |
 
 **Returns:** `FieldDescriptor[]` — Ready to pass to `MapoForm` or `MapoDetail`.
+
+---
+
+### `fieldsToJsonSchema(fields, options?)`
+
+Describes a form as a JSON Schema that `useFormFromSchema` reads back into equivalent descriptors: one property per field, with Mapo's own details in `x-mapo-field` and `x-mapo-attrs`. A pure function, also exported from `mapomodule/types`. See [From form to JSON Schema](/uikit/form/schema-to-form#from-form-to-json-schema).
+
+| Parameter          | Type                                                                         | Default        | Description                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `fields`           | `AnyFieldDescriptor[]`                                                       | — **required** | The descriptors, as passed to `MapoForm`.                                                                              |
+| `options.property` | `(schema: JSONSchema, field: AnyFieldDescriptor) => JSONSchema \| undefined` | —              | Called for every field, those of repeaters included: returns the schema to use, or `undefined` to leave the field out. |
+
+**Returns:** `JSONSchema` — an object schema: one property per field, named by its key, and `required` listing the required fields.
 
 ---
 
@@ -518,6 +585,18 @@ Shared state for the `MapoFocusPortal` / `MapoRepeater` focus-mode integration.
 | `isActive`    | `Ref<boolean>`                                  | `true` when focus mode is active.               |
 | `enter`       | `(target: FocusTarget) => void`                 | Open focus mode on a specific item.             |
 | `exit`        | `() => void`                                    | Close focus mode and restore the previous view. |
+
+---
+
+### `useFieldAnnotation(descriptor)`
+
+The annotation of a field, the one its mark shows. Call it in a custom field component to highlight the field, show the annotation's text or offer its actions inside the field. See [Field annotations](/uikit/form/annotations#read-the-annotation-in-a-custom-field).
+
+| Parameter    | Type                                   | Description                                |
+| ------------ | -------------------------------------- | ------------------------------------------ |
+| `descriptor` | `MaybeRefOrGetter<AnyFieldDescriptor>` | The field's descriptor, or a getter of it. |
+
+**Returns:** `ComputedRef<FieldAnnotation | undefined>` — the entry at the path of the field's value; for a translatable field, otherwise the entry at its bare key. Inside a repeater item it reads the item's annotations; outside a form it is always `undefined`.
 
 ---
 
@@ -604,3 +683,29 @@ Language context helpers for nested field components.
 | -------------------- | ------------------------ | ------------- | --------------------------------------------------------------------- |
 | `provideCurrentLang` | `lang: Ref<string>`      | `void`        | Provide the active language to descendants.                           |
 | `useCurrentLang`     | `fallback?: Ref<string>` | `Ref<string>` | Inject the current language, falling back to `fallback` or `ref('')`. |
+
+---
+
+## UIKit — `@mapomodule/uikit`
+
+### `useMapoDetail()`
+
+The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel and `metadata()`, the endpoint's `OPTIONS` response requested once per page. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
+
+**Returns:** `MapoDetailContext<T> | undefined` — `undefined` outside a `MapoDetail`.
+
+---
+
+### `defineDetailExtension(extension)`
+
+Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. See [Detail page](/uikit/detail#how-to-add-an-action-to-every-detail-page).
+
+| Parameter             | Type                                     | Description                                                                               |
+| --------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `extension.key`       | `string`                                 | Names the extension; registering a key again replaces it.                                 |
+| `extension.placement` | `"actions" \| "body-top"`                | The sidebar card above Save, or above the body form.                                      |
+| `extension.component` | `Component \| () => Promise<Component>`  | The component, or a function that imports it. It reads the detail with `useMapoDetail()`. |
+| `extension.visible`   | `(detail: MapoDetailContext) => boolean` | Whether a page shows it. Default: always.                                                 |
+| `extension.order`     | `number`                                 | Order among the extensions of a placement, lower first. Default: `0`.                     |
+
+**Returns:** `() => void` — removes the extension.

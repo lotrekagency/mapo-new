@@ -3,6 +3,13 @@ import { createRenderer, h, onUnmounted } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoDetail from "../runtime/components/MapoDetail.vue";
+import MapoDetailExtensions from "../runtime/components/MapoDetailExtensions.vue";
+import {
+  defineDetailExtension,
+  detailExtensions,
+} from "../runtime/composables/defineDetailExtension.js";
+import { useMapoDetail } from "../runtime/composables/useMapoDetail.js";
+import type { MapoDetailContext } from "../runtime/types/detail.js";
 
 type AfterEachHook = (to: unknown, from: unknown, failure?: unknown) => void;
 
@@ -24,11 +31,13 @@ const crud = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 const confirm = vi.hoisted(() => ({ ask: vi.fn() }));
+// One app instance for every call, as in an app: the extensions live on it.
+const nuxtApp = vi.hoisted(() => ({ $mapoFormRegistry: {} }));
 
 vi.mock("#app", () => ({
   useRouter: () => router,
   onBeforeRouteLeave: () => {},
-  useNuxtApp: () => ({ $mapoFormRegistry: {} }),
+  useNuxtApp: () => nuxtApp,
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("@mapomodule/core/runtime/api/crud", () => ({ useCrud: () => crud }));
@@ -132,14 +141,35 @@ const UButton: Component = {
   },
 };
 
+// `MapoForm` keeps the props of each instance, body and sidebar alike.
+interface FormProps {
+  annotations?: object;
+  fields?: { key: string; type: string; attrs?: Record<string, unknown> }[];
+}
+const forms: FormProps[] = [];
+
+const MapoForm: Component = {
+  name: "MapoForm",
+  inheritAttrs: false,
+  props: { annotations: Object, fields: Array },
+  setup(props: FormProps, { slots }: SetupContext) {
+    forms.push(props);
+    onUnmounted(() => {
+      forms.splice(forms.indexOf(props), 1);
+    });
+    return () => h("div", null, slots.default?.());
+  },
+};
+
 const stubs: Record<string, Component> = {
   UButton,
   UCard: passthrough("UCard"),
   UAlert: passthrough("UAlert"),
   UIcon: passthrough("UIcon"),
   UModal: passthrough("UModal"),
-  MapoForm: passthrough("MapoForm"),
+  MapoForm,
   MapoDetailLangSwitch: passthrough("MapoDetailLangSwitch"),
+  MapoDetailExtensions,
 };
 
 const button = (label: string) => {
@@ -156,10 +186,13 @@ interface ActionBindings {
 
 let app: App<HeadlessNode> | undefined;
 
-function mountDetail(slots: Record<string, (bindings: never) => VNode[]> = {}) {
+function mountDetail(
+  slots: Record<string, (bindings: never) => VNode[]> = {},
+  extraProps: Record<string, unknown> = {},
+) {
+  const props = { endpoint: "/api/news/", id: 5, ...extraProps };
   const root: Component = {
-    render: () =>
-      h(MapoDetail as Component, { endpoint: "/api/news/", id: 5 }, slots),
+    render: () => h(MapoDetail as Component, props, slots),
   };
   app = createApp(root);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
@@ -200,6 +233,7 @@ beforeEach(() => {
 afterEach(() => {
   app?.unmount();
   app = undefined;
+  detailExtensions(nuxtApp).splice(0);
 });
 
 describe("MapoDetail actions", () => {
@@ -289,5 +323,286 @@ describe("MapoDetail actions", () => {
     expect(crud.delete).toHaveBeenCalledTimes(1);
     expect(confirm.ask).toHaveBeenCalledTimes(1);
     expect(button("mapo.delete").loading).toBe(true);
+  });
+});
+
+describe("MapoDetail annotations", () => {
+  it("passes the annotations to the body and the sidebar forms", async () => {
+    const annotations = { title: { label: "Suggested by AI" } };
+    mountDetail(
+      {},
+      { annotations, sidebarFields: [{ key: "status", type: "text" }] },
+    );
+    await settle();
+
+    expect(forms).toHaveLength(2);
+    for (const form of forms) expect(form.annotations).toEqual(annotations);
+  });
+});
+
+describe("MapoDetail schema mode", () => {
+  // What Django REST Framework serves on OPTIONS, with no `schema`.
+  const drfMetadata = {
+    name: "News List",
+    actions: {
+      POST: {
+        title: { type: "string", required: true, label: "Title" },
+        status: {
+          type: "choice",
+          label: "Status",
+          choices: [{ value: "draft", display_name: "Draft" }],
+        },
+        author: { type: "field", required: true, label: "Author" },
+      },
+    },
+  };
+
+  it("builds the body fields from DRF metadata", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    mountDetail({}, { experimentalFieldsFromSchema: true });
+    await settle();
+
+    const body = forms[0]!.fields!;
+    expect(body.map((field) => [field.key, field.type])).toEqual([
+      ["title", "text"],
+      ["status", "select"],
+      ["author", "field:author"],
+    ]);
+    expect(body[1]!.attrs?.options).toEqual([
+      { text: "Draft", value: "draft" },
+    ]);
+  });
+
+  it("reads the OPTIONS response with schemaFromMetadata when given", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    const schemaFromMetadata = vi.fn(() => ({
+      type: "object",
+      properties: { headline: { type: "string", title: "Headline" } },
+    }));
+    mountDetail({}, { experimentalFieldsFromSchema: true, schemaFromMetadata });
+    await settle();
+
+    expect(schemaFromMetadata).toHaveBeenCalledWith(drfMetadata);
+    expect(forms[0]!.fields!.map((field) => field.key)).toEqual(["headline"]);
+  });
+
+  it("derives nothing without the opt-in", async () => {
+    crud.options.mockResolvedValue(drfMetadata);
+    mountDetail();
+    await settle();
+
+    expect(forms[0]!.fields).toEqual([]);
+  });
+});
+
+/** Mounts a component in `body-top` that keeps the context it reads. */
+function mountWithProbe(extraProps: Record<string, unknown> = {}) {
+  const seen: { detail?: MapoDetailContext } = {};
+  const Probe: Component = {
+    setup() {
+      seen.detail = useMapoDetail();
+      return () => h("i");
+    },
+  };
+  mountDetail({ "body-top": () => [h(Probe)] }, extraProps);
+  return seen;
+}
+
+describe("MapoDetail context", () => {
+  const fields = [{ key: "title", type: "text" }];
+
+  it("shares the record, the fields and the state with the components inside", async () => {
+    const seen = mountWithProbe({ fields, languages: ["it", "en"] });
+    await settle();
+    const detail = seen.detail!;
+
+    expect(detail.endpoint.value).toBe("/api/news/");
+    expect(detail.id.value).toBe(5);
+    expect(detail.isNew.value).toBe(false);
+    expect(detail.model.value).toEqual(record);
+    expect(detail.fields.value).toEqual(fields);
+    expect(detail.languages.value).toEqual(["it", "en"]);
+    expect(detail.readonly.value).toBe(false);
+    expect(detail.isDirty.value).toBe(false);
+
+    (detail.model.value as { title: string }).title = "Changed";
+    expect(detail.isDirty.value).toBe(true);
+  });
+
+  it("saves through the context as the buttons do", async () => {
+    const seen = mountWithProbe({ fields });
+    await settle();
+
+    await seen.detail!.save();
+
+    expect(crud.partialUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the marks set from inside under the annotations prop", async () => {
+    const fromProp = { title: { label: "From the page" } };
+    const seen = mountWithProbe({ fields, annotations: fromProp });
+    await settle();
+
+    seen.detail!.annotations.value = {
+      title: { label: "From inside" },
+      slug: { label: "From inside" },
+    };
+    await settle();
+
+    expect(forms[0]!.annotations).toEqual({
+      title: { label: "From the page" },
+      slug: { label: "From inside" },
+    });
+  });
+
+  it("asks the endpoint for OPTIONS once, whoever asks", async () => {
+    crud.options.mockResolvedValue({ name: "News List" });
+    // No languages: the detail asks OPTIONS for them itself.
+    const seen = mountWithProbe({ fields });
+    await settle();
+
+    expect(await seen.detail!.metadata()).toEqual({ name: "News List" });
+    await seen.detail!.metadata();
+    expect(crud.options).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers metadata() with undefined when the endpoint has no OPTIONS", async () => {
+    crud.options.mockRejectedValue(new Error("405"));
+    const seen = mountWithProbe({ fields, languages: ["it"] });
+    await settle();
+
+    expect(await seen.detail!.metadata()).toBeUndefined();
+  });
+
+  it("passes the fields rendered to the slots", async () => {
+    let bindings: { fields?: unknown; sidebarFields?: unknown } = {};
+    const sidebarFields = [{ key: "status", type: "text" }];
+    mountDetail(
+      {
+        "side-bottom": (slotProps: typeof bindings) => {
+          bindings = slotProps;
+          return [];
+        },
+      },
+      { fields, sidebarFields },
+    );
+    await settle();
+
+    expect(bindings.fields).toEqual(fields);
+    expect(bindings.sidebarFields).toEqual(sidebarFields);
+  });
+});
+
+describe("MapoDetail extensions", () => {
+  /** A component that notes when it renders, under its name. */
+  const rendered: string[] = [];
+  const noting = (name: string): Component => ({
+    setup() {
+      rendered.push(name);
+      return () => h("i");
+    },
+  });
+
+  beforeEach(() => {
+    rendered.splice(0);
+  });
+
+  it("renders each extension in its place", async () => {
+    defineDetailExtension({
+      key: "fill",
+      placement: "actions",
+      component: noting("fill"),
+    });
+    defineDetailExtension({
+      key: "summary",
+      placement: "body-top",
+      component: noting("summary"),
+    });
+    mountDetail();
+    await settle();
+
+    expect(rendered.sort()).toEqual(["fill", "summary"]);
+  });
+
+  it("lets a page show none of them, or only some", async () => {
+    defineDetailExtension({
+      key: "a",
+      placement: "actions",
+      component: noting("a"),
+    });
+    defineDetailExtension({
+      key: "b",
+      placement: "actions",
+      component: noting("b"),
+    });
+
+    mountDetail({}, { extensions: false });
+    await settle();
+    expect(rendered).toEqual([]);
+    app?.unmount();
+
+    mountDetail({}, { extensions: ["b"] });
+    await settle();
+    expect(rendered).toEqual(["b"]);
+  });
+
+  it("asks visible() with the context", async () => {
+    const visible = vi.fn((detail: MapoDetailContext) => !detail.isNew.value);
+    defineDetailExtension({
+      key: "duplicate",
+      placement: "actions",
+      component: noting("duplicate"),
+      visible,
+    });
+    mountDetail({}, { id: "new" });
+    await settle();
+
+    expect(visible).toHaveBeenCalled();
+    expect(rendered).toEqual([]);
+  });
+
+  it("orders them, replaces a key registered again, and removes them", async () => {
+    defineDetailExtension({
+      key: "late",
+      placement: "actions",
+      component: noting("late"),
+      order: 2,
+    });
+    defineDetailExtension({
+      key: "early",
+      placement: "actions",
+      component: noting("old"),
+    });
+    defineDetailExtension({
+      key: "early",
+      placement: "actions",
+      component: noting("early"),
+      order: 1,
+    });
+    const remove = defineDetailExtension({
+      key: "gone",
+      placement: "actions",
+      component: noting("gone"),
+      order: 3,
+    });
+    remove();
+    mountDetail();
+    await settle();
+
+    expect(rendered).toEqual(["early", "late"]);
+  });
+
+  it("loads a component from a loader", async () => {
+    const loaded = noting("loaded");
+    defineDetailExtension({
+      key: "lazy",
+      placement: "body-top",
+      component: () => Promise.resolve({ default: loaded }),
+    });
+    mountDetail();
+    // The record, then the loader, then the render of what it loaded.
+    for (let step = 0; step < 4; step++) await settle();
+
+    expect(rendered).toEqual(["loaded"]);
   });
 });

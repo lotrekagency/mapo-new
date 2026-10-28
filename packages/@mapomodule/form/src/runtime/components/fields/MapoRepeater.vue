@@ -7,6 +7,7 @@ import type { RepeaterDescriptor } from "../../types/index.js";
 import {
   normalizeTemplates,
   reachesMax,
+  repeaterItemFields,
   shouldUseModalPicker,
 } from "../../utils/repeaterTemplates.js";
 import { injectMapoForm } from "../../composables/useMapoForm.js";
@@ -115,9 +116,12 @@ watchEffect(() => {
 });
 
 function fieldsForItem(item: Record<string, unknown>) {
-  if (!hasTemplates.value) return props.descriptor.fields ?? [];
-  const key = (item._template as string) ?? selectedTemplate.value;
-  return templateByKey.value.get(key)?.fields ?? props.descriptor.fields ?? [];
+  return repeaterItemFields(
+    props.descriptor,
+    templateList.value,
+    item,
+    selectedTemplate.value,
+  );
 }
 
 // ─── Item CRUD ───────────────────────────────────────────────────────────────

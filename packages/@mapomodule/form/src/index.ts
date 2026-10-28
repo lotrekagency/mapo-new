@@ -23,12 +23,15 @@ export {
 } from "./runtime/composables/useProgressiveDisclosure.js";
 export { flattenFieldGroups } from "./runtime/utils/flattenFieldGroups.js";
 export type { FieldGroupDescriptor } from "./runtime/utils/flattenFieldGroups.js";
+export { fieldsToJsonSchema } from "./runtime/utils/fieldsToJsonSchema.js";
+export type { FieldsToJsonSchemaOptions } from "./runtime/utils/fieldsToJsonSchema.js";
 export { KnownFieldType } from "./runtime/types/index.js";
 export type {
   FieldType,
   FieldAccessor,
   FieldDescriptor,
   AnyFieldDescriptor,
+  FieldExtensions,
   TextDescriptor,
   NumberDescriptor,
   BooleanDescriptor,
@@ -52,4 +55,8 @@ export type {
   FieldComponentEntry,
   FieldRegistry,
   PartialFieldRegistry,
+  FieldAnnotation,
+  FieldAnnotationAction,
+  FieldAnnotationColor,
+  FieldAnnotations,
 } from "./runtime/types/index.js";

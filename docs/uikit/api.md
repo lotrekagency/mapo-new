@@ -10,20 +10,25 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 
 ### Props
 
-| Prop            | Type                    | Default        | Description                                                                                                     |
-| --------------- | ----------------------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
-| `endpoint`      | `string`                | — **required** | REST endpoint passed to `useCrud`.                                                                              |
-| `id`            | `string \| number`      | — **required** | Record ID. Pass `'new'` to create.                                                                              |
-| `fields`        | `FieldDescriptor<T>[]`  | — **required** | Fields for the main body form.                                                                                  |
-| `sidebarFields` | `FieldDescriptor<T>[]`  | `[]`           | Fields rendered in the sidebar form.                                                                            |
-| `languages`     | `string[]`              | `[]`           | Translation language codes (e.g. `['it', 'en']`).                                                               |
-| `langThreshold` | `number`                | `8`            | Show the language select next to the tabs above this many languages.                                            |
-| `modelName`     | `string \| null`        | `null`         | Human-readable model name shown in the page title.                                                              |
-| `sidebarCols`   | `number`                | `4`            | Sidebar column span (1–11 in a 12-col grid).                                                                    |
-| `sticky`        | `boolean`               | `true`         | Keep sidebar sticky while scrolling. Offset controlled by `--mapo-topbar-height` CSS variable (default `64px`). |
-| `usePatch`      | `boolean`               | `true`         | Send `PATCH` (diff only) on update instead of `PUT`.                                                            |
-| `readonly`      | `boolean`               | `false`        | Force read-only mode globally.                                                                                  |
-| `registry`      | `FieldRegistry \| null` | `null`         | Field registry. Falls back to `$mapoFormRegistry` if omitted.                                                   |
+| Prop                           | Type                                    | Default        | Description                                                                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `endpoint`                     | `string`                                | — **required** | REST endpoint passed to `useCrud`.                                                                                                                                                                                                |
+| `id`                           | `string \| number`                      | — **required** | Record ID. Pass `'new'` to create.                                                                                                                                                                                                |
+| `fields`                       | `FieldDescriptor<T>[]`                  | —              | Fields for the main body form. Optional only when `experimentalFieldsFromSchema` supplies them.                                                                                                                                   |
+| `experimentalFieldsFromSchema` | `boolean`                               | `false`        | Derive the body fields from the endpoint's OPTIONS response (a published `schema`, otherwise DRF metadata) when `fields` is not given. See [Detail page](./detail#how-to-derive-the-fields-from-the-backend-schema-experimental). |
+| `schemaFromMetadata`           | `(metadata) => JSONSchema \| undefined` | —              | Replaces how the OPTIONS response becomes the schema of the derived fields. Default: `metadataToJsonSchema` from `@mapomodule/utils`.                                                                                             |
+| `schemaFieldOptions`           | `UseFormFromSchemaOptions`              | —              | Passed to `useFormFromSchema` when deriving (`exclude`, `overrides`).                                                                                                                                                             |
+| `sidebarFields`                | `FieldDescriptor<T>[]`                  | `[]`           | Fields rendered in the sidebar form.                                                                                                                                                                                              |
+| `languages`                    | `string[]`                              | `[]`           | Translation language codes (e.g. `['it', 'en']`).                                                                                                                                                                                 |
+| `langThreshold`                | `number`                                | `8`            | Show the language select next to the tabs above this many languages.                                                                                                                                                              |
+| `modelName`                    | `string \| null`                        | `null`         | Human-readable model name shown in the page title.                                                                                                                                                                                |
+| `sidebarCols`                  | `number`                                | `4`            | Sidebar column span (1–11 in a 12-col grid).                                                                                                                                                                                      |
+| `sticky`                       | `boolean`                               | `true`         | Keep sidebar sticky while scrolling. Offset controlled by `--mapo-topbar-height` CSS variable (default `64px`).                                                                                                                   |
+| `usePatch`                     | `boolean`                               | `true`         | Send `PATCH` (diff only) on update instead of `PUT`.                                                                                                                                                                              |
+| `readonly`                     | `boolean`                               | `false`        | Force read-only mode globally.                                                                                                                                                                                                    |
+| `registry`                     | `FieldRegistry \| null`                 | `null`         | Field registry. Falls back to `$mapoFormRegistry` if omitted.                                                                                                                                                                     |
+| `annotations`                  | `FieldAnnotations`                      | —              | Marks on the fields of the body and the sidebar forms. See [Field annotations](./form/annotations).                                                                                                                               |
+| `extensions`                   | `boolean \| string[]`                   | `true`         | Which extensions registered with `defineDetailExtension()` the page shows: all, none (`false`) or the listed keys. See [Detail page](./detail#how-to-add-an-action-to-every-detail-page).                                         |
 
 ### Emits
 
@@ -51,6 +56,16 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `field.{field.key}`   | Per-field override (forwarded to the inner `MapoForm`). |
 
 ---
+
+## MapoDetailExtensions
+
+Renders, inside a `MapoDetail`, the extensions registered with `defineDetailExtension()` for one place, in their order. `MapoDetail` uses it itself; place it in a slot that replaces that place, such as `side-buttons`, to keep the extensions there.
+
+### Props
+
+| Prop        | Type                      | Default        | Description                                                      |
+| ----------- | ------------------------- | -------------- | ---------------------------------------------------------------- |
+| `placement` | `"actions" \| "body-top"` | — **required** | Which extensions: the action card's, or the ones above the form. |
 
 ## MapoDetailLangSwitch
 
