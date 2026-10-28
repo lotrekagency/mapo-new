@@ -19,6 +19,8 @@ src/
   runtime/components/           shell components; fields/ (Mapo*Field.vue) and fields/nui/ (Nuxt UI wrappers)
   runtime/composables/          useMapoForm, useFormFromSchema, useFormDraft, useFocusMode, useProgressiveDisclosure,
                                 defineFormField, useUnsavedChangesGuard, useMediaManager, useCurrentLang
+  runtime/utils/                flattenFieldGroups, repeaterTemplates, tabVisibility, fieldComponent (one async
+                                component per registry loader)
   __tests__/                    Vitest suites, with the #imports mock used by the root config
 ```
 
@@ -46,6 +48,7 @@ src/
 
 ```bash
 pnpm --filter @mapomodule/form test
+pnpm exec vitest run packages/@mapomodule/form   # from the root: also the *.component.test.ts files
 pnpm --filter @mapomodule/form typecheck      # vue-tsc: templates are part of the gate
 pnpm --filter @mapomodule/form lint
 ```
@@ -54,7 +57,7 @@ Then check the change in `apps/example-e2e/app/pages/form/` (one page per form s
 
 ## Gotchas
 
-- **A field remounts and loses focus when the parent re-renders** → `MapoFormField` creates the async component inside a `computed`, so a new descriptor object means a new component. Keep descriptor objects stable; the fix (caching per loader) is an open thread in the root manual.
+- **A field with `is` remounts and loses focus when `fields` is recomputed** → the component or the loader in `is` is written inside the computed, so each recompute brings a new one. Declare it once at module level. Registry entries are wrapped once per loader (`runtime/utils/fieldComponent.ts`), so new descriptor objects of the same type keep the field mounted.
 - **An editor field shows its client error only on submit, never on blur** → `MapoWygEditor` gets `@blur` on its root `div`, which never has the focus (open thread). Keep it a single-root component: a second root drops the `flex-1`, `id` and `style` that `MapoFormField` passes, and the editor shrinks to its toolbar.
 - **A type renders `MapoUnknownField`** → it is not in the registry the app sees: check `defineFormField()` ran in a plugin, or the spelling of `type`.
 - **Types collapse to `any` in apps** → the build's `clean-empty-vue-dts.mjs` step was skipped.

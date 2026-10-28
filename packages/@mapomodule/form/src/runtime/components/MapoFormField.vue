@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, inject, ref, watch } from "vue";
+import { computed, inject, ref, watch } from "vue";
 import type { Ref } from "vue";
 import type { AnyFieldDescriptor } from "../types/index.js";
 import {
@@ -8,6 +8,7 @@ import {
   resolveFieldAccessor,
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { toFieldComponent } from "../utils/fieldComponent.js";
 import { getNestedValue, debounce } from "@mapomodule/utils";
 import MapoUnknownField from "./MapoUnknownField.vue";
 
@@ -144,12 +145,12 @@ const asyncTrailingIconClass = computed(
 
 // ─── Component resolution ────────────────────────────────────────────────────
 
+// The same loader always gives the same component, so a new descriptor object of
+// the same type updates the mounted field instead of replacing it.
 const fieldComponent = computed(() => {
   const entry = resolveFieldComponent(props.descriptor, registry);
   if (!entry) return MapoUnknownField;
-  if (typeof entry === "function")
-    return defineAsyncComponent(entry as () => Promise<{ default: unknown }>);
-  return entry;
+  return toFieldComponent(entry);
 });
 
 const fieldAttrs = computed(() =>

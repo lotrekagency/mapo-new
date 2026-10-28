@@ -206,7 +206,6 @@ Symptom → cause.
 - **`TS2307: Cannot find module '@mapomodule/form/types'` in an app** → pnpm strict layout; declare the package or import from `mapomodule/types`.
 - **The Nitro build breaks after adding a file to `mcp/src/runtime/mcp/`** → the toolkit loads every top-level file there as a handler; only `handlers/` may live there.
 - **A Tailwind class has no effect in a Mapo component** → it is built at runtime; safelist it in uikit `main.css`.
-- **A field loses focus or remounts when the form re-renders** → `MapoFormField` wraps the registry loader in `defineAsyncComponent` inside a `computed`, so a new descriptor object creates a new component; keep descriptor objects stable (§12).
 - **"Mapo knowledge base not found" from the MCP server** → the package was not built; run `pnpm --filter @mapomodule/mcp build`.
 - **A VitePress page fails to build** → a bare `<word>` in prose or a heading; wrap it in backticks.
 - **pnpm warns that the `pnpm` field in `package.json` is no longer read** → a newer global pnpm prints it before handing over to the pinned 8.15.6, which applies the overrides (they are in `pnpm-lock.yaml`).
@@ -219,15 +218,14 @@ What exists: [`docs/guide/feature-status.md`](docs/guide/feature-status.md). Kno
 
 ### Code
 
-1. `MapoFormField` recreates the async field component whenever the descriptor object changes; caching the async component per loader would fix the remount.
-2. `MapoWygEditor` never marks editor fields as touched: the `blur` listener from `MapoFormField` lands on its root `div`, which never has the focus (the Tiptap content does).
-3. `MapoConfirmDialog` has no accessible name: its title is a plain heading inside the modal content.
-4. `@mapomodule/uikit` registers `MapoMediaManagerDialog` twice (by name and as global), so every app build prints an override warning.
-5. Lint reports a few hundred warnings in `form` and `uikit` (no errors).
+1. `MapoWygEditor` never marks editor fields as touched: the `blur` listener from `MapoFormField` lands on its root `div`, which never has the focus (the Tiptap content does).
+2. `MapoConfirmDialog` has no accessible name: its title is a plain heading inside the modal content.
+3. `@mapomodule/uikit` registers `MapoMediaManagerDialog` twice (by name and as global), so every app build prints an override warning.
+4. Lint reports a few hundred warnings in `form` and `uikit` (no errors).
 
 ### Testing and CI
 
-1. `core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them.
+1. `core`, `store` and `uikit` have tests but no `test` script, and the `form` config skips its `*.component.test.ts` files, so `pnpm test` and CI do not run them.
 2. The apps have no `typecheck` script, so `pnpm typecheck` and CI cover the packages only; type-check an app by hand ([apps manual](apps/AGENTS.md)).
 3. There is no browser end-to-end suite; `apps/example-e2e` is shaped as its target.
 4. CI runs on pull requests to `main` only; the push trigger is commented out in `.github/workflows/ci.yml`.

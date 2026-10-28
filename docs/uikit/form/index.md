@@ -186,6 +186,8 @@ When `<MapoFormField>` renders a field, it walks this cascade:
 3. Unknown type?            → MapoUnknownField (yellow placeholder)
 ```
 
+A lazy entry (`() => import(...)`) becomes an async component once per loader, shared by every form in the app. When a descriptor is replaced by a new object of the same type, as a computed `fields` array does at every change, the mounted field is updated, not replaced: it keeps the focus and its state. A type already loaded renders at once in any later field or form.
+
 Then for each field:
 
 ```
