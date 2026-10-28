@@ -1,0 +1,62 @@
+{
+  "name": "@mapomodule/ai",
+  "version": "0.0.0",
+  "description": "Mapo AI-assisted data entry: the AI gateway on the app's Nitro server (experimental)",
+  "type": "module",
+  "license": "MIT",
+  "author": "Lotrek Agency (https://lotrek.it)",
+  "homepage": "https://lotrekagency.github.io/mapo-new/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotrekagency/mapo-new.git",
+    "directory": "packages/@mapomodule/ai"
+  },
+  "bugs": {
+    "url": "https://github.com/lotrekagency/mapo-new/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/module.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./types": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./runtime/*": {
+      "types": "./src/runtime/*.ts",
+      "import": "./dist/runtime/*.js",
+      "default": "./src/runtime/*"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "dev": "nuxt-module-build build --stub --watch",
+    "build": "nuxt-module-build build",
+    "prepare": "nuxt-module-build build --stub",
+    "dev:prepare": "nuxt-module-build build --stub",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "h3": "^1.15.11"
+  },
+  "peerDependencies": {
+    "nuxt": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@nuxt/kit": "4.4.2",
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "4.4.2",
+    "nuxt": "^4.5.1",
+    "vue": "^3.5.40"
+  }
+}

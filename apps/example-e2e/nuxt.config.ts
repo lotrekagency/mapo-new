@@ -26,6 +26,10 @@ export default defineNuxtConfig({
       },
     },
 
+    // AI-assisted data entry (experimental). Opt-in: an empty block installs
+    // the module, and the gateway answers at /_mapo/ai/status.
+    ai: {},
+
     i18n: {
       defaultLocale: "en",
       // `file` points at i18n/locales/<file>: those messages are deep-merged on

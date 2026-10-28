@@ -110,6 +110,7 @@ export default defineConfig({
           { text: 'Utils', link: '/modules/utils' },
           { text: 'i18n', link: '/modules/i18n' },
           { text: 'MCP server (AI assistants)', link: '/modules/mcp' },
+          { text: 'AI-assisted entry (experimental)', link: '/modules/ai' },
           { text: 'Composable & Function API', link: '/modules/api' },
         ],
       },

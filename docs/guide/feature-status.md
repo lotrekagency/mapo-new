@@ -163,6 +163,17 @@ UI translations for every Mapo component, extensible by the consuming app. See [
 | `useMapoT()`                | ✅     | Translator for stores/composables where `useI18n()` is unavailable                           |
 | Fully translated components | ✅     | List, Detail, Form fields, Media Manager, Menu Manager, login, feedback                      |
 
+### AI-assisted entry (`@mapomodule/ai`, experimental)
+
+New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
+
+| Feature                     | Status | Notes                                                                        |
+| --------------------------- | ------ | ---------------------------------------------------------------------------- |
+| Opt-in installation         | ✅     | The meta-module installs the package only when the app sets `mapo.ai`        |
+| Gateway status route        | ✅     | `GET /_mapo/ai/status` answers with the gateway's contract version           |
+| Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them    |
+| Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk |
+
 ---
 
 ## Not yet implemented 🔲

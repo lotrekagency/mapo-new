@@ -21,7 +21,7 @@ export default defineNuxtConfig({
 
 | Package             | Role                                                                                                                                     |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `mapomodule`        | Meta-module. Reads the `mapo` config key and installs every package below (`@mapomodule/mcp` only in development).                       |
+| `mapomodule`        | Meta-module. Reads `mapo` and installs the packages below: `@mapomodule/mcp` only in development, `@mapomodule/ai` only with `mapo.ai`.  |
 | `@mapomodule/core`  | Service layer: `$mapoFetch` with 401/403 handling, `useCrud`, `useMapoAuth`, the `auth`, `permissions` and `roles` route middleware.     |
 | `@mapomodule/store` | Pinia stores: `useAuthStore`, `useSnackStore`, `useConfirmStore`, `useSidebarStore`, plus `usePermissions`.                              |
 | `@mapomodule/uikit` | The admin shell (layouts, sidebar, topbar, login), `MapoList`, `MapoDetail`, the media manager, the menu manager, theming, MapoOverride. |
@@ -29,6 +29,7 @@ export default defineNuxtConfig({
 | `@mapomodule/i18n`  | A wrapper around `@nuxtjs/i18n` with Mapo's English and Italian catalogs and `useMapoT()`.                                               |
 | `@mapomodule/utils` | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …). Not a Nuxt module, not auto-imported.                                |
 | `@mapomodule/mcp`   | A development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration.                    |
+| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway on the app's server (`/_mapo/ai/*`), answering `status` only.         |
 
 Backend integrations ship as separate packages. The Camomilla CMS one is [`@mapomodule/mapo-integrations-camomilla`](/modules/camomilla); any other backend gets [its own small integration](/modules/integrations-howto).
 
@@ -41,7 +42,8 @@ mapomodule
 ├── @mapomodule/core     → store, utils
 ├── @mapomodule/form     → store, i18n, utils
 ├── @mapomodule/uikit    → core, store, form, i18n, utils, @nuxt/ui
-└── @mapomodule/mcp      development only
+├── @mapomodule/mcp      development only
+└── @mapomodule/ai       opt-in with mapo.ai, experimental
 ```
 
 ## How a request flows
@@ -124,7 +126,7 @@ Pick the lightest layer that does the job:
 
 ## Configuration in one place
 
-With the meta-module, everything lives under the `mapo` key. Core options sit at the top level (`authLoginUrl`, `userInfoApi`, `logoutUrl`, `loginUrl`, …), and each sub-module has its own block: `mapo.uikit`, `mapo.form`, `mapo.i18n` and `mapo.mcp`. A package installed on its own reads its own key instead: `mapoCore`, `mapoStore`, `mapoUikit`, `mapoForm`, `mapoI18n` or `mapoMcp`.
+With the meta-module, everything lives under the `mapo` key. Core options sit at the top level (`authLoginUrl`, `userInfoApi`, `logoutUrl`, `loginUrl`, …), and each sub-module has its own block: `mapo.uikit`, `mapo.form`, `mapo.i18n`, `mapo.mcp` and `mapo.ai` (which also opts in to `@mapomodule/ai`). A package installed on its own reads its own key instead: `mapoCore`, `mapoStore`, `mapoUikit`, `mapoForm`, `mapoI18n`, `mapoMcp` or `mapoAi`.
 
 Every option has a default, listed in [Core options](/modules/core#options).
 

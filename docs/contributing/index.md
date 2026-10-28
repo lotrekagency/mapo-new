@@ -103,7 +103,7 @@ wip: stuff                                  ✘
 The commit type drives the version bump of the affected packages (see [Release Process](/guide/release-process)): `fix` is a patch, `feat` a minor, `feat!` or a `BREAKING CHANGE` footer a major. Choose it for what the change means to consumers.
 
 - Types in use: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `style`.
-- The scope is the package or area: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-theme`, `deps`, `ci`.
+- The scope is the package or area: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `ai`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-theme`, `deps`, `ci`.
 - A sweeping mechanical change (formatting, renames across packages) is its own commit.
 
 ## CI and releases

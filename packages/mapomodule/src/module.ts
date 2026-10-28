@@ -10,6 +10,7 @@ import type { MapoUikitOptions } from "@mapomodule/uikit";
 import type { MapoFormOptions } from "@mapomodule/form";
 import type { MapoI18nOptions } from "@mapomodule/i18n";
 import type { MapoMcpOptions } from "@mapomodule/mcp/types";
+import type { MapoAiOptions } from "@mapomodule/ai/types";
 
 interface MapoModuleOptions extends MapoOptions {
   /** Options forwarded to @mapomodule/uikit (CSS override, Nuxt UI defaults). */
@@ -23,6 +24,12 @@ interface MapoModuleOptions extends MapoOptions {
    * Installed in development only; pass `false` to skip it entirely.
    */
   mcp?: MapoMcpOptions | false;
+  /**
+   * Options forwarded to @mapomodule/ai (AI-assisted data entry, experimental).
+   * Opt-in: the module is installed only when this key is set, `{}` included;
+   * without it, or with `false`, nothing of the module is loaded.
+   */
+  ai?: MapoAiOptions | false;
 }
 
 // Meta-module: installs all @mapomodule/* Nuxt modules with a single registration.
@@ -42,10 +49,10 @@ export default defineNuxtModule<MapoModuleOptions>({
       await installModule(await resolver.resolvePath("@mapomodule/store"));
     }
 
-    // Forward only core options: `uikit`, `form`, `i18n` and `mcp` have their
-    // own modules, and leaking them into `runtimeConfig.public.mapoCore` would
-    // change its generated type per-app.
-    const { uikit, form, i18n, mcp, ...coreOptions } = options;
+    // Forward only core options: `uikit`, `form`, `i18n`, `mcp` and `ai` have
+    // their own modules, and leaking them into `runtimeConfig.public.mapoCore`
+    // would change its generated type per-app.
+    const { uikit, form, i18n, mcp, ai, ...coreOptions } = options;
 
     if (!hasNuxtModule("@mapomodule/i18n")) {
       await installModule(
@@ -83,6 +90,14 @@ export default defineNuxtModule<MapoModuleOptions>({
         await resolver.resolvePath("@mapomodule/mcp"),
         mcp || {},
       );
+    }
+
+    // AI-assisted data entry: opt-in, so an app that does not set `mapo.ai`
+    // never loads the module, its routes or its dependencies.
+    const aiOptedOut = ai === false;
+    const aiConfigured = ai !== undefined;
+    if (aiConfigured && !aiOptedOut && !hasNuxtModule("@mapomodule/ai")) {
+      await installModule(await resolver.resolvePath("@mapomodule/ai"), ai);
     }
   },
 }) satisfies NuxtModule<MapoModuleOptions>;

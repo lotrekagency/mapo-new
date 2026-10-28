@@ -5,4 +5,5 @@ export * from "@mapomodule/core/types";
 export * from "@mapomodule/store/types";
 export * from "@mapomodule/form/types";
 export * from "@mapomodule/uikit/types";
+export * from "@mapomodule/ai/types";
 export * from "@mapomodule/utils";

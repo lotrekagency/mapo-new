@@ -33,7 +33,7 @@ Mapo v2 is in beta and published on the `next` dist-tag. The `latest` tag still 
 
 | Package                                           | Role                                                                                                                                                               |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`mapomodule`](packages/mapomodule)               | Meta-module: reads the `mapo` config key and installs every package below (`@mapomodule/mcp` only in development)                                                  |
+| [`mapomodule`](packages/mapomodule)               | Meta-module: reads the `mapo` config key and installs every package below (`@mapomodule/mcp` only in development, `@mapomodule/ai` only with `mapo.ai`)            |
 | [`@mapomodule/core`](packages/@mapomodule/core)   | Service layer: `$mapoFetch` with 401/403 handling, `useCrud`, `useMapoAuth`, the `auth`, `permissions` and `roles` route middleware, server-side session hydration |
 | [`@mapomodule/store`](packages/@mapomodule/store) | Pinia stores (auth, snack, confirm, sidebar) and `usePermissions`                                                                                                  |
 | [`@mapomodule/uikit`](packages/@mapomodule/uikit) | Admin shell (layouts, sidebar, topbar, login), `MapoList`, `MapoDetail`, media manager, menu manager, theming, MapoOverride                                        |
@@ -41,6 +41,7 @@ Mapo v2 is in beta and published on the `next` dist-tag. The `latest` tag still 
 | [`@mapomodule/i18n`](packages/@mapomodule/i18n)   | `@nuxtjs/i18n` v10 wrapper with Mapo's English and Italian catalogs and `useMapoT()`                                                                               |
 | [`@mapomodule/utils`](packages/@mapomodule/utils) | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …): not a Nuxt module, imported explicitly                                                         |
 | [`@mapomodule/mcp`](packages/@mapomodule/mcp)     | Development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration                                                 |
+| [`@mapomodule/ai`](packages/@mapomodule/ai)       | Experimental, opt-in with `mapo.ai`: AI-assisted data entry. Today it adds the AI gateway (`/_mapo/ai/*`) to the app's server                                      |
 
 Backend integrations ship from their own repositories. [`@mapomodule/mapo-integrations-camomilla`](https://github.com/camomillacms/mapo-integrations-camomilla) proxies a [Camomilla CMS](https://github.com/lotrekagency/camomilla) backend; any other backend gets [its own small integration](https://lotrekagency.github.io/mapo-new/modules/integrations-howto).
 
@@ -79,6 +80,7 @@ Switch the packages to stub mode while you work on them: `dist/` then re-exports
 | `pnpm dev:packages`                                                     | Every package at once, through Turborepo                           |
 | `pnpm dev:core`, `dev:store`, `dev:uikit`, `dev:form`, `dev:mapomodule` | One Nuxt module package (`nuxt-module-build build --stub --watch`) |
 | `pnpm dev:utils`                                                        | `@mapomodule/utils` (`tsc --watch`)                                |
+| `pnpm dev:ai`                                                           | `@mapomodule/ai`, in the same stub mode as the modules above       |
 
 `@mapomodule/i18n` and `@mapomodule/mcp` have no root alias: run `pnpm --filter @mapomodule/i18n dev`. After stubbing, regenerate the app's auto-import types with `pnpm nuxt prepare` inside the app.
 
@@ -110,11 +112,11 @@ Workflow, options and caveats: [Testing changes in a consumer app](docs/contribu
 | `pnpm build`           | Builds every workspace package through Turborepo, in dependency order: the packages, the apps and the docs site     |
 | `pnpm lint`            | ESLint over every package's `src/`                                                                                  |
 | `pnpm typecheck`       | `tsc --noEmit` for the TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`; the apps are checked by hand |
-| `pnpm test`            | Vitest in the packages that declare a `test` script: `utils`, `form` (without its component tests) and `mcp`        |
+| `pnpm test`            | Vitest in the packages that declare a `test` script: `utils`, `form` (without its component tests), `mcp` and `ai`  |
 | `pnpm exec vitest run` | Every test file in the repository, including `core`, `store`, `uikit` and the component tests                       |
 | `pnpm docs:build`      | The documentation site                                                                                              |
 
-Type declarations: `core`, `store` and `i18n` emit them with `tsc -p tsconfig.build-types.json`, and `utils` with plain `tsc`. `form` and `uikit` use `vue-tsc`, then `scripts/clean-empty-vue-dts.mjs` deletes the empty `.vue.d.ts` stubs that would collapse app types to `any`. The `mcp` build also generates its knowledge base from `docs/` and the `uikit` and `form` sources.
+Type declarations: `core`, `store` and `i18n` emit them with `tsc -p tsconfig.build-types.json`, and `utils` with plain `tsc`. `form` and `uikit` use `vue-tsc`, then `scripts/clean-empty-vue-dts.mjs` deletes the empty `.vue.d.ts` stubs that would collapse app types to `any`. `ai` and `mcp` get theirs from `nuxt-module-build` alone; the `mcp` build also generates its knowledge base from `docs/` and the `uikit` and `form` sources.
 
 What to run before handing a change over, and how to check it in the reference app: [Testing and verification](docs/contributing/testing.md).
 

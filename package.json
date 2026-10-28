@@ -25,6 +25,7 @@
     "dev:utils": "pnpm --filter @mapomodule/utils dev",
     "dev:mapomodule": "pnpm --filter mapomodule dev",
     "dev:form": "pnpm --filter @mapomodule/form dev",
+    "dev:ai": "pnpm --filter @mapomodule/ai dev",
     "dev:packages": "turbo run dev --filter='./packages/**'",
     "dev:link": "node scripts/dev-link.mjs",
     "prepare": "husky",

@@ -26,6 +26,7 @@ export default defineNuxtConfig({
     form: { debounce: 300 }, // field registry defaults
     i18n: { defaultLocale: "en" }, // locales
     // mcp: false, // skip the development-only MCP server
+    // ai: {}, // opt in to AI-assisted data entry (experimental)
   },
 });
 ```
@@ -42,6 +43,7 @@ Every key is optional. The app also needs an `app.vue` that wraps the page in `<
 | `@mapomodule/uikit` | `mapo.uikit`            | Layouts, sidebar, login, `MapoList`, `MapoDetail`, media and menu managers, theming      |
 | `@mapomodule/form`  | `mapo.form`             | The form engine and its field registry                                                   |
 | `@mapomodule/mcp`   | `mapo.mcp`              | An MCP server for AI assistants, in development only                                     |
+| `@mapomodule/ai`    | `mapo.ai`               | AI-assisted data entry (experimental), installed only when `mapo.ai` is set              |
 
 `@mapomodule/utils`, `@nuxt/ui` and `@iconify-json/lucide` come along as dependencies. A module you register yourself in `modules` is not installed a second time, and it then reads its own config key (`mapoForm`, `mapoUikit`, …) instead of the `mapo` block.
 
@@ -53,7 +55,7 @@ Composables, stores and components are auto-imported. Types come from one aggreg
 import type { FieldDescriptor, ListColumn } from "mapomodule/types";
 ```
 
-`mapomodule/types` re-exports the public types of `core`, `store`, `form`, `uikit` and `utils`.
+`mapomodule/types` re-exports the public types of `core`, `store`, `form`, `uikit`, `ai` and `utils`.
 
 ## Documentation
 

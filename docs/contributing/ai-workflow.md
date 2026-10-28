@@ -13,7 +13,7 @@ Rules, procedures and facts live in one place each, and every tool-specific file
 | `CLAUDE.md`          | Claude Code                                                                        | Only `@AGENTS.md`, which imports the manual next to it                  |
 | `docs/contributing/` | Everyone                                                                           | The procedures: these pages                                             |
 
-Module manuals exist where a folder has rules of its own: `packages/@mapomodule/mcp`, `form`, `uikit`, `core`, `docs/` and `apps/`. The root `AGENTS.md` lists them, so an agent that does not load nested files still knows to read them.
+Module manuals exist where a folder has rules of its own: `packages/@mapomodule/mcp`, `form`, `uikit`, `core`, `ai`, `docs/` and `apps/`. The root `AGENTS.md` lists them, so an agent that does not load nested files still knows to read them.
 
 For Copilot in VS Code, turn on nested manuals in your settings:
 
