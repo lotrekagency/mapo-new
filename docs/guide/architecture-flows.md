@@ -20,7 +20,7 @@ mapomodule                                  ← meta-module: installs every @map
 
 `mapomodule` is a thin **meta-module**: it installs `@mapomodule/store`, `@mapomodule/i18n`, `@mapomodule/core`, `@mapomodule/uikit` and `@mapomodule/form` transitively with resolver-based `installModule(...)` calls (pnpm strict compatible), plus `@mapomodule/mcp` in development. It re-exports only types, through `mapomodule/types`: it simply ensures the full Mapo stack is registered with a single `modules[]` entry.
 
-`@mapomodule/core` depends on `@mapomodule/store` at **build time** via package.json `dependencies`. At runtime, stores are accessed through composables (`useAuthStore()`, `useSnackStore()`) which are auto-imported by Nuxt — there is no static import of the module entry from runtime code.
+`@mapomodule/core` depends on `@mapomodule/store` at **build time** via package.json `dependencies`. At runtime, the fetch plugin resolves stores with the Nuxt app's Pinia instance, avoiding reliance on a global active store during concurrent SSR requests. There is no static import of the module entry from runtime code.
 
 `@mapomodule/mapo-integrations-camomilla` sits at the **Nitro layer** — it runs on the server before Nuxt's rendering pipeline. It has no knowledge of stores or composables. It communicates with `@mapomodule/core` purely through HTTP: the proxy rewrites paths and manages cookies; `@mapomodule/core` plugins consume the resulting HTTP responses.
 

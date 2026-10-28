@@ -60,8 +60,10 @@ Runs on **both server and client**. Creates a `$fetch` instance with auth interc
 Behaviour:
 
 - **401** (unauthenticated): calls `authStore.reset()` and, if on the client, redirects to `/login?redirect=<current-path>`
-- **403** (forbidden): calls `useSnackStore().show('Permission denied', 'error')`
+- **403** (forbidden): translates `mapo.permissionDenied` and shows it through `useSnackStore()`
 - All other responses pass through unchanged
+
+The interceptor resolves both stores from the Pinia instance on the Nuxt app, so concurrent SSR requests do not depend on a process-global active Pinia.
 
 `$mapoFetch` does **not** inject an `Authorization` header. Authentication uses session cookies (`__mapo_session`, or a shared Django `sessionid` with the Camomilla integration). SSR requests forward the incoming `Cookie` header unless a call provides its own. HTTP failures reject with ofetch's `FetchError`, preserving `.status`, `.data` and `.response`.
 
