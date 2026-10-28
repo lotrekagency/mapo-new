@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- nuxt/app is a virtual runtime module; stub the handful of helpers used. ---
 const cookieRef = { value: "a-session-value" as string | null };
+const djangoCookieRef = { value: null as string | null };
+const requestHeaders = { cookie: "__mapo_session=a-session-value" };
 const runtimeConfig = { public: { mapoCore: {} as Record<string, unknown> } };
 
 vi.mock("nuxt/app", () => ({
   defineNuxtPlugin: (p: unknown) => p,
   useRuntimeConfig: () => runtimeConfig,
-  useCookie: () => cookieRef,
-  useRequestHeaders: () => ({ cookie: "__mapo_session=a-session-value" }),
+  useCookie: (name: string) =>
+    name === "sessionid" ? djangoCookieRef : cookieRef,
+  useRequestHeaders: () => requestHeaders,
 }));
 
 vi.mock("pinia", () => ({ setActivePinia: vi.fn() }));
@@ -36,6 +39,8 @@ describe("mapo-core:init (SSR session restore)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cookieRef.value = "a-session-value";
+    djangoCookieRef.value = null;
+    requestHeaders.cookie = "__mapo_session=a-session-value";
     runtimeConfig.public.mapoCore = {};
   });
 
@@ -62,19 +67,58 @@ describe("mapo-core:init (SSR session restore)", () => {
     expect(url).toBe("/api/whoami/");
   });
 
-  it("clears the session cookie when the backend rejects it (401)", async () => {
-    const fetchMock = vi.fn(() =>
-      Promise.reject(Object.assign(new Error("Unauthorized"), { status: 401 })),
-    );
+  it("restores a shared Django session without a Mapo copy", async () => {
+    cookieRef.value = null;
+    djangoCookieRef.value = "live-django-session";
+    requestHeaders.cookie = "sessionid=live-django-session; csrftoken=csrf";
+    const fetchMock = vi.fn().mockResolvedValue({ username: "site-user" });
+
     await run(fetchMock);
 
-    expect(authStore.reset).toHaveBeenCalled();
-    expect(cookieRef.value).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith("/api/profiles/me/", {
+      method: "GET",
+      headers: requestHeaders,
+    });
+    expect(authStore.setUser).toHaveBeenCalledWith({ username: "site-user" });
+    expect(djangoCookieRef.value).toBe("live-django-session");
   });
+
+  it("forwards both cookies unchanged so the integration decides precedence", async () => {
+    djangoCookieRef.value = "new-django-session";
+    requestHeaders.cookie =
+      "sessionid=new-django-session; __mapo_session=a-session-value";
+    const fetchMock = vi.fn().mockResolvedValue({ username: "current-user" });
+
+    await run(fetchMock);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/profiles/me/", {
+      method: "GET",
+      headers: requestHeaders,
+    });
+    expect(authStore.setUser).toHaveBeenCalledWith({
+      username: "current-user",
+    });
+  });
+
+  it.each([401, 403])(
+    "clears only the Mapo copy on rejection (%i)",
+    async (status) => {
+      djangoCookieRef.value = "shared-session";
+      const fetchMock = vi.fn(() =>
+        Promise.reject(Object.assign(new Error("Rejected"), { status })),
+      );
+      await run(fetchMock);
+
+      expect(authStore.reset).toHaveBeenCalled();
+      expect(cookieRef.value).toBeNull();
+      expect(djangoCookieRef.value).toBe("shared-session");
+    },
+  );
 
   // A transport failure must not log the user out: the cookie is HttpOnly, so
   // clearing it here is irreversible for the client.
   it("keeps the session cookie when the backend is unreachable", async () => {
+    djangoCookieRef.value = "shared-session";
     const fetchMock = vi.fn(() =>
       Promise.reject(Object.assign(new Error("Bad Gateway"), { status: 502 })),
     );
@@ -82,6 +126,7 @@ describe("mapo-core:init (SSR session restore)", () => {
 
     expect(authStore.reset).toHaveBeenCalled();
     expect(cookieRef.value).toBe("a-session-value");
+    expect(djangoCookieRef.value).toBe("shared-session");
   });
 
   it("does nothing when there is no session cookie", async () => {

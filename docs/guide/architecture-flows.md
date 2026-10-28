@@ -28,7 +28,7 @@ mapomodule                                  ← meta-module: installs every @map
 
 ## Flow 1 — SSR page load with an active session
 
-What happens when a user with a `__mapo_session` cookie visits the app:
+What happens when a user with a `__mapo_session` or Django `sessionid` cookie visits the app:
 
 ```
 Browser → GET /admin/articles
@@ -41,12 +41,13 @@ Browser → GET /admin/articles
   │
   ├─ Nuxt server plugin: mapo-core:init (01.init.server.ts)
   │    ├─ sidebarStore.hydrateFromCookies()       ← reads sidebar_drawer etc.
-  │    ├─ reads __mapo_session via useCookie()
+  │    ├─ reads __mapo_session and sessionid via useCookie()
   │    │    (HttpOnly — readable server-side from request headers)
-  │    ├─ $mapoFetch GET http://host/api/profiles/me/
-  │    │    (absolute URL required to pass through Nitro proxy)
+  │    ├─ $mapoFetch GET /api/profiles/me/
+  │    │    (relative path through Nuxt's local fetch, including app.baseURL)
   │    │     ↓ intercepted by @mapomodule/mapo-integrations-camomilla proxy
-  │    │     ↓ maps __mapo_session → sessionid cookie header
+  │    │     ↓ synced: sessionid wins, Mapo copy is a fallback
+  │    │     ↓ isolated: maps __mapo_session → sessionid cookie header
   │    │     ↓ rewritten to /api/camomilla/users/current/
   │    │     ↓ forwarded to Camomilla backend
   │    │     ↓ response: { id, username, groups, all_permissions, ... }
@@ -99,7 +100,7 @@ Component calls: useCrud<Article>('/api/articles/').list({ page: 1 })
   │
   └─ $mapoFetch GET /api/articles/?page=1
         ↓ @mapomodule/mapo-integrations-camomilla proxy:
-        ├─ maps __mapo_session → sessionid cookie header
+        ├─ synced: sessionid wins; isolated: maps __mapo_session → sessionid
         ├─ adds X-CSRFToken header from csrftoken cookie
         ├─ adds X-Forwarded-Host / X-Forwarded-Proto from Referer
         ├─ path /api/articles/ — no specific rewrite → passes through
@@ -176,7 +177,7 @@ User clicks logout
 Component makes any $mapoFetch call
   │
   └─ Backend returns 401 Unauthorized
-        ↓ $mapoFetch onResponseError interceptor (00.fetch.ts)
+        ↓ $mapoFetch onResponse interceptor (00.fetch.ts)
         ├─ authStore.reset()
         └─ if client-side: navigateTo('/login?redirect=<current-path>')
 ```

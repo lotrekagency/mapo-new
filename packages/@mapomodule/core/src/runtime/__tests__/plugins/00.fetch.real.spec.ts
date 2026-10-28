@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createFetch } from "ofetch";
 
 // Exercises the REAL mapo-core:fetch plugin hooks, not a hand-written copy of them.
 // The hooks are built inside setup() via the global `$fetch.create`, so stub that and
@@ -79,6 +80,42 @@ describe("mapo-core:fetch — real plugin hooks", () => {
     });
     expect(returned).toBeUndefined();
   });
+
+  it.each([401, 403, 500])(
+    "preserves ofetch error status, body and response (%i)",
+    async (status) => {
+      const body = { detail: "Backend rejected the request" };
+      const fetch = createFetch({
+        fetch: vi.fn().mockResolvedValue(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+      });
+      vi.stubGlobal("$fetch", fetch);
+      const { provide } = (
+        plugin as unknown as {
+          setup: () => {
+            provide: {
+              mapoFetch: typeof fetch;
+              mapoFetchLoading: { value: boolean };
+            };
+          };
+        }
+      ).setup();
+
+      await expect(
+        provide.mapoFetch("/api/x", { retry: 0 }),
+      ).rejects.toMatchObject({
+        name: "FetchError",
+        status,
+        data: body,
+        response: { status },
+      });
+      expect(provide.mapoFetchLoading.value).toBe(false);
+    },
+  );
 
   it("still resets auth on 401 and snacks on 403", () => {
     const { hooks } = buildPlugin();
