@@ -27,6 +27,11 @@ describe("matchRecipes", () => {
     ["generate the fields from a json schema", "schema-to-form"],
     ["describe my form as a json schema", "form-to-schema"],
     ["read the DRF OPTIONS metadata into form fields", "schema-sources"],
+    ["add a button to every detail page", "detail-extensions"],
+    [
+      "read the current record from a component inside the detail",
+      "detail-context",
+    ],
     [
       "add a typed property of my own to every field descriptor",
       "descriptor-extensions",

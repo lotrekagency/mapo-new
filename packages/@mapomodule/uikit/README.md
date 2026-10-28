@@ -45,7 +45,7 @@ Components are auto-imported.
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shell    | The `mapo-default` and `mapo-empty` layouts, `MapoSidebar` (built from route metadata), `MapoTopbar`, `MapoLogin`, `MapoThemeToggle`, `MapoLangSwitcher`, `MapoLogoutButton`; a `/login` and a `/` page when the app has none |
 | Lists    | `MapoList`: server-side pagination, search, sorting, filters, tabs, bulk actions, drag reorder and quick edit, with the state synced to the URL                                                                               |
-| Details  | `MapoDetail`: loads the record, renders the form, saves a differential `PATCH`, maps 400 errors onto fields, drafts and per-language editing                                                                                  |
+| Details  | `MapoDetail`: loads the record, renders the form, saves a differential `PATCH`, maps 400 errors onto fields, drafts and per-language editing; `useMapoDetail()` and `defineDetailExtension()` for what goes inside            |
 | Media    | `MapoMediaManager`, the `MapoMediaManagerDialog` picker, `useMediaStore`, and `$mapoMediaAdapter`, which backend integrations replace                                                                                         |
 | Menus    | `MapoMenuManager`: a drag-and-drop tree editor with per-language trees                                                                                                                                                        |
 | Feedback | `MapoSnackBar` and `MapoConfirmDialog`, driven by the store and mounted by `MapoRootComponents` in `mapo-default`                                                                                                             |
@@ -59,7 +59,8 @@ Pick the lightest layer that does the job:
 1. **CSS tokens** through `mapo.uikit.css`, for colours, radius and dark mode.
 2. **Nuxt UI defaults** through `mapo.uikit.ui`, for component variants across the app.
 3. **Slots** on the layout and on Mapo components, for structural additions.
-4. **MapoOverride**: a file at `app/mapooverride/<Name>.vue` replaces the registered component with that name at build time. Keep its props, events and slots compatible; from then on you own its updates.
+4. **Detail extensions**: `defineDetailExtension()` adds an action or a section to every `MapoDetail`, which reads the record with `useMapoDetail()`.
+5. **MapoOverride**: a file at `app/mapooverride/<Name>.vue` replaces the registered component with that name at build time. Keep its props, events and slots compatible; from then on you own its updates.
 
 ## Documentation
 

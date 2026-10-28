@@ -36,6 +36,8 @@ import type {
 } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { languagesFromMetadata } from "../utils/langInfo";
+import { DETAIL_KEY } from "../composables/useMapoDetail";
+import type { MapoDetailContext } from "../types/detail";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { MultipartPolicy } from "@mapomodule/core";
@@ -150,6 +152,11 @@ const props = withDefaults(
      * `translations.it.title`, `blocks.0.title`). See `MapoForm`.
      */
     annotations?: FieldAnnotations;
+    /**
+     * Which extensions registered with `defineDetailExtension()` the page
+     * shows: all (`true`), none (`false`) or the listed keys.
+     */
+    extensions?: boolean | string[];
   }>(),
   {
     fields: undefined,
@@ -172,6 +179,7 @@ const props = withDefaults(
     previewField: undefined,
     forceLanguages: undefined,
     annotations: undefined,
+    extensions: true,
   },
 );
 
@@ -435,14 +443,10 @@ async function describeEndpoint() {
     props.experimentalFieldsFromSchema && !props.fields?.length;
   if (!wantsLangs && !wantsFields) return;
 
-  let metadata: Record<string, unknown>;
-  try {
-    metadata = (await crud.options()) as Record<string, unknown>;
-  } catch {
-    // A backend without OPTIONS metadata is not an error worth surfacing: it
-    // just means nothing is auto-derived.
-    return;
-  }
+  const metadata = await describe();
+  // A backend without OPTIONS metadata is not an error worth surfacing: it
+  // just means nothing is auto-derived.
+  if (!metadata) return;
 
   if (wantsLangs) derivedLangs.value = languagesFromMetadata(metadata);
   if (wantsFields) {
@@ -667,6 +671,55 @@ onBeforeUnmount(() => {
   }
 });
 
+// ─── Context ─────────────────────────────────────────────────────────────────
+// What the components inside the detail read with useMapoDetail(): its slots,
+// its forms and the extensions registered with defineDetailExtension().
+
+/** Marks set from inside the detail; the `annotations` prop wins on a path. */
+const innerAnnotations = ref<FieldAnnotations>({});
+const formAnnotations = computed<FieldAnnotations>(() => ({
+  ...innerAnnotations.value,
+  ...(props.annotations ?? {}),
+}));
+
+let metadataRequest: Promise<Record<string, unknown> | undefined> | undefined;
+
+/** The endpoint's OPTIONS response, requested once and shared. */
+function describe(): Promise<Record<string, unknown> | undefined> {
+  metadataRequest ??= crud.options().then(
+    (response) =>
+      typeof response === "object" && response !== null
+        ? (response as Record<string, unknown>)
+        : undefined,
+    () => undefined,
+  );
+  return metadataRequest;
+}
+
+const context: MapoDetailContext<T> = {
+  endpoint: computed(() => props.endpoint),
+  id: computed(() => props.id),
+  isNew,
+  model,
+  fields: activeFields,
+  sidebarFields: computed(() => props.sidebarFields ?? []),
+  languages: activeLangs,
+  currentLang,
+  registry,
+  errors,
+  readonly: effectiveReadonly,
+  isLoading,
+  isSaving,
+  isBusy,
+  isDirty,
+  annotations: innerAnnotations,
+  extensions: computed(() => props.extensions),
+  save,
+  back,
+  metadata: describe,
+};
+provide(DETAIL_KEY, context as unknown as MapoDetailContext);
+
 // ─── Slot bindings ───────────────────────────────────────────────────────────
 
 // Forward field-level (`field.*`), group-level (`group.*`) and tab-level (`tab.*`,
@@ -685,6 +738,8 @@ const formSlotNames = computed(() =>
 
 const slotBindings = computed(() => ({
   model: model.value,
+  fields: activeFields.value,
+  sidebarFields: props.sidebarFields ?? [],
   errors: errors.value,
   currentLang: currentLang.value,
   isNew: isNew.value,
@@ -708,6 +763,10 @@ type DraftBannerState = {
 
 type SlotBindings = {
   model: T;
+  /** The body fields rendered: the `fields` prop, or the ones derived from the schema. */
+  fields: AnyFieldDescriptor<T>[];
+  /** The sidebar fields rendered. */
+  sidebarFields: AnyFieldDescriptor<T>[];
   errors: Record<string, string[]>;
   currentLang: string;
   isNew: boolean;
@@ -842,6 +901,8 @@ defineSlots<{
           />
         </slot>
 
+        <MapoDetailExtensions placement="body-top" />
+
         <slot name="body-top" v-bind="slotBindings" />
 
         <!-- Main form -->
@@ -854,7 +915,7 @@ defineSlots<{
             :current-lang="currentLang"
             :registry="registry"
             :readonly="effectiveReadonly"
-            :annotations="annotations"
+            :annotations="formAnnotations"
           >
             <template
               v-for="slotName in formSlotNames"
@@ -877,6 +938,8 @@ defineSlots<{
           <slot name="side-buttons" v-bind="slotBindings">
             <UCard>
               <div class="flex flex-col gap-2">
+                <MapoDetailExtensions placement="actions" />
+
                 <slot name="button-save" v-bind="slotBindings">
                   <UButton
                     v-if="!effectiveReadonly"
@@ -937,7 +1000,7 @@ defineSlots<{
                 :current-lang="currentLang"
                 :registry="registry"
                 :readonly="effectiveReadonly"
-                :annotations="annotations"
+                :annotations="formAnnotations"
               >
                 <template
                   v-for="slotName in formSlotNames"
@@ -957,7 +1020,7 @@ defineSlots<{
               :current-lang="currentLang"
               :registry="registry"
               :readonly="effectiveReadonly"
-              :annotations="annotations"
+              :annotations="formAnnotations"
             >
               <template
                 v-for="slotName in formSlotNames"

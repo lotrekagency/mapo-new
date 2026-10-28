@@ -33,6 +33,8 @@ const { fetch, loading } = useMapoFetch();
 | `useUnsavedChangesGuard`                        | ✅            | `@mapomodule/form`  |
 | `useFocusMode`                                  | ✅            | `@mapomodule/form`  |
 | `defineFormField`                               | ✅            | `@mapomodule/form`  |
+| `useMapoDetail`                                 | ✅            | `@mapomodule/uikit` |
+| `defineDetailExtension`                         | ✅            | `@mapomodule/uikit` |
 | `when` / `whenAny` / `whenNot` / `matchesField` | ✅            | `@mapomodule/form`  |
 
 > Only `@mapomodule/utils` functions (`debounce`, `deepMerge`, `objectDiff`, `formatDate`, etc.) are **not** auto-imported and require an explicit import.
@@ -103,6 +105,8 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `useUnsavedChangesGuard`                        | composable  | auto-imported                                                              | —                            |
 | `useFocusMode`                                  | composable  | auto-imported                                                              | —                            |
 | `defineFormField`                               | function    | auto-imported                                                              | call from a Nuxt plugin      |
+| `useMapoDetail`                                 | composable  | auto-imported                                                              | inside a `MapoDetail`        |
+| `defineDetailExtension`                         | function    | auto-imported                                                              | call from a Nuxt plugin      |
 | `when` / `whenAny` / `whenNot` / `matchesField` | helpers     | auto-imported                                                              | progressive disclosure       |
 | `isOneOf` / `isNoneOf` / `isEmpty` / …          | matchers    | auto-imported                                                              | use with `matchesField`      |
 | `debounce`                                      | utility     | `import { debounce } from '@mapomodule/utils'`                             | not a composable             |
@@ -123,6 +127,7 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`                  | strict built-in union        |
 | `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`               | includes custom field types  |
 | `FieldExtensions`                               | type        | `declare module 'mapomodule/types' { interface FieldExtensions {} }`       | your descriptor properties   |
+| `MapoDetailContext<T>`                          | type        | `import type { MapoDetailContext } from 'mapomodule/types'`                | what `useMapoDetail` returns |
 | `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`                    | —                            |
 | `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`                       | generic preserved            |
 | `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`                   | —                            |

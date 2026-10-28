@@ -170,6 +170,7 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoThemeToggle",
       // ─── CRUD / Detail / List ─────────────────────────────────────────────
       "MapoDetail",
+      "MapoDetailExtensions",
       "MapoDetailLangSwitch",
       "MapoList",
       "MapoListHead",
@@ -256,6 +257,15 @@ export default defineNuxtModule<MapoUikitOptions>({
       {
         name: "useMediaStore",
         from: resolver.resolve("./runtime/stores/media"),
+      },
+      // The detail context and its extensions
+      {
+        name: "useMapoDetail",
+        from: resolver.resolve("./runtime/composables/useMapoDetail"),
+      },
+      {
+        name: "defineDetailExtension",
+        from: resolver.resolve("./runtime/composables/defineDetailExtension"),
       },
     ]);
 

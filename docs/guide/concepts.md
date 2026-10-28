@@ -117,7 +117,8 @@ Pick the lightest layer that does the job:
 1. **CSS tokens** (`mapo.uikit.css`) for colours, radius and dark mode.
 2. **Nuxt UI defaults** (`mapo.uikit.ui`) for component variants across the app.
 3. **Slots** on the layout and on Mapo components for structural additions.
-4. **MapoOverride**: a file at `app/mapooverride/<Component>.vue` replaces that Mapo component at build time. You then own its updates.
+4. **Detail extensions**: `defineDetailExtension()` adds an action or a section to every `MapoDetail` without touching the pages; inside, `useMapoDetail()` reads the record, its fields and its state.
+5. **MapoOverride**: a file at `app/mapooverride/<Component>.vue` replaces that Mapo component at build time. You then own its updates.
 
 → [Theming & customization](/howto/theming), [MapoOverride](/uikit/mapoverride)
 

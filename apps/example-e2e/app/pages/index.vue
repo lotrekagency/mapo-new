@@ -62,6 +62,11 @@ const sections = [
         desc: "MapoDetail experimentalFieldsFromSchema on DRF OPTIONS metadata, schemaFromMetadata",
       },
       {
+        label: "Detail context",
+        to: "/form/detail-context/1",
+        desc: "useMapoDetail, defineDetailExtension, the extensions prop, fields in the slots",
+      },
+      {
         label: "Custom Fields",
         to: "/form/custom-fields",
         desc: "defineFormField, registry, accessor, unknown type fallback",

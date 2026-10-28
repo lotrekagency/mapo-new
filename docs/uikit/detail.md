@@ -77,6 +77,7 @@ The page now supports:
 | `previewField`                 | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
 | `forceLanguages`               | `string[]`                       | —             | Override the language list regardless of the `languages` prop or the `lang_info` returned by the endpoint's OPTIONS response. Useful for per-model language subsets.                                  |
 | `annotations`                  | `FieldAnnotations`               | —             | Marks on the fields of the body and the sidebar forms, keyed by the path of the value. See [Field annotations](./form/annotations).                                                                   |
+| `extensions`                   | `boolean \| string[]`            | `true`        | Which extensions registered with `defineDetailExtension()` the page shows: all, none (`false`) or the listed keys. See [Detail extensions](#how-to-add-an-action-to-every-detail-page).               |
 
 The `registry` prop is optional — `<MapoDetail>` resolves `$mapoFormRegistry` automatically.
 
@@ -269,6 +270,84 @@ Replace the whole action card (Save/Back) or the danger card entirely:
 </MapoDetail>
 ```
 
+## How to: read the detail from a component inside it
+
+A component rendered inside `<MapoDetail>`, in a slot, as a field or as an [extension](#how-to-add-an-action-to-every-detail-page), reads the detail with the auto-imported `useMapoDetail()` instead of receiving the same values again as props:
+
+```ts
+const detail = useMapoDetail<Article>(); // undefined outside a MapoDetail
+```
+
+| Member                                                   | Type                                                  | What it is                                                                       |
+| -------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `endpoint`, `id`, `isNew`                                | `ComputedRef`                                         | The record and where it lives                                                    |
+| `model`                                                  | `Ref<T>`                                              | The record being edited: write to it to change the values of the form            |
+| `fields`, `sidebarFields`                                | `ComputedRef<AnyFieldDescriptor<T>[]>`                | The fields rendered: the props, or the ones derived from the schema              |
+| `languages`, `currentLang`                               | `ComputedRef<string[]>`, `Ref<string>`                | The languages of the record, and the one being edited: write to it to switch     |
+| `registry`                                               | `ComputedRef<FieldRegistry>`                          | The field registry the forms use                                                 |
+| `errors`                                                 | read-only `Ref<Record<string, string[]>>`             | The server errors of the last save                                               |
+| `readonly`, `isLoading`, `isSaving`, `isBusy`, `isDirty` | read-only refs                                        | The state, as the buttons see it                                                 |
+| `annotations`                                            | `Ref<FieldAnnotations>`                               | Marks set from inside the detail (below)                                         |
+| `extensions`                                             | `ComputedRef<boolean \| readonly string[]>`           | The extensions the page allows                                                   |
+| `save(andBack?)`, `back()`                               | functions                                             | What the buttons do; ignored while a save, a delete or a navigation is under way |
+| `metadata()`                                             | `() => Promise<Record<string, unknown> \| undefined>` | The endpoint's `OPTIONS` response, requested once per page (below)               |
+
+**Write the record and mark what you wrote.** A component can fill the form and show where its values come from, as an importer or an assistant does:
+
+```ts
+const detail = useMapoDetail<Article>()!;
+detail.model.value.title = "Chi siamo";
+detail.annotations.value = {
+  ...detail.annotations.value,
+  title: {
+    label: "Imported from the old site",
+    icon: "i-lucide-download",
+    color: "info",
+  },
+};
+```
+
+These marks show with those of the `annotations` prop; on the same path the prop wins. Replace the map to change them, as with the prop. → [Field annotations](./form/annotations)
+
+**One `OPTIONS` request per page.** `metadata()` returns the endpoint's `OPTIONS` response, requested once and shared: the detail asks for it to read the languages and, with `experimentalFieldsFromSchema`, the fields, and a component asking again gets the same answer without a new request. It is `undefined` when the endpoint has no `OPTIONS` metadata.
+
+## How to: add an action to every detail page
+
+`defineDetailExtension()`, called from a plugin, adds a component to every `<MapoDetail>` of the app without touching the pages: in `actions`, the sidebar card above Save, or in `body-top`, above the body form. The component reads the detail with `useMapoDetail()`.
+
+```ts
+// app/plugins/detail-actions.ts
+export default defineNuxtPlugin(() => {
+  defineDetailExtension({
+    key: "duplicate",
+    placement: "actions",
+    component: () => import("~/components/DuplicateButton.vue"),
+    visible: (detail) => !detail.isNew.value,
+  });
+});
+```
+
+| Option            | What it does                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `key`             | Names the extension: registering a key again replaces it, and a page picks extensions by key |
+| `placement`       | `"actions"` or `"body-top"`                                                                  |
+| `component`       | The component, or a function that imports it                                                 |
+| `visible(detail)` | Whether a page shows it; it receives the context. Default: always                            |
+| `order`           | Order among the extensions of the same place, lower first. Default: `0`                      |
+
+A page chooses the extensions it shows with the `extensions` prop:
+
+```vue
+<MapoDetail … :extensions="false" />
+<!-- none -->
+<MapoDetail … :extensions="['duplicate']" />
+<!-- only these -->
+```
+
+- `defineDetailExtension()` returns a function that removes the extension: a page can register one while it is open and remove it in `onUnmounted`.
+- The `side-buttons` slot replaces the card the `actions` extensions render in. To keep them in your own card, place `<MapoDetailExtensions placement="actions" />` in it.
+- An extension is a plain component: it gets no props, and everything it needs comes from `useMapoDetail()`.
+
 ## How to: pass field-level slots through
 
 `<MapoDetail>` forwards `field.<key>.*` and `group.<name>.*` slots to the inner `<MapoForm>` instances.
@@ -396,6 +475,8 @@ Every slot receives the same `slotBindings` object:
 ```ts
 interface DetailSlotProps<T> {
   model: T;
+  fields: AnyFieldDescriptor<T>[]; // the body fields rendered: the prop, or the ones derived from the schema
+  sidebarFields: AnyFieldDescriptor<T>[];
   errors: Record<string, string[]>;
   currentLang: string;
   isNew: boolean;

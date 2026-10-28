@@ -28,6 +28,7 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `readonly`                     | `boolean`                               | `false`        | Force read-only mode globally.                                                                                                                                                                                                    |
 | `registry`                     | `FieldRegistry \| null`                 | `null`         | Field registry. Falls back to `$mapoFormRegistry` if omitted.                                                                                                                                                                     |
 | `annotations`                  | `FieldAnnotations`                      | —              | Marks on the fields of the body and the sidebar forms. See [Field annotations](./form/annotations).                                                                                                                               |
+| `extensions`                   | `boolean \| string[]`                   | `true`         | Which extensions registered with `defineDetailExtension()` the page shows: all, none (`false`) or the listed keys. See [Detail page](./detail#how-to-add-an-action-to-every-detail-page).                                         |
 
 ### Emits
 
@@ -55,6 +56,16 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `field.{field.key}`   | Per-field override (forwarded to the inner `MapoForm`). |
 
 ---
+
+## MapoDetailExtensions
+
+Renders, inside a `MapoDetail`, the extensions registered with `defineDetailExtension()` for one place, in their order. `MapoDetail` uses it itself; place it in a slot that replaces that place, such as `side-buttons`, to keep the extensions there.
+
+### Props
+
+| Prop        | Type                      | Default        | Description                                                      |
+| ----------- | ------------------------- | -------------- | ---------------------------------------------------------------- |
+| `placement` | `"actions" \| "body-top"` | — **required** | Which extensions: the action card's, or the ones above the form. |
 
 ## MapoDetailLangSwitch
 

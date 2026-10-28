@@ -17,6 +17,12 @@ export type {
   SelectMode,
 } from "./runtime/types/media.js";
 export type {
+  MapoDetailContext,
+  DetailExtension,
+  DetailExtensionLoader,
+  DetailExtensionPlacement,
+} from "./runtime/types/detail.js";
+export type {
   MapoMenu,
   MenuTreeNode,
   MenuNodeLink,

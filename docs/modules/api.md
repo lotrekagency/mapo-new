@@ -683,3 +683,29 @@ Language context helpers for nested field components.
 | -------------------- | ------------------------ | ------------- | --------------------------------------------------------------------- |
 | `provideCurrentLang` | `lang: Ref<string>`      | `void`        | Provide the active language to descendants.                           |
 | `useCurrentLang`     | `fallback?: Ref<string>` | `Ref<string>` | Inject the current language, falling back to `fallback` or `ref('')`. |
+
+---
+
+## UIKit — `@mapomodule/uikit`
+
+### `useMapoDetail()`
+
+The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel and `metadata()`, the endpoint's `OPTIONS` response requested once per page. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
+
+**Returns:** `MapoDetailContext<T> | undefined` — `undefined` outside a `MapoDetail`.
+
+---
+
+### `defineDetailExtension(extension)`
+
+Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. See [Detail page](/uikit/detail#how-to-add-an-action-to-every-detail-page).
+
+| Parameter             | Type                                     | Description                                                                               |
+| --------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `extension.key`       | `string`                                 | Names the extension; registering a key again replaces it.                                 |
+| `extension.placement` | `"actions" \| "body-top"`                | The sidebar card above Save, or above the body form.                                      |
+| `extension.component` | `Component \| () => Promise<Component>`  | The component, or a function that imports it. It reads the detail with `useMapoDetail()`. |
+| `extension.visible`   | `(detail: MapoDetailContext) => boolean` | Whether a page shows it. Default: always.                                                 |
+| `extension.order`     | `number`                                 | Order among the extensions of a placement, lower first. Default: `0`.                     |
+
+**Returns:** `() => void` — removes the extension.

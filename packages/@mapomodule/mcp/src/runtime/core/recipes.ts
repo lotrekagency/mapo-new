@@ -96,6 +96,40 @@ export const RECIPES: Recipe[] = [
       "MapoDetail wired to useCrud, with body/sidebar field descriptors and save flow.",
   },
   {
+    id: "detail-context",
+    task: "Use the record and state of a detail page from a component inside it",
+    keywords: [
+      "useMapoDetail",
+      "detail context",
+      "inside MapoDetail",
+      "current record",
+      "record being edited",
+      "shared OPTIONS",
+    ],
+    doc: "uikit/detail.md",
+    heading: "How to: read the detail from a component inside it",
+    seeAlso: ["uikit/form/annotations.md"],
+    summary:
+      "useMapoDetail() gives a component inside MapoDetail the record, the fields rendered, languages, state, save() and an annotations channel.",
+  },
+  {
+    id: "detail-extensions",
+    task: "Add an action or a section to every detail page",
+    keywords: [
+      "defineDetailExtension",
+      "detail extension",
+      "every detail page",
+      "action above save",
+      "MapoDetailExtensions",
+      "extensions prop",
+    ],
+    doc: "uikit/detail.md",
+    heading: "How to: add an action to every detail page",
+    seeAlso: ["uikit/api.md"],
+    summary:
+      "defineDetailExtension(), from a plugin, adds a component above Save or above the form of every MapoDetail; pages pick them with the extensions prop.",
+  },
+  {
     id: "standalone-form",
     task: "Use the form engine outside a detail page",
     keywords: [
