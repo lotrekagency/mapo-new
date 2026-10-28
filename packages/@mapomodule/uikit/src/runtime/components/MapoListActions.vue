@@ -15,10 +15,16 @@ const props = withDefaults(
     selectionQuery: URLSearchParams;
     endpoint: string;
     lookup?: string;
+    /** Django model label used to gate the built-in permanent delete action. */
+    permissionModel?: string;
+    /** Whether to include the built-in permanent delete action. */
+    defaultActions?: boolean;
   }>(),
   {
     actions: () => [],
     lookup: "id",
+    permissionModel: undefined,
+    defaultActions: true,
   },
 );
 
@@ -34,11 +40,12 @@ defineSlots<{
 const { t } = useI18n();
 const snack = useSnackStore();
 const confirm = useConfirmStore();
+const { canDelete, checkPermission } = usePermissions();
 const crud = useCrud<T>(props.endpoint);
 
 const isRunning = ref(false);
 
-const defaultActions = computed<ActionDescriptor<T>[]>(() => [
+const builtInActions = computed<ActionDescriptor<T>[]>(() => [
   {
     label: t("mapo.listActions.permanentDelete"),
     handler: async ({ selection }) => {
@@ -51,13 +58,15 @@ const defaultActions = computed<ActionDescriptor<T>[]>(() => [
         ),
       );
     },
-    permissions: "delete",
     handleMultiple: true,
     handleAll: false,
   },
 ]);
 
-const allActions = computed(() => [...defaultActions.value, ...props.actions]);
+const allActions = computed(() => [
+  ...(props.defaultActions ? builtInActions.value : []),
+  ...props.actions,
+]);
 
 const visibleActions = computed(() =>
   allActions.value.filter((a) =>
@@ -80,13 +89,16 @@ const applyButtonColor = computed(() =>
 );
 
 function canRun(action: ActionDescriptor<T>): boolean {
+  if (builtInActions.value.includes(action)) {
+    return !props.permissionModel || canDelete(props.permissionModel);
+  }
+
   const perms = action.permissions
     ? Array.isArray(action.permissions)
       ? action.permissions
       : [action.permissions]
     : [];
   if (!perms.length) return true;
-  const { checkPermission } = usePermissions();
   return perms.every((p) => checkPermission(p));
 }
 
