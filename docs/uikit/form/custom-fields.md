@@ -140,6 +140,48 @@ const annotation = useFieldAnnotation(() => props.descriptor);
 
 It follows the same rule as the mark and works inside repeater items too. [A complete field](./annotations#a-complete-field) shows how to highlight the control and offer the actions.
 
+## Add your own descriptor properties
+
+A custom field may need a setting the descriptor does not have, such as a help text or a unit. Declare it on `FieldExtensions`: every descriptor type then accepts it, and TypeScript checks it like the descriptor's own properties.
+
+```ts
+// shared/types/field-extensions.d.ts, or any .d.ts the app's tsconfig includes
+declare module "mapomodule/types" {
+  interface FieldExtensions {
+    /** A sentence that tells whoever fills the field what to write. */
+    help?: string;
+  }
+}
+
+export {};
+```
+
+```ts
+interface Product {
+  title: string;
+  price: number;
+}
+
+const fields: FieldDescriptor<Product>[] = [
+  { key: "price", type: "number", help: "Whole euros, 0 when free." },
+  // ❌ Type error: `hlep` is not a descriptor property
+  { key: "title", type: "text", hlep: "…" },
+];
+```
+
+The form engine never reads these properties: whoever declares one reads it. A custom field reads it from its `descriptor` prop:
+
+```vue
+<p v-if="descriptor.help" class="text-xs text-muted">{{ descriptor.help }}</p>
+```
+
+`fieldsToJsonSchema` writes it into the schema through its [`property` option](./schema-to-form#customise-each-property).
+
+- **Keep them optional, with names of your own**, so they cannot clash with a property Mapo adds later.
+- **Declare them where you import the types from**: an app on `mapomodule/types`, a package on `@mapomodule/form/types`.
+- **Keep `export {}`**: it makes the file a module, so `declare module` adds to Mapo's types instead of replacing them.
+- **They exist for TypeScript only**: nothing checks them at runtime, and a field that does not use one ignores it.
+
 ## Tip: reusing built-in Mapo fields
 
 A custom field can compose other Mapo fields internally:

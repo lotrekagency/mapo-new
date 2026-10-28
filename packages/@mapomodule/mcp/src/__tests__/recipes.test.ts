@@ -25,6 +25,11 @@ describe("matchRecipes", () => {
     ["show a field only when another field is checked", "conditional-fields"],
     ["autosave a draft while the user edits", "form-draft"],
     ["generate the fields from a json schema", "schema-to-form"],
+    ["describe my form as a json schema", "form-to-schema"],
+    [
+      "add a typed property of my own to every field descriptor",
+      "descriptor-extensions",
+    ],
     ["put a hint below one form field with a slot", "form-slots"],
     ["edit a repeater item fullscreen", "focus-mode"],
     ["mark a field as suggested by AI", "field-annotations"],

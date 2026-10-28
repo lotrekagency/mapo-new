@@ -155,6 +155,10 @@ export {};
         from: resolver.resolve("./runtime/composables/useFormFromSchema"),
       },
       {
+        name: "fieldsToJsonSchema",
+        from: resolver.resolve("./runtime/utils/fieldsToJsonSchema"),
+      },
+      {
         name: "useFormDraft",
         from: resolver.resolve("./runtime/composables/useFormDraft"),
       },

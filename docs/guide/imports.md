@@ -28,6 +28,7 @@ const { fetch, loading } = useMapoFetch();
 | `usePermissions`                                | ✅            | `@mapomodule/store` |
 | `useMapoForm`                                   | ✅            | `@mapomodule/form`  |
 | `useFormFromSchema`                             | ✅            | `@mapomodule/form`  |
+| `fieldsToJsonSchema`                            | ✅            | `@mapomodule/form`  |
 | `useFormDraft`                                  | ✅            | `@mapomodule/form`  |
 | `useUnsavedChangesGuard`                        | ✅            | `@mapomodule/form`  |
 | `useFocusMode`                                  | ✅            | `@mapomodule/form`  |
@@ -97,6 +98,7 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `usePermissions`                                | composable  | auto-imported                                                              | —                            |
 | `useMapoForm`                                   | composable  | auto-imported                                                              | —                            |
 | `useFormFromSchema`                             | composable  | auto-imported                                                              | —                            |
+| `fieldsToJsonSchema`                            | function    | auto-imported; also exported from `mapomodule/types`                       | —                            |
 | `useFormDraft`                                  | composable  | auto-imported                                                              | —                            |
 | `useUnsavedChangesGuard`                        | composable  | auto-imported                                                              | —                            |
 | `useFocusMode`                                  | composable  | auto-imported                                                              | —                            |
@@ -117,6 +119,7 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `extractDefs`                                   | json-schema | `import { extractDefs } from '@mapomodule/utils/jsonSchema'`               | —                            |
 | `FieldDescriptor<T>`                            | type        | `import type { FieldDescriptor } from 'mapomodule/types'`                  | strict built-in union        |
 | `AnyFieldDescriptor<T>`                         | type        | `import type { AnyFieldDescriptor } from 'mapomodule/types'`               | includes custom field types  |
+| `FieldExtensions`                               | type        | `declare module 'mapomodule/types' { interface FieldExtensions {} }`       | your descriptor properties   |
 | `FieldRegistry`                                 | type        | `import type { FieldRegistry } from 'mapomodule/types'`                    | —                            |
 | `ListColumn<T>`                                 | type        | `import type { ListColumn } from 'mapomodule/types'`                       | generic preserved            |
 | `CrudRepository<T>`                             | type        | `import type { CrudRepository } from 'mapomodule/types'`                   | —                            |

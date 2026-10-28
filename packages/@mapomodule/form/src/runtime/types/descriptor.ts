@@ -70,10 +70,35 @@ export interface FieldAccessor<TValue = unknown, TModel = unknown> {
 }
 
 /**
+ * Properties that packages and apps add to every field descriptor, with type
+ * checking. The form engine never reads them: whoever declares a property reads
+ * it, for example a custom field or the `property` option of
+ * `fieldsToJsonSchema()`.
+ *
+ * Declare a property by augmenting this interface. Keep it optional, and give it
+ * a name of your own so it cannot clash with a descriptor property.
+ *
+ * @example
+ * // In an app: a .d.ts file the app's tsconfig includes
+ * declare module "mapomodule/types" {
+ *   interface FieldExtensions {
+ *     help?: string;
+ *   }
+ * }
+ *
+ * // Makes the file a module, so the block above adds to Mapo's types
+ * // instead of replacing them.
+ * export {};
+ */
+// Empty on purpose: it exists to be augmented.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface FieldExtensions {}
+
+/**
  * Common properties shared by every field descriptor.
  * All concrete descriptor types extend this interface.
  */
-interface FieldBase<T> {
+interface FieldBase<T> extends FieldExtensions {
   /** Model key. Accepts a direct `keyof T` or a dotted path up to 4 levels deep (e.g. `"data.hero.title"`). */
   key: DeepKeyOf<T>;
   /** Human-readable label displayed above the field. */

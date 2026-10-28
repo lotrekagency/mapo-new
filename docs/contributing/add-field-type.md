@@ -76,6 +76,7 @@ Add the labels to both catalogs, `packages/@mapomodule/i18n/src/runtime/locales/
 
 - Registry resolution and default attrs: `packages/@mapomodule/form/src/__tests__/registry.test.ts`.
 - Any value transformation (accessor, parsing, formatting) gets its own unit test.
+- The JSON Schema round trip: a case in `packages/@mapomodule/form/src/__tests__/fieldsToJsonSchema.test.ts`, which fails until every built-in type has one. When the value has a fixed shape, add it to `VALUE_SCHEMAS` in `runtime/utils/fieldsToJsonSchema.ts`; `x-mapo-field` carries the type either way.
 
 ### 8. Docs and the reference app
 
@@ -87,6 +88,6 @@ Add the labels to both catalogs, `packages/@mapomodule/i18n/src/runtime/locales/
 
 - [ ] Component, enum value, descriptor with documented `attrs`, registry entry.
 - [ ] Labels in both catalogs.
-- [ ] Tests for registry resolution and value logic.
+- [ ] Tests for registry resolution, value logic and the JSON Schema round trip.
 - [ ] `mapo_list_field_types` lists the type after an MCP build.
 - [ ] Docs and feature status updated; the field works in `apps/example-e2e`.

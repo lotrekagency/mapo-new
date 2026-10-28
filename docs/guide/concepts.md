@@ -106,7 +106,8 @@ The `type` is resolved through the **field registry**, which maps each type to a
 - A type that is not registered renders `MapoUnknownField` instead of failing silently.
 - `defineFormField()` registers a custom type. Registering an existing type replaces it and prints a development warning unless you pass `{ override: true }`. → [Registry](/uikit/form/registry)
 - `MapoDetail` renders forms for you; `MapoForm` and `useMapoForm()` run the same engine on your own state. → [Standalone form](/howto/form-standalone)
-- `useFormFromSchema()` builds descriptors from a JSON Schema, such as a DRF serializer. → [From JSON Schema](/uikit/form/schema-to-form)
+- `useFormFromSchema()` builds descriptors from a JSON Schema, such as a DRF serializer, and `fieldsToJsonSchema()` describes a form as a JSON Schema that reads back into the same descriptors. → [JSON Schema and forms](/uikit/form/schema-to-form)
+- `FieldExtensions` adds typed properties of your own to every descriptor; the form engine ignores them, and the code that declares them reads them. → [Custom fields](/uikit/form/custom-fields#add-your-own-descriptor-properties)
 - Validation, translatable fields, conditional fields, drafts, focus mode, slots and field annotations each have their own page under **Form Engine**.
 
 ## Customization layers

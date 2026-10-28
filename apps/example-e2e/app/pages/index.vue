@@ -54,7 +54,7 @@ const sections = [
       {
         label: "Schema → Form",
         to: "/form/schema-to-form",
-        desc: "useFormFromSchema — JSON Schema to FieldDescriptor[]",
+        desc: "useFormFromSchema and fieldsToJsonSchema — JSON Schema ↔ FieldDescriptor[]",
       },
       {
         label: "Custom Fields",

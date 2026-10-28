@@ -95,7 +95,7 @@ export default defineConfig({
           { text: 'Field Expand', link: '/uikit/form/field-expand' },
           { text: 'Field annotations', link: '/uikit/form/annotations' },
           { text: 'Draft autosave', link: '/uikit/form/draft' },
-          { text: 'From JSON Schema', link: '/uikit/form/schema-to-form' },
+          { text: 'JSON Schema and forms', link: '/uikit/form/schema-to-form' },
           { text: 'useMapoForm() — reference', link: '/uikit/form/composable' },
           { text: 'Devtools panel', link: '/uikit/form/devtools' },
           { text: 'Component API', link: '/uikit/form/api' },

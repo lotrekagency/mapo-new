@@ -21,7 +21,8 @@ src/
                                 defineFormField, useUnsavedChangesGuard, useMediaManager, useCurrentLang,
                                 useFieldAnnotation
   runtime/utils/                flattenFieldGroups, repeaterTemplates, tabVisibility, fieldComponent (one async
-                                component per registry loader), annotations (lookup by value path, tab badges)
+                                component per registry loader), annotations (lookup by value path, tab badges),
+                                fieldsToJsonSchema (a form as JSON Schema, the reverse of useFormFromSchema)
   __tests__/                    Vitest suites, with the #imports mock used by the root config
 ```
 
@@ -42,7 +43,8 @@ src/
 | A field type                    | The procedure page above, end to end                                                                                                                       |
 | A composable's signature        | `docs/uikit/form/composable.md` or the feature page, `docs/modules/api.md` if listed there                                                                 |
 | A shell component's props/slots | `docs/uikit/form/api.md`, `docs/uikit/form/slots.md`                                                                                                       |
-| `useFormFromSchema` mapping     | `docs/uikit/form/schema-to-form.md`; check `mcp/src/runtime/core/openapi.ts` stays consistent                                                              |
+| `useFormFromSchema` mapping     | `fieldsToJsonSchema`, which writes what it reads; `schema-to-form.md`; check `mcp/src/runtime/core/openapi.ts` stays consistent                            |
+| `FieldExtensions`               | The section in `docs/uikit/form/custom-fields.md`; `property` of `fieldsToJsonSchema` if the schema should carry it                                        |
 | Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`                                                                       |
 | Field annotations               | `docs/uikit/form/annotations.md`, `docs/uikit/form/api.md`, `useFieldAnnotation` in `docs/modules/api.md`; the `annotations` prop of `MapoDetail` in uikit |
 
@@ -59,6 +61,8 @@ Then check the change in `apps/example-e2e/app/pages/form/` (one page per form s
 
 ## Gotchas
 
+- **A `FieldExtensions` property is unknown in a package's code** → the package imports descriptor types from a `@mapomodule/form/runtime/…` subpath, which resolves to `src/` and is a second copy of the types. Augment the module you import the types from, or import them from `@mapomodule/form/types`, as apps do through `mapomodule/types`.
+- **A round trip through `fieldsToJsonSchema` changes a field** → the writer and `useFormFromSchema` disagree on a keyword. `KEYWORD_ATTRS` in `useFormFromSchema.ts` lists the attrs both map to a standard keyword; the writer adds `x-mapo-field` only when `schemaFieldType()` reads back another type.
 - **A field with `is` remounts and loses focus when `fields` is recomputed** → the component or the loader in `is` is written inside the computed, so each recompute brings a new one. Declare it once at module level. Registry entries are wrapped once per loader (`runtime/utils/fieldComponent.ts`), so new descriptor objects of the same type keep the field mounted.
 - **An editor field shows its client error only on submit, never on blur** → `MapoWygEditor` gets `@blur` on its root `div`, which never has the focus (open thread). Keep it a single-root component: a second root drops the `flex-1`, `id` and `style` that `MapoFormField` passes, and the editor shrinks to its toolbar.
 - **A type renders `MapoUnknownField`** → it is not in the registry the app sees: check `defineFormField()` ran in a plugin, or the spelling of `type`.

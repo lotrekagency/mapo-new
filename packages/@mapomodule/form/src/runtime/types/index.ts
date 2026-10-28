@@ -9,6 +9,7 @@ export type {
   FieldAccessor,
   FieldDescriptor,
   AnyFieldDescriptor,
+  FieldExtensions,
   TextDescriptor,
   NumberDescriptor,
   BooleanDescriptor,

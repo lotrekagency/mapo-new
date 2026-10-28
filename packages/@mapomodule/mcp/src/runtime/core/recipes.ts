@@ -381,6 +381,41 @@ export const RECIPES: Recipe[] = [
       "useFormFromSchema turns a JSON Schema (DRF, Pydantic) into field descriptors you can extend.",
   },
   {
+    id: "form-to-schema",
+    task: "Describe a form as JSON Schema",
+    keywords: [
+      "fieldsToJsonSchema",
+      "form to json schema",
+      "export the fields",
+      "serialize the form",
+      "round trip",
+      "x-mapo-field",
+      "x-mapo-attrs",
+    ],
+    doc: "uikit/form/schema-to-form.md",
+    heading: "From form to JSON Schema",
+    seeAlso: ["uikit/form/custom-fields.md"],
+    summary:
+      "fieldsToJsonSchema writes a form's descriptors as JSON Schema, and useFormFromSchema reads it back into the same descriptors.",
+  },
+  {
+    id: "descriptor-extensions",
+    task: "Add typed properties of your own to field descriptors",
+    keywords: [
+      "FieldExtensions",
+      "extend the descriptor",
+      "declare module",
+      "module augmentation",
+      "custom descriptor property",
+      "typed property",
+    ],
+    doc: "uikit/form/custom-fields.md",
+    heading: "Add your own descriptor properties",
+    seeAlso: ["uikit/form/schema-to-form.md"],
+    summary:
+      "FieldExtensions adds typed properties of your own to every descriptor through module augmentation; the property option of fieldsToJsonSchema writes them into the schema.",
+  },
+  {
     id: "form-slots",
     task: "Customize how a form field renders with slots",
     keywords: [

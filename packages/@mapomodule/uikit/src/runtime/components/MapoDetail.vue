@@ -27,11 +27,11 @@ import type {
   AnyFieldDescriptor,
   FieldAnnotations,
   FieldRegistry,
+  UseFormFromSchemaOptions,
 } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { languagesFromMetadata } from "../utils/langInfo";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
-import type { UseFormFromSchemaOptions } from "@mapomodule/form/runtime/composables/useFormFromSchema";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { MultipartPolicy } from "@mapomodule/core";
 

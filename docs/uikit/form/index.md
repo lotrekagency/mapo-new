@@ -111,6 +111,7 @@ The v2 form engine starts from a different premise: **the form is data, not a te
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 4 — JSON Schema bridge (optional)                    │
 │  useFormFromSchema(schema) → FieldDescriptor[]              │
+│  fieldsToJsonSchema(fields) → JSON Schema, and back         │
 │  Generates descriptors automatically from Pydantic / DRF    │
 └──────────────────────────┬──────────────────────────────────┘
                            │ produces
@@ -173,6 +174,8 @@ Important: `AnyFieldDescriptor` is a typing escape hatch, not a compile-time reg
 - If the type is not registered, Mapo renders `MapoUnknownField` (fail-soft) rather than throwing.
 
 So for built-in-only forms, prefer `FieldDescriptor<T>[]` to keep stricter editor errors.
+
+Properties of your own, such as a help text that a custom field shows, are declared on `FieldExtensions` and checked the same way: see [Add your own descriptor properties](./custom-fields#add-your-own-descriptor-properties).
 
 The generic `<T>` type-checks `key` against your model, but also accepts dotted strings for nested fields (`'blocks.0.title'`) or dynamic models. Typo errors in field names are caught by the IDE, not after deploy.
 
@@ -239,4 +242,4 @@ The system never breaks on malformed descriptors or unknown types. In **developm
 - [Registry and custom fields →](./registry)
 - [Reusable field sets →](./reusable-fields)
 - [`useMapoForm()` headless →](./composable)
-- [From JSON Schema to form →](./schema-to-form)
+- [JSON Schema and forms →](./schema-to-form)

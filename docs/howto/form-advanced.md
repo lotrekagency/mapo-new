@@ -363,32 +363,35 @@ Generate `FieldDescriptor[]` automatically from a Pydantic or DRF schema:
 const schema = await $fetch("/api/articles/schema/");
 
 // Convert to FieldDescriptor[] automatically
-const { fields, model } = useFormFromSchema(schema);
+const fields = useFormFromSchema(schema, { exclude: ["id"] });
 ```
 
 The generated fields use the closest matching type:
 
-| Schema type                    | Generated field type |
-| ------------------------------ | -------------------- |
-| `string`                       | `text`               |
-| `string` + `format: date-time` | `datetime`           |
-| `string` + `enum`              | `select`             |
-| `boolean`                      | `switch`             |
-| `number` / `integer`           | `number`             |
-| `array`                        | `repeater`           |
-| `object`                       | nested `repeater`    |
+| Schema type                    | Generated field type                |
+| ------------------------------ | ----------------------------------- |
+| `string`                       | `text`                              |
+| `string` + `format: date-time` | `datetime`                          |
+| `enum` (any type)              | `select`                            |
+| `boolean`                      | `boolean`                           |
+| `number` / `integer`           | `number`                            |
+| `array` of objects             | `repeater`                          |
+| `array` of other values        | `select` with `multiple: true`      |
+| `object`                       | `seo`, or `object:<key>` for others |
 
 Override specific fields after generation:
 
 ```ts
-const { fields, model } = useFormFromSchema(schema);
+const fields = useFormFromSchema(schema);
 
 // Find and override the body field to use the WYSIWYG editor
-const bodyField = fields.value.find((f) => f.key === "body");
+const bodyField = fields.find((f) => f.key === "body");
 if (bodyField) bodyField.type = "editor";
 ```
 
-→ Full reference: [From JSON Schema to form](/uikit/form/schema-to-form)
+`fieldsToJsonSchema(fields)` goes the other way: it describes a form as a JSON Schema that reads back into the same descriptors.
+
+→ Full reference: [JSON Schema and forms](/uikit/form/schema-to-form)
 
 ## Adding a custom field type globally
 

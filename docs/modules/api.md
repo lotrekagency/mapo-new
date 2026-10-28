@@ -456,7 +456,7 @@ Core composable powering `MapoForm`. Provides dirty tracking, validation, and su
 
 ### `useFormFromSchema(schema, options?)`
 
-Generates a `FieldDescriptor[]` array from a JSON Schema document.
+Generates a `FieldDescriptor[]` array from a JSON Schema document. It also reads back the schemas `fieldsToJsonSchema` writes.
 
 | Parameter           | Type                                       | Default        | Description                                                    |
 | ------------------- | ------------------------------------------ | -------------- | -------------------------------------------------------------- |
@@ -465,6 +465,19 @@ Generates a `FieldDescriptor[]` array from a JSON Schema document.
 | `options.overrides` | `Record<string, Partial<FieldDescriptor>>` | `{}`           | Per-field descriptor overrides applied after schema mapping.   |
 
 **Returns:** `FieldDescriptor[]` — Ready to pass to `MapoForm` or `MapoDetail`.
+
+---
+
+### `fieldsToJsonSchema(fields, options?)`
+
+Describes a form as a JSON Schema that `useFormFromSchema` reads back into equivalent descriptors: one property per field, with Mapo's own details in `x-mapo-field` and `x-mapo-attrs`. A pure function, also exported from `mapomodule/types`. See [From form to JSON Schema](/uikit/form/schema-to-form#from-form-to-json-schema).
+
+| Parameter          | Type                                                                         | Default        | Description                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `fields`           | `AnyFieldDescriptor[]`                                                       | — **required** | The descriptors, as passed to `MapoForm`.                                                                              |
+| `options.property` | `(schema: JSONSchema, field: AnyFieldDescriptor) => JSONSchema \| undefined` | —              | Called for every field, those of repeaters included: returns the schema to use, or `undefined` to leave the field out. |
+
+**Returns:** `JSONSchema` — an object schema: one property per field, named by its key, and `required` listing the required fields.
 
 ---
 
