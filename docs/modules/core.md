@@ -60,10 +60,12 @@ Runs on **both server and client**. Creates a `$fetch` instance with auth interc
 Behaviour:
 
 - **401** (unauthenticated): calls `authStore.reset()` and, if on the client, redirects to `/login?redirect=<current-path>`
-- **403** (forbidden): calls `useSnackStore().show('Permission denied', 'error')`
+- **403** (forbidden): translates `mapo.permissionDenied` and shows it through `useSnackStore()`
 - All other responses pass through unchanged
 
-`$mapoFetch` does **not** inject an `Authorization` header. Authentication is done via the `__mapo_session` HttpOnly cookie, which the browser/server attaches automatically to every same-origin request.
+The interceptor resolves both stores from the Pinia instance on the Nuxt app, so concurrent SSR requests do not depend on a process-global active Pinia.
+
+`$mapoFetch` does **not** inject an `Authorization` header. Authentication uses session cookies (`__mapo_session`, or a shared Django `sessionid` with the Camomilla integration). SSR requests forward the incoming `Cookie` header unless a call provides its own. HTTP failures reject with ofetch's `FetchError`, preserving `.status`, `.data` and `.response`.
 
 ### `01.init.server.ts` — SSR session hydration
 
@@ -72,14 +74,14 @@ Runs **server-side only** on every request. Mirrors the Vuex `nuxtServerInit` pa
 Sequence:
 
 1. `sidebarStore.hydrateFromCookies()` — restores sidebar state from request cookies
-2. Reads `__mapo_session` cookie via `useCookie()` (SSR-safe — reads the incoming HTTP request headers)
-3. If the cookie is absent, returns immediately (unauthenticated request)
+2. Reads `__mapo_session` and Django's `sessionid` via `useCookie()` (SSR-safe — reads the incoming HTTP request headers)
+3. If both cookies are absent, returns immediately (unauthenticated request)
 4. Forwards the `cookie` header to the backend via `useRequestHeaders(['cookie'])`
-5. Calls `$mapoFetch(absolute_url, { method: 'GET', headers })` with an **absolute URL** — required so the request routes through the Nitro proxy layer (`@mapomodule/mapo-integrations-camomilla`) rather than bypassing it
+5. Calls `$mapoFetch(userInfoApi, { method: 'GET', headers })` with the configured relative path, so Nuxt's local fetch handles the request through Nitro, including sub-path deployments
 6. Calls `authStore.setUser(user)` on success → `isAuthenticated` becomes `true`
-7. On any error: `authStore.reset()` + clears `__mapo_session` cookie (stale or invalid session)
+7. On any error: logs the failure and calls `authStore.reset()`. Clears only `__mapo_session` on a backend 401/403; transport errors and 5xx keep it. The shared `sessionid` is never cleared by this plugin.
 
-> **Why absolute URL?** An internal server-side `$fetch` call with a relative path would bypass Nitro middleware. The init plugin constructs `${protocol}//${host}${path}` from `useRequestURL()` to ensure the request enters the normal Nitro pipeline and gets the cookie/path rewriting from `@mapomodule/mapo-integrations-camomilla`.
+> **Shared sessions:** core only checks whether a session cookie exists; it does not decide which one wins. The backend integration validates the forwarded cookies. With Camomilla's `syncCamomillaSession: true`, Django's `sessionid` wins over a stale Mapo copy, so a login on the same-origin public site or Django admin can restore the backoffice session without a separate Mapo login. With sync disabled, the integration keeps sessions isolated.
 
 > **Why not read the cookie value directly?** `__mapo_session` is an HttpOnly cookie. Its value is readable in SSR (from HTTP request headers) but never from client JS. The plugin does not store or forward the raw token — it only forwards the `cookie` header wholesale, letting the backend validate the session.
 
@@ -344,7 +346,7 @@ Use this when you need to combine permissions from different models, or when the
 On every server-side render, the `01.init.server` plugin runs **before** any route middleware:
 
 1. Reads sidebar cookies → hydrates `useSidebarStore`
-2. Reads `__mapo_session` cookie → calls `userInfoApi` (absolute URL, with forwarded `cookie` header) → hydrates `useAuthStore`
+2. Reads `__mapo_session` and `sessionid` → if either is present, calls `userInfoApi` (configured relative path, with forwarded `cookie` header) → hydrates `useAuthStore`
 3. On fetch error → resets auth store and clears the cookie (stale session)
 
 This is the v2 equivalent of Vuex `nuxtServerInit`. See [Architecture Flows](/guide/architecture-flows) for the full call graph.

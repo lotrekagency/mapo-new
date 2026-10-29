@@ -79,6 +79,7 @@ That single component renders a paginated table, a search input, a filter dropdo
 | `lookup`           | `string`                                                 | `'id'`           | Key used as primary key (selection, links, drag)                                                                                                                                                                                             |
 | `filters`          | `FilterDescriptor[]`                                     | `[]`             | Filter dropdown items                                                                                                                                                                                                                        |
 | `actions`          | `ActionDescriptor<T>[]`                                  | `[]`             | Bulk actions shown when rows are selected                                                                                                                                                                                                    |
+| `defaultActions`   | `boolean`                                                | `true`           | Include the built-in permanent-delete bulk action. Set to `false` to omit it; custom `actions` remain available.                                                                                                                             |
 | `tabs`             | `ListTabItem[]`                                          | `[]`             | Status / segment tab bar                                                                                                                                                                                                                     |
 | `defaultTab`       | `string`                                                 | first tab        | Active tab on mount                                                                                                                                                                                                                          |
 | `tabQueryParam`    | `string`                                                 | `'tab'`          | Query param used when fetching with a tab                                                                                                                                                                                                    |
@@ -214,9 +215,11 @@ The table reads permissions from `usePermissions()` (which proxies `useAuthStore
 
 - The **pencil** (quick-edit) button is shown only when the user has `change_article`.
 - The **trash** (delete) button is shown only when the user has `delete_article`.
+- The built-in **permanent delete** bulk action is enabled only when the user has `delete_article`.
 - Superusers always see both buttons regardless of the model label.
 
 Omit `permissionModel` to preserve the previous behavior (buttons always visible).
+Set `:default-actions="false"` to omit the built-in permanent-delete bulk action while keeping custom `actions`.
 
 > **Note.** Pass the bare Django model name (e.g. `"article"`), not the app-label–prefixed form (`"news.article"`). The permission check uses `change_<model>` and `delete_<model>` directly.
 

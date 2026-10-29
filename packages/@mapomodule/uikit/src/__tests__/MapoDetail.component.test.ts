@@ -145,13 +145,18 @@ const UButton: Component = {
 interface FormProps {
   annotations?: object;
   fields?: { key: string; type: string; attrs?: Record<string, unknown> }[];
+  notifyErrors?: boolean;
 }
 const forms: FormProps[] = [];
 
 const MapoForm: Component = {
   name: "MapoForm",
   inheritAttrs: false,
-  props: { annotations: Object, fields: Array },
+  props: {
+    annotations: Object,
+    fields: Array,
+    notifyErrors: { type: Boolean, default: true },
+  },
   setup(props: FormProps, { slots }: SetupContext) {
     forms.push(props);
     onUnmounted(() => {
@@ -237,6 +242,23 @@ afterEach(() => {
 });
 
 describe("MapoDetail actions", () => {
+  it("shows server error toasts only from the main form when sidebar fields are present", async () => {
+    mountDetail(
+      {},
+      {
+        fields: [{ key: "title", type: "text" }],
+        sidebarFields: [{ key: "slug", type: "text" }],
+      },
+    );
+    await settle();
+
+    expect(forms).toHaveLength(2);
+    expect(forms.map(({ notifyErrors }) => notifyErrors)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it("keeps the buttons busy until the page has gone back after Save", async () => {
     mountDetail();
     await settle();

@@ -5,6 +5,7 @@ Mapo provides two global feedback mechanisms — snack notifications and confirm
 ## MapoSnackBar
 
 `MapoSnackBar` watches `useSnackStore().messages` and bridges each entry to Nuxt UI's `useToast` + `<UNotifications />`. Multiple toasts can be active simultaneously — each `show()` call appends a new one to the queue. Any page or composable can trigger a toast by calling `useSnackStore().show(...)`.
+If Nuxt UI evicts an older toast when its active queue is full, Mapo removes the matching entry from the snack store as well.
 
 ### Usage
 

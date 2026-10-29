@@ -166,7 +166,8 @@ All other cookies are stripped from requests to the backend.
 
 ### On every request
 
-- `__mapo_session` is mapped to `sessionid` so Camomilla recognises the Django session
+- With sync disabled, `__mapo_session` is mapped to `sessionid` so Camomilla recognises the isolated Mapo session
+- With sync enabled, the incoming `sessionid` wins; `__mapo_session` is only a fallback when `sessionid` is absent, including on logout
 - `csrftoken` is forwarded as the `X-CSRFToken` header (required for POST/PUT/PATCH/DELETE)
 - `X-Forwarded-Host` and `X-Forwarded-Proto` are derived from the `Referer` header
 
@@ -179,7 +180,7 @@ All other cookies are stripped from requests to the backend.
 
 When `false` (default): Mapo and Django admin have independent sessions. Logging in to Mapo does not log you into Django admin, and vice versa.
 
-When `true`: both `sessionid` and `__mapo_session` are kept in sync. Logging in from either Mapo or the Django admin panel authenticates you on both sides simultaneously. Useful during development or when the same team uses both interfaces.
+When `true`: Django's `sessionid` is authoritative. A login on Mapo, the same-origin public site or Django admin authenticates the backoffice too, provided the cookie path/domain covers it. The Mapo copy is still written on auth responses, but it does not track Django's session key rotation and must never override an incoming `sessionid`. If only the copy is present, it remains a fallback. No cookie cleanup middleware is needed to resolve a mismatch.
 
 ```ts
 camomilla: {
@@ -192,7 +193,7 @@ camomilla: {
 
 `@mapomodule/mapo-integrations-camomilla` and `@mapomodule/core` are designed to work together without any glue code.
 
-> **SSR proxy routing**: The `@mapomodule/core` init server plugin calls `userInfoApi` using an **absolute URL** (`http://host/api/profiles/me/`). This is required so the internal server-side `$fetch` call enters Nitro's request pipeline and gets intercepted by this proxy — a relative path would bypass Nitro middleware entirely.
+> **SSR session restore:** The core init plugin attempts `userInfoApi` when either `__mapo_session` or `sessionid` is present, forwarding the incoming cookies unchanged. It uses the configured relative path through Nuxt's local fetch so Nitro can apply proxy rewriting under the app's base URL too. Core only clears the Mapo copy on a 401/403; it does not delete the shared Django session cookie.
 
 - `useMapoAuth()` calls `/api/auth/login` → proxy rewrites to `/api/camomilla/auth/login/`
 - `useCrud('/api/articles/')` calls `/api/articles/` → proxy forwards to `/api/articles/` on the backend

@@ -29,6 +29,7 @@
     "discard": "Scarta",
     "loading": "Caricamento...",
     "genericError": "Qualcosa è andato storto, riprova più tardi...",
+    "permissionDenied": "Permesso negato",
     "saveSuccess": "Elemento salvato con successo!",
     "createSuccess": "Elemento creato con successo!",
     "deleteSuccess": "Elemento eliminato con successo!",

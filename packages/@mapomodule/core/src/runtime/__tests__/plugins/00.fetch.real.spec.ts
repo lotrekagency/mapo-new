@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createFetch } from "ofetch";
 
 // Exercises the REAL mapo-core:fetch plugin hooks, not a hand-written copy of them.
 // The hooks are built inside setup() via the global `$fetch.create`, so stub that and
@@ -16,11 +17,15 @@ vi.mock("nuxt/app", () => ({
 
 const authStore = { reset: vi.fn() };
 const snackStore = { show: vi.fn() };
+const pinia = {};
+const translate = vi.fn((key: string) =>
+  key === "mapo.permissionDenied" ? "Permesso negato" : key,
+);
 vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
-  useAuthStore: () => authStore,
+  useAuthStore: vi.fn(() => authStore),
 }));
 vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
-  useSnackStore: () => snackStore,
+  useSnackStore: vi.fn(() => snackStore),
 }));
 
 import plugin from "../../plugins/00.fetch";
@@ -42,8 +47,13 @@ function buildPlugin() {
     },
   });
   const res = (
-    plugin as unknown as { setup: () => { provide: Record<string, unknown> } }
-  ).setup();
+    plugin as unknown as {
+      setup: (nuxtApp: {
+        $pinia: typeof pinia;
+        $i18n: { t: typeof translate };
+      }) => { provide: Record<string, unknown> };
+    }
+  ).setup({ $pinia: pinia, $i18n: { t: translate } });
   Object.assign(provided, res.provide);
   return { hooks, provided };
 }
@@ -80,6 +90,45 @@ describe("mapo-core:fetch — real plugin hooks", () => {
     expect(returned).toBeUndefined();
   });
 
+  it.each([401, 403, 500])(
+    "preserves ofetch error status, body and response (%i)",
+    async (status) => {
+      const body = { detail: "Backend rejected the request" };
+      const fetch = createFetch({
+        fetch: vi.fn().mockResolvedValue(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+      });
+      vi.stubGlobal("$fetch", fetch);
+      const { provide } = (
+        plugin as unknown as {
+          setup: (nuxtApp: {
+            $pinia: typeof pinia;
+            $i18n: { t: typeof translate };
+          }) => {
+            provide: {
+              mapoFetch: typeof fetch;
+              mapoFetchLoading: { value: boolean };
+            };
+          };
+        }
+      ).setup({ $pinia: pinia, $i18n: { t: translate } });
+
+      await expect(
+        provide.mapoFetch("/api/x", { retry: 0 }),
+      ).rejects.toMatchObject({
+        name: "FetchError",
+        status,
+        data: body,
+        response: { status },
+      });
+      expect(provide.mapoFetchLoading.value).toBe(false);
+    },
+  );
+
   it("still resets auth on 401 and snacks on 403", () => {
     const { hooks } = buildPlugin();
 
@@ -87,7 +136,22 @@ describe("mapo-core:fetch — real plugin hooks", () => {
     expect(authStore.reset).toHaveBeenCalled();
 
     hooks.onResponse({ response: { status: 403 }, request: "/api/y" });
-    expect(snackStore.show).toHaveBeenCalledWith("Permission denied", "error");
+    expect(snackStore.show).toHaveBeenCalledWith("Permesso negato", "error");
+    expect(translate).toHaveBeenCalledWith("mapo.permissionDenied");
+  });
+
+  it("uses the Pinia instance from the Nuxt plugin for auth and snack stores", async () => {
+    const { hooks } = buildPlugin();
+
+    hooks.onResponse({ response: { status: 401 }, request: "/api/x" });
+    hooks.onResponse({ response: { status: 403 }, request: "/api/y" });
+
+    const { useAuthStore } =
+      await import("@mapomodule/store/runtime/stores/auth");
+    const { useSnackStore } =
+      await import("@mapomodule/store/runtime/stores/snack");
+    expect(useAuthStore).toHaveBeenCalledWith(pinia);
+    expect(useSnackStore).toHaveBeenCalledWith(pinia);
   });
 
   // Was fired twice per 403 while both hooks called handle().

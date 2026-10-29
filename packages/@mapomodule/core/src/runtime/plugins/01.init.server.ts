@@ -18,7 +18,7 @@ import type { MapoCoreRuntimeConfig } from "../types";
  * On each SSR request, this plugin:
  * - Activates the request Pinia instance and initializes auth/sidebar stores.
  * - Restores sidebar UI state from cookies.
- * - If the HttpOnly session cookie is present, calls the configured `userInfoApi`
+ * - If a Mapo or Django session cookie is present, calls the configured `userInfoApi`
  *   (forwarding request cookies) to restore the authenticated user in the auth store.
  *
  * On session restore failure it resets auth state, and clears the session cookie only
@@ -39,11 +39,11 @@ export default defineNuxtPlugin({
 
     sidebarStore.hydrateFromCookies();
 
-    // The session cookie is HttpOnly — readable on SSR but not on the client.
-    // If present, hydrate the auth store by fetching the user with the
-    // incoming Cookie header forwarded to the proxy middleware.
+    // A shared Django login may have no Mapo copy yet. Forward both cookies
+    // unchanged and let the integration decide which session is authoritative.
     const sessionCookie = useCookie(CoreCookieEnum.Session);
-    if (!sessionCookie.value) return;
+    const djangoSessionCookie = useCookie("sessionid");
+    if (!sessionCookie.value && !djangoSessionCookie.value) return;
 
     try {
       const headers = useRequestHeaders(["cookie"]);

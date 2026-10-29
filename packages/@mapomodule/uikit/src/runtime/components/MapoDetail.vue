@@ -1001,6 +1001,7 @@ defineSlots<{
                 :registry="registry"
                 :readonly="effectiveReadonly"
                 :annotations="formAnnotations"
+                :notify-errors="false"
               >
                 <template
                   v-for="slotName in formSlotNames"
@@ -1021,6 +1022,7 @@ defineSlots<{
               :registry="registry"
               :readonly="effectiveReadonly"
               :annotations="formAnnotations"
+              :notify-errors="false"
             >
               <template
                 v-for="slotName in formSlotNames"
