@@ -47,7 +47,7 @@ mapomodule
 ## How a request flows
 
 1. A page declares its layout, middleware, sidebar entry and permissions with `definePageMeta`.
-2. On the server, `@mapomodule/core` hydrates the session: it calls `userInfoApi` and fills `useAuthStore()` before any page renders.
+2. On the server, `@mapomodule/core` hydrates the session when `__mapo_session` or Django's `sessionid` is present: it forwards the incoming cookies to `userInfoApi` and fills `useAuthStore()` before any page renders. With Camomilla session sync enabled, the shared Django cookie takes precedence over the Mapo copy.
 3. The `auth`, `permissions` and `roles` middleware decide whether the route is reachable.
 4. Components fetch through `useCrud()` and `$mapoFetch`. Requests go to the Nuxt server (`/api/*`), where a backend integration proxies them to the real API.
 5. A 401 resets the session and redirects to the login page; a 403 shows a "Permission denied" snackbar and keeps the session.

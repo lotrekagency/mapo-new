@@ -24,6 +24,7 @@ const crud = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 const confirm = vi.hoisted(() => ({ ask: vi.fn() }));
+const mapoFormProps: Array<{ notifyErrors: boolean }> = [];
 
 vi.mock("#app", () => ({
   useRouter: () => router,
@@ -138,7 +139,18 @@ const stubs: Record<string, Component> = {
   UAlert: passthrough("UAlert"),
   UIcon: passthrough("UIcon"),
   UModal: passthrough("UModal"),
-  MapoForm: passthrough("MapoForm"),
+  MapoForm: {
+    name: "MapoForm",
+    props: { notifyErrors: { type: Boolean, default: true } },
+    setup(props: { notifyErrors?: boolean }, { slots }: SetupContext) {
+      const formProps = { notifyErrors: props.notifyErrors ?? true };
+      mapoFormProps.push(formProps);
+      onUnmounted(() => {
+        mapoFormProps.splice(mapoFormProps.indexOf(formProps), 1);
+      });
+      return () => h("div", null, slots.default?.());
+    },
+  },
   MapoDetailLangSwitch: passthrough("MapoDetailLangSwitch"),
 };
 
@@ -156,10 +168,17 @@ interface ActionBindings {
 
 let app: App<HeadlessNode> | undefined;
 
-function mountDetail(slots: Record<string, (bindings: never) => VNode[]> = {}) {
+function mountDetail(
+  slots: Record<string, (bindings: never) => VNode[]> = {},
+  props: Record<string, unknown> = {},
+) {
   const root: Component = {
     render: () =>
-      h(MapoDetail as Component, { endpoint: "/api/news/", id: 5 }, slots),
+      h(
+        MapoDetail as Component,
+        { endpoint: "/api/news/", id: 5, ...props },
+        slots,
+      ),
   };
   app = createApp(root);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
@@ -195,6 +214,7 @@ beforeEach(() => {
   crud.delete.mockResolvedValue(undefined);
   confirm.ask.mockReset();
   confirm.ask.mockResolvedValue(true);
+  mapoFormProps.length = 0;
 });
 
 afterEach(() => {
@@ -203,6 +223,23 @@ afterEach(() => {
 });
 
 describe("MapoDetail actions", () => {
+  it("shows server error toasts only from the main form when sidebar fields are present", async () => {
+    mountDetail(
+      {},
+      {
+        fields: [{ key: "title", type: "text" }],
+        sidebarFields: [{ key: "slug", type: "text" }],
+      },
+    );
+    await settle();
+
+    expect(mapoFormProps).toHaveLength(2);
+    expect(mapoFormProps.map(({ notifyErrors }) => notifyErrors)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it("keeps the buttons busy until the page has gone back after Save", async () => {
     mountDetail();
     await settle();

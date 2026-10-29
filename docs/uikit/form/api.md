@@ -16,16 +16,17 @@ Descriptor typing guidance:
 
 ### Props
 
-| Prop          | Type                       | Default        | Description                                                                  |
-| ------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------- |
-| `modelValue`  | `T`                        | — **required** | The form data object (v-model).                                              |
-| `fields`      | `AnyFieldDescriptor<T>[]`  | — **required** | Array of field descriptors defining the form layout.                         |
-| `errors`      | `Record<string, string[]>` | `{}`           | Server-side validation errors keyed by field path.                           |
-| `languages`   | `string[]`                 | `[]`           | Available language codes for translated fields.                              |
-| `currentLang` | `string`                   | `''`           | Active language code. Controlled externally (by `MapoDetail`).               |
-| `readonly`    | `boolean`                  | `false`        | Make all fields read-only.                                                   |
-| `immediate`   | `boolean`                  | `false`        | Run client validators immediately without waiting for the first submit.      |
-| `registry`    | `FieldRegistry`            | —              | Field component registry. Auto-injected from `$mapoFormRegistry` if omitted. |
+| Prop           | Type                       | Default        | Description                                                                                                      |
+| -------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `modelValue`   | `T`                        | — **required** | The form data object (v-model).                                                                                  |
+| `fields`       | `AnyFieldDescriptor<T>[]`  | — **required** | Array of field descriptors defining the form layout.                                                             |
+| `errors`       | `Record<string, string[]>` | `{}`           | Server-side validation errors keyed by field path.                                                               |
+| `languages`    | `string[]`                 | `[]`           | Available language codes for translated fields.                                                                  |
+| `currentLang`  | `string`                   | `''`           | Active language code. Controlled externally (by `MapoDetail`).                                                   |
+| `readonly`     | `boolean`                  | `false`        | Make all fields read-only.                                                                                       |
+| `immediate`    | `boolean`                  | `false`        | Run client validators immediately without waiting for the first submit.                                          |
+| `notifyErrors` | `boolean`                  | `true`         | Show a toast for server-side field errors. Set to `false` on a secondary form that shares another form's errors. |
+| `registry`     | `FieldRegistry`            | —              | Field component registry. Auto-injected from `$mapoFormRegistry` if omitted.                                     |
 
 ### Emits
 

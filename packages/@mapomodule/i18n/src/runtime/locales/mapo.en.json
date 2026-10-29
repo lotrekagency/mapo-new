@@ -29,6 +29,7 @@
     "discard": "Discard",
     "loading": "Loading...",
     "genericError": "Something went wrong, please try again later...",
+    "permissionDenied": "Permission denied",
     "saveSuccess": "Saved successfully",
     "createSuccess": "Created successfully",
     "deleteSuccess": "Deleted successfully",

@@ -25,6 +25,11 @@ const props = withDefaults(
     readonly?: boolean;
     immediate?: boolean;
     /**
+     * Show a toast for server-side field errors. Set to `false` for secondary
+     * forms that share errors with another form. Defaults to `true`.
+     */
+    notifyErrors?: boolean;
+    /**
      * Field component registry. When omitted, it is auto-injected from
      * `$mapoFormRegistry` (provided by the `@mapomodule/form` plugin).
      * Pass it explicitly only for headless forms or one-off registry swaps.
@@ -37,6 +42,7 @@ const props = withDefaults(
     currentLang: "",
     readonly: false,
     immediate: false,
+    notifyErrors: true,
     registry: undefined,
   },
 );
@@ -85,6 +91,7 @@ const form = useMapoForm({
   languages: props.languages,
   currentLang: currentLangRef,
   immediate: props.immediate,
+  notifyErrors: props.notifyErrors,
   debounce: globalDebounce,
   registry: injectedRegistry.value,
 });

@@ -20,15 +20,20 @@ import type { MapoCoreRuntimeConfig } from "../types";
  * Error handling behavior:
  * - `401` (except logout calls): reset auth state and, on client, redirect to login
  *   with the current route encoded in a `redirect` query parameter.
- * - `403`: show a global "Permission denied" error snackbar.
+ * - `403`: show a localized permission-denied error snackbar.
  */
 export default defineNuxtPlugin({
   name: "mapo-core:fetch",
   enforce: "pre",
-  setup() {
+  setup(nuxtApp) {
+    const app = nuxtApp as typeof nuxtApp & {
+      $pinia: NonNullable<Parameters<typeof useAuthStore>[0]>;
+      $i18n?: { t: (key: string) => string };
+    };
     const rc = useRuntimeConfig().public.mapoCore as MapoCoreRuntimeConfig;
     const logoutUrl = rc.logoutUrl;
     const loginUrl = rc.loginUrl;
+    const translate = (key: string) => app.$i18n?.t(key) ?? key;
 
     // Track whether a 401 redirect is already in flight to prevent duplicate redirects.
     let redirectInFlight = false;
@@ -40,7 +45,7 @@ export default defineNuxtPlugin({
         !redirectInFlight
       ) {
         redirectInFlight = true;
-        const auth = useAuthStore();
+        const auth = useAuthStore(app.$pinia);
         auth.reset();
         if (import.meta.client) {
           const route = useRoute();
@@ -50,7 +55,10 @@ export default defineNuxtPlugin({
         }
       }
       if (status === 403) {
-        useSnackStore().show("Permission denied", "error");
+        useSnackStore(app.$pinia).show(
+          translate("mapo.permissionDenied"),
+          "error",
+        );
       }
     };
 

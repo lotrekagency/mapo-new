@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { useMapoForm } from "../runtime/composables/useMapoForm.js";
 import { defaultRegistry } from "../runtime/registry/defaults.js";
 import type { FieldDescriptor } from "../runtime/types/descriptor.js";
 
+const snackShow = vi.hoisted(() => vi.fn());
 vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
   useAuthStore: () => ({ info: { id: 1, username: "testuser" } }),
 }));
 vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
-  useSnackStore: () => ({ show: vi.fn() }),
+  useSnackStore: () => ({ show: snackShow }),
 }));
 // Pulls in `nuxt/app`, which cannot resolve outside a Nuxt build. Assertions
 // below match on message keys, so echoing the key back is the useful stub.
@@ -18,6 +19,7 @@ vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
 
 // provide/inject called outside setup() emits a warning; silence it in tests.
 beforeEach(() => {
+  snackShow.mockClear();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
@@ -108,6 +110,64 @@ describe("getFieldValue", () => {
   it("reads the current value", () => {
     const { form } = makeForm({ title: "Existing" });
     expect(form.getFieldValue({ key: "title", type: "text" })).toBe("Existing");
+  });
+
+  describe("server error notifications", () => {
+    it("uses the field label and falls back to the field key", async () => {
+      const model = ref<Article>({
+        title: "",
+        slug: "",
+        is_draft: false,
+        count: 0,
+        translations: {},
+      });
+      const fields = ref<FieldDescriptor<Article>[]>([
+        { key: "title", type: "text", label: "Article title" },
+      ]);
+      const errors = ref<Record<string, string[]>>({});
+      useMapoForm({
+        model,
+        fields,
+        errors,
+        registry: defaultRegistry,
+      });
+
+      errors.value = {
+        title: ["This field is required."],
+        unknown: ["Invalid value."],
+      };
+      await nextTick();
+
+      expect(snackShow).toHaveBeenCalledWith(
+        "Article title: This field is required.\nunknown: Invalid value.",
+        "error",
+      );
+    });
+
+    it("suppresses duplicate server error notifications when disabled", async () => {
+      const model = ref<Article>({
+        title: "",
+        slug: "",
+        is_draft: false,
+        count: 0,
+        translations: {},
+      });
+      const errors = ref<Record<string, string[]>>({});
+      useMapoForm({
+        model,
+        fields: ref<FieldDescriptor<Article>[]>([
+          { key: "title", type: "text", label: "Article title" },
+        ]),
+        errors,
+        notifyErrors: false,
+        registry: defaultRegistry,
+      });
+
+      errors.value = { title: ["This field is required."] };
+      await nextTick();
+
+      expect(snackShow).not.toHaveBeenCalled();
+    });
   });
 });
 
