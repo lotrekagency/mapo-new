@@ -1,3 +1,9 @@
+# @mapomodule/i18n [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.4...@mapomodule/i18n@2.0.0-beta.5) (2026-10-29)
+
+### Bug Fixes
+
+- **core:** localize fetch errors and use app-scoped stores ([b2a9c76](https://github.com/lotrekagency/mapo-new/commit/b2a9c760c685c315b71d395ae4157232973bc598))
+
 # @mapomodule/i18n [2.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.3...@mapomodule/i18n@2.0.0-beta.4) (2026-10-27)
 
 ### Features
