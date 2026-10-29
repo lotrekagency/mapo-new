@@ -8,6 +8,17 @@ const toast = useToast();
 
 const _shown = new Set<number>();
 
+function dismissEvictedMessages() {
+  const activeToastIds = new Set(
+    toast.toasts.value.map(({ id }) => String(id)),
+  );
+  for (const id of _shown) {
+    if (activeToastIds.has(String(id))) continue;
+    _shown.delete(id);
+    snack.dismiss(id);
+  }
+}
+
 watch(
   () => snack.messages,
   (msgs) => {
@@ -30,6 +41,7 @@ watch(
           if (!open) snack.dismiss(msg.id);
         },
       });
+      dismissEvictedMessages();
     }
   },
   { deep: true },

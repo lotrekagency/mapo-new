@@ -57,6 +57,11 @@ const props = withDefaults(
      * hides the trash unless the user has `delete_article`. Omit to always show both.
      */
     permissionModel?: string;
+    /**
+     * Whether to include the built-in permanent delete bulk action.
+     * Defaults to `true`; custom `actions` are unaffected.
+     */
+    defaultActions?: boolean;
     // Pagination
     /** Initial page size: a number, or `"all"`. Default: 20. */
     defaultPageSize?: number | "all";
@@ -304,6 +309,8 @@ watch([activeTab, activeFilters], () => {
           :selection-query="selectionQuery"
           :endpoint="crudEndpoint"
           :lookup="lookup"
+          :permission-model="permissionModel"
+          :default-actions="defaultActions"
           @action-completed="refresh"
         />
       </div>

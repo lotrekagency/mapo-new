@@ -80,25 +80,27 @@ Paginated, filterable, sortable data table with quick-edit, bulk actions, and ta
 
 ### Props
 
-| Prop              | Type                     | Default             | Description                                                          |
-| ----------------- | ------------------------ | ------------------- | -------------------------------------------------------------------- |
-| `endpoint`        | `string`                 | — **required**      | API endpoint for data fetching.                                      |
-| `columns`         | `ListColumn[]`           | — **required**      | Column definitions.                                                  |
-| `lookup`          | `string`                 | `'id'`              | Primary key field name.                                              |
-| `filters`         | `FilterDescriptor[]`     | `[]`                | Available filter definitions.                                        |
-| `actions`         | `ActionDescriptor<T>[]`  | `[]`                | Bulk action definitions.                                             |
-| `tabs`            | `ListTabItem[]`          | `[]`                | Tab definitions for list segmentation.                               |
-| `defaultTab`      | `string`                 | —                   | Default active tab value.                                            |
-| `tabQueryParam`   | `string`                 | `'tab'`             | URL query parameter name for the active tab.                         |
-| `searchable`      | `boolean`                | `true`              | Show the search input.                                               |
-| `draggable`       | `boolean`                | `false`             | Enable drag-and-drop row reordering.                                 |
-| `positionField`   | `string`                 | `'position'`        | Model field updated on drag reorder.                                 |
-| `editFields`      | `FieldDescriptor<T>[]`   | `[]`                | Fields shown in the quick-edit modal.                                |
-| `languages`       | `string[]`               | —                   | Language codes for quick-edit i18n.                                  |
-| `registry`        | `Partial<FieldRegistry>` | —                   | Field registry for quick-edit.                                       |
-| `detailBase`      | `string`                 | —                   | Base path for the per-row detail link (e.g. `'/news'` → `/news/42`). |
-| `defaultPageSize` | `number \| "all"`        | `20`                | Initial page size.                                                   |
-| `pageSizeOptions` | `(number \| "all")[]`    | `[10, 20, 50, 100]` | Per-page options; `"all"` shows every row.                           |
+| Prop              | Type                     | Default             | Description                                                               |
+| ----------------- | ------------------------ | ------------------- | ------------------------------------------------------------------------- |
+| `endpoint`        | `string`                 | — **required**      | API endpoint for data fetching.                                           |
+| `columns`         | `ListColumn[]`           | — **required**      | Column definitions.                                                       |
+| `lookup`          | `string`                 | `'id'`              | Primary key field name.                                                   |
+| `filters`         | `FilterDescriptor[]`     | `[]`                | Available filter definitions.                                             |
+| `actions`         | `ActionDescriptor<T>[]`  | `[]`                | Bulk action definitions.                                                  |
+| `defaultActions`  | `boolean`                | `true`              | Include the built-in permanent-delete bulk action.                        |
+| `tabs`            | `ListTabItem[]`          | `[]`                | Tab definitions for list segmentation.                                    |
+| `defaultTab`      | `string`                 | —                   | Default active tab value.                                                 |
+| `tabQueryParam`   | `string`                 | `'tab'`             | URL query parameter name for the active tab.                              |
+| `searchable`      | `boolean`                | `true`              | Show the search input.                                                    |
+| `draggable`       | `boolean`                | `false`             | Enable drag-and-drop row reordering.                                      |
+| `positionField`   | `string`                 | `'position'`        | Model field updated on drag reorder.                                      |
+| `editFields`      | `FieldDescriptor<T>[]`   | `[]`                | Fields shown in the quick-edit modal.                                     |
+| `languages`       | `string[]`               | —                   | Language codes for quick-edit i18n.                                       |
+| `registry`        | `Partial<FieldRegistry>` | —                   | Field registry for quick-edit.                                            |
+| `detailBase`      | `string`                 | —                   | Base path for the per-row detail link (e.g. `'/news'` → `/news/42`).      |
+| `permissionModel` | `string`                 | —                   | Django model label used to gate row actions and the built-in bulk delete. |
+| `defaultPageSize` | `number \| "all"`        | `20`                | Initial page size.                                                        |
+| `pageSizeOptions` | `(number \| "all")[]`    | `[10, 20, 50, 100]` | Per-page options; `"all"` shows every row.                                |
 
 ### Slots
 
@@ -197,13 +199,15 @@ Bulk action toolbar rendered by `MapoList`.
 
 ### Props
 
-| Prop             | Type                    | Default        | Description                              |
-| ---------------- | ----------------------- | -------------- | ---------------------------------------- |
-| `actions`        | `ActionDescriptor<T>[]` | `[]`           | Custom action definitions.               |
-| `selection`      | `T[] \| "all"`          | — **required** | Currently selected items (or `"all"`).   |
-| `selectionQuery` | `URLSearchParams`       | — **required** | Query params representing the selection. |
-| `endpoint`       | `string`                | — **required** | API endpoint for bulk operations.        |
-| `lookup`         | `string`                | `'id'`         | Primary key field name.                  |
+| Prop              | Type                    | Default        | Description                                                           |
+| ----------------- | ----------------------- | -------------- | --------------------------------------------------------------------- |
+| `actions`         | `ActionDescriptor<T>[]` | `[]`           | Custom action definitions.                                            |
+| `defaultActions`  | `boolean`               | `true`         | Whether to include the built-in permanent-delete action.              |
+| `permissionModel` | `string`                | —              | Django model label used to gate the built-in permanent-delete action. |
+| `selection`       | `T[] \| "all"`          | — **required** | Currently selected items (or `"all"`).                                |
+| `selectionQuery`  | `URLSearchParams`       | — **required** | Query params representing the selection.                              |
+| `endpoint`        | `string`                | — **required** | API endpoint for bulk operations.                                     |
+| `lookup`          | `string`                | `'id'`         | Primary key field name.                                               |
 
 ### Emits
 

@@ -105,6 +105,7 @@ try {
 ```
 
 Errors are displayed under the matching field. Path matching also works for nested keys (`translations.it.title`, `blocks.0.title`).
+The server-error toast uses each matching field descriptor's `label`, falling back to the raw field path when no descriptor is found. Set `<MapoForm :notify-errors="false">` when multiple forms share the same errors and only one toast should be shown.
 
 ### Nested error shapes
 

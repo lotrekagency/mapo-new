@@ -140,7 +140,12 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
         const entries = Object.entries(val);
         if (!entries.length) return;
         const lines = entries
-          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
+          .map(([field, msgs]) => {
+            const label =
+              toValue(fields).find((descriptor) => descriptor.key === field)
+                ?.label || field;
+            return `${label}: ${(msgs as string[]).join(", ")}`;
+          })
           .join("\n");
         snack.show(lines, "error");
       },

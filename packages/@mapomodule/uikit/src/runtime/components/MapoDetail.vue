@@ -905,6 +905,7 @@ defineSlots<{
                 :current-lang="currentLang"
                 :registry="registry"
                 :readonly="effectiveReadonly"
+                :notify-errors="false"
               >
                 <template
                   v-for="slotName in formSlotNames"
@@ -924,6 +925,7 @@ defineSlots<{
               :current-lang="currentLang"
               :registry="registry"
               :readonly="effectiveReadonly"
+              :notify-errors="false"
             >
               <template
                 v-for="slotName in formSlotNames"
