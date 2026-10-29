@@ -1,3 +1,10 @@
+# @mapomodule/core [2.0.0-beta.12](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.11...@mapomodule/core@2.0.0-beta.12) (2026-10-29)
+
+### Bug Fixes
+
+- **core:** localize fetch errors and use app-scoped stores ([b2a9c76](https://github.com/lotrekagency/mapo-new/commit/b2a9c760c685c315b71d395ae4157232973bc598))
+- **core:** restore shared Django sessions during SSR ([41f3a82](https://github.com/lotrekagency/mapo-new/commit/41f3a828a474eb8d01be4e163e571c843eb9f9a5))
+
 # @mapomodule/core [2.0.0-beta.11](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/core@2.0.0-beta.10...@mapomodule/core@2.0.0-beta.11) (2026-10-27)
 
 ### Dependencies
