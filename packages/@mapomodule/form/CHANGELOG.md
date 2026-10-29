@@ -1,3 +1,13 @@
+# @mapomodule/form [2.0.0-beta.13](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.12...@mapomodule/form@2.0.0-beta.13) (2026-10-29)
+
+### Bug Fixes
+
+- **form:** prevent duplicate errors and show field labels ([59c492b](https://github.com/lotrekagency/mapo-new/commit/59c492bc5c0a9894abacd993808ff732506e1715))
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.5
+
 # @mapomodule/form [2.0.0-beta.12](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.11...@mapomodule/form@2.0.0-beta.12) (2026-10-27)
 
 ### Bug Fixes
