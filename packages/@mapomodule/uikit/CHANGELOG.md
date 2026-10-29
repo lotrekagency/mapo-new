@@ -1,3 +1,17 @@
+# @mapomodule/uikit [2.0.0-beta.16](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.15...@mapomodule/uikit@2.0.0-beta.16) (2026-10-29)
+
+### Bug Fixes
+
+- **form:** prevent duplicate errors and show field labels ([59c492b](https://github.com/lotrekagency/mapo-new/commit/59c492bc5c0a9894abacd993808ff732506e1715))
+- **uikit:** gate bulk delete with model permissions ([d5cdf30](https://github.com/lotrekagency/mapo-new/commit/d5cdf30925cdbe91d10909c7fcedf6bef6ac367f))
+- **uikit:** remove evicted toasts from snack store ([4e0379b](https://github.com/lotrekagency/mapo-new/commit/4e0379b380de14bd235ba78ef339b76310f7785a))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.13
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.5
+- **@mapomodule/core:** upgraded to 2.0.0-beta.12
+
 # @mapomodule/uikit [2.0.0-beta.15](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.14...@mapomodule/uikit@2.0.0-beta.15) (2026-10-27)
 
 ### Features
