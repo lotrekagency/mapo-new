@@ -44,6 +44,7 @@ src/
 | A composable's signature        | `docs/uikit/form/composable.md` or the feature page, `docs/modules/api.md` if listed there                                                                 |
 | A shell component's props/slots | `docs/uikit/form/api.md`, `docs/uikit/form/slots.md`                                                                                                       |
 | `useFormFromSchema` mapping     | `fieldsToJsonSchema` and the normalizers in `utils/src/jsonSchema/`, which write what it reads; `schema-to-form.md`; the MCP's `openapi.ts`                |
+| What the reader decides         | What the AI may fill (`ai/src/runtime/shared/entity.ts`, run its tests); it runs on Nitro, so no Vue or Nuxt here or in `fieldsToJsonSchema`               |
 | `FieldExtensions`               | The section in `docs/uikit/form/custom-fields.md`; `property` of `fieldsToJsonSchema` if the schema should carry it                                        |
 | Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`                                                                       |
 | Field annotations               | `docs/uikit/form/annotations.md`, `docs/uikit/form/api.md`, `useFieldAnnotation` in `docs/modules/api.md`; the `annotations` prop of `MapoDetail` in uikit |
