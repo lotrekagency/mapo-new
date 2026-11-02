@@ -1730,3 +1730,339 @@ describe("buildAiEntity — conditions", () => {
     expect(fieldOf(entity, "contact.code")?.constraints).toEqual({});
   });
 });
+
+describe("buildAiEntity — choices the AI can answer with", () => {
+  it("keeps one choice per value as a string, the first listed, and never the empty one", () => {
+    const entity = formEntity([
+      {
+        key: "rank",
+        type: "select",
+        attrs: {
+          options: [
+            { text: "None", value: "" },
+            { text: "One", value: 1 },
+            { text: "Uno", value: "1" },
+            { text: "Two", value: 2 },
+          ],
+        },
+      },
+    ] as Fields);
+
+    expect(fieldOf(entity, "rank")?.choices).toEqual([
+      { value: 1, label: "One" },
+      { value: 2, label: "Two" },
+    ]);
+  });
+
+  it("matches the form's choices and the backend's as strings", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "rank",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "One", value: 1 },
+              { text: "Two", value: 2 },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({ rank: { enum: ["1", "2", "3"] } }),
+    });
+
+    expect(fieldOf(entity, "rank")?.choices).toEqual([
+      { value: 1, label: "One" },
+      { value: 2, label: "Two" },
+    ]);
+    expect(entity.warnings).toEqual([]);
+  });
+
+  it("leaves alone a choice whose only value is empty", () => {
+    const entity = buildAiEntity({
+      fields: objectSchema({
+        none: { enum: [""] },
+        nothing: { type: "array", items: { enum: [""] } },
+      }),
+    });
+
+    expect(reasonOf(entity, "none")).toBe("unsupported");
+    expect(reasonOf(entity, "nothing")).toBe("unsupported");
+  });
+
+  it("reads a backend that accepts only the empty value as a list, not as no list", () => {
+    const select = (key: string, values: string[]) => ({
+      key,
+      type: "select",
+      attrs: { options: values.map((value) => ({ text: value, value })) },
+    });
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        { key: "code", type: "text" },
+        select("status", ["a", "b"]),
+        select("level", [""]),
+        select("blank", [""]),
+      ] as Fields),
+      schema: objectSchema({
+        code: { type: "string", enum: [""] },
+        status: { enum: [""] },
+        level: { enum: ["a", "b"] },
+        blank: { enum: [""] },
+      }),
+    });
+
+    expect(reasonOf(entity, "code")).toBe("unsupported");
+    expect(reasonOf(entity, "status")).toBe("conflict");
+    expect(reasonOf(entity, "level")).toBe("conflict");
+    expect(reasonOf(entity, "blank")).toBe("unsupported");
+    expect(entity.warnings).toEqual([
+      { kind: "choices-conflict", key: "status" },
+      { kind: "choices-conflict", key: "level" },
+    ]);
+  });
+
+  it("tells a boolean from its text, as a DRF backend does", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "open",
+          type: "select",
+          attrs: { options: [{ text: "Yes", value: true }] },
+        },
+        {
+          key: "both",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "Yes", value: true },
+              { text: "Text", value: "true" },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({ open: { enum: ["true"] } }),
+    });
+
+    expect(reasonOf(entity, "open")).toBe("conflict");
+    expect(fieldOf(entity, "both")?.choices).toEqual([
+      { value: true, label: "Yes" },
+      { value: "true", label: "Text" },
+    ]);
+  });
+
+  it("matches a boolean with its text as Python writes it", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "open",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "Yes", value: true },
+              { text: "No", value: false },
+            ],
+          },
+        },
+        {
+          key: "same",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "Yes", value: true },
+              { text: "Python", value: "True" },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({ open: { enum: ["True", "False"] } }),
+    });
+
+    expect(fieldOf(entity, "open")?.choices?.map(({ value }) => value)).toEqual(
+      [true, false],
+    );
+    expect(fieldOf(entity, "same")?.choices).toEqual([
+      { value: true, label: "Yes" },
+    ]);
+    expect(entity.warnings).not.toContainEqual({
+      kind: "choices-conflict",
+      key: "open",
+    });
+  });
+
+  it("reads a list with no value the AI could give as a list, whatever it holds", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        { key: "code", type: "text" },
+        {
+          key: "status",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "A", value: "a" },
+              { text: "B", value: "b" },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({
+        code: { enum: [null] },
+        status: { enum: [null, ""] },
+      }),
+    });
+
+    expect(reasonOf(entity, "code")).toBe("unsupported");
+    expect(reasonOf(entity, "status")).toBe("conflict");
+  });
+
+  it("reads an empty list of options as no list", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "status",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "A", value: "a" },
+              { text: "B", value: "b" },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({ status: { type: "string", enum: [] } }),
+    });
+
+    expect(
+      fieldOf(entity, "status")?.choices?.map(({ value }) => value),
+    ).toEqual(["a", "b"]);
+    expect(entity.warnings).toEqual([]);
+  });
+
+  it("reads plain options as their own values, as the form does", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        { key: "size", type: "radio", attrs: { options: ["s", "m", "l"] } },
+        { key: "stars", type: "star-rating", attrs: { options: [1, 2, 3] } },
+        {
+          key: "city",
+          type: "text",
+          attrs: { options: [{ id: 1, name: "Rome" }] },
+        },
+      ] as Fields),
+      schema: objectSchema({
+        size: { type: "string", enum: ["s", "m", "l"] },
+        stars: { type: "integer" },
+        city: { type: "string" },
+      }),
+    });
+
+    expect(fieldOf(entity, "size")?.choices).toEqual([
+      { value: "s", label: "s" },
+      { value: "m", label: "m" },
+      { value: "l", label: "l" },
+    ]);
+    expect(
+      fieldOf(entity, "stars")?.choices?.map(({ value }) => value),
+    ).toEqual([1, 2, 3]);
+    expect(fieldOf(entity, "city")?.kind).toBe("string");
+    expect(entity.warnings).toEqual([]);
+  });
+
+  it("reads tuples and records without a value as no list, as the form does", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "size",
+          type: "radio",
+          attrs: {
+            options: [
+              ["s", "Small"],
+              ["m", "Medium"],
+            ],
+          },
+        },
+        { key: "code", type: "text", attrs: { options: [["a", "A"]] } },
+      ] as Fields),
+      schema: objectSchema({
+        size: { type: "string", enum: ["s", "m"] },
+        code: { type: "string" },
+      }),
+    });
+
+    expect(fieldOf(entity, "size")?.choices?.map(({ value }) => value)).toEqual(
+      ["s", "m"],
+    );
+    expect(fieldOf(entity, "code")?.kind).toBe("string");
+    expect(entity.warnings).toEqual([]);
+  });
+
+  it("never offers an option the operator cannot pick", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "status",
+          type: "select",
+          attrs: {
+            options: [
+              { text: "Draft", value: "draft" },
+              { text: "Archived", value: "archived", disabled: true },
+            ],
+          },
+        },
+        {
+          key: "locked",
+          type: "select",
+          attrs: {
+            options: [{ text: "Archived", value: "archived", disabled: true }],
+          },
+        },
+      ] as Fields),
+    });
+
+    expect(
+      fieldOf(entity, "status")?.choices?.map(({ value }) => value),
+    ).toEqual(["draft"]);
+    expect(reasonOf(entity, "locked")).toBe("unsupported");
+  });
+
+  it("takes an option's label from its text or its label", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        {
+          key: "level",
+          type: "radio",
+          attrs: {
+            options: [
+              { label: "Beginner", value: "b" },
+              { text: "Expert", label: "ignored", value: "e" },
+            ],
+          },
+        },
+      ] as Fields),
+      schema: objectSchema({ level: { type: "string" } }),
+    });
+
+    expect(fieldOf(entity, "level")?.choices).toEqual([
+      { value: "b", label: "Beginner" },
+      { value: "e", label: "Expert" },
+    ]);
+  });
+
+  it.each([
+    ["the number first", [1, "1", 2]],
+    ["the text first", ["1", 1, 2]],
+  ])(
+    "keeps the variant of the field's type, whichever the backend lists first (%s)",
+    (_case, values) => {
+      const entity = buildAiEntity({
+        fields: fieldsToJsonSchema([{ key: "rank", type: "number" }] as Fields),
+        schema: objectSchema({ rank: { enum: values } }),
+      });
+
+      expect(fieldOf(entity, "rank")?.kind).toBe("choice");
+      expect(
+        fieldOf(entity, "rank")?.choices?.map(({ value }) => value),
+      ).toEqual([1, 2]);
+      expect(entity.warnings).toEqual([]);
+    },
+  );
+});

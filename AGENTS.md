@@ -8,7 +8,7 @@ Code, comments, docs and READMEs are written in English. Reply to the user, clos
 
 ## 1. What this repository is
 
-Mapo v2 is a Nuxt 4 admin framework: a set of Nuxt modules (`@mapomodule/*` plus the `mapomodule` meta-module) that turn a REST backend into a backoffice declaratively. Apps describe endpoints, list columns, form field descriptors and route permissions, and Mapo renders list and detail pages, forms, auth, navigation, media and menus. It is built on Nuxt 4, Vue 3, Nuxt UI v4, Tailwind CSS v4, Pinia and `@nuxtjs/i18n`, and follows Django REST Framework conventions; the Camomilla CMS integration ships from its own repository. `@mapomodule/mcp` serves the docs and the real APIs to AI assistants in consumer apps. `@mapomodule/ai` (experimental, opt-in with `mapo.ai`) is the AI-assisted data entry package; today it is the AI gateway skeleton.
+Mapo v2 is a Nuxt 4 admin framework: a set of Nuxt modules (`@mapomodule/*` plus the `mapomodule` meta-module) that turn a REST backend into a backoffice declaratively. Apps describe endpoints, list columns, form field descriptors and route permissions, and Mapo renders list and detail pages, forms, auth, navigation, media and menus. It is built on Nuxt 4, Vue 3, Nuxt UI v4, Tailwind CSS v4, Pinia and `@nuxtjs/i18n`, and follows Django REST Framework conventions; the Camomilla CMS integration ships from its own repository. `@mapomodule/mcp` serves the docs and the real APIs to AI assistants in consumer apps. `@mapomodule/ai` (experimental, opt-in with `mapo.ai`) is the AI-assisted data entry package; today it holds the AI gateway skeleton and the shared core that decides what the AI may fill.
 
 Read [`docs/guide/concepts.md`](docs/guide/concepts.md) first: packages, backend contract, the form engine and the customization layers, in one page.
 
@@ -69,7 +69,7 @@ packages/
   @mapomodule/i18n      @nuxtjs/i18n wrapper, mapo.en/it catalogs, useMapoT
   @mapomodule/utils     plain TypeScript helpers (no Nuxt), explicit imports
   @mapomodule/mcp       MCP server for AI assistants: dev-only Nuxt module + mapo-mcp stdio CLI
-  @mapomodule/ai        AI-assisted data entry, experimental and opt-in: the AI gateway under /_mapo/ai/*
+  @mapomodule/ai        AI-assisted data entry, experimental and opt-in: gateway under /_mapo/ai/*, shared core in runtime/shared/
   mapomodule            meta-module: `mapo` config key, installs everything (ai only with `mapo.ai`), mapomodule/types aggregator
 apps/
   example-e2e           reference app: one page per scenario, in-memory mock API, MCP test bed

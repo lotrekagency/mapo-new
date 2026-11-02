@@ -12,8 +12,10 @@
 export const MAPO_AI_GATEWAY_PATH = "/_mapo/ai";
 
 /**
- * Version of the gateway contract. It goes up when a route or a response
- * changes in a way an older client cannot read.
+ * Version of the gateway contract: the routes, their bodies and their
+ * responses. It goes up when one of them changes in a way an older client
+ * cannot read, including the format of a task contract carried in a body
+ * (`AI_CONTRACT_FORMAT_VERSION`, `contract.ts`).
  */
 export const MAPO_AI_CONTRACT_VERSION = 1;
 

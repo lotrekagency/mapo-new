@@ -111,7 +111,11 @@ export interface AiField {
   translatable: boolean;
   /** A list of choices or of related records. */
   multiple: boolean;
-  /** The accepted values of a `choice` field. */
+  /**
+   * The accepted values of a `choice` field, one per value the backend tells
+   * apart (`1` and `"1"` are one, `true` and `"True"` too, `true` and
+   * `"true"` are two), never `""`.
+   */
   choices?: AiChoice[];
   /** Where a `relation` field looks its records up. */
   endpoint?: string;
@@ -473,22 +477,56 @@ function compact<T extends object>(record: T): T {
   return Object.fromEntries(entries) as T;
 }
 
-/** The options `useFormFromSchema()` read, as AI choices. */
+/** The first of the values that is a string. */
+function firstString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === "string");
+}
+
+/**
+ * The options `useFormFromSchema()` read, as the choices the AI can answer
+ * with. An option is a record with a `value`, or a scalar that is its own
+ * value, as the form's writer reads it; an array or a record without a
+ * `value` is not one. The AI answers with scalars but `""`, which means
+ * "none", and never with an option the operator cannot pick (`disabled`).
+ * `undefined` when there is no list of options; `[]` when no option is one
+ * the AI could give.
+ */
 function choicesOf(attrs: Record<string, unknown>): AiChoice[] | undefined {
   const options = attrs.options;
   if (!Array.isArray(options)) return undefined;
-  const choices = options.flatMap((option): AiChoice[] => {
-    if (!isRecord(option)) return [];
-    const value = option.value;
-    const isScalar =
-      typeof value === "string" ||
+  const read = options.flatMap(
+    (option): { value: unknown; label?: string; disabled?: boolean }[] => {
+      const isScalar = typeof option !== "object" || option === null;
+      if (isScalar) return [{ value: option }];
+      if (!isRecord(option) || !("value" in option)) return [];
+      return [
+        {
+          value: option.value,
+          label: firstString(option.text, option.label),
+          disabled: option.disabled === true,
+        },
+      ];
+    },
+  );
+  if (!read.length) return undefined;
+  return read.flatMap(({ value, label, disabled }): AiChoice[] => {
+    const isAnswerable =
+      (typeof value === "string" && value !== "") ||
       typeof value === "number" ||
       typeof value === "boolean";
-    if (!isScalar) return [];
-    const label = typeof option.text === "string" ? option.text : String(value);
-    return [{ value, label }];
+    if (!isAnswerable || disabled) return [];
+    return [{ value, label: label ?? String(value) }];
   });
-  return choices.length ? choices : undefined;
+}
+
+/**
+ * A choice value as a DRF backend matches it: by its text as Python writes
+ * it. `1` and `"1"` are one choice, and so are `true` and `"True"`; `true`
+ * and `"true"` are two.
+ */
+function choiceKey(value: AiChoice["value"]): string {
+  if (typeof value === "boolean") return value ? "True" : "False";
+  return String(value);
 }
 
 /**
@@ -1038,7 +1076,12 @@ function hasImpossibleLimits(limits: AiConstraints): boolean {
   );
 }
 
-/** The field's choices the backend accepts, or the backend's when the field has none; `null` when none is left. */
+/**
+ * The field's choices the backend accepts (compared by `choiceKey()`), or the
+ * backend's when the field has none. `null` when the two lists share none,
+ * unless neither holds a value the AI could give: then `[]`, nothing to
+ * choose.
+ */
 function mergeChoices(
   field: Side,
   backend: Side | undefined,
@@ -1046,10 +1089,33 @@ function mergeChoices(
   const accepted = backend?.choices;
   if (!accepted) return field.choices;
   if (!field.choices) return accepted;
-  const common = field.choices.filter((choice) =>
-    accepted.some((other) => other.value === choice.value),
+  const acceptedKeys = new Set(
+    accepted.map((choice) => choiceKey(choice.value)),
   );
-  return common.length ? common : null;
+  const common = field.choices.filter((choice) =>
+    acceptedKeys.has(choiceKey(choice.value)),
+  );
+  // Two lists with no value the AI could give agree: nothing to choose.
+  const areBothEmpty = !field.choices.length && !accepted.length;
+  return common.length || areBothEmpty ? common : null;
+}
+
+/**
+ * One choice per value the backend tells apart (see `choiceKey()`): of `1`
+ * and `"1"`, the first that fits the field's kind, otherwise the first listed.
+ */
+function onePerValue(
+  choices: readonly AiChoice[],
+  fits: (choice: AiChoice) => boolean,
+): AiChoice[] {
+  const kept = new Map<string, AiChoice>();
+  for (const choice of choices) {
+    const key = choiceKey(choice.value);
+    const current = kept.get(key);
+    const isBetter = !current || (!fits(current) && fits(choice));
+    if (isBetter) kept.set(key, choice);
+  }
+  return [...kept.values()];
 }
 
 function warnAboutConflicts(
@@ -1132,22 +1198,21 @@ function mergeField(
   if (isRelation && !endpoint) return skip("relation");
 
   const canHaveChoices = NARROWABLE_KINDS.has(baseKind);
-  const choices = canHaveChoices ? mergeChoices(field, described) : undefined;
+  const merged = canHaveChoices ? mergeChoices(field, described) : undefined;
   // A backend `enum` on a text or number field narrows it to a choice, if
   // its values are of the field's type.
   const narrowedTypes = JSON_TYPES_BY_KIND[baseKind];
-  const choicesFitType =
-    !choices ||
-    !narrowedTypes ||
-    choices.every((choice) =>
-      narrowedTypes.includes(valueJsonType(choice.value)),
-    );
+  const fitsKind = (choice: AiChoice) =>
+    !narrowedTypes || narrowedTypes.includes(valueJsonType(choice.value));
+  const choices = merged ? onePerValue(merged, fitsKind) : merged;
+  const choicesFitType = !choices || choices.every(fitsKind);
   if (choices === null || !choicesFitType) {
     warnings.push({ kind: "choices-conflict", key: field.key });
     return skip("conflict");
   }
   const kind = choices ? "choice" : baseKind;
-  const isChoiceWithoutChoices = kind === "choice" && !choices;
+  // No list, or a list of "none" alone: nothing the AI could answer.
+  const isChoiceWithoutChoices = kind === "choice" && !choices?.length;
   if (isChoiceWithoutChoices) return skip("unsupported");
 
   const constraints = mergeConstraints(field.constraints, backend?.constraints);
