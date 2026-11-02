@@ -940,6 +940,22 @@ describe("buildAiEntity — values without a type", () => {
 });
 
 describe("buildAiEntity — details", () => {
+  it("keeps every step a number must be a multiple of, from both sides", () => {
+    const entity = buildAiEntity({
+      fields: objectSchema({
+        price: { type: "number", multipleOf: 0.5 },
+        seats: { type: "integer", multipleOf: 0 },
+      }),
+      schema: objectSchema({
+        price: { type: "number", multipleOf: 0.01 },
+        seats: { type: "integer", multipleOf: "5" as unknown as number },
+      }),
+    });
+
+    expect(fieldOf(entity, "price")?.constraints.steps).toEqual([0.5, 0.01]);
+    expect(fieldOf(entity, "seats")?.constraints.steps).toBeUndefined();
+  });
+
   it("ignores a label that is not a string", () => {
     const entity = buildAiEntity({
       schema: objectSchema({

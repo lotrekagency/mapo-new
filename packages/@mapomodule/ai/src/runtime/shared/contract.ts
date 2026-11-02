@@ -15,11 +15,13 @@
  *
  * A value the source does not give is the empty string, or an empty list.
  * Formats, limits and choices the schema cannot hold are written in each
- * property's description, and the sanitizer applies them to the answer. Two
- * kinds of limit only the sanitizer applies: a pattern on rich text, which
- * the HTML must match, and the limits of a relation's key.
+ * property's description, and the sanitizer (`sanitize.ts`) applies them to
+ * the answer. A pattern on rich text is not described: it applies to the
+ * HTML, which only the sanitizer sees. The limits of a relation's key are
+ * not described either: the ids come from the backend's records.
  */
 import type { JSONSchema } from "@mapomodule/utils";
+import { isMultipleOf } from "./numbers";
 import type {
   AiChoice,
   AiConstraints,
@@ -253,6 +255,21 @@ function codeSpan(text: string): string {
     : `${fence}${text}${fence}`;
 }
 
+/**
+ * A `multipleOf` in words: a whole number for `1`, decimals for a power of
+ * ten (`0.01`), a multiple otherwise; nothing when the kind implies it (`1`
+ * on a whole number).
+ */
+function stepRule(step: number, kind: AiValueKind): string | undefined {
+  const isImplied = kind === "integer" && isMultipleOf(1, step);
+  if (isImplied) return undefined;
+  if (step === 1) return "A whole number.";
+  const decimals = Math.round(-Math.log10(step));
+  const isPowerOfTen = decimals > 0 && Math.abs(step - 10 ** -decimals) < 1e-12;
+  if (isPowerOfTen) return `At most ${plural(decimals, "decimal")}.`;
+  return `A multiple of ${step}.`;
+}
+
 function constraintRules(field: AiContractField): string[] {
   const all: AiConstraints = field.constraints;
   // A relation's limits, but for the number of records, are the key's: the
@@ -283,6 +300,10 @@ function constraintRules(field: AiContractField): string[] {
   add(limits.maximum, (n) => `At most ${n}.`);
   add(limits.exclusiveMinimum, (n) => `Greater than ${n}.`);
   add(limits.exclusiveMaximum, (n) => `Less than ${n}.`);
+  for (const step of limits.steps ?? []) {
+    const rule = stepRule(step, field.kind);
+    if (rule) rules.push(rule);
+  }
   add(minItems, (n) => `At least ${plural(n, "value")}.`);
   add(limits.maxItems, (n) => `At most ${plural(n, "value")}.`);
   const patterns = isHtml ? [] : (limits.patterns ?? []);

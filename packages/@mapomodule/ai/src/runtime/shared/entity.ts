@@ -89,6 +89,8 @@ export interface AiConstraints {
   maxItems?: number;
   /** Regular expressions the value must match, every one of them. */
   patterns?: string[];
+  /** Steps a number must be a multiple of, every one of them (`multipleOf`). */
+  steps?: number[];
 }
 
 /** A field the AI may fill. */
@@ -429,6 +431,13 @@ function constraintsOf(view: PropertyView): AiConstraints {
       : [],
   );
   const unique = [...new Set(patterns)];
+  const steps = view.path.flatMap((schema) => {
+    const step = schema.multipleOf;
+    return typeof step === "number" && Number.isFinite(step) && step > 0
+      ? [step]
+      : [];
+  });
+  const uniqueSteps = [...new Set(steps)];
   return compact({
     minLength: limit(view, "minLength", higher),
     maxLength: limit(view, "maxLength", lower),
@@ -439,6 +448,7 @@ function constraintsOf(view: PropertyView): AiConstraints {
     minItems: limit(view, "minItems", higher),
     maxItems: limit(view, "maxItems", lower),
     patterns: unique.length ? unique : undefined,
+    steps: uniqueSteps.length ? uniqueSteps : undefined,
   });
 }
 
@@ -1045,6 +1055,9 @@ function mergeConstraints(
   const patterns = [
     ...new Set([...(field.patterns ?? []), ...(backend.patterns ?? [])]),
   ];
+  const steps = [
+    ...new Set([...(field.steps ?? []), ...(backend.steps ?? [])]),
+  ];
   return compact({
     minLength: higher(field.minLength, backend.minLength),
     maxLength: lower(field.maxLength, backend.maxLength),
@@ -1055,6 +1068,7 @@ function mergeConstraints(
     minItems: higher(field.minItems, backend.minItems),
     maxItems: lower(field.maxItems, backend.maxItems),
     patterns: patterns.length ? patterns : undefined,
+    steps: steps.length ? steps : undefined,
   });
 }
 

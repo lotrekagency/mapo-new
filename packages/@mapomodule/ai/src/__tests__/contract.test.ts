@@ -637,6 +637,23 @@ describe("compileFillContract — descriptions", () => {
     );
   });
 
+  it.each<[string, AiValueKind, number[], string | undefined]>([
+    ["decimals for a power of ten", "number", [0.01], "At most 2 decimals."],
+    ["one decimal", "number", [0.1], "At most 1 decimal."],
+    ["a multiple otherwise", "number", [0.5], "A multiple of 0.5."],
+    ["a multiple of a whole step", "integer", [5], "A multiple of 5."],
+    ["nothing for a step a whole number meets", "integer", [1], undefined],
+    ["a whole number on a number", "number", [1], "A whole number."],
+  ])("describes a step: %s", (_case, kind, steps, rule) => {
+    const contract = compileFillContract({
+      entity: modelOf([aiField("amount", kind, { constraints: { steps } })]),
+    });
+    const description = String(propertyOf(contract, "amount").description);
+
+    if (rule) expect(description).toContain(rule);
+    else expect(description).not.toMatch(/multiple|decimal/);
+  });
+
   it("writes no minimum of zero", () => {
     const contract = compileFillContract({
       entity: modelOf([
