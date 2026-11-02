@@ -116,7 +116,7 @@ Workflow, options and caveats: [Testing changes in a consumer app](docs/contribu
 | `pnpm exec vitest run` | Every test file in the repository, including `core`, `store`, `uikit` and the component tests                       |
 | `pnpm docs:build`      | The documentation site                                                                                              |
 
-Type declarations: `core`, `store` and `i18n` emit them with `tsc -p tsconfig.build-types.json`, and `utils` with plain `tsc`. `form` and `uikit` use `vue-tsc`, then `scripts/clean-empty-vue-dts.mjs` deletes the empty `.vue.d.ts` stubs that would collapse app types to `any`. `ai` and `mcp` get theirs from `nuxt-module-build` alone; the `mcp` build also generates its knowledge base from `docs/` and the `uikit` and `form` sources.
+Type declarations: `core`, `store`, `i18n` and `ai` emit them with `tsc -p tsconfig.build-types.json`, and `utils` with plain `tsc`. `form` and `uikit` use `vue-tsc`, then `scripts/clean-empty-vue-dts.mjs` deletes the empty `.vue.d.ts` stubs that would collapse app types to `any`. `mcp` gets its own from `nuxt-module-build` alone; its build also generates the knowledge base from `docs/` and the `uikit` and `form` sources.
 
 What to run before handing a change over, and how to check it in the reference app: [Testing and verification](docs/contributing/testing.md).
 

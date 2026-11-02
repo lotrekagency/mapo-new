@@ -194,6 +194,12 @@ importers:
 
   packages/@mapomodule/ai:
     dependencies:
+      '@mapomodule/form':
+        specifier: workspace:*
+        version: link:../form
+      '@mapomodule/utils':
+        specifier: workspace:*
+        version: link:../utils
       h3:
         specifier: ^1.15.11
         version: 1.15.11

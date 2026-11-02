@@ -66,7 +66,7 @@ In Vue components and pages, `useAuthStore` is auto-imported by Nuxt and this do
 
 **Mitigation in place**: every runtime package now runs a dedicated declaration pass after `nuxt-module-build build`:
 
-- `tsc -p tsconfig.build-types.json` for TS-only packages (`core`, `store`)
+- `tsc -p tsconfig.build-types.json` for TS-only packages (`core`, `store`, `i18n`, `ai`)
 - `vue-tsc -p tsconfig.build-types.json` for SFC packages (`form`, `uikit`)
 
 For SFC packages, the build also runs `scripts/clean-empty-vue-dts.mjs` to remove zero-byte `.vue.d.ts` / `.d.vue.ts` stubs emitted in `dist/`. TypeScript can prefer those sibling declarations over the real `.vue` source; when they are empty, consumer types silently collapse to `any`.

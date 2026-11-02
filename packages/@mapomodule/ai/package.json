@@ -39,7 +39,7 @@
   ],
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
-    "build": "nuxt-module-build build",
+    "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
     "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
@@ -47,6 +47,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mapomodule/form": "workspace:*",
+    "@mapomodule/utils": "workspace:*",
     "h3": "^1.15.11"
   },
   "peerDependencies": {
