@@ -1,3 +1,4 @@
+import { withDecimalLimits, withDecimalsAsNumbers } from "./decimal.js";
 import { ATTRS_KEYWORD, FIELD_KEYWORD, placeholderType } from "./dialect.js";
 import type { JSONSchema } from "./types.js";
 
@@ -90,6 +91,22 @@ function numberLimits(field: DrfFieldInfo): JSONSchema {
   };
 }
 
+/**
+ * A decimal: its limits, and the decimal places and digits Django checks.
+ * Without `decimal_places`, every digit may stand before the point.
+ */
+function decimalSchema(field: DrfFieldInfo): JSONSchema {
+  const places = toNumber(field.decimal_places);
+  const digits = toNumber(field.max_digits);
+  const wholeDigits =
+    digits !== undefined && places !== undefined ? digits - places : digits;
+  return withDecimalLimits(
+    { type: "number", ...numberLimits(field) },
+    wholeDigits,
+    places,
+  );
+}
+
 /** The JSON type every value shares, if any. */
 function sharedType(values: unknown[]): string | undefined {
   const types = new Set(values.map((value) => typeof value));
@@ -150,7 +167,7 @@ const BUILT_IN_TYPES: Readonly<Record<string, DrfTypeSchema>> = {
   regex: (field) => ({ type: "string", ...stringLimits(field) }),
   integer: (field) => ({ type: "integer", ...numberLimits(field) }),
   float: (field) => ({ type: "number", ...numberLimits(field) }),
-  decimal: (field) => ({ type: "number", ...numberLimits(field) }),
+  decimal: decimalSchema,
   boolean: () => ({ type: "boolean" }),
   date: () => ({ type: "string", format: "date" }),
   datetime: () => ({ type: "string", format: "date-time" }),
@@ -297,7 +314,9 @@ export function drfMetadataToJsonSchema(
  * The JSON Schema an endpoint's `OPTIONS` response describes: the `schema` it
  * publishes, as Camomilla does, otherwise its DRF metadata, read with
  * {@link drfMetadataToJsonSchema}. This is what `MapoDetail` reads with
- * `experimentalFieldsFromSchema`.
+ * `experimentalFieldsFromSchema`. In a published schema, a decimal sent as a
+ * string (`type: string`, `format: decimal`) is read as a number, as the
+ * DRF metadata reads it.
  *
  * @param metadata The `OPTIONS` response, as received.
  * @param options  Passed to {@link drfMetadataToJsonSchema}.
@@ -310,6 +329,6 @@ export function metadataToJsonSchema(
   if (!isRecord(metadata)) return undefined;
   const schema = metadata.schema;
   if (isRecord(schema) && isRecord(schema.properties))
-    return schema as JSONSchema;
+    return withDecimalsAsNumbers(schema as JSONSchema);
   return drfMetadataToJsonSchema(metadata, options);
 }

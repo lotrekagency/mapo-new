@@ -18,7 +18,10 @@ describe("drfMetadataToJsonSchema — types", () => {
     ["contact", { type: "string", format: "email", maxLength: 254 }],
     ["website", { type: "string", format: "uri", maxLength: 200 }],
     ["seats", { type: "integer", minimum: 1, maximum: 500 }],
-    ["price", { type: "number", minimum: 0 }],
+    [
+      "price",
+      { type: "number", minimum: 0, multipleOf: 0.01, exclusiveMaximum: 10000 },
+    ],
     ["rating", { type: "number" }],
     ["is_public", { type: "boolean" }],
     ["starts_at", { type: "string", format: "date-time" }],
@@ -36,6 +39,50 @@ describe("drfMetadataToJsonSchema — types", () => {
     ],
   ])("reads %s", (key, expected) => {
     expect(property(key)).toMatchObject(expected);
+  });
+
+  it("reads a decimal's places and digits as Django checks them", () => {
+    const decimal = (info: Record<string, unknown>) =>
+      drfMetadataToJsonSchema({
+        actions: { POST: { amount: { type: "decimal", ...info } } },
+      })!.properties!.amount;
+
+    // max_digits 6 and decimal_places 2: four digits before the point.
+    expect(property("price")).toEqual({
+      title: "Price",
+      type: "number",
+      minimum: 0,
+      multipleOf: 0.01,
+      exclusiveMaximum: 10000,
+    });
+    expect(
+      decimal({ max_digits: 5, decimal_places: 2, max_value: "50.00" }),
+    ).toEqual({
+      type: "number",
+      maximum: 50,
+      multipleOf: 0.01,
+      exclusiveMinimum: -1000,
+    });
+    // A max_value at the bound stays, for the form: the bound is added beside it.
+    expect(
+      decimal({ max_digits: 6, decimal_places: 2, max_value: "10000" }),
+    ).toEqual({
+      type: "number",
+      maximum: 10000,
+      multipleOf: 0.01,
+      exclusiveMinimum: -10000,
+      exclusiveMaximum: 10000,
+    });
+    // Without decimal places every digit may stand before the point.
+    expect(decimal({ max_digits: 3 })).toEqual({
+      type: "number",
+      exclusiveMinimum: -1000,
+      exclusiveMaximum: 1000,
+    });
+    expect(decimal({ max_digits: null, decimal_places: 3 })).toEqual({
+      type: "number",
+      multipleOf: 0.001,
+    });
   });
 
   it("keeps the label, the help text and the read-only flag", () => {
@@ -215,6 +262,30 @@ describe("metadataToJsonSchema", () => {
     expect(metadataToJsonSchema({ ...options, schema: published })).toBe(
       published,
     );
+  });
+
+  it("reads a decimal the published schema sends as a string as a number", () => {
+    const published = {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        price: {
+          type: "string",
+          format: "decimal",
+          minimum: 0,
+          maximum: 1000,
+          multipleOf: 0.01,
+        },
+      },
+    };
+
+    expect(metadataToJsonSchema({ schema: published })).toEqual({
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        price: { type: "number", minimum: 0, maximum: 1000, multipleOf: 0.01 },
+      },
+    });
   });
 
   it("reads the DRF metadata otherwise", () => {

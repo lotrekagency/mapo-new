@@ -75,7 +75,7 @@ Two normalizers in `@mapomodule/utils` read what a Django REST Framework backend
 - `drfMetadataToJsonSchema(metadata, options?)` reads the `OPTIONS` response of an endpoint: DRF's standard metadata, `actions.POST`;
 - `openApiToJsonSchema(document, model, options?)` reads a component of an OpenAPI 3 document, such as the one DRF-spectacular serves. `openApiModels(document)` lists the components, each with the endpoint that lists it.
 
-`metadataToJsonSchema(metadata, options?)` reads an `OPTIONS` response either way: the `schema` it publishes, as Camomilla does, otherwise its DRF metadata. It is what `<MapoDetail>` reads with `experimentalFieldsFromSchema` ([Detail page](/uikit/detail#how-to-derive-the-fields-from-the-backend-schema-experimental)).
+`metadataToJsonSchema(metadata, options?)` reads an `OPTIONS` response either way: the `schema` it publishes, as Camomilla does, otherwise its DRF metadata. In a published schema, a decimal sent as a string becomes a number, as in OpenAPI (below). It is what `<MapoDetail>` reads with `experimentalFieldsFromSchema` ([Detail page](/uikit/detail#how-to-derive-the-fields-from-the-backend-schema-experimental)).
 
 ```ts
 import {
@@ -104,7 +104,8 @@ Both return `undefined` when there is nothing to read: DRF publishes `actions.PO
 | `email`                       | `format: email`                                                  | `email`                                                    |
 | `url`                         | `format: uri`                                                    | `url`                                                      |
 | `slug`                        | `type: string` with the slug `pattern`                           | `text`                                                     |
-| `integer`, `float`, `decimal` | `integer` or `number`, with `minimum` / `maximum`                | `number`                                                   |
+| `integer`, `float`            | `integer` or `number`, with `minimum` / `maximum`                | `number`                                                   |
+| `decimal`                     | `number`, with its decimal places and digits (below)             | `number`                                                   |
 | `boolean`                     | `type: boolean`                                                  | `boolean`                                                  |
 | `date`, `datetime`, `time`    | `format: date`, `date-time`, `time`                              | `date`, `datetime`, `time`                                 |
 | `duration`                    | `format: duration`                                               | `text`                                                     |
@@ -117,11 +118,15 @@ Both return `undefined` when there is nothing to read: DRF publishes `actions.PO
 
 `label` becomes `title`, `help_text` `description`, and `read_only` `readOnly`; `required` lists the required fields that are not read-only. `method: "PUT"` reads the update metadata of a detail endpoint instead.
 
+A `decimal` keeps the limits Django checks: `decimal_places` becomes `multipleOf` (`2` → `0.01`), and `max_digits` the bounds of the digits before the point, excluded (`max_digits: 6` with `decimal_places: 2` → `exclusiveMinimum: -10000`, `exclusiveMaximum: 10000`). A bound is added only on a side where `min_value` or `max_value` is not stricter, and those stay. The form's number input reads `minimum` and `maximum` (`attrs.min`, `attrs.max`); `multipleOf` and the exclusive bounds are checked by the backend, and by the AI's sanitizer, not by the input.
+
 ### OpenAPI
 
 - `$ref`s are followed, also through the `allOf: [{ $ref }]` wrapper DRF-spectacular writes around a nullable relation, and the members of an `allOf` composition are merged.
 - A property that points to another object component is a relation: `type: relation` with the endpoint that lists that component, read from the document's `paths`; an array of them is an `m2m`. Without an endpoint it becomes a placeholder.
-- `nullable: true` becomes a type list, a `decimal` sent as a string a number, and a property with no type, such as a JSON field, a placeholder.
+- `nullable: true` becomes a type list, and a property with no type, such as a JSON field, a placeholder.
+- A `decimal` sent as a string (`type: string`, `format: decimal`) becomes a number. The `pattern` DRF-spectacular writes for it gives its decimal places and digits, read as for DRF metadata: `^-?\d{0,4}(?:\.\d{0,2})?$` → `multipleOf: 0.01`, `exclusiveMinimum: -10000`, `exclusiveMaximum: 10000`.
+- OpenAPI 3.0's bound flags become JSON Schema's bounds: `maximum: 10000` with `exclusiveMaximum: true` → `exclusiveMaximum: 10000`, with `maximum` kept for the form.
 - Labels come from `title`, otherwise from the property name: `published_at` → "Published at".
 
 With DRF-spectacular's `COMPONENT_SPLIT_REQUEST`, read the `…Request` component: it describes what a client sends.

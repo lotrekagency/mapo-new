@@ -1,3 +1,4 @@
+import { decimalAsNumber, withExclusiveBounds } from "./decimal.js";
 import { FIELD_KEYWORD, placeholderType } from "./dialect.js";
 import type { JSONSchema } from "./types.js";
 
@@ -206,10 +207,13 @@ const PLAIN_KEYWORDS = [
   "default",
 ] as const;
 
+/** The plain keywords of the source, with OpenAPI 3.0's bound flags as JSON Schema writes them. */
 function plainKeywords(schema: Obj): JSONSchema {
-  return Object.fromEntries(
-    PLAIN_KEYWORDS.filter((keyword) => schema[keyword] !== undefined).map(
-      (keyword) => [keyword, schema[keyword]],
+  return withExclusiveBounds(
+    Object.fromEntries(
+      PLAIN_KEYWORDS.filter((keyword) => schema[keyword] !== undefined).map(
+        (keyword) => [keyword, schema[keyword]],
+      ),
     ),
   );
 }
@@ -269,15 +273,10 @@ function valueSchema(
       : { type: "object" };
   }
 
-  // A decimal DRF-spectacular sends as a string.
-  if (type === "string" && schema.format === "decimal") {
-    const {
-      format: _format,
-      pattern: _pattern,
-      ...rest
-    } = plainKeywords(schema);
-    return { type: "number", ...rest };
-  }
+  // A decimal DRF-spectacular sends as a string: a number, with the decimal
+  // places and digits its pattern writes.
+  if (type === "string" && schema.format === "decimal")
+    return decimalAsNumber({ type, ...plainKeywords(schema) });
 
   if (typeof type === "string") return { type, ...plainKeywords(schema) };
   // No type, as for a JSON field: any value, edited as JSON.

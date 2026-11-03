@@ -418,7 +418,7 @@ Type guards.
 
 ### `metadataToJsonSchema(metadata, options?)`
 
-Reads an endpoint's `OPTIONS` response as JSON Schema: the `schema` it publishes (Camomilla), otherwise its Django REST Framework metadata. `<MapoDetail>` uses it with `experimentalFieldsFromSchema`. See [From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi).
+Reads an endpoint's `OPTIONS` response as JSON Schema: the `schema` it publishes (Camomilla), otherwise its Django REST Framework metadata. In a published schema, a decimal sent as a string (`type: string`, `format: decimal`) becomes a number, with the limits its `pattern` writes. `<MapoDetail>` uses it with `experimentalFieldsFromSchema`. See [From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi).
 
 | Parameter  | Type                 | Description                                  |
 | ---------- | -------------------- | -------------------------------------------- |

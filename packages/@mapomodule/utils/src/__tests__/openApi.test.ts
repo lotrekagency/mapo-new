@@ -72,8 +72,66 @@ describe("openApiToJsonSchema — values", () => {
     });
   });
 
-  it("reads a decimal sent as a string as a number", () => {
-    expect(property("price")).toEqual({ title: "Price", type: "number" });
+  it("reads a decimal sent as a string as a number, its digits as limits", () => {
+    // DRF-spectacular writes max_digits 6 and decimal_places 2 in a pattern.
+    expect(property("price")).toEqual({
+      title: "Price",
+      type: "number",
+      multipleOf: 0.01,
+      exclusiveMinimum: -10000,
+      exclusiveMaximum: 10000,
+    });
+  });
+
+  it("reads a decimal sent as a number with its bounds, as OpenAPI 3.0 flags them", () => {
+    // DRF-spectacular with COERCE_DECIMAL_TO_STRING off: max_whole_digits 4,
+    // then a max_value that replaces the upper bound.
+    const numeric = {
+      components: {
+        schemas: {
+          Ticket: {
+            type: "object",
+            properties: {
+              price: {
+                type: "number",
+                format: "double",
+                maximum: 10000,
+                minimum: -10000,
+                exclusiveMaximum: true,
+                exclusiveMinimum: true,
+              },
+              discount: {
+                type: "number",
+                format: "double",
+                maximum: 50,
+                minimum: -10000,
+                exclusiveMinimum: true,
+              },
+            },
+          },
+        },
+      },
+    };
+    const ticket = openApiToJsonSchema(numeric, "Ticket")!;
+
+    // The inclusive keywords stay too: the form reads only those.
+    expect(ticket.properties!.price).toEqual({
+      title: "Price",
+      type: "number",
+      format: "double",
+      maximum: 10000,
+      minimum: -10000,
+      exclusiveMaximum: 10000,
+      exclusiveMinimum: -10000,
+    });
+    expect(ticket.properties!.discount).toEqual({
+      title: "Discount",
+      type: "number",
+      format: "double",
+      maximum: 50,
+      minimum: -10000,
+      exclusiveMinimum: -10000,
+    });
   });
 
   it("turns nullable into a type list", () => {
