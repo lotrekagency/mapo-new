@@ -169,6 +169,12 @@ describe("sanitizeFillAnswer — values of each kind", () => {
       "<info@teatro.it>",
       "info@teatro.it",
     ],
+    [
+      "a point of a map",
+      "coordinates",
+      "45.4642, 9.1900",
+      { lat: 45.4642, lng: 9.19 },
+    ],
     ["text without control characters", "string", "a\u0000b\u0007c", "abc"],
     ["text keeping its line breaks", "text", "a\u0000\nb", "a\nb"],
   ])("reads %s", (_case, kind, raw, value) => {
@@ -197,6 +203,8 @@ describe("sanitizeFillAnswer — values of each kind", () => {
     ["an email without a top level", "email", "a@b.c"],
     ["an email with an empty label", "email", "info@teatro..it"],
     ["an offset that does not exist", "datetime", "2026-03-12T21:00:00+25:99"],
+    ["a point off the globe", "coordinates", "95.1, 9.19"],
+    ["a point with hemisphere letters", "coordinates", "45.46 N, 9.19 E"],
     ["a number for a text", "string", 12],
     ["an object for a text", "string", { text: "x" }],
   ])("discards %s as a wrong format", (_case, kind, raw) => {

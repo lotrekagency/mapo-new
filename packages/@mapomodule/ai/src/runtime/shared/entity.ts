@@ -8,18 +8,26 @@
  * Safety comes first. A secret, a read-only value, an excluded field or a
  * media field never becomes fillable, wherever the schema says so: beside a
  * union, inside one of its branches, behind a `$ref`, on an object around a
- * dotted key, or in a part of the schema the form's reader cannot read.
+ * dotted key, in a part of the schema the form's reader cannot read, inside
+ * the items of a list, or in any declaration of a nested value.
  */
 import { ATTRS_KEYWORD, FIELD_KEYWORD } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
-import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
+import {
+  TEMPLATE_PROPERTY,
+  useFormFromSchema,
+} from "@mapomodule/form/runtime/composables/useFormFromSchema";
 import { readAiOptions } from "./dialect";
 import type { AiPropertyOptions } from "./dialect";
 import { isRecord } from "./guards";
 
 // ─── The model ───────────────────────────────────────────────────────────────
 
-/** The kind of value the AI writes into a field. */
+/**
+ * The kind of value the AI writes into a field. Two are not a single value:
+ * `coordinates`, a point of a map field (`{ lat, lng }`), and `list`, the
+ * items of a repeater, each with its own fields (`items`).
+ */
 export type AiValueKind =
   | "string"
   | "text"
@@ -34,7 +42,9 @@ export type AiValueKind =
   | "datetime"
   | "time"
   | "choice"
-  | "relation";
+  | "relation"
+  | "coordinates"
+  | "list";
 
 /**
  * Why the AI leaves a field alone:
@@ -46,9 +56,10 @@ export type AiValueKind =
  * - `media`: a file or a media, on either side;
  * - `relation`: a relation whose endpoint is unknown, so no record can be
  *   looked up;
- * - `unsupported`: a nested value (repeater, object, SEO, map), a list without
- *   choices, a value without a JSON type, a `$ref` to nothing, or a property
- *   the form's reader cannot read;
+ * - `unsupported`: a list without choices, a value without a JSON type, a
+ *   `$ref` to nothing, a property the form's reader cannot read, a value of
+ *   unknown shape (`field:` types, an object without properties), or a
+ *   repeater with nothing to fill, or that contains itself;
  * - `conflict`: the form and the backend leave no valid value, because they
  *   share no choice or their limits exclude each other.
  */
@@ -121,8 +132,10 @@ export interface AiField {
   choices?: AiChoice[];
   /** Where a `relation` field looks its records up. */
   endpoint?: string;
-  /** Limits the value must respect. */
+  /** Limits the value must respect; for a `list`, the number of its items. */
   constraints: AiConstraints;
+  /** What each item of a `list` holds. */
+  items?: AiItems;
 }
 
 /** A field the AI never fills, and why. */
@@ -135,6 +148,35 @@ export interface AiSkippedField {
   label?: string;
   /** Why the AI leaves it alone. */
   reason: AiSkipReason;
+}
+
+/**
+ * What each item of a list holds: the same fields in every item or, when
+ * the items vary, the fields of each template, which an item names in
+ * `_template`. Keys are the item's own: `name` is `speakers.0.name` in the
+ * form. The rules that keep the AI out apply inside items too.
+ */
+export interface AiItems {
+  /** The fields of every item; empty when the items follow templates. */
+  fields: AiField[];
+  /** The fields of every item the AI leaves alone. */
+  skipped: AiSkippedField[];
+  /** The templates the items follow, in the form's order. */
+  templates?: AiItemTemplate[];
+}
+
+/** One template of a list's items: the fields of an item that names it. */
+export interface AiItemTemplate {
+  /** The value of `_template` that names it. */
+  key: string;
+  /** Its name for people. */
+  label?: string;
+  /** What an item of this template is for. */
+  description?: string;
+  /** The fields of an item of this template. */
+  fields: AiField[];
+  /** The fields of an item of this template the AI leaves alone. */
+  skipped: AiSkippedField[];
 }
 
 /** Something a developer should look at. */
@@ -159,7 +201,12 @@ export type AiEntityWarning =
    * those it cannot read keep only what keeps the AI out. One malformed
    * definition in `$defs` can make every property unreadable.
    */
-  | { kind: "unreadable-source"; source: "schema" | "fields" };
+  | {
+      kind: "unreadable-source";
+      source: "schema" | "fields";
+      /** The nested value whose declaration it is, `*` for its items: `speakers.*`. */
+      key?: string;
+    };
 
 /** What the AI may fill in a record of an entity, and how. */
 export interface AiEntity {
@@ -186,7 +233,11 @@ export interface AiEntitySources {
 
 /** Options of {@link buildAiEntity}. */
 export interface BuildAiEntityOptions {
-  /** Keys the AI never fills in this entity; `seo` covers `seo.title` too. */
+  /**
+   * Keys the AI never fills in this entity: `seo` covers `seo.title` too,
+   * and `speakers.email` (or `speakers.*.email`) the email of every item of
+   * the `speakers` list.
+   */
   exclude?: readonly string[];
 }
 
@@ -724,20 +775,12 @@ function withEveryDeclaration(
   limitSources: readonly JSONSchema[],
   defs: Record<string, JSONSchema>,
 ): Side {
-  const flags = flagsOf(flagSources, defs);
   const constraints = limitSources.reduce(
     (merged, declaration) =>
       mergeConstraints(merged, constraintsOf(viewOf(declaration, defs))),
     side.constraints,
   );
-  return {
-    ...side,
-    secret: side.secret || flags.secret,
-    readonly: side.readonly || flags.readonly,
-    media: side.media || flags.media,
-    ai: flags.exclude ? { ...side.ai, exclude: true } : side.ai,
-    constraints,
-  };
+  return { ...withFlags(side, flagsOf(flagSources, defs)), constraints };
 }
 
 /** The value may be null: a type list with `null`, or a union with a `null` branch. */
@@ -772,15 +815,34 @@ function readSides(
   source: "schema" | "fields",
   warnings: AiEntityWarning[],
 ): Map<string, Side> {
+  return readSource(root, source, warnings).sides;
+}
+
+/** One source read: its sides, and what describes each key as written. */
+interface SourceRead {
+  sides: Map<string, Side>;
+  /** The first declaration of each key, as written. */
+  declarations: Map<string, JSONSchema>;
+  /** The definitions its `$ref`s point to. */
+  defs: Record<string, JSONSchema>;
+}
+
+/** {@link readSides}, with the declarations a nested value is read from. */
+function readSource(
+  root: JSONSchema | undefined,
+  source: "schema" | "fields",
+  warnings: AiEntityWarning[],
+): SourceRead {
   const sides = new Map<string, Side>();
-  if (!root) return sides;
+  const declared = new Map<string, JSONSchema>();
+  if (!root) return { sides, declarations: declared, defs: {} };
 
   const defs = definitionsOf(root);
+  const read = { sides, declarations: declared, defs };
   // The root's unions are not shapes of the record; its `allOf` parts are.
   const parts = partsOf(root, defs, false);
   // The first declaration of a key describes it; every declaration adds its
   // flags and limits (below). A map, so a key such as `__proto__` stays data.
-  const declared = new Map<string, JSONSchema>();
   for (const part of parts) {
     if (!isRecord(part.properties)) continue;
     for (const [key, declaration] of Object.entries(part.properties)) {
@@ -789,7 +851,7 @@ function readSides(
   }
   const properties: Record<string, JSONSchema> = Object.fromEntries(declared);
   const keys = [...declared.keys()];
-  if (!keys.length) return sides;
+  if (!keys.length) return read;
   const required = keys.filter((key) => isRequiredIn(parts, key));
 
   const sideFor = (key: string, descriptor: Descriptor | undefined): Side => {
@@ -813,7 +875,7 @@ function readSides(
       const key = String(descriptor.key);
       sides.set(key, sideFor(key, descriptor));
     }
-    return sides;
+    return read;
   }
 
   warnOnce(warnings, { kind: "unreadable-source", source });
@@ -827,7 +889,7 @@ function readSides(
     });
     sides.set(key, sideFor(key, single?.[0]));
   }
-  return sides;
+  return read;
 }
 
 // ─── Looking a form key up in the backend ────────────────────────────────────
@@ -835,10 +897,16 @@ function readSides(
 type Lookup = (
   key: string,
   readValue: boolean,
-) => { inherited: KeepOutFlags; value?: Side };
+) => {
+  inherited: KeepOutFlags;
+  value?: Side;
+  /** The declaration that describes the value, as written: a nested value is read from it. */
+  declaration?: JSONSchema;
+};
 
 /**
- * Looks form keys up in the backend's schema. A dotted key, such as
+ * Looks form keys up in a schema: the backend's, or the form's for what
+ * keeps the AI out of a nested value. A dotted key, such as
  * `seo.title`, is followed through the nested objects as far as they go. At
  * every step each declaration of the segment counts: in an object, in the
  * schemas on the way to its value, in its `allOf` parts and in its
@@ -852,8 +920,12 @@ type Lookup = (
  * nothing outside them does. A value is required only when every object on
  * the way requires it outside its alternatives and is not nullable. With
  * `readValue`, the backend's description of the value comes back as well.
+ *
+ * A `*` segment steps into the items of every list on the way, of every
+ * declaration: `speakers.*.pin` is the `pin` of any item, and what the items
+ * themselves say counts too. A value inside items is never required.
  */
-function backendLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
+function schemaLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
   const defs = definitionsOf(root);
   const rootShapes = partsOf(root, defs, true);
   const rootRecord = partsOf(root, defs, false);
@@ -866,6 +938,24 @@ function backendLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
 
     for (const [index, segment] of segments.entries()) {
       const isRoot = index === 0;
+      const isItems = segment === "*" && !isRoot;
+      if (isItems) {
+        const items = containers.flatMap((container) =>
+          partsOf(container, defs, true).flatMap((part) =>
+            isRecord(part.items) ? [part.items] : [],
+          ),
+        );
+        const flags = flagsOf(items, defs);
+        inherited.secret = inherited.secret || flags.secret;
+        inherited.readonly = inherited.readonly || flags.readonly;
+        inherited.exclude = inherited.exclude || flags.exclude;
+        inherited.media = inherited.media || flags.media;
+        if (!items.length) return { inherited };
+        // A list may have no item: nothing in its items is required.
+        isRequired = false;
+        containers = items;
+        continue;
+      }
       const shapes = isRoot
         ? rootShapes
         : containers.flatMap((container) => partsOf(container, defs, true));
@@ -888,7 +978,8 @@ function backendLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
         // outside the alternatives does, but its limits do not count.
         const isFromAlternative = !isRoot && record.length === 0;
         const first = record[0] ?? (isRoot ? undefined : everywhere[0]);
-        if (!readValue || !first) return { inherited };
+        if (!first) return { inherited };
+        if (!readValue) return { inherited, declaration: first };
         // The value alone, under the form's key, read like a top-level one.
         const valueRoot: JSONSchema = {
           type: "object",
@@ -897,11 +988,12 @@ function backendLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
           ...(isRequired ? { required: [key] } : {}),
         };
         const value = readSides(valueRoot, "schema", warnings).get(key);
-        if (!value) return { inherited };
+        if (!value) return { inherited, declaration: first };
         const own = isFromAlternative ? { ...value, constraints: {} } : value;
         return {
           inherited,
           value: withEveryDeclaration(own, everywhere, record, defs),
+          declaration: first,
         };
       }
 
@@ -917,14 +1009,18 @@ function backendLookup(root: JSONSchema, warnings: AiEntityWarning[]): Lookup {
 
 // ─── Value kinds ─────────────────────────────────────────────────────────────
 
-const NESTED_TYPES = new Set(["repeater", "seo", "map"]);
-
+/**
+ * Types whose value is not one value: an object is filled through its own
+ * fields (`objectFields()`), a repeater through its items (`listField()`).
+ * A `field:` type is a value of unknown shape.
+ */
 function isNestedType(type: string): boolean {
-  return (
-    NESTED_TYPES.has(type) ||
-    type.startsWith("object:") ||
-    type.startsWith("field:")
-  );
+  return type === "repeater" || isObjectType(type) || type.startsWith("field:");
+}
+
+/** An object the form shows as one field: the SEO block, or an object read from a schema. */
+function isObjectType(type: string): boolean {
+  return type === "seo" || type.startsWith("object:");
 }
 
 function isRelationType(type: string): boolean {
@@ -972,6 +1068,7 @@ const JSON_TYPES_BY_KIND: Readonly<
   integer: ["integer", "number"],
   number: ["integer", "number"],
   boolean: ["boolean"],
+  coordinates: ["object"],
 };
 
 /** Kinds a backend `enum` can narrow to a choice. */
@@ -996,6 +1093,8 @@ function kindOfType(
   field: Side,
   backend: Side | undefined,
 ): KindOrSkip | undefined {
+  // A point of the map field: written by the source in digits, or not at all.
+  if (type === "map") return { kind: "coordinates", borrowed: false };
   if (isNestedType(type)) return { reason: "unsupported" };
   const isNumber = type === "number" || type === "slider";
   if (isNumber) {
@@ -1222,42 +1321,156 @@ function namesSecret(key: string): boolean {
   return hasSecretWord || hasSecretPair;
 }
 
-function mergeField(
-  field: Side,
-  backend: Side | undefined,
-  inherited: Readonly<KeepOutFlags>,
-  isListedAsExcluded: boolean,
+/** What the schemas around a nested value say about one of its keys, source by source. */
+interface AroundFlags {
+  /** The form's declarations: they decide, like the field's own flags. */
+  form: Readonly<KeepOutFlags>;
+  /** The backend's: a secret, an exclusion or a media keeps the AI out, read-only warns. */
+  backend: Readonly<KeepOutFlags>;
+}
+
+const NO_AROUND: Readonly<AroundFlags> = { form: NO_FLAGS, backend: NO_FLAGS };
+
+/** The objects and lists a nested value sits in. */
+interface Nesting {
+  depth: number;
+  /** The definitions on the way down: one that comes back contains itself. */
+  chain: ReadonlySet<string>;
+  /**
+   * The keys of the values around, templates included (`blocks.hero`); `""`
+   * for the record. A secret's name can start in one: `api` around `key`.
+   */
+  names: string;
+  /** A value around is translatable: one per language, and so is everything inside. */
+  translatable: boolean;
+  /**
+   * What the schemas around this entity say about one of its keys: every
+   * declaration on the way, in `allOf` parts, union branches and conditions.
+   * A nested value is built from one declaration of each source; this keeps
+   * what the others say to keep the AI out.
+   */
+  around?: (key: string) => AroundFlags;
+}
+
+const TOP: Nesting = {
+  depth: 0,
+  chain: new Set(),
+  names: "",
+  translatable: false,
+};
+
+/** Both sets of flags: what either says keeps the AI out. */
+function anyFlags(
+  a: Readonly<KeepOutFlags>,
+  b: Readonly<KeepOutFlags>,
+): KeepOutFlags {
+  return {
+    secret: a.secret || b.secret,
+    readonly: a.readonly || b.readonly,
+    exclude: a.exclude || b.exclude,
+    media: a.media || b.media,
+  };
+}
+
+/** The side with the flags of other declarations of the same source. */
+function withFlags(side: Side, flags: Readonly<KeepOutFlags>): Side {
+  return {
+    ...side,
+    secret: side.secret || flags.secret,
+    readonly: side.readonly || flags.readonly,
+    media: side.media || flags.media,
+    ai: flags.exclude ? { ...side.ai, exclude: true } : side.ai,
+  };
+}
+
+/** A declaration of one source, with the definitions its `$ref`s point to. */
+interface Declared {
+  schema: JSONSchema;
+  defs: Record<string, JSONSchema>;
+}
+
+/** What a nested value is built from: each source's declaration of it. */
+interface NestedSources {
+  /** The form's, when there are fields: they decide what exists. */
+  form?: Declared;
+  /** The backend's. */
+  backend?: Declared;
+}
+
+/** One field of an entity: its two sides, what keeps it out, and where it sits. */
+interface FieldInput {
+  /** The side that decides: the form's, or the backend's without fields. */
+  field: Side;
+  /** The backend's side, when the form decides. */
+  backend: Side | undefined;
+  /** What the backend's declarations and the objects around pass on. */
+  inherited: Readonly<KeepOutFlags>;
+  isListedAsExcluded: boolean;
+  nested: NestedSources;
+  exclusions: readonly string[];
+  nesting: Nesting;
+  /** What every declaration, here and around, says about a path from this entity's root. */
+  flagsAt: (path: string) => AroundFlags;
+}
+
+/**
+ * Why the AI must leave a field alone whatever it holds: a secret, a value
+ * the operator cannot change, an exclusion, a media, or a value Mapo cannot
+ * read. Checked before anything else, for a single value, an object and a
+ * list alike. A key names a secret with the keys around it too: `key` in
+ * an object `api` is `api.key`.
+ */
+function keepOutReason(input: FieldInput): AiSkipReason | undefined {
+  const { field, backend, inherited, nesting } = input;
+  const name = nesting.names ? `${nesting.names}.${field.key}` : field.key;
+  // A secret anywhere stays out: the stricter wins.
+  const isSecret =
+    field.secret ||
+    backend?.secret === true ||
+    inherited.secret ||
+    namesSecret(name);
+  if (isSecret) return "secret";
+  // The form decides what is read-only; the backend only warns.
+  if (field.readonly) return "readonly";
+  const isExcluded =
+    input.isListedAsExcluded ||
+    field.ai.exclude === true ||
+    backend?.ai.exclude === true ||
+    inherited.exclude;
+  if (isExcluded) return "excluded";
+  // The AI never writes a file or a media id, whichever side says so.
+  const isMedia = field.media || backend?.media === true || inherited.media;
+  if (isMedia) return "media";
+  if (field.unreadable) return "unsupported";
+  return undefined;
+}
+
+/** The checks every field takes first: the conflicts to warn about, and what keeps the AI out. */
+function precheck(
+  input: FieldInput,
   warnings: AiEntityWarning[],
-): AiField | AiSkippedField {
+): { skip: (reason: AiSkipReason) => AiSkippedField; keptOut?: AiSkipReason } {
+  const { field, backend, inherited } = input;
   // A backend description Mapo could not read counts only for what keeps
   // the AI out, and for its limits.
   const described = backend?.unreadable ? undefined : backend;
   const label = field.label ?? described?.label;
   const skip = (reason: AiSkipReason): AiSkippedField =>
     compact({ key: field.key, fieldType: field.fieldType, label, reason });
-
   const isBackendReadonly = backend?.readonly === true || inherited.readonly;
   warnAboutConflicts(field, described, isBackendReadonly, warnings);
+  const keptOut = keepOutReason(input);
+  return { skip, ...(keptOut ? { keptOut } : {}) };
+}
 
-  // A secret anywhere stays out: the stricter wins.
-  const isSecret =
-    field.secret ||
-    backend?.secret === true ||
-    inherited.secret ||
-    namesSecret(field.key);
-  if (isSecret) return skip("secret");
-  // The form decides what is read-only; the backend only warns.
-  if (field.readonly) return skip("readonly");
-  const isExcluded =
-    isListedAsExcluded ||
-    field.ai.exclude === true ||
-    backend?.ai.exclude === true ||
-    inherited.exclude;
-  if (isExcluded) return skip("excluded");
-  // The AI never writes a file or a media id, whichever side says so.
-  const isMedia = field.media || backend?.media === true || inherited.media;
-  if (isMedia) return skip("media");
-  if (field.unreadable) return skip("unsupported");
+function mergeField(
+  input: FieldInput,
+  warnings: AiEntityWarning[],
+): AiField | AiSkippedField {
+  const { field, backend } = input;
+  const { skip, keptOut } = precheck(input, warnings);
+  if (keptOut) return skip(keptOut);
+  const described = backend?.unreadable ? undefined : backend;
 
   const kindOrSkip = kindOf(field, described);
   if ("reason" in kindOrSkip) return skip(kindOrSkip.reason);
@@ -1298,15 +1511,375 @@ function mergeField(
     key: field.key,
     fieldType: field.fieldType,
     kind,
-    label,
+    label: field.label ?? described?.label,
     description: field.description ?? described?.description,
     hint: field.ai.hint ?? described?.ai.hint,
     required: field.required || backend?.required === true,
-    translatable: field.translatable,
+    translatable: field.translatable || input.nesting.translatable,
     multiple: field.multiple || isBorrowedList,
     choices,
     endpoint: isRelation ? endpoint : undefined,
     constraints,
+  });
+}
+
+// ─── Nested values ───────────────────────────────────────────────────────────
+// An object is filled through its own fields, under dotted keys (`seo.title`);
+// a repeater through its items, each read as an entity of its own from the
+// items of both sources. Every rule that keeps the AI out applies inside.
+
+/**
+ * Objects and lists inside one another the model follows, at most: more
+ * than a real form has, finite for a schema that contains itself. The
+ * contract keeps of them what the providers accept.
+ */
+const MAX_NESTED_LEVELS = 8;
+
+/** The parts of a point, as the map field saves it. */
+const POINT_PARTS = ["lat", "lng"] as const;
+
+/** The value of a declaration, through its `$ref`s and nullable unions, and the definitions on the way. */
+function resolved(declared: Declared): { declared: Declared; refs: string[] } {
+  const { path, core } = valuePath(declared.schema, declared.defs);
+  const refs = path.flatMap((step) =>
+    typeof step.$ref === "string" ? [defName(step.$ref)] : [],
+  );
+  return { declared: { schema: core, defs: declared.defs }, refs };
+}
+
+/** A declaration as a root of its own, its definitions carried along. */
+function asRoot(declared: Declared): JSONSchema {
+  return {
+    ...declared.schema,
+    $defs: { ...declared.defs, ...definitionsOf(declared.schema) },
+  };
+}
+
+/** The items of a list's declaration, resolved; `undefined` when it has none. */
+function itemsOf(
+  declared: Declared | undefined,
+): { declared: Declared; refs: string[] } | undefined {
+  if (!declared) return undefined;
+  const list = resolved(declared);
+  const items = list.declared.schema.items;
+  if (!isRecord(items)) return undefined;
+  const item = resolved({ schema: items, defs: declared.defs });
+  return { declared: item.declared, refs: [...list.refs, ...item.refs] };
+}
+
+/** The object a declaration holds, resolved, when it has properties of its own or in its `allOf`. */
+function objectOf(
+  declared: Declared | undefined,
+): { declared: Declared; refs: string[] } | undefined {
+  if (!declared) return undefined;
+  const object = resolved(declared);
+  const { schema, defs } = object.declared;
+  const hasProperties = partsOf(schema, defs, false).some(
+    (part) =>
+      isRecord(part.properties) && Object.keys(part.properties).length > 0,
+  );
+  return hasProperties ? object : undefined;
+}
+
+/** Items written as one of several templates, told apart by `_template`. */
+function isTemplateItems(items: JSONSchema): boolean {
+  return (
+    Array.isArray(items.oneOf) &&
+    items.discriminator?.propertyName === TEMPLATE_PROPERTY
+  );
+}
+
+/** One template of a list's items: its key, its name, its fields without `_template`. */
+interface TemplateBranch {
+  key: string;
+  label?: string;
+  description?: string;
+  declared: Declared;
+}
+
+/**
+ * The templates of a list's items, one per key: of two branches with the
+ * same key the last, in the place of the first, as the form's reader keeps
+ * them. What the other says to keep the AI out still counts, through the
+ * lookup of every declaration.
+ */
+function templateBranches(items: Declared): TemplateBranch[] {
+  const branches = Array.isArray(items.schema.oneOf) ? items.schema.oneOf : [];
+  const byKey = new Map<string, TemplateBranch>();
+  for (const branch of branches) {
+    if (!isRecord(branch)) continue;
+    const { schema } = resolved({ schema: branch, defs: items.defs }).declared;
+    const { properties: written, required: wanted, ...rest } = schema;
+    const properties = isRecord(written) ? written : {};
+    const marker = properties[TEMPLATE_PROPERTY];
+    const key = isRecord(marker) ? marker.const : undefined;
+    // A branch without the `const` of its key cannot be chosen.
+    if (typeof key !== "string") continue;
+    const { [TEMPLATE_PROPERTY]: _marker, ...fields } = properties;
+    const required = Array.isArray(wanted)
+      ? wanted.filter((name) => name !== TEMPLATE_PROPERTY)
+      : [];
+    const text = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value : undefined;
+    byKey.set(
+      key,
+      compact({
+        key,
+        label: text(schema.title),
+        description: text(schema.description),
+        declared: {
+          schema: {
+            ...rest,
+            properties: fields,
+            ...(required.length ? { required } : {}),
+          },
+          defs: items.defs,
+        },
+      }),
+    );
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * An exclusion as the entity reads it: one that ends in `*`, any item,
+ * keeps out the list itself (`speakers.*` is `speakers`).
+ */
+function wholeExclusion(excluded: string): string {
+  return excluded.replace(/(?:\.\*)+$/, "");
+}
+
+/** The keys of an `exclude` list below `key`, as the nested value sees them: `speakers.email` and `speakers.*.email` give `email`. */
+function exclusionsBelow(exclusions: readonly string[], key: string): string[] {
+  const start = `${key}.`;
+  return exclusions.flatMap((excluded) => {
+    if (!excluded.startsWith(start)) return [];
+    const rest = excluded.slice(start.length);
+    const below = rest.startsWith("*.") ? rest.slice(2) : rest;
+    return below ? [below] : [];
+  });
+}
+
+/** A warning about a nested key, under the key of the value that holds it; a source it could not read, at that value. */
+function under(warning: AiEntityWarning, prefix: string): AiEntityWarning {
+  if (warning.kind !== "unreadable-source")
+    return { ...warning, key: `${prefix}.${warning.key}` };
+  return {
+    ...warning,
+    key: warning.key ? `${prefix}.${warning.key}` : prefix,
+  };
+}
+
+/** The nesting of what a value holds: one level down, with its definitions, its name and what it passes on. */
+function innerNesting(
+  input: FieldInput,
+  refs: readonly string[],
+  names: string,
+  around: (key: string) => AroundFlags,
+): Nesting {
+  const { nesting, field } = input;
+  return {
+    depth: nesting.depth + 1,
+    chain: new Set([...nesting.chain, ...refs]),
+    names: nesting.names ? `${nesting.names}.${names}` : names,
+    translatable: nesting.translatable || field.translatable,
+    around,
+  };
+}
+
+/**
+ * An object the form shows as one field (the SEO block, an object read from
+ * a schema), as its own fields under dotted keys: `seo` gives `seo.title`,
+ * `seo.description` and `seo.permalink`. The form's object decides them when
+ * it lists properties; an object type of the app's lists none, and then the
+ * backend's does. An optional object makes its fields optional.
+ */
+function objectFields(
+  input: FieldInput,
+  warnings: AiEntityWarning[],
+): { fields: AiField[]; skipped: AiSkippedField[] } {
+  const { field, backend, nested, nesting } = input;
+  const { skip, keptOut } = precheck(input, warnings);
+  const none = (reason: AiSkipReason) => ({
+    fields: [],
+    skipped: [skip(reason)],
+  });
+  if (keptOut) return none(keptOut);
+
+  const fromForm = objectOf(nested.form);
+  const deciding = fromForm ?? objectOf(nested.backend);
+  if (!deciding) return none("unsupported");
+  const isCycle = deciding.refs.some((name) => nesting.chain.has(name));
+  if (isCycle || nesting.depth >= MAX_NESTED_LEVELS) return none("unsupported");
+  const inner = innerNesting(input, deciding.refs, field.key, (child) =>
+    input.flagsAt(`${field.key}.${child}`),
+  );
+  const counterpart = nested.backend
+    ? resolved(nested.backend).declared
+    : undefined;
+  const sources: AiEntitySources = fromForm
+    ? {
+        fields: asRoot(fromForm.declared),
+        ...(counterpart ? { schema: asRoot(counterpart) } : {}),
+      }
+    : { schema: asRoot(deciding.declared) };
+  const entity = buildEntity(
+    sources,
+    { exclude: exclusionsBelow(input.exclusions, field.key) },
+    inner,
+  );
+  for (const warning of entity.warnings)
+    warnOnce(warnings, under(warning, field.key));
+
+  const isRequired = field.required || backend?.required === true;
+  const fields = entity.fields.map((child) => ({
+    ...child,
+    key: `${field.key}.${child.key}`,
+    required: child.required && isRequired,
+  }));
+  const skipped = entity.skipped.map((child) => ({
+    ...child,
+    key: `${field.key}.${child.key}`,
+  }));
+  const isEmpty = !fields.length && !skipped.length;
+  return isEmpty ? none("unsupported") : { fields, skipped };
+}
+
+/** The fields of a list's items, from the items of both sources: the same fields, or one set per template. */
+function itemsModel(
+  key: string,
+  deciding: Declared,
+  other: Declared | undefined,
+  formDecides: boolean,
+  exclude: string[],
+  nesting: Nesting,
+  warnings: AiEntityWarning[],
+): AiItems {
+  const entityOf = (
+    own: Declared,
+    counterpart: Declared | undefined,
+    at: Nesting,
+  ) => {
+    const sources: AiEntitySources = formDecides
+      ? {
+          fields: asRoot(own),
+          ...(counterpart ? { schema: asRoot(counterpart) } : {}),
+        }
+      : { schema: asRoot(own) };
+    const entity = buildEntity(sources, { exclude }, at);
+    for (const warning of entity.warnings)
+      warnOnce(warnings, under(warning, `${key}.*`));
+    return entity;
+  };
+  if (!isTemplateItems(deciding.schema)) {
+    const entity = entityOf(deciding, other, nesting);
+    return { fields: entity.fields, skipped: entity.skipped };
+  }
+  // The other side's template of the same key, or else all its items: what
+  // keeps the AI out counts wherever it is written.
+  const counterparts =
+    other && isTemplateItems(other.schema)
+      ? new Map(
+          templateBranches(other).map((branch) => [
+            branch.key,
+            branch.declared,
+          ]),
+        )
+      : undefined;
+  const templates = templateBranches(deciding).map((branch): AiItemTemplate => {
+    const counterpart = counterparts?.get(branch.key) ?? other;
+    // A template's key is part of its fields' names: `api` and `key`.
+    const names = `${nesting.names}.${branch.key}`;
+    const entity = entityOf(branch.declared, counterpart, {
+      ...nesting,
+      names,
+    });
+    return compact({
+      key: branch.key,
+      label: branch.label,
+      description: branch.description,
+      fields: entity.fields,
+      skipped: entity.skipped,
+    });
+  });
+  return { fields: [], skipped: [], templates };
+}
+
+/** The reason every field of the items is left alone for, when they share one: a list of media alone is `media`. */
+function sharedReason(items: AiItems): AiSkipReason | undefined {
+  const skipped = [
+    ...items.skipped,
+    ...(items.templates ?? []).flatMap((template) => template.skipped),
+  ];
+  const [first] = skipped;
+  const isShared =
+    !!first && skipped.every((one) => one.reason === first.reason);
+  return isShared ? first.reason : undefined;
+}
+
+/**
+ * A repeater, as a list of items: each item is read as an entity of its own
+ * from the items of both sources (the form's decide which fields exist), or
+ * per template when the items vary. A list with nothing to fill in its
+ * items, or that contains itself, stays out.
+ */
+function listField(
+  input: FieldInput,
+  warnings: AiEntityWarning[],
+): AiField | AiSkippedField {
+  const { field, backend, nested, nesting } = input;
+  const { skip, keptOut } = precheck(input, warnings);
+  if (keptOut) return skip(keptOut);
+
+  const formDecides = nested.form !== undefined;
+  const deciding = itemsOf(nested.form ?? nested.backend);
+  if (!deciding) return skip("unsupported");
+  const isCycle = deciding.refs.some((name) => nesting.chain.has(name));
+  if (isCycle || nesting.depth >= MAX_NESTED_LEVELS) return skip("unsupported");
+  const inner = innerNesting(input, deciding.refs, field.key, (child) =>
+    input.flagsAt(`${field.key}.*.${child}`),
+  );
+  const other = formDecides ? itemsOf(nested.backend) : undefined;
+  const items = itemsModel(
+    field.key,
+    deciding.declared,
+    other?.declared,
+    formDecides,
+    exclusionsBelow(input.exclusions, field.key),
+    inner,
+    warnings,
+  );
+  const hasItemFields = items.fields.length > 0;
+  const hasTemplateFields = (items.templates ?? []).some(
+    (template) => template.fields.length > 0,
+  );
+  if (!hasItemFields && !hasTemplateFields)
+    return skip(sharedReason(items) ?? "unsupported");
+
+  // The limits of a list are the number of its items.
+  const limits = mergeConstraints(field.constraints, backend?.constraints);
+  const constraints = compact({
+    minItems: limits.minItems,
+    maxItems: limits.maxItems,
+  });
+  if (hasImpossibleLimits(constraints)) {
+    warnings.push({ kind: "limits-conflict", key: field.key });
+    return skip("conflict");
+  }
+  const described = backend?.unreadable ? undefined : backend;
+  return compact({
+    key: field.key,
+    fieldType: field.fieldType,
+    kind: "list",
+    label: field.label ?? described?.label,
+    description: field.description ?? described?.description,
+    hint: field.ai.hint ?? described?.ai.hint,
+    required: field.required || backend?.required === true,
+    // A translatable list is one per language, its items' values too.
+    translatable: inner.translatable,
+    multiple: false,
+    constraints,
+    items,
   });
 }
 
@@ -1321,6 +1894,12 @@ function mergeField(
  *   accepts…), and a disagreement becomes a warning. A dotted form key is
  *   looked up inside the backend's nested objects, and every object on the
  *   way passes on what keeps the AI out.
+ *
+ * Nested values are filled too. An object the form shows as one field (the
+ * SEO block, an object read from a schema) becomes its own fields under
+ * dotted keys (`seo.title`). A repeater becomes a `list` field whose `items`
+ * are read as entities of their own, from the items of both sources, per
+ * template when the items vary. The map field becomes `coordinates`.
  *
  * Fail-soft: when the form's reader cannot read a source, its properties are
  * read one by one, and those it cannot read keep only what keeps the AI out.
@@ -1340,48 +1919,132 @@ export function buildAiEntity(
   sources: AiEntitySources,
   options: BuildAiEntityOptions = {},
 ): AiEntity {
+  return buildEntity(sources, options, TOP);
+}
+
+/** {@link buildAiEntity}, at some depth inside objects and lists. */
+function buildEntity(
+  sources: AiEntitySources,
+  options: BuildAiEntityOptions,
+  nesting: Nesting,
+): AiEntity {
   const warnings: AiEntityWarning[] = [];
   const hasFields = sources.fields !== undefined;
-  const fromFields = readSides(sources.fields, "fields", warnings);
-  const fromSchema = readSides(sources.schema, "schema", warnings);
+  const fromFields = readSource(sources.fields, "fields", warnings);
+  const fromSchema = readSource(sources.schema, "schema", warnings);
   const decides = hasFields ? fromFields : fromSchema;
-  const exclusions = options.exclude ?? [];
+  const exclusions = (options.exclude ?? []).map(wholeExclusion);
+  const isExcludedKey = (key: string) =>
+    exclusions.some(
+      (excluded) => key === excluded || key.startsWith(`${excluded}.`),
+    );
 
   const lookup = sources.schema
-    ? backendLookup(sources.schema, warnings)
+    ? schemaLookup(sources.schema, warnings)
     : undefined;
+  // The form's other declarations of a nested value: only what keeps the
+  // AI out is read from them.
+  const formLookup = sources.fields
+    ? schemaLookup(sources.fields, warnings)
+    : undefined;
+  /** What this entity's schemas and those around it say about a path, source by source. */
+  const flagsAt = (path: string): AroundFlags => {
+    const around = nesting.around?.(path) ?? NO_AROUND;
+    const fromForm = formLookup ? formLookup(path, false).inherited : NO_FLAGS;
+    const fromBackend = lookup ? lookup(path, false).inherited : NO_FLAGS;
+    return {
+      form: anyFlags(fromForm, around.form),
+      backend: anyFlags(fromBackend, around.backend),
+    };
+  };
 
-  /** The backend's description of a form key, and what all its declarations and the objects around it pass on. */
+  /** The backend's description of a form key, its declaration, and what all its declarations and the objects around it pass on. */
   const backendOf = (
     key: string,
-  ): { backend?: Side; inherited: Readonly<KeepOutFlags> } => {
-    if (!lookup) return { inherited: NO_FLAGS };
-    const exact = hasFields ? fromSchema.get(key) : undefined;
+    around: Readonly<KeepOutFlags>,
+  ): {
+    backend?: Side;
+    inherited: Readonly<KeepOutFlags>;
+    declaration?: JSONSchema;
+  } => {
+    if (!lookup) return { inherited: around };
+    const exact = hasFields ? fromSchema.sides.get(key) : undefined;
     const found = lookup(key, hasFields && !exact);
     const backend = hasFields ? (exact ?? found.value) : undefined;
-    return { backend, inherited: found.inherited };
+    const declaration = found.declaration ?? fromSchema.declarations.get(key);
+    return {
+      backend,
+      inherited: anyFlags(found.inherited, around),
+      declaration,
+    };
   };
 
   const fields: AiField[] = [];
   const skipped: AiSkippedField[] = [];
-  for (const field of decides.values()) {
-    const isListedAsExcluded = exclusions.some(
-      (excluded) =>
-        field.key === excluded || field.key.startsWith(`${excluded}.`),
-    );
-    const { backend, inherited } = backendOf(field.key);
-    // Without fields the backend is the form: any declaration that says
-    // read-only decides.
+  // A key the form declares on its own wins over the same key of an object.
+  const ownKeys = new Set(decides.sides.keys());
+  for (const field of decides.sides.values()) {
+    const around = nesting.around?.(field.key) ?? NO_AROUND;
+    const found = backendOf(field.key, around.backend);
+    const { backend, declaration } = found;
+    // A point is one value: what keeps out one of its parts keeps it out.
+    const isPoint = field.fieldType === "map" || backend?.fieldType === "map";
+    const parts = isPoint
+      ? POINT_PARTS.map((part) => flagsAt(`${field.key}.${part}`))
+      : [];
+    const formFlags = parts.reduce((all, part) => anyFlags(all, part.form), {
+      ...around.form,
+    });
+    const inherited = parts.reduce((all, part) => anyFlags(all, part.backend), {
+      ...found.inherited,
+    });
+    const isPartExcluded =
+      isPoint && exclusionsBelow(exclusions, field.key).length > 0;
+    const isListedAsExcluded = isExcludedKey(field.key) || isPartExcluded;
+    // The form's other declarations count as its own. Without fields the
+    // backend is the form: any declaration that says read-only decides.
+    const own = withFlags(field, formFlags);
     const primary = hasFields
-      ? field
-      : { ...field, readonly: field.readonly || inherited.readonly };
-    const merged = mergeField(
-      primary,
+      ? own
+      : { ...own, readonly: own.readonly || inherited.readonly };
+    const declared = decides.declarations.get(field.key);
+    const nested: NestedSources = hasFields
+      ? {
+          ...(declared
+            ? { form: { schema: declared, defs: fromFields.defs } }
+            : {}),
+          ...(declaration
+            ? { backend: { schema: declaration, defs: fromSchema.defs } }
+            : {}),
+        }
+      : declared
+        ? { backend: { schema: declared, defs: fromSchema.defs } }
+        : {};
+    const input: FieldInput = {
+      field: primary,
       backend,
       inherited,
       isListedAsExcluded,
-      warnings,
-    );
+      nested,
+      exclusions,
+      nesting,
+      flagsAt,
+    };
+
+    if (isObjectType(primary.fieldType)) {
+      const object = objectFields(input, warnings);
+      // The object's own entry stays; a field of it the form also declares
+      // on its own goes.
+      const isKept = (one: { key: string }) =>
+        one.key === primary.key || !ownKeys.has(one.key);
+      fields.push(...object.fields.filter(isKept));
+      skipped.push(...object.skipped.filter(isKept));
+      continue;
+    }
+    const merged =
+      primary.fieldType === "repeater"
+        ? listField(input, warnings)
+        : mergeField(input, warnings);
     if ("reason" in merged) skipped.push(merged);
     else fields.push(merged);
   }

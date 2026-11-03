@@ -12,25 +12,31 @@
  * and holds it: the whole text, the number or the label appears in the
  * quote; a date writes its day and year, a time its hours and minutes, a
  * date and time both and its time zone; an address and rich text their
- * links. Yes/no and links to an item need a found quote of two words or
- * more. The rules of what a quote must hold can be changed
- * (`AiVerificationRules`), never so far that a value is verified without a
- * quote found in the source. Without the source's text nothing is verified.
+ * links; a point of a map its two coordinates in a row, told apart by their
+ * hemispheres or their order. Yes/no and links to an item need a found
+ * quote of two words or more. A list's items quote for themselves: a list
+ * is verified only when every item is. The rules of what a quote must hold
+ * can be changed (`AiVerificationRules`), never so far that a value is
+ * verified without a quote found in the source. Without the source's text
+ * nothing is verified.
  */
 import type { AiChoice } from "./entity";
 import { isMultipleOf } from "./numbers";
 import type {
   AiContractEntity,
   AiContractField,
+  AiContractItems,
   AiExtractContract,
   AiFillContract,
 } from "./contract";
+import { AI_TEMPLATE_PROPERTY, quotableFields } from "./contract";
 import {
   holds,
   isCalendarDate,
   isOneWord,
   isQuoted,
   numbersIn,
+  pointsIn,
   searchableSource,
   writesDate,
   writesDateTime,
@@ -58,11 +64,26 @@ export type AiRelationRef =
   | { search: string; item?: string }
   | { item: string };
 
-/** One value of a field, typed for the form. */
-export type AiSingleValue = AiScalar | AiRelationRef;
+/** A point of a map field, as the form saves it. */
+export interface AiCoordinates {
+  lat: number;
+  lng: number;
+}
 
-/** A field's value: a list for a multiple field. */
-export type AiValue = AiSingleValue | AiSingleValue[];
+/** One value of a field, typed for the form. */
+export type AiSingleValue = AiScalar | AiRelationRef | AiCoordinates;
+
+/**
+ * One item of a list, as the form saves it: each value under its key, a
+ * dotted key as nested objects (`seo.title` → `{ seo: { title } }`), and
+ * `_template` when the items vary.
+ */
+export interface AiItemValue {
+  [key: string]: AiValue | AiItemValue;
+}
+
+/** A field's value: a list for a multiple field, the items for a `list`. */
+export type AiValue = AiSingleValue | AiSingleValue[] | AiItemValue[];
 
 /**
  * Why a value was not kept:
@@ -105,6 +126,21 @@ export interface AiDroppedValue {
   reason: AiDiscardReason;
 }
 
+/** What became of one item of a `list`. */
+export interface AiItemOutcome {
+  /** The template the item follows, when the items vary. */
+  template?: string;
+  /** Each field of the item, by its key in the item. */
+  fields: AiFieldOutcomes;
+  /**
+   * Every value the item gives is verified and none was discarded, it has
+   * every value its fields require, and it repeats no item before it. An
+   * item that follows a template is never verified: no quote can prove
+   * which kind of block it is.
+   */
+  verified: boolean;
+}
+
 /** What became of the answer for one field. */
 export type AiFieldOutcome =
   | { status: "empty" }
@@ -114,15 +150,18 @@ export type AiFieldOutcome =
       value: AiValue;
       /**
        * A quote found in the source holds every value, nothing was taken out
-       * of a list and the list is long enough. Magic Fill applies a verified
-       * value without a preview, so anything less needs the operator.
+       * of a list and the list is long enough; for a `list`, every item is
+       * verified. Magic Fill applies a verified value without a preview, so
+       * anything less needs the operator.
        */
       verified: boolean;
-      /** The quotes the answer gives for the field, found or not. */
+      /** The quotes the answer gives for the field, found or not; a list's are in its items. */
       quotes: AiQuote[];
-      /** Values of a list taken out: the rest needs review. */
+      /** For a `list`: each item, with the outcome of each of its fields. */
+      items?: AiItemOutcome[];
+      /** Values or items of a list taken out: the rest needs review. */
       dropped?: AiDroppedValue[];
-      /** Fewer values than the list needs: kept, for review. */
+      /** Fewer values or items than the list needs: kept, for review. */
       tooFew?: boolean;
     }
   | {
@@ -284,6 +323,7 @@ export interface SanitizeOptions {
 type Probe =
   | { kind: "found" }
   | { kind: "text"; texts: string[] }
+  | { kind: "coordinates"; lat: number; lng: number }
   | { kind: "link"; target: string }
   | { kind: "rich"; text: string; links: string[] }
   | { kind: "number"; value: number }
@@ -542,6 +582,11 @@ function convert(field: AiContractField, raw: string): Element {
     }
     case "relation":
       return relationRef(field, clean);
+    case "coordinates":
+      return coordinatesOf(text);
+    case "list":
+      // A list is an array of items, read by `listOutcome()`.
+      return error("format");
     default: {
       // A kind this version does not know, from a newer contract.
       const unknown: never = field.kind;
@@ -549,6 +594,25 @@ function convert(field: AiContractField, raw: string): Element {
       return error("format");
     }
   }
+}
+
+const COORDINATES =
+  /^([+-]?\d{1,3}(?:\.\d+)?)\s*(?:,\s*|\s+)([+-]?\d{1,3}(?:\.\d+)?)$/;
+
+/** A point as `latitude, longitude`, in decimal degrees with a dot, on the globe. */
+function coordinatesOf(text: string): Element {
+  const [, latText, lngText] = COORDINATES.exec(singleLine(text)) ?? [];
+  if (!latText || !lngText) return error("format");
+  const lat = Number(latText);
+  const lng = Number(lngText);
+  const isLatitude = Math.abs(lat) <= 90;
+  const isLongitude = Math.abs(lng) <= 180;
+  if (!isLatitude || !isLongitude) return error("format");
+  return {
+    kind: "value",
+    value: { lat, lng },
+    probe: { kind: "coordinates", lat, lng },
+  };
 }
 
 /** A relation answered by id (from the listed records) or by name. */
@@ -722,6 +786,13 @@ function holdsProbe(
       return numbersIn(quote).some((number) =>
         isSameNumber(number, probe.value),
       );
+    case "coordinates":
+      // The pair the quote writes, in its order and with its hemispheres.
+      return pointsIn(quote).some(
+        (point) =>
+          isSameNumber(point.lat, probe.lat) &&
+          isSameNumber(point.lng, probe.lng),
+      );
     case "date":
       return (
         !isOneWordQuote &&
@@ -765,6 +836,8 @@ function field(
   targets: LinkTargets | undefined,
   reading: Reading,
 ): AiFieldOutcome {
+  if (asked.kind === "list")
+    return listOutcome(asked, raw, path, targets, reading);
   const found = quotes.filter((quote) => quote.found);
   const isHeld = (probe: Probe) =>
     found.some((quote) => holdsProbe(probe, quote.quote, reading.rules));
@@ -815,6 +888,230 @@ function field(
   };
 }
 
+// ─── Lists ───────────────────────────────────────────────────────────────────
+
+type ItemRead =
+  | { kind: "empty" }
+  | { kind: "error"; reason: AiDiscardReason }
+  | { kind: "item"; outcome: AiItemOutcome; value: AiItemValue };
+
+/**
+ * A list, item by item: each item is read against its fields (its
+ * template's, when the items vary) with its own quotes. An item without a
+ * value is no item and is skipped; one that is not an object, names no
+ * template of the list or has every value discarded is taken out. An item
+ * that repeats one before it rests on the same quotes, so it is not
+ * verified. The list is verified only when every item is, none was taken
+ * out and it is long enough.
+ */
+function listOutcome(
+  asked: AiContractField,
+  raw: unknown,
+  path: string,
+  targets: LinkTargets | undefined,
+  reading: Reading,
+): AiFieldOutcome {
+  const discard = (reason: AiDiscardReason): AiFieldOutcome => ({
+    status: "discarded",
+    reason,
+    proposed: raw,
+    quotes: [],
+  });
+  const items = asked.items;
+  if (!items || !Array.isArray(raw)) return discard("format");
+
+  const outcomes: AiItemOutcome[] = [];
+  const values: AiItemValue[] = [];
+  const dropped: AiDroppedValue[] = [];
+  const seen = new Set<string>();
+  raw.forEach((proposed: unknown, index) => {
+    const read = readItem(
+      items,
+      proposed,
+      `${path}[${index}]`,
+      targets,
+      reading,
+    );
+    if (read.kind === "error") dropped.push({ proposed, reason: read.reason });
+    if (read.kind !== "item") return;
+    const written = JSON.stringify(read.value);
+    const isRepeated = seen.has(written);
+    seen.add(written);
+    outcomes.push(
+      isRepeated ? { ...read.outcome, verified: false } : read.outcome,
+    );
+    values.push(read.value);
+  });
+  const [firstDropped] = dropped;
+  if (!outcomes.length && firstDropped) return discard(firstDropped.reason);
+  if (!outcomes.length) return { status: "empty" };
+  const { minItems, maxItems } = asked.constraints;
+  if (maxItems !== undefined && outcomes.length > maxItems)
+    return discard("too-many-values");
+  const tooFew = minItems !== undefined && outcomes.length < minItems;
+  const isEveryItemVerified = outcomes.every((item) => item.verified);
+  return {
+    status: "filled",
+    value: values,
+    verified: isEveryItemVerified && !dropped.length && !tooFew,
+    quotes: [],
+    items: outcomes,
+    ...(dropped.length ? { dropped } : {}),
+    ...(tooFew ? { tooFew } : {}),
+  };
+}
+
+/**
+ * One item: verified when every value it gives is, it has every value its
+ * fields require, and it follows no template, since no quote can prove
+ * which kind of block it is.
+ */
+function readItem(
+  items: AiContractItems,
+  raw: unknown,
+  path: string,
+  targets: LinkTargets | undefined,
+  reading: Reading,
+): ItemRead {
+  if (!isRecord(raw)) return { kind: "error", reason: "format" };
+  const known = [
+    ...(items.templates ? [AI_TEMPLATE_PROPERTY] : []),
+    ...items.fields.map((asked) => asked.wire),
+    ...(items.evidence ? ["evidence"] : []),
+  ];
+  unknownProperties(raw, known, path, reading);
+
+  let fields = items.fields;
+  let template: string | undefined;
+  if (items.templates) {
+    const named = raw[AI_TEMPLATE_PROPERTY];
+    const key = typeof named === "string" ? named.trim() : "";
+    const chosen = items.templates.find((one) => one.key === key);
+    if (!chosen) return { kind: "error", reason: "not-listed" };
+    template = chosen.key;
+    const wires = new Set(chosen.wires);
+    fields = items.fields.filter((asked) => wires.has(asked.wire));
+  }
+
+  const quotes = items.evidence
+    ? quotesOf(quotableFields(fields), raw.evidence, path, reading)
+    : new Map<string, AiQuote[]>();
+  const outcomes = outcomesOf(fields, raw, quotes, path, targets, reading);
+  const given = Object.values(outcomes).filter(
+    (outcome) => outcome.status !== "empty",
+  );
+  // A model pads lists: an item without a value is no item.
+  if (!given.length) return { kind: "empty" };
+  const hasFilled = given.some((outcome) => outcome.status === "filled");
+  const firstDiscarded = given.find(
+    (outcome) => outcome.status === "discarded",
+  );
+  // Nothing of the item is left: it is taken out, with the first reason.
+  if (!hasFilled && firstDiscarded?.status === "discarded")
+    return { kind: "error", reason: firstDiscarded.reason };
+  const isEveryValueVerified = given.every(
+    (outcome) => outcome.status === "filled" && outcome.verified,
+  );
+  const isComplete = fields.every(
+    (asked) => !asked.required || outcomes[asked.key]?.status === "filled",
+  );
+  return {
+    kind: "item",
+    outcome: {
+      ...(template ? { template } : {}),
+      fields: outcomes,
+      verified: isEveryValueVerified && isComplete && !template,
+    },
+    value: itemValue(outcomes, template),
+  };
+}
+
+/** An item as the form saves it: each filled value under its key, a dotted key as nested objects. */
+function itemValue(
+  outcomes: AiFieldOutcomes,
+  template: string | undefined,
+): AiItemValue {
+  const item: AiItemValue = {};
+  if (template) defineOwn(item, AI_TEMPLATE_PROPERTY, template);
+  for (const [key, outcome] of Object.entries(outcomes)) {
+    if (outcome.status === "filled") setAt(item, key.split("."), outcome.value);
+  }
+  return item;
+}
+
+/**
+ * A property of the object's own, whatever its name: assigning `__proto__`
+ * would change the object's prototype, or `Object.prototype` itself one
+ * level down, instead of holding the value.
+ */
+function defineOwn(target: object, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+}
+
+function setAt(
+  target: AiItemValue,
+  segments: readonly string[],
+  value: AiValue,
+): void {
+  const [head, ...rest] = segments;
+  if (head === undefined) return;
+  if (!rest.length) {
+    defineOwn(target, head, value);
+    return;
+  }
+  const existing = Object.hasOwn(target, head) ? target[head] : undefined;
+  const next: AiItemValue = isNestedObject(existing) ? existing : {};
+  defineOwn(target, head, next);
+  setAt(next, rest, value);
+}
+
+/**
+ * An object `setAt()` built for a dotted key. Keys of one item never make a
+ * value and a path of the same name, so an object there is one of these.
+ */
+function isNestedObject(
+  value: AiValue | AiItemValue | undefined,
+): value is AiItemValue {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Every outcome of a result by the path of its value in the form, as the
+ * form's annotations are keyed: a field inside a list's items under
+ * `<list>.<index>.<key>` (`speakers.0.name`), at any depth, after the
+ * outcome of the list itself. Indexes are those of the list's value, the
+ * items left out and taken out aside.
+ *
+ * A value inside a list is applied with its list: only the list's own
+ * `verified` lets it skip the preview, even when the outcome of a value
+ * inside it is verified.
+ *
+ * @param fields The `fields` of a fill result, or of an extracted item.
+ */
+export function outcomesByPath(
+  fields: AiFieldOutcomes,
+): Record<string, AiFieldOutcome> {
+  // A map, so a key such as `__proto__` stays data.
+  const byPath = new Map<string, AiFieldOutcome>();
+  const visit = (outcomes: AiFieldOutcomes, prefix: string): void => {
+    for (const [key, outcome] of Object.entries(outcomes)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      byPath.set(path, outcome);
+      if (outcome.status !== "filled" || !outcome.items) continue;
+      outcome.items.forEach((item, index) =>
+        visit(item.fields, `${path}.${index}`),
+      );
+    }
+  };
+  visit(fields, "");
+  return Object.fromEntries(byPath);
+}
+
 function unknownProperties(
   record: Record<string, unknown>,
   known: readonly string[],
@@ -829,9 +1126,9 @@ function unknownProperties(
       });
 }
 
-/** The quotes of an entity's answer, by property name. */
+/** The quotes of an entity's or an item's answer for `fields`, by property name. */
 function quotesOf(
-  entity: AiContractEntity,
+  fields: readonly AiContractField[],
   evidence: unknown,
   path: string,
   reading: Reading,
@@ -844,7 +1141,7 @@ function quotesOf(
     });
     return byWire;
   }
-  const wires = new Set(entity.fields.map((asked) => asked.wire));
+  const wires = new Set(fields.map((asked) => asked.wire));
   evidence.forEach((entry: unknown, index) => {
     const at = `${path}.evidence[${index}]`;
     const name = isRecord(entry) ? entry.field : undefined;
@@ -890,13 +1187,36 @@ function entityFields(
   // Quotes count only when the contract asks for them.
   const quotes =
     entity.evidence && isRecord(values)
-      ? quotesOf(entity, evidence, path, reading)
+      ? quotesOf(quotableFields(entity.fields), evidence, path, reading)
       : new Map<string, AiQuote[]>();
+  return outcomesOf(
+    entity.fields,
+    isRecord(values) ? record : undefined,
+    quotes,
+    valuesPath,
+    targets,
+    reading,
+  );
+}
+
+/**
+ * One outcome per field, from the object that holds the values: an
+ * entity's `values` or an item. A property the object lacks is a warning,
+ * unless the object itself is missing (already reported).
+ */
+function outcomesOf(
+  fields: readonly AiContractField[],
+  record: Record<string, unknown> | undefined,
+  quotes: ReadonlyMap<string, AiQuote[]>,
+  path: string,
+  targets: LinkTargets | undefined,
+  reading: Reading,
+): AiFieldOutcomes {
   return Object.fromEntries(
-    entity.fields.map((asked): [string, AiFieldOutcome] => {
-      const at = `${valuesPath}.${asked.wire}`;
-      const isGiven = Object.hasOwn(record, asked.wire);
-      if (!isGiven && isRecord(values))
+    fields.map((asked): [string, AiFieldOutcome] => {
+      const at = `${path}.${asked.wire}`;
+      const isGiven = !!record && Object.hasOwn(record, asked.wire);
+      if (!isGiven && record)
         reading.warnings.push({ kind: "unexpected-shape", path: at });
       const raw = isGiven ? record[asked.wire] : undefined;
       if (raw === undefined) return [asked.key, { status: "empty" }];

@@ -48,6 +48,7 @@ describe("buildAiEntity — a form alone", () => {
     ["date", {}, "date"],
     ["datetime", {}, "datetime"],
     ["time", {}, "time"],
+    ["map", {}, "coordinates"],
     ["select", { options: [{ text: "Draft", value: "draft" }] }, "choice"],
     ["fks", { endpoint: "/api/places/" }, "relation"],
     ["m2m", { endpoint: "/api/tags/" }, "relation"],
@@ -63,8 +64,6 @@ describe("buildAiEntity — a form alone", () => {
     ["media", {}, "media"],
     ["media-m2m", {}, "media"],
     ["enhanced-media", {}, "media"],
-    ["seo", {}, "unsupported"],
-    ["map", {}, "unsupported"],
     ["fks", {}, "relation"],
     ["rating", {}, "unsupported"],
   ])("leaves a %s field alone (%s)", (type, attrs, reason) => {
@@ -74,12 +73,26 @@ describe("buildAiEntity — a form alone", () => {
     expect(entity.skipped).toEqual([{ key: "value", fieldType: type, reason }]);
   });
 
-  it("leaves a repeater alone: nested values are not filled", () => {
+  it("fills a repeater through its items, a map as one point and the SEO block through its fields", () => {
     const entity = formEntity([
       { key: "faq", type: "repeater", fields: [{ key: "q", type: "text" }] },
+      { key: "place", type: "map" },
+      { key: "seo", type: "seo" },
     ] as Fields);
 
-    expect(reasonOf(entity, "faq")).toBe("unsupported");
+    expect(entity.skipped).toEqual([]);
+    expect(fieldOf(entity, "faq")).toMatchObject({
+      kind: "list",
+      items: { fields: [{ key: "q", kind: "string" }], skipped: [] },
+    });
+    expect(fieldOf(entity, "place")).toMatchObject({ kind: "coordinates" });
+    expect(entity.fields.map((field) => field.key)).toEqual([
+      "faq",
+      "place",
+      "seo.title",
+      "seo.description",
+      "seo.permalink",
+    ]);
   });
 
   it("keeps a select's choices with their labels, and its multiplicity", () => {

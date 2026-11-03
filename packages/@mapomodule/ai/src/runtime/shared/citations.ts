@@ -253,6 +253,155 @@ export function numbersIn(text: string): number[] {
   return [...found];
 }
 
+// ─── Points of a map ─────────────────────────────────────────────────────────
+
+/** A point of a map, in decimal degrees. */
+export interface MapPoint {
+  lat: number;
+  lng: number;
+}
+
+/** The letters of the hemispheres, with the axis and the sign each gives: `O` is west in Italian, Spanish and French. */
+const HEMISPHERES: Readonly<
+  Record<string, { axis: "lat" | "lng"; sign: number }>
+> = {
+  N: { axis: "lat", sign: 1 },
+  S: { axis: "lat", sign: -1 },
+  E: { axis: "lng", sign: 1 },
+  W: { axis: "lng", sign: -1 },
+  O: { axis: "lng", sign: -1 },
+};
+
+/**
+ * A coordinate: a sign, up to three digits, decimals after a dot or a
+ * comma, a degree sign. A comma after decimals with a dot separates (`45.46,9.19`);
+ * after decimals with a comma it could go on (`45,46,9`), so it reads nothing.
+ */
+const DEGREES = String.raw`([-+−]?)(\d{1,3}(?:\.\d+(?!\.\p{N})|,\d+(?![.,]\p{N})|(?![.,]\p{N}))(?!\p{N}))(\s?[°º])?`;
+const LETTER_BEFORE = String.raw`(?:([NSEWO])\s*)?`;
+const LETTER_AFTER = String.raw`(?:(\s*)([NSEWO])(?![\p{L}\p{N}]))?`;
+/** Between the two coordinates: a comma, a semicolon, a slash, spaces, or "and". */
+const BETWEEN = String.raw`(?:\s*[,;/]\s*|\s+(?:e|and|et|y|und|en)\s+|\s+)`;
+const POINT = new RegExp(
+  String.raw`(?<![\p{L}\p{N}.,])${LETTER_BEFORE}${DEGREES}${LETTER_AFTER}${BETWEEN}${LETTER_BEFORE}${DEGREES}${LETTER_AFTER}`,
+  "gu",
+);
+
+/** A coordinate as the quote writes it. */
+interface WrittenCoordinate {
+  degrees: number;
+  letter?: string;
+  /** It reads as a coordinate: with decimals, a degree sign or a letter. */
+  isMarked: boolean;
+  /** A minus or a plus: with a letter too, the two could disagree. */
+  isSigned: boolean;
+}
+
+function coordinate(
+  sign: string | undefined,
+  number: string,
+  degree: string | undefined,
+  letter: string | undefined,
+): WrittenCoordinate {
+  const magnitude = Number(number.replace(",", "."));
+  const isNegative = sign === "-" || sign === "−";
+  return {
+    degrees: isNegative ? -magnitude : magnitude,
+    ...(letter ? { letter } : {}),
+    isMarked: /[.,]/.test(number) || !!degree || !!letter,
+    isSigned: !!sign,
+  };
+}
+
+/** The point two coordinates in a row write: their letters say which is which, otherwise the latitude comes first. */
+function pointOf(
+  first: WrittenCoordinate,
+  second: WrittenCoordinate,
+): MapPoint | undefined {
+  const isCoordinate = (one: WrittenCoordinate) =>
+    one.isMarked && !(one.isSigned && one.letter);
+  if (!isCoordinate(first) || !isCoordinate(second)) return undefined;
+  const hemisphereOf = (one: WrittenCoordinate) =>
+    one.letter ? HEMISPHERES[one.letter] : undefined;
+  const firstHemisphere = hemisphereOf(first);
+  const secondHemisphere = hemisphereOf(second);
+  const isSameAxis =
+    !!firstHemisphere && firstHemisphere.axis === secondHemisphere?.axis;
+  if (isSameAxis) return undefined;
+  const firstValue = first.degrees * (firstHemisphere?.sign ?? 1);
+  const secondValue = second.degrees * (secondHemisphere?.sign ?? 1);
+  const isLongitudeFirst =
+    firstHemisphere?.axis === "lng" || secondHemisphere?.axis === "lat";
+  const lat = isLongitudeFirst ? secondValue : firstValue;
+  const lng = isLongitudeFirst ? firstValue : secondValue;
+  const isOnGlobe = Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  return isOnGlobe ? { lat, lng } : undefined;
+}
+
+/**
+ * The points a text writes: two coordinates in a row, read left to right.
+ * Each coordinate has decimals, a degree sign or a hemisphere letter
+ * (`N`, `S`, `E`, `W`, `O`), before it or after it; the letters, or else
+ * the order, say which is the latitude: `45,4642 N e 9,1900 E`,
+ * `N 45.4642, E 9.1900` and `9.19 E, 45.46 N` write one point each, while
+ * `45 posti, 9 euro` and degrees with minutes and seconds write none.
+ */
+export function pointsIn(text: string): MapPoint[] {
+  const points: MapPoint[] = [];
+  // A pattern of its own: the scan moves its `lastIndex`.
+  const pattern = new RegExp(POINT.source, POINT.flags);
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    const [
+      written,
+      firstBefore,
+      firstSign,
+      firstNumber = "",
+      firstDegree,
+      ,
+      firstAfter,
+      secondBefore,
+      secondSign,
+      secondNumber = "",
+      secondDegree,
+      secondSpaces = "",
+      secondAfter,
+    ] = match;
+    // Letters written before the numbers: the one after the first is the second's.
+    const isLetterFirst = firstBefore !== undefined;
+    const firstLetter = isLetterFirst ? firstBefore : firstAfter;
+    const secondLetters = (
+      isLetterFirst ? [firstAfter, secondBefore] : [secondBefore, secondAfter]
+    ).filter((letter) => letter !== undefined);
+    const point =
+      secondLetters.length > 1
+        ? undefined
+        : pointOf(
+            coordinate(firstSign, firstNumber, firstDegree, firstLetter),
+            coordinate(
+              secondSign,
+              secondNumber,
+              secondDegree,
+              secondLetters[0],
+            ),
+          );
+    const end = match.index + written.length;
+    if (!point) {
+      // The second coordinate may start a point of its own; the first is
+      // never read again, without the letter it has before it.
+      const firstEnd = written.indexOf(firstNumber) + firstNumber.length;
+      pattern.lastIndex = match.index + firstEnd;
+      continue;
+    }
+    points.push(point);
+    // With letters first, a letter after the second belongs to what follows.
+    const isNextLetter = isLetterFirst && secondAfter !== undefined;
+    pattern.lastIndex = isNextLetter
+      ? end - secondSpaces.length - secondAfter.length
+      : end;
+  }
+  return points;
+}
+
 // ─── Dates and times ─────────────────────────────────────────────────────────
 
 /** A day of the calendar. */

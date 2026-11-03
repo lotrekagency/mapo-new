@@ -5,6 +5,7 @@ import {
   isQuoted,
   normalizeText,
   numbersIn,
+  pointsIn,
   searchableSource,
   writesDate,
   writesDateTime,
@@ -500,5 +501,59 @@ describe("numbersIn", () => {
     expect(numbersIn(text).sort((a, b) => a - b)).toEqual(
       [...numbers].sort((a, b) => a - b),
     );
+  });
+});
+
+describe("pointsIn", () => {
+  it.each([
+    ["latitude first", "Coordinate: 45.4642, 9.1900", [[45.4642, 9.19]]],
+    ["a minus sign", "Sydney -33.8688, 151.2093", [[-33.8688, 151.2093]]],
+    ["a typographic minus", "\u221233.8688 151.2093", [[-33.8688, 151.2093]]],
+    ["letters after", "40.7128 N, 74.0060 W", [[40.7128, -74.006]]],
+    ["letters before", "S 33.8688 E 151.2093", [[-33.8688, 151.2093]]],
+    ["degree signs", "45.4642° N, 9.1900° E", [[45.4642, 9.19]]],
+    [
+      "decimal commas and a word between",
+      "45,4642 N e 9,1900 E",
+      [[45.4642, 9.19]],
+    ],
+    ["west as ovest", "40,7128 N, 74,0060 O", [[40.7128, -74.006]]],
+    [
+      "the longitude first, by its letters",
+      "9.1900 E, 45.4642 N",
+      [[45.4642, 9.19]],
+    ],
+    ["a link's pair", "maps/@45.4642,9.1900,17z", [[45.4642, 9.19]]],
+    ["three decimals", "41.902, 12.453", [[41.902, 12.453]]],
+    [
+      "two points, letters after",
+      "45.46 N 9.19 E 41.9 N 12.5 E",
+      [
+        [45.46, 9.19],
+        [41.9, 12.5],
+      ],
+    ],
+    [
+      "two points, letters before",
+      "N 45.46 E 9.19 N 41.9 E 12.5",
+      [
+        [45.46, 9.19],
+        [41.9, 12.5],
+      ],
+    ],
+    ["the pair after another number", "Sala 3, 45.46, 9.19", [[45.46, 9.19]]],
+    ["no pair from one number", "Sala da 45 posti", []],
+    ["no pair from numbers apart", "45 posti, ingresso 9 euro", []],
+    ["no pair from whole numbers", "Sale 45, 9", []],
+    ["no pair with a whole number", "45.46, 9", []],
+    ["no pair from decimal commas in a row", "45,4642,9,1900", []],
+    ["no pair from degrees and minutes", "45°27′51″N 9°11′24″E", []],
+    ["no pair on one axis", "N 45.46, N 9.19", []],
+    ["no pair from a sign and a letter", "-45.46 S, 9.19", []],
+    ["no pair off the globe", "95.1, 9.19", []],
+    ["no pair from a longer number", "1234.5, 9.19", []],
+    ["no pair from labels", "lat 45.46, lng 9.19", []],
+  ])("reads %s", (_case, text, points) => {
+    expect(pointsIn(text).map(({ lat, lng }) => [lat, lng])).toEqual(points);
   });
 });

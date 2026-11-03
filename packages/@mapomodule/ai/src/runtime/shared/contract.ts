@@ -13,6 +13,11 @@
  *   property names and enum values;
  * - property names of letters, digits and `_`, up to 64 characters.
  *
+ * Nesting is counted as in the tests: every schema on the way, the root and
+ * the leaf included. A repeater is an array of items, each with its fields,
+ * its `_template` when the items vary, and its own `evidence`; a list that
+ * would go deeper than ten levels is left out of the contract (`omitted`).
+ *
  * A value the source does not give is the empty string, or an empty list.
  * Formats, limits and choices the schema cannot hold are written in each
  * property's description, and the sanitizer (`sanitize.ts`) applies them to
@@ -38,7 +43,7 @@ import type {
  * (`gateway.ts`), which versions the routes; a contract travels in a route's
  * body, so a change here that the gateway reads raises that one too.
  */
-export const AI_CONTRACT_FORMAT_VERSION = 1;
+export const AI_CONTRACT_FORMAT_VERSION = 2;
 
 /**
  * How a relation field is answered: `choice`, one id among a short list of
@@ -47,7 +52,7 @@ export const AI_CONTRACT_FORMAT_VERSION = 1;
 export type AiRelationMode = "choice" | "search";
 
 /** A field as the contract asks for it. */
-export interface AiContractField extends AiField {
+export interface AiContractField extends Omit<AiField, "items"> {
   /** The property name in the answer: the key made safe for every provider. */
   wire: string;
   /**
@@ -67,6 +72,47 @@ export interface AiContractField extends AiField {
    * over the item.
    */
   linksTo?: string;
+  /** For a `list`: what each item asks for. */
+  items?: AiContractItems;
+  /** For a field of a templated item: the key of the template it belongs to. */
+  template?: string;
+}
+
+/**
+ * What each item of a list asks for: its fields, named by their `wire` in
+ * the item, and its quotes. With templates, the item names one in
+ * `_template` and fills only that template's fields, whose wires carry the
+ * template's key (`hero_title`).
+ */
+export interface AiContractItems {
+  /** Every field an item may hold: of all the templates together when there are templates. */
+  fields: AiContractField[];
+  /** The item quotes the source for its values in its own `evidence`. */
+  evidence: boolean;
+  /** The templates an item may follow. */
+  templates?: AiContractTemplate[];
+}
+
+/** One template of a list's items, as the contract asks for it. */
+export interface AiContractTemplate {
+  /** The value of `_template` that names it. */
+  key: string;
+  /** Its name for people. */
+  label?: string;
+  /** What an item of this template is for. */
+  description?: string;
+  /** The wires, in the item, of this template's fields. */
+  wires: string[];
+}
+
+/**
+ * A field the entity model has but the contract leaves out: `too-deep`, a
+ * list nested deeper than every provider accepts.
+ */
+export interface AiOmittedField {
+  /** Its path in the record, `*` standing for any item: `blocks.*.gallery`. */
+  key: string;
+  reason: "too-deep";
 }
 
 /** An entity as the contract describes it. */
@@ -83,6 +129,8 @@ export interface AiContractEntity {
   evidence: boolean;
   /** The fields the AI fills, in the form's order. */
   fields: AiContractField[];
+  /** Fields of the model the contract leaves out, and why. */
+  omitted?: AiOmittedField[];
 }
 
 interface AiContractBase {
@@ -129,7 +177,9 @@ export interface AiContractSource {
   endpoint?: string;
   /**
    * The records a relation field may point to, by field key, when they are
-   * few: the AI then picks an id instead of writing text to search for.
+   * few: the AI then picks an id instead of writing text to search for. A
+   * field inside a list's items goes by its path, `*` standing for the item:
+   * `speakers.*.organisation`.
    */
   relationChoices?: Readonly<Record<string, readonly AiChoice[]>>;
   /** Ask for quotes from the source. Default `true`. */
@@ -154,6 +204,16 @@ const MAX_SCHEMA_CHARACTERS = 100_000;
 const MAX_PROPERTIES = 5000;
 /** Longest property name. */
 const MAX_WIRE_LENGTH = 64;
+/** Schemas on the deepest way through the answer, the root and the leaf included. */
+const MAX_NESTING = 10;
+
+/**
+ * The property an item of a templated list names its template in: in the
+ * answer, as in the value the form saves.
+ */
+export const AI_TEMPLATE_PROPERTY = "_template";
+/** Names of an item's own properties, which its fields cannot take. */
+const ITEM_PROPERTIES = ["evidence", AI_TEMPLATE_PROPERTY];
 
 // ─── Property names ──────────────────────────────────────────────────────────
 
@@ -233,6 +293,9 @@ const KIND_RULES: Readonly<Record<AiValueKind, string>> = {
   choice:
     "One of the listed values; empty when the source's value is none of them.",
   relation: "",
+  coordinates:
+    'The point as "latitude, longitude" in decimal degrees with a dot, such as "45.4642, 9.1900", only when the source writes both numbers: never work them out from an address or a place name.',
+  list: "One item for each one the source gives, in its order.",
 };
 
 /** Kinds whose text is written in the record's language. */
@@ -294,6 +357,8 @@ function constraintRules(field: AiContractField): string[] {
     n !== undefined && n > 0 ? n : undefined;
   const minLength = positive(limits.minLength);
   const minItems = positive(limits.minItems);
+  // A list counts its items; a multiple field, its values.
+  const counted = field.kind === "list" ? "item" : "value";
   add(minLength, (n) => `At least ${length(n)}.`);
   add(limits.maxLength, (n) => `At most ${length(n)}.`);
   add(limits.minimum, (n) => `At least ${n}.`);
@@ -304,8 +369,8 @@ function constraintRules(field: AiContractField): string[] {
     const rule = stepRule(step, field.kind);
     if (rule) rules.push(rule);
   }
-  add(minItems, (n) => `At least ${plural(n, "value")}.`);
-  add(limits.maxItems, (n) => `At most ${plural(n, "value")}.`);
+  add(minItems, (n) => `At least ${plural(n, counted)}.`);
+  add(limits.maxItems, (n) => `At most ${plural(n, counted)}.`);
   const patterns = isHtml ? [] : (limits.patterns ?? []);
   for (const pattern of patterns)
     rules.push(`Matches the regular expression ${codeSpan(pattern)}.`);
@@ -313,7 +378,7 @@ function constraintRules(field: AiContractField): string[] {
   const hasMinimum = minLength !== undefined || minItems !== undefined;
   if (hasMinimum)
     rules.push(
-      "Never add words or values the source does not give to reach a minimum.",
+      `Never add words or ${counted}s the source does not give to reach a minimum.`,
     );
   return rules;
 }
@@ -370,7 +435,8 @@ function kindRule(field: AiContractField): string {
 }
 
 function emptyRule(field: AiContractField): string {
-  if (field.multiple) return "An empty list when the source gives none.";
+  const isList = field.multiple || field.kind === "list";
+  if (isList) return "An empty list when the source gives none.";
   if (field.linksTo)
     return 'Both "record" and "item" empty ("") when the source does not give it.';
   return 'Empty ("") when the source does not give it.';
@@ -380,8 +446,16 @@ function describe(
   field: AiContractField,
   language: string | undefined,
 ): string {
-  const parts: string[] = [field.label, field.description, field.hint].flatMap(
-    (text) => sentence(text) ?? [],
+  const parts: string[] = [];
+  // A templated item holds every template's fields: say whose this one is.
+  if (field.template)
+    parts.push(
+      `Only in an item whose ${AI_TEMPLATE_PROPERTY} is ${JSON.stringify(field.template)}; empty in the others.`,
+    );
+  parts.push(
+    ...[field.label, field.description, field.hint].flatMap(
+      (text) => sentence(text) ?? [],
+    ),
   );
   parts.push(kindRule(field));
 
@@ -439,37 +513,118 @@ function linkedSchema(field: AiContractField): JSONSchema {
 function valueSchema(
   field: AiContractField,
   language: string | undefined,
+  budget: EnumBudget,
 ): JSONSchema {
   const description = describe(field, language);
+  if (field.items)
+    return {
+      type: "array",
+      items: itemSchema(field.items, language, budget),
+      description,
+    };
   const element = () =>
     field.linksTo ? linkedSchema(field) : elementSchema(field, !field.multiple);
   if (field.multiple) return { type: "array", items: element(), description };
   return { ...element(), description };
 }
 
+function valuesProperties(
+  fields: readonly AiContractField[],
+  language: string | undefined,
+  budget: EnumBudget,
+): Record<string, JSONSchema> {
+  return Object.fromEntries(
+    fields.map((field) => [field.wire, valueSchema(field, language, budget)]),
+  );
+}
+
 function valuesSchema(
   fields: readonly AiContractField[],
   language: string | undefined,
+  budget: EnumBudget,
 ): JSONSchema {
   return {
     type: "object",
     additionalProperties: false,
     required: fields.map((field) => field.wire),
-    properties: Object.fromEntries(
-      fields.map((field) => [field.wire, valueSchema(field, language)]),
-    ),
+    properties: valuesProperties(fields, language, budget),
+  };
+}
+
+/**
+ * The fields a quote can be given for, in the `evidence` of a record or of
+ * an item: a list's values are quoted inside its own items.
+ */
+export function quotableFields(
+  fields: readonly AiContractField[],
+): AiContractField[] {
+  return fields.filter((field) => field.kind !== "list");
+}
+
+/** `"hero" (Hero banner: A large image…), "gallery"`: the templates an item may follow. */
+function listTemplates(templates: readonly AiContractTemplate[]): string {
+  return templates
+    .map((template) => {
+      const about = [template.label, template.description]
+        .map((text) => text?.trim())
+        .filter(Boolean)
+        .join(": ");
+      const key = JSON.stringify(template.key);
+      return about ? `${key} (${about})` : key;
+    })
+    .join(", ");
+}
+
+/**
+ * One item of a list: its `_template` when the items vary, its fields and,
+ * when asked, its own `evidence`, so a quote never needs an index to find
+ * its item.
+ */
+function itemSchema(
+  items: AiContractItems,
+  language: string | undefined,
+  budget: EnumBudget,
+): JSONSchema {
+  const templates: Record<string, JSONSchema> = items.templates
+    ? {
+        [AI_TEMPLATE_PROPERTY]: {
+          type: "string",
+          enum: items.templates.map((template) => template.key),
+          description: `What kind of item this is: ${listTemplates(items.templates)}. Fill only that kind's fields; leave the others empty.`,
+        },
+      }
+    : {};
+  const evidence: Record<string, JSONSchema> = items.evidence
+    ? {
+        evidence: evidenceSchema(
+          quotableFields(items.fields),
+          !budget.unlistedEvidence.has(items),
+          "For each value of this item, the words of the source it comes from. A value without a quote is checked by hand.",
+        ),
+      }
+    : {};
+  const properties: Record<string, JSONSchema> = {
+    ...templates,
+    ...valuesProperties(items.fields, language, budget),
+    ...evidence,
+  };
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: Object.keys(properties),
+    properties,
   };
 }
 
 function evidenceSchema(
   fields: readonly AiContractField[],
   listsFields: boolean,
+  description = "For each value given, the words of the source it comes from. A value without a quote is checked by hand.",
 ): JSONSchema {
   const wires = fields.map((field) => field.wire);
   return {
     type: "array",
-    description:
-      "For each value given, the words of the source it comes from. A value without a quote is checked by hand.",
+    description,
     items: {
       type: "object",
       additionalProperties: false,
@@ -505,9 +660,14 @@ function entityProperties(
   const listsFields = !budget.unlistedEvidence.has(entity);
   return {
     properties: {
-      values: valuesSchema(entity.fields, language),
+      values: valuesSchema(entity.fields, language, budget),
       ...(entity.evidence
-        ? { evidence: evidenceSchema(entity.fields, listsFields) }
+        ? {
+            evidence: evidenceSchema(
+              quotableFields(entity.fields),
+              listsFields,
+            ),
+          }
         : {}),
     },
     required: entity.evidence ? ["values", "evidence"] : ["values"],
@@ -634,36 +794,58 @@ function relationRecords(source: AiContractSource, key: string): AiChoice[] {
   return Array.isArray(records) ? answerableChoices(records) : [];
 }
 
+/** Where a field's value sits in the answer. */
+interface Placement {
+  /** The depth of the object that holds the value: 2 for a record's `values` in a fill. */
+  depth: number;
+  /** The path of that object in the record, `*` standing for any item; `""` for the record. */
+  prefix: string;
+  /** Quotes are asked. */
+  evidence: boolean;
+  /** Where a list left out goes. */
+  omitted: AiOmittedField[];
+}
+
+/** A field's path in the record, as `omitted` and `relationChoices` write it. */
+function pathIn(at: Placement, key: string): string {
+  return at.prefix ? `${at.prefix}.${key}` : key;
+}
+
 /** The field as the contract asks for it, or `undefined` when there is nothing to answer with. */
 function contractField(
   field: AiField,
   source: AiContractSource,
   taken: Set<string>,
   targets: readonly LinkTarget[],
+  at: Placement,
+  wireKey = field.key,
 ): AiContractField | undefined {
-  if (field.kind !== "relation") {
-    const choices = field.choices ? answerableChoices(field.choices) : [];
+  if (field.kind === "list")
+    return contractList(field, source, taken, targets, at, wireKey);
+  const { items: _items, ...value } = field;
+  if (value.kind !== "relation") {
+    const choices = value.choices ? answerableChoices(value.choices) : [];
     // A choice of "none" alone: `buildAiEntity()` skips it already.
-    const hasNoChoice = field.kind === "choice" && !choices.length;
+    const hasNoChoice = value.kind === "choice" && !choices.length;
     if (hasNoChoice) return undefined;
     const draft: AiContractField = {
-      ...field,
-      wire: wireName(field.key, taken),
-      ...(field.choices ? { choices } : {}),
-      choicesInSchema: field.kind === "boolean" || choices.length > 0,
+      ...value,
+      wire: wireName(wireKey, taken),
+      ...(value.choices ? { choices } : {}),
+      choicesInSchema: value.kind === "boolean" || choices.length > 0,
     };
     // A list too long for one `enum` goes to the description.
     const fits = enumSize(draft) <= MAX_PROPERTY_ENUM;
     return fits ? draft : { ...draft, choicesInSchema: false };
   }
 
-  const target = field.endpoint
-    ? linkTargetOf(targets, field.endpoint)
+  const target = value.endpoint
+    ? linkTargetOf(targets, value.endpoint)
     : undefined;
-  const records = relationRecords(source, field.key);
+  const records = relationRecords(source, pathIn(at, value.key));
   const asChoice: AiContractField = {
-    ...field,
-    wire: wireName(field.key, taken),
+    ...value,
+    wire: wireName(wireKey, taken),
     choices: records,
     choicesInSchema: true,
     relationMode: "choice",
@@ -677,13 +859,124 @@ function contractField(
   return { ...rest, choicesInSchema: false, relationMode: "search" };
 }
 
+/**
+ * A list as the contract asks for it: an array of items, each object with
+ * its fields, its `_template` when the items vary and its own `evidence`.
+ * A list that would go deeper than {@link MAX_NESTING} with its item, its
+ * quotes and its links is left out whole, and so is one whose items keep no
+ * field; both go to `omitted` when depth is the cause.
+ */
+function contractList(
+  field: AiField,
+  source: AiContractSource,
+  taken: Set<string>,
+  targets: readonly LinkTarget[],
+  at: Placement,
+  wireKey: string,
+): AiContractField | undefined {
+  const items = field.items;
+  if (!items) return undefined;
+  const path = pathIn(at, field.key);
+  const tooDeep = () => {
+    at.omitted.push({ key: path, reason: "too-deep" });
+    return undefined;
+  };
+  // Below the array, the item; below the item, a leaf, or its quotes: an
+  // array of entries, each an object of leaves.
+  const itemDepth = at.depth + 2;
+  if (itemDepth + (at.evidence ? 3 : 1) > MAX_NESTING) return tooDeep();
+
+  const omitted: AiOmittedField[] = [];
+  const inner: Placement = {
+    depth: itemDepth,
+    prefix: `${path}.*`,
+    evidence: at.evidence,
+    omitted,
+  };
+  const itemTaken = new Set(ITEM_PROPERTIES);
+  const fields: AiContractField[] = [];
+  const templates: AiContractTemplate[] = [];
+  if (items.templates) {
+    for (const template of items.templates) {
+      const wires: string[] = [];
+      for (const child of template.fields) {
+        const asked = contractField(
+          child,
+          source,
+          itemTaken,
+          targets,
+          inner,
+          `${template.key}.${child.key}`,
+        );
+        if (!asked) continue;
+        fields.push({ ...asked, template: template.key });
+        wires.push(asked.wire);
+      }
+      if (wires.length)
+        templates.push(
+          compactTemplate({
+            key: template.key,
+            label: template.label,
+            description: template.description,
+            wires,
+          }),
+        );
+    }
+  } else {
+    for (const child of items.fields) {
+      const asked = contractField(child, source, itemTaken, targets, inner);
+      if (asked) fields.push(asked);
+    }
+  }
+
+  // A link is an object of leaves, a list of links an array of them.
+  const linkDepth = Math.max(
+    0,
+    ...fields.map((one) => (one.linksTo ? (one.multiple ? 3 : 2) : 0)),
+  );
+  if (itemDepth + linkDepth > MAX_NESTING) return tooDeep();
+  if (!fields.length) return omitted.length ? tooDeep() : undefined;
+  at.omitted.push(...omitted);
+
+  const { items: _items, ...value } = field;
+  return {
+    ...value,
+    wire: wireName(wireKey, taken),
+    choicesInSchema: false,
+    items: {
+      fields,
+      evidence: at.evidence && quotableFields(fields).length > 0,
+      ...(items.templates ? { templates } : {}),
+    },
+  };
+}
+
+/** A template without the `undefined` of a missing label or description. */
+function compactTemplate(template: AiContractTemplate): AiContractTemplate {
+  return {
+    key: template.key,
+    ...(template.label ? { label: template.label } : {}),
+    ...(template.description ? { description: template.description } : {}),
+    wires: template.wires,
+  };
+}
+
+/**
+ * The entity as the contract asks for it.
+ * @param valuesDepth The depth of its `values` in the answer: 2 in a fill,
+ * 4 in an extraction, under `items` and the item.
+ */
 function contractEntity(
   source: AiContractSource,
   targets: readonly LinkTarget[],
+  valuesDepth: number,
 ): AiContractEntity {
   const taken = new Set<string>();
+  const evidence = source.evidence ?? true;
+  const omitted: AiOmittedField[] = [];
+  const at: Placement = { depth: valuesDepth, prefix: "", evidence, omitted };
   const fields = source.entity.fields.flatMap((field) => {
-    const asked = contractField(field, source, taken, targets);
+    const asked = contractField(field, source, taken, targets, at);
     return asked ? [asked] : [];
   });
   return {
@@ -691,9 +984,11 @@ function contractEntity(
     ...(source.label ? { label: source.label } : {}),
     ...(source.description ? { description: source.description } : {}),
     ...(source.endpoint ? { endpoint: source.endpoint } : {}),
-    // Without fields there is nothing to quote, and no `enum` to name them.
-    evidence: (source.evidence ?? true) && fields.length > 0,
+    // Without a value outside lists there is nothing to quote here, and no
+    // `enum` to name them; a list's items quote for themselves.
+    evidence: evidence && quotableFields(fields).length > 0,
     fields,
+    ...(omitted.length ? { omitted } : {}),
   };
 }
 
@@ -701,8 +996,8 @@ function contractEntity(
 
 /** What the budget took out of the schema, beyond the fields' own `choicesInSchema`. */
 interface EnumBudget {
-  /** Entities whose evidence names its fields as plain text instead of an `enum`. */
-  unlistedEvidence: Set<AiContractEntity>;
+  /** The evidence, of an entity or of a list's items, that names its fields as plain text instead of an `enum`. */
+  unlistedEvidence: Set<AiContractEntity | AiContractItems>;
 }
 
 /** A list the schema may hold as an `enum`, and how to move it out or back. */
@@ -772,8 +1067,29 @@ function enumSites(
   budget: EnumBudget,
 ): { evidence: EnumSite[]; values: EnumSite[] } {
   const sites = { evidence: [] as EnumSite[], values: [] as EnumSite[] };
-  for (const entity of entities) {
-    for (const field of entity.fields) {
+  const addEvidence = (
+    owner: AiContractEntity | AiContractItems,
+    fields: readonly AiContractField[],
+  ) => {
+    const wires = quotableFields(fields).map((field) => field.wire);
+    const takeOut = () => budget.unlistedEvidence.add(owner);
+    if (wires.length > MAX_PROPERTY_ENUM) takeOut();
+    else
+      sites.evidence.push({
+        values: wires.length,
+        characters: characters(wires),
+        takeOut,
+        putBack: () => budget.unlistedEvidence.delete(owner),
+      });
+  };
+  // A list's items hold lists of values and evidence of their own.
+  const visit = (fields: readonly AiContractField[]) => {
+    for (const field of fields) {
+      if (field.items) {
+        visit(field.items.fields);
+        if (field.items.evidence) addEvidence(field.items, field.items.fields);
+        continue;
+      }
       const allowed = allowedValues(field);
       if (!allowed) continue;
       sites.values.push({
@@ -787,19 +1103,24 @@ function enumSites(
         },
       });
     }
-    if (!entity.evidence) continue;
-    const wires = entity.fields.map((field) => field.wire);
-    const takeOut = () => budget.unlistedEvidence.add(entity);
-    if (wires.length > MAX_PROPERTY_ENUM) takeOut();
-    else
-      sites.evidence.push({
-        values: wires.length,
-        characters: characters(wires),
-        takeOut,
-        putBack: () => budget.unlistedEvidence.delete(entity),
-      });
+  };
+  for (const entity of entities) {
+    visit(entity.fields);
+    if (entity.evidence) addEvidence(entity, entity.fields);
   }
   return sites;
+}
+
+/** Schemas on the deepest way through `schema`, itself and the leaf included; a union's branches sit at its depth. */
+function depthOf(schema: JSONSchema): number {
+  const below = [
+    ...Object.values(schema.properties ?? {}).map(
+      (child) => 1 + depthOf(child),
+    ),
+    ...(schema.items ? [1 + depthOf(schema.items)] : []),
+    ...(schema.anyOf ?? []).map((branch) => depthOf(branch)),
+  ];
+  return Math.max(1, ...below);
 }
 
 /**
@@ -850,6 +1171,12 @@ function fitSchema(
   const budget: EnumBudget = { unlistedEvidence: new Set() };
   const sites = enumSites(entities, budget);
   const first = build(budget);
+  // The lists that would go too deep are left out already: this is a guard.
+  const depth = depthOf(first);
+  if (depth > MAX_NESTING)
+    throw new Error(
+      `The answer schema is too deep for every provider: ${depth} levels (at most ${MAX_NESTING}).`,
+    );
   const census = censusOf(first);
   // Moving a list takes out no property: with too many, refuse at once,
   // counting what would be left with every list moved.
@@ -914,7 +1241,7 @@ export function compileFillContract(
   source: AiContractSource,
   options: CompileContractOptions = {},
 ): AiFillContract {
-  const entity = contractEntity(source, []);
+  const entity = contractEntity(source, [], 2);
   const schema = fitSchema([entity], (budget) =>
     fillSchema(entity, options.language, budget),
   );
@@ -974,7 +1301,7 @@ export function compileExtractContract(
     targets.push({ ...key, type: source.type });
   }
 
-  const entities = sources.map((source) => contractEntity(source, targets));
+  const entities = sources.map((source) => contractEntity(source, targets, 4));
   const schema = fitSchema(entities, (budget) =>
     extractSchema(entities, options.language, budget),
   );
