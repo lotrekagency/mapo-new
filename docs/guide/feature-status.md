@@ -171,6 +171,7 @@ New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
 | --------------------------- | ------ | ---------------------------------------------------------------------------- |
 | Opt-in installation         | ✅     | The meta-module installs the package only when the app sets `mapo.ai`        |
 | Gateway status route        | ✅     | `GET /_mapo/ai/status` answers with the gateway's contract version           |
+| Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; nothing writes to it yet |
 | Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them    |
 | Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk |
 

@@ -1,7 +1,7 @@
 /**
- * The AI gateway contract: where its routes live, which version of the
- * contract they speak and what they answer. Pure TypeScript, shared by the
- * module and the server routes.
+ * The AI gateway contract: where its routes live and keep their state, which
+ * version of the contract they speak and what they answer. Pure TypeScript,
+ * shared by the module and the server routes.
  */
 
 /**
@@ -10,6 +10,13 @@
  * backend never catches these routes.
  */
 export const MAPO_AI_GATEWAY_PATH = "/_mapo/ai";
+
+/**
+ * The Nitro storage mount the gateway keeps its state in, every record
+ * sealed (`runtime/server/storage/sealed.ts`). The app chooses its driver as
+ * for any Nitro mount; without one the module mounts the file system.
+ */
+export const MAPO_AI_STORAGE_MOUNT = "mapo-ai";
 
 /**
  * Version of the gateway contract: the routes, their bodies and their

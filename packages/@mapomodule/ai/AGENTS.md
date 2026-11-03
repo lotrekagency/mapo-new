@@ -4,13 +4,15 @@ Local rules for the AI-assisted data entry package. The root [`AGENTS.md`](../..
 
 ## What this package is
 
-An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`, and the gateway answers `GET status` with the version of its contract.
+An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`, and the gateway answers `GET status` with the version of its contract. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; no route writes to it yet.
 
 ## Layout
 
 ```text
 src/
-  module.ts                  Nuxt module: registers the gateway routes with addServerHandler
+  module.ts                  Nuxt module: the gateway routes (addServerHandler), the storage plugin, the secret in
+                             private runtime config, the default mount at `ready`
+  storage.ts                 build time: the file-system default of the `mapo-ai` mount, as Nitro does for `data`
   index.ts                   public types (MapoAiOptions, MapoAiStatus), also re-exported by mapomodule/types
   runtime/shared/            pure TypeScript shared by the module, the server and the browser:
                                gateway.ts  route prefix, contract version, response shapes
@@ -27,8 +29,15 @@ src/
                                            dates, times and time zones, links
                                numbers.ts  numbers as the backend checks them (`multipleOf`)
                                guards.ts   type guards for outside values
+  runtime/server/storage/    the sealed storage of the gateway's state:
+                               sealed.ts   envelopes (AES-256-GCM, WebCrypto), a key per purpose (HKDF), users as keyed
+                                           hashes, expiry, the sweep; pure, the storage and the secret are passed in
+                               secret.ts   NUXT_MAPO_AI_SECRET read as outside data; the log lines about it
+                               nitro.ts    the wiring to the mount and the runtime config: useMapoAiStorage(event)
+  runtime/server/plugins/    Nitro plugins: storage.ts checks the storage when the server starts and sweeps hourly
   runtime/server/routes/     Nitro handlers, one file per route
-  __tests__/                 Vitest; gateway routes are tested on a bare h3 app
+  __tests__/                 Vitest; gateway routes on a bare h3 app; the storage's wiring, its plugin and the
+                             module with `nitropack/runtime` and `@nuxt/kit` mocked
 ```
 
 ## Rules
@@ -38,11 +47,12 @@ src/
 3. **Gateway routes live under `/_mapo/ai/`**, never under `/api/*`, where backend integrations proxy to the real backend. The prefix and the gateway's version (`MAPO_AI_CONTRACT_VERSION`) are in `runtime/shared/gateway.ts`; raise it when a route, a body or a response changes in a way an older client cannot read. The format of a task contract has its own version, `AI_CONTRACT_FORMAT_VERSION` in `contract.ts`; a change to it that the gateway reads raises both.
 4. **Server code imports explicitly**: `h3` for handlers and helpers (a dependency), `nitropack/runtime` for runtime config and storage (`nitropack` goes in devDependencies, for its types). Never `#imports`: auto-imports do not run in `node_modules`, and the package is type-checked with plain `tsc`.
 5. **`runtime/shared/` stays pure**: no Nuxt, Nitro, Vue or Node imports, so the browser and the server can both use it. It may import the pure helpers of `@mapomodule/utils` and, by subpath, the form's schema reader and writer (`@mapomodule/form/runtime/composables/useFormFromSchema`, `@mapomodule/form/runtime/utils/fieldsToJsonSchema`).
-6. **Secrets stay on the server.** Keys and secrets go in the private `runtimeConfig`, never in `runtimeConfig.public`, a response, a log or an audit record.
+6. **Secrets stay on the server.** Keys and secrets go in the private `runtimeConfig`, never in `runtimeConfig.public`, a response, a log or an audit record. They are set at runtime, from the environment (`NUXT_MAPO_AI_SECRET`): a value written in the Nuxt config is copied into the server bundle, and the module warns about it.
 7. **Outside data is `unknown`** until a validator turns it into a typed value: request bodies, provider responses, files, rendered HTML and stored records. Never cast it with `as`. A provider's answer goes through `sanitize.ts`, which reads it property by property and never throws on it: what it cannot use is empty, discarded with a reason, or a warning.
 8. **Nothing that keeps the AI out may be lost.** A secret, a read-only value, an exclusion or a media type counts wherever a schema writes it: beside a union, in one of its branches, behind a `$ref`, on an object around a dotted key (even when the path stops before the value), in a part of the schema the form's reader cannot read. The reader resolves for display and drops some of these; `entity.ts` looks through every variant and reads an unreadable schema property by property. A new keyword of this kind gets a regression test on both sides of the merge.
 9. **One schema for every provider.** The contract's schema stays in the subset that every provider accepts in strict mode: objects with every key in `required` and `additionalProperties: false`, strings, arrays, string `enum`s, at most one `anyOf` and never at the root; no `null`, no numeric or length limits, no formats; at most 250 values in one `enum`, 1000 in all; at most 5000 properties, 10 levels of nesting and 100,000 characters of property names and enum values; property names of letters, digits and `_`, up to 64 characters. A value the source does not give is `""` or an empty list. What the schema cannot say goes in the property's description, and the sanitizer applies it. The compiler measures the schema it builds and moves lists to the descriptions until it fits, or throws. `expectPortable()` in `contract.test.ts` checks the subset: a new keyword needs the current docs of every provider first.
 10. **Every action is an operation.** What the UI does is also callable without the UI, with typed input and output and its dependencies passed in. Writes to the backend always need the operator's confirmation; the gateway itself never writes to the backend.
+11. **The state is sealed, and fails closed.** What the gateway keeps goes through `useMapoAiStorage(event)`, never `useStorage()` directly. Without a usable secret or a mount the storage is closed: no clear text, no memory of one process. A record that does not open is never deleted: only its expiry or a new value removes it. Stored values are outside data (rule 7): read them with a validator.
 
 ## Change together
 
@@ -56,6 +66,8 @@ src/
 | The contract's shape             | `AI_CONTRACT_FORMAT_VERSION` (and the gateway's when it reads it), `expectPortable()`, `sanitize.ts`            |
 | A tag of rich text               | `markdown.ts` and the extensions of `MapoWygEditor`: the editor must accept every tag the AI's HTML has         |
 | A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests        |
+| A storage purpose                | `STORAGE_PURPOSES` in `storage/sealed.ts`; never rename one that has records: its key comes from the name       |
+| The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests              |
 
 ## Verify
 
@@ -66,4 +78,4 @@ pnpm --filter @mapomodule/ai typecheck
 pnpm --filter @mapomodule/ai lint
 ```
 
-Live: `apps/example-e2e` sets `mapo.ai`, so `curl http://localhost:3000/_mapo/ai/status` answers while `pnpm dev:example-e2e` runs. Stop the dev server afterwards.
+Live: `apps/example-e2e` sets `mapo.ai`, so `curl http://localhost:3000/_mapo/ai/status` answers while `pnpm dev:example-e2e` runs. Without `NUXT_MAPO_AI_SECRET` the dev server warns that it seals with a temporary secret, and the state goes to `apps/example-e2e/.data/mapo-ai`. Stop the dev server afterwards.

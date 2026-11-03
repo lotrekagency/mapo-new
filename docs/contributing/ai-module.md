@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, with its `status` route, and the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript and is not part of the package's public types yet.
+Neither feature exists yet. Today the package installs the gateway, with its `status` route and an encrypted storage on the server for its state, and the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript and is not part of the package's public types yet.
 
 ## How a value travels
 
@@ -32,8 +32,11 @@ A filled value is either **verified** or **to check**, and the difference matter
 
 | File                              | Role                                                        |
 | --------------------------------- | ----------------------------------------------------------- |
-| `src/module.ts`                   | The Nuxt module: registers the gateway's routes             |
+| `src/module.ts`                   | The Nuxt module: routes, storage plugin, private secret     |
+| `src/storage.ts`                  | At build time, the storage's default mount                  |
 | `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route            |
+| `src/runtime/server/storage/`     | The sealed storage of the gateway's state                   |
+| `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps     |
 | `src/runtime/shared/entity.ts`    | The entity model                                            |
 | `src/runtime/shared/contract.ts`  | The contract compiler                                       |
 | `src/runtime/shared/sanitize.ts`  | The sanitizer and the verification rules                    |
@@ -41,7 +44,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes         |
 | `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude` |
 
-The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, and one schema serves every provider.
+The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, and the state is sealed and fails closed.
 
 ## The entity model
 
@@ -148,9 +151,85 @@ Today only the core reads the rules. They will become an option of the app, then
 - **One quote, one moment.** A quote that writes two days never verifies a date and time, because the time could belong to either; a time zone counts only on the time it follows.
 - **Strict rules cost reviews.** An Italian `alle 21` is not a time unless `bareHours` is on, and an ambiguous number such as `1.500` never verifies.
 
+## The storage
+
+The gateway's state lives on the app's server, in the Nitro mount `mapo-ai`, and every record is sealed before it reaches the driver. No route writes to it yet; the gateway's routes will reach it through `useMapoAiStorage(event)`, which reads the secret through the request's event (on Cloudflare Workers the environment arrives with the request) and throws a 503 while the storage is closed.
+
+| File                                    | Role                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------- |
+| `src/storage.ts`                        | At build time: mounts the file system at `mapo-ai` when the app mounts nothing there    |
+| `src/runtime/server/storage/sealed.ts`  | Envelopes, a key per purpose, users, expiry and the sweep; pure, as `runtime/shared` is |
+| `src/runtime/server/storage/secret.ts`  | `NUXT_MAPO_AI_SECRET`, read as outside data, and what the log says about it             |
+| `src/runtime/server/storage/nitro.ts`   | The wiring to the mount and the runtime config: `useMapoAiStorage(event)`               |
+| `src/runtime/server/plugins/storage.ts` | When the server starts, after the app's plugins: the checks, the first and hourly sweep |
+
+### A sealed record
+
+What the driver stores for one record, here the file `staging/b1.sealed` of the default mount:
+
+```json
+{
+  "v": 1,
+  "kid": "5a67ec5c27baeea6",
+  "iv": "Ml-g-E0c1r8Vz28N",
+  "ct": "RPjxm0a7Y1Vd…",
+  "exp": 1800000005000
+}
+```
+
+- `ct` is the value, as JSON, encrypted with AES-256-GCM, with its tag; `iv` is a random 12-byte nonce, new at every write.
+- The key is derived from the secret with HKDF, one for each purpose of `STORAGE_PURPOSES` (`audit`, `keys`, `tokens`, `settings`, `catalog`, `staging`). `kid` names the key without revealing it, so a record sealed with another secret or for another purpose is told apart from a damaged one. The derivation leaves the envelope's version out: a new format of the envelope keeps the keys and the users' spaces.
+- The seal also authenticates the record's path in the mount, the envelope's version and its expiry, `exp`, which stays in clear for the sweep: a record copied to another key or user, or whose expiry was moved, does not open.
+- Every record's name on the driver ends with `.sealed`. No key segment has a dot, so a record never takes the name of the folder of the records under it: a batch `b1` and its drafts `b1:d1` are `b1.sealed` and `b1/d1.sealed` on a file system.
+- What comes back is outside data: `get(key, read)` hands it to the caller's validator, and returns `undefined` when there is nothing, when it has expired, when it does not open or when the validator refuses it.
+
+Everything is WebCrypto, with no Node import, so the same code runs on every server runtime Nitro targets.
+
+### Purposes and users
+
+`createSealedStorage({ storage, secret }).store(purpose)` holds the records of one purpose, and `forUser(id)` resolves to those of one user within it, filed under `u:` and a keyed hash (HMAC) of the id: neither file names nor keys say who the users are. The purpose's own store lists, reads and removes every user's records too, as an admin will; it never writes in a user's space, which only `forUser()` does.
+
+A key is up to 8 segments of lowercase letters, digits, `_` and `-`, each up to 64 characters, joined by `:`, and none is a name Windows keeps for a device (`con`, `nul`, `com1`…). Lowercase because a case-insensitive file system would merge `B1` and `b1`; a route checks an id from a request before it makes a key of it.
+
+### Expiry and the sweep
+
+`set(key, value, { expiresAt })` gives a record its expiry, in epoch milliseconds, later than now or `set` throws a `RangeError`. An expired record is never returned, and is removed when it is read. `sweepExpired()` removes every expired record of the mount, reading only `exp`, so it needs no secret and runs while the storage is closed; the plugin runs it when the server starts and every hour, and skips a round while nothing is mounted, so a driver mounted later is swept from the next round. A driver with its own expiry, such as Redis, also gets `ttl`, in seconds.
+
+The plugin starts on a zero `setTimeout`, once the app's own plugins have run (Nitro runs the plugins of modules before the app's): an app can mount its driver at `mapo-ai` from a plugin, with a password read from the environment, in place of the module's default.
+
+Some runtimes allow no timer while the server starts: Cloudflare Workers run the plugins in their global scope, where a timer throws, and a plugin that throws stops the server. The plugin catches it: the checks run on the first request, with its event, which carries the environment there, and expired records go only when they are read. The tests cover it with a `setTimeout` that throws; it has not run on workerd.
+
+### Without a secret
+
+| `NUXT_MAPO_AI_SECRET`                                                    | `readMapoAiSecret()`      | The storage                |
+| ------------------------------------------------------------------------ | ------------------------- | -------------------------- |
+| 32 characters or more                                                    | `set`                     | Open                       |
+| Not set, in `nuxt dev`                                                   | `temporary`, for this run | Open, and lost at restart  |
+| Not set, in production                                                   | `missing`                 | Closed                     |
+| Shorter, or not text (the environment can turn it into a number or JSON) | `too-short`, `not-text`   | Closed, in development too |
+
+In `nuxt dev` a run also ends when the server code reloads: Nitro starts a new worker, which makes a new temporary secret.
+
+Closed means no value is read or written: `useMapoAiStorage(event)` throws a 503, and the log says why when the server starts. Only the sweep still runs, since it reads `exp` alone. A secret that is set but unusable is never replaced by a temporary one, which would hide the mistake.
+
+Without a mount, the storage is closed too, rather than kept in the memory of one process. The default mount follows the rules of Nitro's own `data` mount, and its `node` flag: `nuxt dev` and every preset that runs on Node get the folder, serverless functions included, where it does not outlive the instance; the other presets get nothing. A mount the app declares in `devStorage` alone counts in development only.
+
+### Strengths and weaknesses
+
+- **It fails closed.** Without a usable secret or a mount no value is read or written: no fallback to clear text, nor to one process's memory.
+- **It never deletes what it cannot read.** A secret changed by mistake leaves the state unreadable but intact, and the old secret opens it again. The other side: after a deliberate change, the old records stay until they expire, and those without an expiry until someone empties the storage.
+- **A user's space depends on the secret.** With a new secret, every user gets a new space, and their old records are no longer found.
+- **One secret at a time**: there is no rotation yet.
+- **The secret's strength is all there is.** HKDF does not slow down guessing, and the key id lets a copy of the storage test a guessed secret offline: the secret must be random, not a passphrase.
+- **The sweep reads every record** of the mount once an hour: right for the hundreds of records of a backoffice, slow for millions.
+- **Last write wins.** Nothing locks a record: of two writes to one key at the same time, the second stays, and a record written again between the read and the removal of an expired one is removed too.
+- **Several instances need a shared driver**, and one secret. The file-system default fits one server, or a volume all of them see.
+- **No sweep where timers are not allowed at startup**, such as Cloudflare Workers: expired records go only when they are read.
+- **The default trusts Nitro's `node` flag**, not whether the file system keeps what is written: a serverless function on Node (`vercel`, `netlify`, `aws-lambda`) gets a folder that does not last, and the app must mount a driver.
+
 ## Testing
 
-The whole core runs without network or UI, with Vitest, in `packages/@mapomodule/ai/src/__tests__/`:
+The whole core and the storage run without network or UI, with Vitest, in `packages/@mapomodule/ai/src/__tests__/`; the storage tests use unstorage's memory and file-system drivers:
 
 | File                | What it proves                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -159,6 +238,12 @@ The whole core runs without network or UI, with Vitest, in `packages/@mapomodule
 | `sanitize.test.ts`  | Each kind read and discarded, limits, lists, relations, links, quotes and the verification rules             |
 | `citations.test.ts` | Finding quotes, numbers read one way, dates, times, time zones and links                                     |
 | `markdown.test.ts`  | The closed list of tags: everything else is text                                                             |
+| `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep   |
+| `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                            |
+| `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                             |
+| `plugin.test.ts`    | The plugin on a mocked Nitro: after the app's plugins, hourly, the log, the close, a runtime without timers  |
+| `nitro.test.ts`     | The wiring: closed with a 503 without a secret or a mount, the secret read through the event, the warnings   |
+| `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations  |
 
 - A bug fix leaves a regression test that fails on the previous version.
 - Answers recorded from real models are reduced to minimal cases and kept as tests, so the rules are checked against what models actually write, not only against answers written by hand.
@@ -188,6 +273,13 @@ pnpm --filter @mapomodule/ai test
 
 Add it to `SECRET_WORDS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. Test it from a form alone and from a backend schema alone, with a key that holds the word inside another word and must stay fillable.
 
+### Add a storage purpose
+
+1. Add it to `STORAGE_PURPOSES` in `sealed.ts`, with a JSDoc that says what it keeps. Its records get a key of their own.
+2. Write its records through `useMapoAiStorage(event).store(purpose)`, never with `useStorage()` directly, and give them an expiry unless they must last.
+3. Read them with a validator: what comes back is outside data, and may have been written by an older version.
+4. Never rename a purpose that has records: the key is derived from its name, and its records would no longer open.
+
 ### Add a tag of rich text
 
 Add it to `markdown.ts` and to the closed list in its tests, and make sure `MapoWygEditor` accepts it: the editor must keep every tag the AI's HTML has.
@@ -199,6 +291,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Section                                          | Filled by                                                |
 | ------------------------------------------------ | -------------------------------------------------------- |
 | What works today, Enable the module, The gateway | The gateway's first route (written)                      |
+| The secret and the storage                       | The encrypted storage (written)                          |
 | Options                                          | Each option, in the change that makes it work            |
 | Fill a form with Magic Fill                      | Magic Fill                                               |
 | Verified and to check                            | Magic Fill, from the verification described on this page |
@@ -217,13 +310,12 @@ This page, for people who work on Mapo, follows every change to the source. At t
 In this order:
 
 1. **Nested values in the core**: repeaters, objects, SEO and maps, verified item by item.
-2. **Encrypted server storage** for the module's state, with expiry.
-3. **The gateway's run route**: authentication, policy, prompts composed in layers, a mock provider, and the verification rules as an option of the app.
-4. **Readers** for text, PDF, images and spreadsheets.
-5. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
-6. **Keys on three levels**: the project's, those an admin assigns, and the operator's own.
-7. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
-8. **Magic Fill**, with an evaluation set run on real providers; then **Import AI**, with a check for duplicates between new items and existing records.
+2. **The gateway's run route**: authentication, policy, prompts composed in layers, a mock provider, the verification rules as an option of the app, and an audit log in the storage.
+3. **Readers** for text, PDF, images and spreadsheets.
+4. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
+5. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
+6. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
+7. **Magic Fill**, with an evaluation set run on real providers; then **Import AI**, with a check for duplicates between new items and existing records.
 
 ### Nice to have
 
@@ -233,4 +325,8 @@ Ideas with no place in the plan yet:
 - Resolve a named time zone (`CET`, `Europe/Rome`) to its offset on the value's date, so that such quotes can verify.
 - Let the form's number input take `multipleOf` as its `step`.
 - Limits on dates (a minimum and a maximum day), which the core does not model.
+- Rotate the storage's secret: read with the previous one too, and seal again with the new one at the next write.
+- Expire a batch and its drafts through one record, instead of one expiry each.
+- Keep the drafts in the browser (IndexedDB), for installations that cannot have a server storage.
+- Versions on records, for two tabs that write the same one.
 - Expose Magic Fill and Import AI as tools of a conversational agent. The module is designed for it: every action of its interface is an operation that can also run without the interface.

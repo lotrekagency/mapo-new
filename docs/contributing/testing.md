@@ -24,6 +24,7 @@ These are present on a clean checkout and are not caused by your change:
 - `pnpm lint` reports warnings (no errors) in `form` and `uikit`, mostly Vue template formatting rules.
 - `pnpm build` prints, for the apps: `SOURCEMAP_BROKEN` warnings from `@tailwindcss/vite`; a `[nuxt-i18n]` notice that `mapo-i18n.config.mjs` is not found in the app's `i18n/` folder; and `Overriding MapoMediaManagerDialog component`, because `@mapomodule/uikit` registers that component twice (once by name, once as global).
 - `pnpm exec vitest run` prints a Vite notice that `vitest.config.ts` has "ESM syntax in a file loaded as CommonJS", once for each test project.
+- `pnpm dev:example-e2e` warns that `NUXT_MAPO_AI_SECRET` is not set: the app sets `mapo.ai`, so the AI module seals its state with a temporary secret for that run, in `apps/example-e2e/.data/mapo-ai` ([AI-assisted entry](/modules/ai#set-the-secret)).
 
 Any other warning is new: fix it or explain it in the hand-over.
 
