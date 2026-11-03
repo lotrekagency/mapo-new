@@ -40,7 +40,7 @@ export type AiValueKind =
  * Why the AI leaves a field alone:
  * - `secret`: a value the backend never sends back, such as a password:
  *   `writeOnly`, `noDraft`, a `password` format or input, or a key that
- *   names a password;
+ *   names a password, a token, a secret or an API, private or access key;
  * - `readonly`: the form does not let the operator change it;
  * - `excluded`: `x-mapo-ai` or the entity's `exclude` list keeps the AI out;
  * - `media`: a file or a media, on either side;
@@ -1162,8 +1162,65 @@ function warnAboutConflicts(
     warnings.push({ kind: "readonly-conflict", key: field.key });
 }
 
-/** A key that names a password: `password`, `new_password`, `passwd`… */
-const PASSWORD_KEY = /pass(?:word|wd)/i;
+/** A key that names a password: `password`, `new_password`, `passwd`, `passphrase`… */
+const PASSWORD_KEY = /pass(?:word|wd|phrase)/i;
+
+/**
+ * Endings of a word of a key that name a secret: `token`, `authtoken`,
+ * `client_secret`, `clientsecret`, `apikey`, `privatekey`, `smtppwd`. A word
+ * that only begins so, such as `tokenizer` or `secretary`, names none.
+ */
+const SECRET_ENDINGS = [
+  "token",
+  "secret",
+  "apikey",
+  "privatekey",
+  "accesskey",
+  "secretkey",
+].flatMap((ending) => [ending, `${ending}s`]);
+
+/** Two words of a key that name a secret together: `api_key`, `privateKey`. */
+const SECRET_PAIRS = new Set(
+  ["api", "private", "access"].flatMap((kind) => [
+    `${kind} key`,
+    `${kind} keys`,
+  ]),
+);
+
+/**
+ * The words of a key, in lower case, split at `_`, `-`, `.`, camel case and
+ * digits: `auth_token` → `auth`, `token`; `apiKey2` and `APIKey2` → `api`,
+ * `key`, `2`.
+ */
+function keyWords(key: string): string[] {
+  return key
+    .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, "$1 $2")
+    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2")
+    .replace(/(\p{L})(\p{N})/gu, "$1 $2")
+    .replace(/(\p{N})(\p{L})/gu, "$1 $2")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/**
+ * A key that names a secret: a password anywhere in it (`pwd` as a word),
+ * or a word that ends in a token, a secret, an API, private, access or
+ * secret key, or an API, private or access key in two words. `secretary`,
+ * `tokenizer` and `keynote` name none.
+ */
+function namesSecret(key: string): boolean {
+  if (PASSWORD_KEY.test(key)) return true;
+  const words = keyWords(key);
+  const hasSecretWord = words.some(
+    (word) =>
+      word === "pwd" || SECRET_ENDINGS.some((ending) => word.endsWith(ending)),
+  );
+  const hasSecretPair = words.some((word, index) =>
+    SECRET_PAIRS.has(`${word} ${words[index + 1] ?? ""}`),
+  );
+  return hasSecretWord || hasSecretPair;
+}
 
 function mergeField(
   field: Side,
@@ -1187,7 +1244,7 @@ function mergeField(
     field.secret ||
     backend?.secret === true ||
     inherited.secret ||
-    PASSWORD_KEY.test(field.key);
+    namesSecret(field.key);
   if (isSecret) return skip("secret");
   // The form decides what is read-only; the backend only warns.
   if (field.readonly) return skip("readonly");

@@ -734,6 +734,65 @@ describe("buildAiEntity — what keeps the AI out counts wherever it is written"
       "secret",
     ]);
   });
+
+  describe("a key that names a token, a secret or an API key", () => {
+    const secrets = [
+      "auth_token",
+      "refreshTokens",
+      "client_secret",
+      "apiKey",
+      "APIKey",
+      "x-api-key",
+      "apikey",
+      "privateKey",
+      "access_key_id",
+      // With a digit, run together, or a password by another name.
+      "api_key2",
+      "apiKey2",
+      "token2",
+      "secret1",
+      "authtoken",
+      "csrftoken",
+      "clientsecret",
+      "secretkey",
+      "privatekey",
+      "accesskey",
+      "db_pwd",
+      "passphrase",
+    ];
+    // The same words at the start of another word, or another word beside "key".
+    const kept = [
+      "secretary_name",
+      "tokenizer",
+      "keynote",
+      "api_version",
+      "passport",
+    ];
+
+    it("keeps it out of a form alone", () => {
+      const entity = formEntity(
+        [...secrets, ...kept].map((key) => ({ key, type: "text" })) as Fields,
+      );
+
+      expect(entity.skipped.map((field) => [field.key, field.reason])).toEqual(
+        secrets.map((key) => [key, "secret"]),
+      );
+      expect(entity.fields.map((field) => field.key)).toEqual(kept);
+    });
+
+    it("keeps it out of a backend schema alone", () => {
+      const entity = buildAiEntity({
+        schema: objectSchema(
+          Object.fromEntries(
+            [...secrets, ...kept].map((key) => [key, { type: "string" }]),
+          ),
+        ),
+      });
+
+      expect(entity.skipped.map((field) => field.key)).toEqual(secrets);
+      expect(entity.fields.map((field) => field.key)).toEqual(kept);
+    });
+  });
 });
 
 describe("buildAiEntity — dotted keys", () => {
