@@ -9,10 +9,16 @@ import type {
   AiFillContract,
 } from "../runtime/shared/contract";
 import {
+  DEFAULT_VERIFICATION_RULES,
   sanitizeExtractAnswer,
   sanitizeFillAnswer,
+  verificationRulesOf,
 } from "../runtime/shared/sanitize";
-import type { AiFieldOutcome, AiFillResult } from "../runtime/shared/sanitize";
+import type {
+  AiFieldOutcome,
+  AiFillResult,
+  AiVerificationRules,
+} from "../runtime/shared/sanitize";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -72,12 +78,16 @@ function sanitizeOne(
   raw: unknown,
   source?: string,
   evidence: unknown[] = [],
+  rules?: Partial<AiVerificationRules>,
 ): { outcome: AiFieldOutcome | undefined; result: AiFillResult } {
   const contract = fill([field]);
   const result = sanitizeFillAnswer(
     contract,
     answer(contract, { [field.key]: raw }, evidence),
-    { ...(source !== undefined ? { source } : {}) },
+    {
+      ...(source !== undefined ? { source } : {}),
+      ...(rules ? { rules } : {}),
+    },
   );
   return { outcome: result.fields[field.key], result };
 }
@@ -677,7 +687,7 @@ describe("sanitizeFillAnswer — quotes", () => {
       true,
     ],
     [
-      "a date, by its quote alone",
+      "a date whose quote writes its day and year",
       aiField("day", "date"),
       "2026-10-14",
       "14 ottobre 2026",
@@ -811,6 +821,307 @@ describe("sanitizeFillAnswer — quotes", () => {
 });
 
 // ─── The answer's shape ──────────────────────────────────────────────────────
+
+// The answers of two local models (the test of the contract and the
+// sanitizer with Ollama), reduced to the part that showed each case.
+describe("sanitizeFillAnswer — verification rules", () => {
+  const quote = (field: string, words: string, where = "") => ({
+    field,
+    quote: words,
+    where,
+  });
+  const verifiedOf = (
+    field: AiField,
+    raw: unknown,
+    source: string,
+    words: string,
+    rules?: Partial<AiVerificationRules>,
+  ) => {
+    const { outcome } = sanitizeOne(
+      field,
+      raw,
+      source,
+      [quote(field.key, words)],
+      rules,
+    );
+    expect(outcome?.status).toBe("filled");
+    return outcome?.status === "filled" ? outcome.verified : undefined;
+  };
+
+  const pressRelease = [
+    "Comunicato stampa \u2013 Pisa, 14 ottobre 2026.",
+    "Riapre il Teatro Verdi di Pisa.",
+  ].join("\n");
+  const draft = [
+    "Articolo in bozza avanzata, da pubblicare il 14 ottobre 2026 alle 21:00.",
+    "Priorit\u00e0: 150. Embargo fino al 12 marzo.",
+  ].join("\n");
+  const published = aiField("published_at", "datetime");
+  const embargo = aiField("embargo_until", "date");
+
+  it("applies the prudent rules when it is given none", () => {
+    expect(DEFAULT_VERIFICATION_RULES).toEqual({
+      dateYear: true,
+      bareHours: false,
+      timeZones: true,
+      oneWordQuotes: "unique",
+      richTextLinks: true,
+    });
+  });
+
+  it("does not verify the midnight a model adds to a day without a time", () => {
+    // One model added the offset too, the other did not.
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T00:00:00+02:00",
+        pressRelease,
+        "Pisa, 14 ottobre 2026",
+      ),
+    ).toBe(false);
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T00:00:00",
+        pressRelease,
+        "14 ottobre 2026",
+      ),
+    ).toBe(false);
+  });
+
+  it("verifies a date and time its quote writes whole", () => {
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T21:00:00",
+        draft,
+        "14 ottobre 2026 alle 21:00",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not verify an offset a model adds to the time of the source", () => {
+    const rules = { timeZones: false };
+
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T21:00:00+02:00",
+        draft,
+        "14 ottobre 2026 alle 21:00",
+      ),
+    ).toBe(false);
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T21:00:00+02:00",
+        draft,
+        "14 ottobre 2026 alle 21:00",
+        rules,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not verify the year a model adds to a day without one", () => {
+    expect(
+      verifiedOf(embargo, "2026-03-12", draft, "Embargo fino al 12 marzo"),
+    ).toBe(false);
+    expect(
+      verifiedOf(embargo, "2026-03-12", draft, "Embargo fino al 12 marzo", {
+        dateYear: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("verifies a time by its hours and minutes, an hour alone only when told so", () => {
+    const doors = aiField("doors", "time");
+    const source = "Apertura porte in serata, spettacolo alle 21.";
+
+    expect(verifiedOf(doors, "20:00", source, "Apertura porte in serata")).toBe(
+      false,
+    );
+    expect(verifiedOf(doors, "21:00", source, "spettacolo alle 21")).toBe(
+      false,
+    );
+    expect(
+      verifiedOf(doors, "21:00", source, "spettacolo alle 21", {
+        bareHours: true,
+      }),
+    ).toBe(true);
+  });
+
+  describe("quotes of one word", () => {
+    const sheet = [
+      'Scheda prodotto: sedia da giardino "Riva".',
+      "Attributo 7: alluminio anodizzato. Attributo 12: impilabile. Attributo 150: garanzia 5 anni.",
+      "Colore: rosso. Finitura: rosso. Peso: 4,25 kg.",
+    ].join("\n");
+
+    it("verifies a value that is the one word the source writes once", () => {
+      const { outcome } = sanitizeOne(
+        aiField("attr_012"),
+        "impilabile",
+        sheet,
+        [quote("attr_012", "impilabile", "Attributo 12")],
+      );
+
+      expect(outcome).toEqual({
+        status: "filled",
+        value: "impilabile",
+        verified: true,
+        quotes: [{ quote: "impilabile", where: "Attributo 12", found: true }],
+      });
+    });
+
+    it("does not count a word the source writes twice, nor any when told so", () => {
+      expect(verifiedOf(aiField("colour"), "rosso", sheet, "rosso")).toBe(
+        false,
+      );
+      expect(
+        verifiedOf(aiField("attr_012"), "impilabile", sheet, "impilabile", {
+          oneWordQuotes: "never",
+        }),
+      ).toBe(false);
+    });
+
+    it("verifies with one word only a value it is whole", () => {
+      const choice = aiField("finish", "choice", {
+        choices: [{ value: "r", label: "Impilabile" }],
+      });
+
+      expect(verifiedOf(choice, "r", sheet, "impilabile")).toBe(true);
+      expect(
+        verifiedOf(aiField("name"), "sedia impilabile", sheet, "impilabile"),
+      ).toBe(false);
+      expect(
+        verifiedOf(
+          aiField("stackable", "boolean"),
+          "true",
+          sheet,
+          "impilabile",
+        ),
+      ).toBe(false);
+      expect(
+        verifiedOf(aiField("day", "date"), "2026-10-07", sheet, "7", {
+          dateYear: false,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("rich text", () => {
+    const body = aiField("body", "html");
+
+    it("verifies rich text whose quote carries the Markdown of the source", () => {
+      const markdown = [
+        "**Grande festa** per la riapertura. Il programma:",
+        "- concerto inaugurale;",
+        "- visite guidate gratuite;",
+        "- mostra fotografica.",
+        "Info su [il sito del teatro](https://teatroverdipisa.it).",
+      ].join("\n");
+      const source = `Rubrica: Teatro.\n\nTesto:\n${markdown}`;
+
+      expect(verifiedOf(body, markdown, source, markdown)).toBe(true);
+    });
+
+    it("does not verify rich text with a link its quote does not write", () => {
+      const source = "Info sul sito del teatro, teatroverdipisa.it.";
+      const quoted = "Info sul sito del teatro, teatroverdipisa.it";
+
+      expect(
+        verifiedOf(
+          body,
+          "Info sul [sito del teatro](https://teatroverdipisa.it/biglietti)",
+          source,
+          quoted,
+        ),
+      ).toBe(false);
+      expect(
+        verifiedOf(
+          body,
+          "Info sul [sito del teatro](https://teatroverdipisa.it)",
+          source,
+          quoted,
+        ),
+      ).toBe(true);
+      expect(
+        verifiedOf(
+          body,
+          "Info sul [sito del teatro](https://teatroverdipisa.it/biglietti)",
+          source,
+          quoted,
+          { richTextLinks: false },
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("does not verify an address whose quote writes a longer one", () => {
+    const tickets = aiField("tickets", "url");
+    const source =
+      "Biglietti su https://teatro.it/biglietti/2027 e al botteghino.";
+    const words = "Biglietti su https://teatro.it/biglietti/2027";
+
+    expect(
+      verifiedOf(tickets, "https://teatro.it/biglietti", source, words),
+    ).toBe(false);
+    expect(
+      verifiedOf(tickets, "https://teatro.it/biglietti/2027", source, words),
+    ).toBe(true);
+  });
+
+  it("reads the rules from stored settings of any shape, and never throws on them", () => {
+    const { result } = sanitizeOne(
+      embargo,
+      "2026-03-12",
+      draft,
+      [],
+      null as never,
+    );
+
+    expect(result.fields.embargo_until).toMatchObject({ status: "filled" });
+    expect(verificationRulesOf(null)).toEqual(DEFAULT_VERIFICATION_RULES);
+    expect(verificationRulesOf("dateYear")).toEqual(DEFAULT_VERIFICATION_RULES);
+    // Only the settings' own values: an inherited one is no setting.
+    expect(verificationRulesOf(Object.create({ dateYear: false }))).toEqual(
+      DEFAULT_VERIFICATION_RULES,
+    );
+    expect(verificationRulesOf({ bareHours: true }).bareHours).toBe(true);
+  });
+
+  it("keeps its defaults out of reach", () => {
+    expect(Object.isFrozen(DEFAULT_VERIFICATION_RULES)).toBe(true);
+  });
+
+  it("keeps the default of a rule given with the wrong type", () => {
+    const malformed = {
+      dateYear: undefined,
+      timeZones: "no",
+      oneWordQuotes: "sometimes",
+      richTextLinks: 0,
+    } as unknown as Partial<AiVerificationRules>;
+
+    expect(
+      verifiedOf(
+        embargo,
+        "2026-03-12",
+        draft,
+        "Embargo fino al 12 marzo",
+        malformed,
+      ),
+    ).toBe(false);
+    expect(
+      verifiedOf(
+        published,
+        "2026-10-14T21:00:00+02:00",
+        draft,
+        "14 ottobre 2026 alle 21:00",
+        malformed,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("sanitizeFillAnswer — the answer's shape", () => {
   const contract = fill([aiField("title"), aiField("seats", "integer")]);

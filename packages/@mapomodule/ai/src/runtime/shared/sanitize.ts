@@ -10,8 +10,12 @@
  *
  * A value is verified when a quote of it is in the source, as whole words,
  * and holds it: the whole text, the number or the label appears in the
- * quote. Dates, times, yes/no and links to an item need only the quote.
- * Without the source's text nothing is verified.
+ * quote; a date writes its day and year, a time its hours and minutes, a
+ * date and time both and its time zone; an address and rich text their
+ * links. Yes/no and links to an item need a found quote of two words or
+ * more. The rules of what a quote must hold can be changed
+ * (`AiVerificationRules`), never so far that a value is verified without a
+ * quote found in the source. Without the source's text nothing is verified.
  */
 import type { AiChoice } from "./entity";
 import { isMultipleOf } from "./numbers";
@@ -21,9 +25,21 @@ import type {
   AiExtractContract,
   AiFillContract,
 } from "./contract";
-import { holds, isQuoted, numbersIn, searchableSource } from "./citations";
+import {
+  holds,
+  isCalendarDate,
+  isOneWord,
+  isQuoted,
+  numbersIn,
+  searchableSource,
+  writesDate,
+  writesDateTime,
+  writesLink,
+  writesTime,
+} from "./citations";
+import type { CalendarDay, ClockTime, OneWordQuotes } from "./citations";
 import { isRecord } from "./guards";
-import { markdownToHtml, markdownToText } from "./markdown";
+import { markdownLinks, markdownToHtml, markdownToText } from "./markdown";
 
 // ─── The result ──────────────────────────────────────────────────────────────
 
@@ -75,7 +91,10 @@ export interface AiQuote {
   quote: string;
   /** Where they are, such as a page; `""` when the source has no parts. */
   where: string;
-  /** Found in the source's text. */
+  /**
+   * Found in the source's text, as whole words: two words or numbers at
+   * least, or one the source writes once (by the `oneWordQuotes` rule).
+   */
   found: boolean;
 }
 
@@ -168,23 +187,115 @@ export interface AiExtractResult {
   warnings: AiAnswerWarning[];
 }
 
+/**
+ * What a quote must hold for a value to be verified, rule by rule. Each
+ * rule has a prudent default ({@link DEFAULT_VERIFICATION_RULES}); the
+ * app's configuration and the admin's settings may change it. No rule makes
+ * a value verified without a quote found in the source.
+ */
+export interface AiVerificationRules {
+  /** The quote of a date writes its year, not only the day: `14 ottobre` verifies no date. */
+  dateYear: boolean;
+  /**
+   * An hour alone counts as a time (`alle 21`): from 13 to 23, when it is
+   * the only number of the quote besides the date's. Off, the quote writes
+   * the minutes, am/pm or `h` (`21:00`, `9 pm`, `21h`).
+   */
+  bareHours: boolean;
+  /**
+   * A date and time verifies only with the time zone of its quote: the same
+   * offset, or none on either side. A model that adds an offset the source
+   * does not write (`Z`, `+02:00`) needs a check.
+   */
+  timeZones: boolean;
+  /**
+   * When a quote of one word or number counts: `"unique"`, when the source
+   * writes it once (`impilabile`); `"never"`. Even then it verifies only a
+   * value it is whole: a text, a label, a number; never a yes/no, a date or
+   * a link to an item.
+   */
+  oneWordQuotes: OneWordQuotes;
+  /** Rich text verifies only when its quote writes the address of each of its links too. */
+  richTextLinks: boolean;
+}
+
+/**
+ * The rules {@link sanitizeFillAnswer} and {@link sanitizeExtractAnswer}
+ * apply when they are given none. Frozen: a change here would loosen every
+ * check.
+ */
+export const DEFAULT_VERIFICATION_RULES: Readonly<AiVerificationRules> =
+  Object.freeze({
+    dateYear: true,
+    bareHours: false,
+    timeZones: true,
+    oneWordQuotes: "unique",
+    richTextLinks: true,
+  });
+
+/**
+ * The verification rules a value gives, such as stored settings: each rule
+ * with a value of its type, the default for the rest. Anything else, `null`
+ * included, keeps the defaults: a malformed setting never loosens the check.
+ *
+ * @param value Outside data, of any shape.
+ */
+export function verificationRulesOf(value: unknown): AiVerificationRules {
+  const given = isRecord(value) ? value : {};
+  const own = (key: keyof AiVerificationRules): unknown =>
+    Object.hasOwn(given, key) ? given[key] : undefined;
+  const flag = (key: keyof AiVerificationRules, fallback: boolean) => {
+    const rule = own(key);
+    return typeof rule === "boolean" ? rule : fallback;
+  };
+  const oneWord = own("oneWordQuotes");
+  const defaults = DEFAULT_VERIFICATION_RULES;
+  return {
+    dateYear: flag("dateYear", defaults.dateYear),
+    bareHours: flag("bareHours", defaults.bareHours),
+    timeZones: flag("timeZones", defaults.timeZones),
+    oneWordQuotes:
+      oneWord === "unique" || oneWord === "never"
+        ? oneWord
+        : defaults.oneWordQuotes,
+    richTextLinks: flag("richTextLinks", defaults.richTextLinks),
+  };
+}
+
 /** Options of {@link sanitizeFillAnswer} and {@link sanitizeExtractAnswer}. */
 export interface SanitizeOptions {
   /** The source's text, where the quotes are searched. Without it nothing is verified. */
   source?: string;
+  /**
+   * The verification rules that differ from {@link DEFAULT_VERIFICATION_RULES},
+   * read with {@link verificationRulesOf}: a rule with a value of the wrong
+   * type keeps its default.
+   */
+  rules?: Partial<AiVerificationRules>;
 }
 
 // ─── One value ───────────────────────────────────────────────────────────────
 
 /**
  * What a quote must hold for a value to be verified: one of some texts (the
- * value, its label), a number, or nothing more than being found (dates,
- * times, yes/no, a link to an item).
+ * value, its label), an address, rich text's words and links, a number, a
+ * day, a time, or nothing more than being found (yes/no, a link to an item).
  */
 type Probe =
   | { kind: "found" }
   | { kind: "text"; texts: string[] }
-  | { kind: "number"; value: number };
+  | { kind: "link"; target: string }
+  | { kind: "rich"; text: string; links: string[] }
+  | { kind: "number"; value: number }
+  | { kind: "date"; day: CalendarDay }
+  | { kind: "time"; time: ClockTime }
+  | {
+      kind: "datetime";
+      day: CalendarDay;
+      time: ClockTime;
+      /** The UTC offset in minutes; `undefined` when the value has none. */
+      offset: number | undefined;
+    };
 
 type Element =
   | { kind: "empty" }
@@ -202,6 +313,7 @@ interface LinkTargets {
 /** The state of one answer being read. */
 interface Reading {
   readings?: string[];
+  rules: AiVerificationRules;
   warnings: AiAnswerWarning[];
   /** Patterns already reported as unreadable, by field key. */
   unreadable: Set<string>;
@@ -229,15 +341,6 @@ function singleLine(text: string): string {
 /** Length in characters as the backend counts them: code points, not UTF-16 units. */
 function lengthOf(text: string): number {
   return [...text].length;
-}
-
-function isCalendarDate(year: number, month: number, day: number): boolean {
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
 }
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -326,8 +429,12 @@ function convert(field: AiContractField, raw: string): Element {
     case "html": {
       const html = markdownToHtml(text);
       if (!html) return empty;
-      // The words of the rich text, as a quote of the source would hold them.
-      const probe: Probe = { kind: "text", texts: [markdownToText(text)] };
+      // The words and the links of the rich text, as a quote of the source would hold them.
+      const probe: Probe = {
+        kind: "rich",
+        text: markdownToText(text),
+        links: markdownLinks(text),
+      };
       return { kind: "value", value: html, probe };
     }
     case "email": {
@@ -335,7 +442,10 @@ function convert(field: AiContractField, raw: string): Element {
       return email ? asText(email) : error("format");
     }
     case "url":
-      return isWebUrl(text) ? asText(text) : error("format");
+      // The address as a whole: `teatro.it/biglietti/2027` is another one.
+      return isWebUrl(text)
+        ? { kind: "value", value: text, probe: { kind: "link", target: text } }
+        : error("format");
     case "color":
       return /^#[0-9a-f]{6}$/i.test(text) ? asText(text) : error("format");
     case "integer": {
@@ -357,11 +467,20 @@ function convert(field: AiContractField, raw: string): Element {
     }
     case "date": {
       const [, year, month, day] = DATE.exec(text) ?? [];
+      const calendarDay = {
+        year: Number(year),
+        month: Number(month),
+        day: Number(day),
+      };
       const isDate =
-        !!year && isCalendarDate(Number(year), Number(month), Number(day));
-      return isDate
-        ? { kind: "value", value: text, probe: FOUND }
-        : error("format");
+        !!year &&
+        isCalendarDate(calendarDay.year, calendarDay.month, calendarDay.day);
+      if (!isDate) return error("format");
+      return {
+        kind: "value",
+        value: text,
+        probe: { kind: "date", day: calendarDay },
+      };
     }
     case "datetime": {
       const [
@@ -383,7 +502,22 @@ function convert(field: AiContractField, raw: string): Element {
         isClockTime(zoneHours, zoneMinutes);
       if (!isDatetime) return error("format");
       const value = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${zone.toUpperCase()}`;
-      return { kind: "value", value, probe: FOUND };
+      const sign = zone.startsWith("-") ? -1 : 1;
+      const offset =
+        zone === ""
+          ? undefined
+          : sign * (Number(zoneHours) * 60 + Number(zoneMinutes));
+      const probe: Probe = {
+        kind: "datetime",
+        day: { year: Number(year), month: Number(month), day: Number(day) },
+        time: {
+          hours: Number(hours),
+          minutes: Number(minutes),
+          seconds: Number(seconds),
+        },
+        offset,
+      };
+      return { kind: "value", value, probe };
     }
     case "time": {
       const [, hours = "", minutes = "", seconds] = TIME.exec(text) ?? [];
@@ -394,7 +528,12 @@ function convert(field: AiContractField, raw: string): Element {
         minutes,
         ...(seconds ? [seconds] : []),
       ].join(":");
-      return { kind: "value", value, probe: FOUND };
+      const time = {
+        hours: Number(hours),
+        minutes: Number(minutes),
+        seconds: Number(seconds ?? 0),
+      };
+      return { kind: "value", value, probe: { kind: "time", time } };
     }
     case "choice": {
       const choice = listedChoice(field.choices, clean);
@@ -554,14 +693,55 @@ function element(
 
 /**
  * The quote holds the value: the whole text as words (a summary longer than
- * its quotes is never verified), the number as the source writes it in one
- * unambiguous way, or nothing more for a value that needs only the quote.
+ * its quotes is never verified), with rich text's links; the number as the
+ * source writes it in one unambiguous way; the day, the time and the time
+ * zone as the rules ask; or nothing more for a value that needs only the
+ * quote. A quote of one word holds only a value it is whole.
  */
-function holdsProbe(probe: Probe, quote: string): boolean {
-  if (probe.kind === "found") return true;
-  if (probe.kind === "number")
-    return numbersIn(quote).some((number) => isSameNumber(number, probe.value));
-  return probe.texts.some((text) => holds(quote, text));
+function holdsProbe(
+  probe: Probe,
+  quote: string,
+  rules: AiVerificationRules,
+): boolean {
+  const isOneWordQuote = isOneWord(quote);
+  switch (probe.kind) {
+    case "found":
+      return !isOneWordQuote;
+    case "text":
+      return probe.texts.some((text) => holds(quote, text));
+    case "link":
+      return writesLink(quote, probe.target);
+    case "rich": {
+      const hasWords = holds(quote, probe.text);
+      const hasLinks =
+        !rules.richTextLinks ||
+        probe.links.every((link) => writesLink(quote, link));
+      return hasWords && hasLinks;
+    }
+    case "number":
+      return numbersIn(quote).some((number) =>
+        isSameNumber(number, probe.value),
+      );
+    case "date":
+      return (
+        !isOneWordQuote &&
+        writesDate(quote, probe.day, { year: rules.dateYear })
+      );
+    case "time":
+      return (
+        !isOneWordQuote &&
+        writesTime(quote, probe.time, { bareHours: rules.bareHours })
+      );
+    case "datetime":
+      return (
+        !isOneWordQuote &&
+        writesDateTime(quote, probe.day, probe.time, probe.offset, {
+          year: rules.dateYear,
+          bareHours: rules.bareHours,
+          timeZone: rules.timeZones,
+        })
+      );
+  }
 }
 
 function isSameNumber(a: number, b: number): boolean {
@@ -587,7 +767,7 @@ function field(
 ): AiFieldOutcome {
   const found = quotes.filter((quote) => quote.found);
   const isHeld = (probe: Probe) =>
-    found.some((quote) => holdsProbe(probe, quote.quote));
+    found.some((quote) => holdsProbe(probe, quote.quote, reading.rules));
   const discard = (reason: AiDiscardReason): AiFieldOutcome => ({
     status: "discarded",
     reason,
@@ -680,7 +860,9 @@ function quotesOf(
       reading.warnings.push({ kind: "unknown-field", path: at, field: name });
       return;
     }
-    const found = !!reading.readings && isQuoted(reading.readings, quote);
+    const found =
+      !!reading.readings &&
+      isQuoted(reading.readings, quote, reading.rules.oneWordQuotes);
     const where = typeof written === "string" ? written : "";
     byWire.set(wire, [...(byWire.get(wire) ?? []), { quote, where, found }]);
   });
@@ -736,6 +918,7 @@ function readingOf(options: SanitizeOptions): Reading {
     ...(options.source !== undefined
       ? { readings: searchableSource(options.source) }
       : {}),
+    rules: verificationRulesOf(options.rules),
     warnings: [],
     unreadable: new Set(),
   };
@@ -749,7 +932,8 @@ function readingOf(options: SanitizeOptions): Reading {
  *
  * @param contract The contract the answer was asked with.
  * @param answer The answer, parsed from JSON: outside data, of any shape.
- * @param options `source`, the text the quotes are searched in.
+ * @param options `source`, the text the quotes are searched in; `rules`,
+ * the verification rules that differ from the defaults.
  * @returns Plain JSON: the gateway sends it to the browser.
  *
  * @example
@@ -785,7 +969,8 @@ export function sanitizeFillAnswer(
  *
  * @param contract The contract the answer was asked with.
  * @param answer The answer, parsed from JSON: outside data, of any shape.
- * @param options `source`, the text the quotes are searched in.
+ * @param options `source`, the text the quotes are searched in; `rules`,
+ * the verification rules that differ from the defaults.
  * @returns Plain JSON: the gateway sends it to the browser.
  */
 export function sanitizeExtractAnswer(

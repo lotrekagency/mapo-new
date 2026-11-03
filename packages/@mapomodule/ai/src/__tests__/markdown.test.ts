@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { markdownToHtml, markdownToText } from "../runtime/shared/markdown";
+import {
+  markdownLinks,
+  markdownToHtml,
+  markdownToText,
+} from "../runtime/shared/markdown";
 
 describe("markdownToHtml — the restricted set", () => {
   it.each([
@@ -136,5 +140,23 @@ describe("markdownToText", () => {
         "**Free** entry.\n\n- [Tickets](https://e.com)\n- *Dinner*",
       ),
     ).toBe("Free entry.\nTickets\nDinner");
+  });
+});
+
+describe("markdownLinks", () => {
+  it("lists the address of each link that becomes a tag, as written, once", () => {
+    expect(
+      markdownLinks(
+        [
+          "Info su [il sito](https://teatro.it) e [i biglietti](http://teatro.it/biglietti).",
+          "- [**Ancora** il sito](https://teatro.it)",
+          "Mai: [x](javascript:alert(1)), [y](mailto:info@teatro.it), [z](teatro.it).",
+        ].join("\n"),
+      ),
+    ).toEqual(["https://teatro.it", "http://teatro.it/biglietti"]);
+  });
+
+  it("lists nothing for text without links", () => {
+    expect(markdownLinks("**Grande festa** per tutti")).toEqual([]);
   });
 });

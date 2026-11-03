@@ -20,9 +20,11 @@ src/
                                contract.ts what the AI is asked to return (fill, extract): the strict schema of the
                                            answer, in the subset every provider accepts, and the fields behind it
                                sanitize.ts the answer checked against its contract: typed values, discarded ones with
-                                           their reason, quotes verified against the source
+                                           their reason, quotes verified against the source by rules with prudent
+                                           defaults (`AiVerificationRules`)
                                markdown.ts the restricted Markdown of rich text, to HTML from a closed list of tags
-                               citations.ts finding a quote in the source, and a value in a quote
+                               citations.ts finding a quote in the source, and a value in a quote: words, numbers,
+                                           dates, times and time zones, links
                                numbers.ts  numbers as the backend checks them (`multipleOf`)
                                guards.ts   type guards for outside values
   runtime/server/routes/     Nitro handlers, one file per route
@@ -53,6 +55,7 @@ src/
 | A value kind or a skip reason    | `entity.ts`; `contract.ts` (`KIND_RULES`, `PROSE_KINDS`); `convert()` in `sanitize.ts`; the tables of the tests |
 | The contract's shape             | `AI_CONTRACT_FORMAT_VERSION` (and the gateway's when it reads it), `expectPortable()`, `sanitize.ts`            |
 | A tag of rich text               | `markdown.ts` and the extensions of `MapoWygEditor`: the editor must accept every tag the AI's HTML has         |
+| A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests        |
 
 ## Verify
 

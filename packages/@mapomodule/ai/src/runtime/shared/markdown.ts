@@ -95,8 +95,16 @@ function blocksOf(markdown: string): Block[] {
   return blocks;
 }
 
-/** Bold, italic and links of one line of text, as HTML or as plain text. */
-function renderInline(text: string, mode: Inline, inLink = false): string {
+/**
+ * Bold, italic and links of one line of text, as HTML or as plain text.
+ * `links` collects the address of each link that becomes a tag, as written.
+ */
+function renderInline(
+  text: string,
+  mode: Inline,
+  inLink = false,
+  links?: string[],
+): string {
   const plain = (value: string) =>
     mode === "html" ? escapeHtml(value) : value;
   let out = "";
@@ -107,7 +115,12 @@ function renderInline(text: string, mode: Inline, inLink = false): string {
     const isBold = rest.startsWith("**");
     const boldEnd = isBold ? text.indexOf("**", index + 2) : -1;
     if (boldEnd > index + 2) {
-      const inner = renderInline(text.slice(index + 2, boldEnd), mode, inLink);
+      const inner = renderInline(
+        text.slice(index + 2, boldEnd),
+        mode,
+        inLink,
+        links,
+      );
       out += mode === "html" ? `<strong>${inner}</strong>` : inner;
       index = boldEnd + 2;
       continue;
@@ -123,6 +136,7 @@ function renderInline(text: string, mode: Inline, inLink = false): string {
         text.slice(index + 1, italicEnd),
         mode,
         inLink,
+        links,
       );
       out += mode === "html" ? `<em>${inner}</em>` : inner;
       index = italicEnd + 1;
@@ -134,6 +148,7 @@ function renderInline(text: string, mode: Inline, inLink = false): string {
       const [whole, label = "", target = ""] = link;
       const inner = renderInline(label, mode, true);
       const href = safeHref(target);
+      if (href) links?.push(target);
       out +=
         mode === "html" && href
           ? `<a href="${escapeHtml(href)}">${inner}</a>`
@@ -191,4 +206,21 @@ export function markdownToText(markdown: string): string {
         : block.lines.map((line) => renderInline(line, "text")),
     )
     .join("\n");
+}
+
+/**
+ * The addresses of the links of restricted Markdown, as written, once each:
+ * only those that become a link in the HTML (`http` and `https`).
+ *
+ * @example
+ * markdownLinks("[Tickets](https://example.com) and [x](javascript:alert(1))")
+ * // ["https://example.com"]
+ */
+export function markdownLinks(markdown: string): string[] {
+  const links: string[] = [];
+  for (const block of blocksOf(markdown)) {
+    const lines = block.kind === "p" ? [block.lines.join(" ")] : block.lines;
+    for (const line of lines) renderInline(line, "text", false, links);
+  }
+  return [...new Set(links)];
 }
