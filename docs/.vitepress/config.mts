@@ -140,6 +140,7 @@ export default defineConfig({
           { text: 'Adding a UIKit component', link: '/contributing/add-component' },
           { text: 'Adding a composable or utility', link: '/contributing/add-composable' },
           { text: 'Working on the MCP server', link: '/contributing/mcp-server' },
+          { text: 'Working on the AI module', link: '/contributing/ai-module' },
           { text: 'Working with AI agents', link: '/contributing/ai-workflow' },
         ],
       },

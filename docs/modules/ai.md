@@ -12,6 +12,8 @@ The package is at its first building block. Today it installs the **AI gateway**
 - The gateway answers `GET /_mapo/ai/status` with the version of its contract.
 - `mapomodule/types` exports `MapoAiOptions` and `MapoAiStatus`.
 
+How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
+
 ## Enable the module
 
 With the meta-package, set the `mapo.ai` key. An empty block is enough:

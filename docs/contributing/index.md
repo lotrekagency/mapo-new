@@ -67,6 +67,7 @@ Every change, from a one-line fix to a new feature, goes through the same steps:
    - [Adding a UIKit component](./add-component)
    - [Adding a composable, store or utility](./add-composable)
    - [Working on the MCP server](./mcp-server)
+   - [Working on the AI module](./ai-module)
 4. **Test.** New logic leaves a Vitest test behind, and a bug fix leaves a regression test. → [Testing and verification](./testing)
 5. **Document** in the same change: the narrative page, the API reference, the sidebar, and the MCP recipes when a new task becomes possible. → [Writing documentation](./documentation)
 6. **Verify.** Run the gates; for UI or runtime changes, also check the reference app. → [Testing and verification](./testing#the-gates)

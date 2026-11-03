@@ -246,6 +246,7 @@ What exists: [`docs/guide/feature-status.md`](docs/guide/feature-status.md). Kno
 | [Adding a UIKit component](docs/contributing/add-component.md)        | You add or change a `Mapo*` component                              |
 | [Adding a composable or utility](docs/contributing/add-composable.md) | You add to a package's public surface                              |
 | [Working on the MCP server](docs/contributing/mcp-server.md)          | You change the MCP server or anything it describes                 |
+| [Working on the AI module](docs/contributing/ai-module.md)            | You change `@mapomodule/ai`: its design, rules and plan            |
 | [Working with AI agents](docs/contributing/ai-workflow.md)            | You change this file, the skills, the subagents or the MCP configs |
 | [Architecture & Flows](docs/guide/architecture-flows.md)              | You touch fetch, auth, SSR hydration or middleware                 |
 | [Known limitations](docs/guide/known-limitations.md)                  | Something looks odd: it may be a documented workaround             |
