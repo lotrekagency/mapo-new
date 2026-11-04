@@ -2,8 +2,9 @@
  * The entity model: what the AI may fill in a record, and how. It is built
  * from JSON Schemas in Mapo's dialect, the backend's and the form's, merged
  * with the fields first (they decide which fields exist and how they look)
- * and the stricter constraint winning. Pure and serializable: the browser
- * builds it, and the gateway receives it inside the contract.
+ * and the stricter constraint winning. Pure and serializable: the gateway
+ * builds it from the descriptions a request sends, and a page can build the
+ * same from the same descriptions.
  *
  * Safety comes first. A secret, a read-only value, an excluded field or a
  * media field never becomes fillable, wherever the schema says so: beside a

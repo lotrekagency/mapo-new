@@ -4,11 +4,25 @@
  */
 
 import type { MapoAiAccessRule } from "./runtime/server/auth/user";
+import type { MapoAiProviderOptions } from "./runtime/server/run/options";
+import type { MapoAiLimits } from "./runtime/shared/gateway";
+import type { AiVerificationRules } from "./runtime/shared/sanitize";
 
 export type {
+  MapoAiDefaults,
+  MapoAiExtractRequest,
+  MapoAiFillRequest,
+  MapoAiLimits,
+  MapoAiProviderStatus,
+  MapoAiRunEntity,
+  MapoAiRunRequest,
+  MapoAiRunResponse,
   MapoAiSecretState,
+  MapoAiSourcePart,
   MapoAiStatus,
   MapoAiStorageState,
+  MapoAiTextPart,
+  MapoAiUsage,
 } from "./runtime/shared/gateway";
 export type {
   MapoAiAccessRule,
@@ -16,6 +30,36 @@ export type {
   MapoAiUserContext,
 } from "./runtime/server/auth/user";
 export type { MapoAiRuntimeHooks } from "./runtime/server/auth/hooks";
+export type {
+  MapoAiModelInfo,
+  MapoAiProvider,
+  MapoAiProviderAnswer,
+  MapoAiProviderCapabilities,
+  MapoAiProviderFailure,
+  MapoAiProviderRequest,
+} from "./runtime/server/providers/types";
+export type { MapoAiMockFixture } from "./runtime/server/providers/mock";
+export type { MapoAiPrompt } from "./runtime/server/prompts/compose";
+export type {
+  MapoAiPromptContext,
+  MapoAiPromptEntity,
+} from "./runtime/server/run/run";
+export type { MapoAiProviderOptions } from "./runtime/server/run/options";
+export type { AiChoice } from "./runtime/shared/entity";
+export type {
+  AiAnswerWarning,
+  AiDiscardReason,
+  AiDroppedValue,
+  AiExtractedItem,
+  AiExtractResult,
+  AiFieldOutcome,
+  AiFieldOutcomes,
+  AiFillResult,
+  AiItemOutcome,
+  AiQuote,
+  AiValue,
+  AiVerificationRules,
+} from "./runtime/shared/sanitize";
 
 /**
  * Options of `@mapomodule/ai`: the `mapo.ai` key through the meta-module, or
@@ -44,4 +88,51 @@ export interface MapoAiOptions {
    * @example { groups: ["editors"], permissions: ["change_article"] }
    */
   users?: MapoAiAccessRule;
+  /**
+   * The providers `run` may call, by id, each with the models a request may
+   * ask for (its default first) and the seconds a call may take. Only the
+   * providers listed here are called: Mapo's own (`mock`) and those the app
+   * registers with `registerMapoAiProvider()`. `false` turns off one a
+   * layer enables.
+   * @default {} (no provider: `run` answers 503)
+   * @example { mock: { models: ["mock"], timeout: 120 } }
+   */
+  providers?: Record<string, MapoAiProviderOptions | false>;
+  /**
+   * The provider, and the model of each task, a request that names none
+   * gets. Unset, or naming one not enabled: the first provider of
+   * `providers`, and its first model.
+   * @default {}
+   * @example { provider: "mock", models: { fill: "mock", extract: "mock" } }
+   */
+  default?: { provider?: string; models?: { fill?: string; extract?: string } };
+  /**
+   * The app's rules for the AI, added to every prompt after Mapo's base
+   * rules, which win where they disagree: `all` for every task, `fill` and
+   * `extract` for one. A Nitro plugin adds rules per request with the
+   * `mapo-ai:prompt` hook.
+   * @default {}
+   * @example { all: "Prices are in euros." }
+   */
+  instructions?: { all?: string; fill?: string; extract?: string };
+  /**
+   * What a quote must hold for a value to be verified, rule by rule; the
+   * rules left out keep their prudent default. No rule verifies a value
+   * without a quote found in the source.
+   * @default { dateYear: true, bareHours: false, timeZones: true, oneWordQuotes: "unique", richTextLinks: true }
+   */
+  verification?: Partial<AiVerificationRules>;
+  /**
+   * The limits of `run`: the calls one user may make in a minute (counted
+   * in the memory of each server process), the characters of a source, and
+   * those of the operator's own instructions (`0` lets operators send none).
+   * @default { perUserPerMinute: 20, maxSourceChars: 100000, maxInstructionsChars: 2000 }
+   */
+  limits?: Partial<MapoAiLimits>;
+  /**
+   * The audit of `run`: one sealed record per call, metadata only, kept
+   * `retentionDays` days.
+   * @default { retentionDays: 90 }
+   */
+  audit?: { retentionDays?: number };
 }

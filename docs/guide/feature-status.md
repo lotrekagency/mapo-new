@@ -170,9 +170,12 @@ New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
 | Feature                     | Status | Notes                                                                                                                                                                        |
 | --------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Opt-in installation         | ✅     | The meta-module installs the package only when the app sets `mapo.ai`                                                                                                        |
-| Gateway status route        | ✅     | `GET /_mapo/ai/status` tells a signed-in user the contract version, whether the app lets them use the AI and whether they administer it; admins also get the storage's state |
+| Gateway status route        | ✅     | `GET /_mapo/ai/status` tells a signed-in user whether they may use and administer the AI, and the providers, models and limits of `run`; admins also get the storage's state |
 | Gateway authentication      | ✅     | The backend session, through `userInfoApi`; `mapo.ai.admin`, `mapo.ai.users` and the `mapo-ai:user` hook                                                                     |
-| Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; nothing writes to it yet                                                                                                 |
+| Gateway run route           | ✅     | `POST /_mapo/ai/run` fills a record or extracts the records of a source, answering one outcome per field; prompt in layers, limits per user, audit of every call             |
+| Providers                   | ✅     | The `mock`, which answers without a model, and the providers an app registers with `registerMapoAiProvider()`                                                                |
+| Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; `run` writes its audit there                                                                                             |
+| Mapo's model providers      | 🔲     | Planned: OpenAI, Anthropic, OpenAI-compatible servers and local models                                                                                                       |
 | Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them                                                                                                    |
 | Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk                                                                                                 |
 

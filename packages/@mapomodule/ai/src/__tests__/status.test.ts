@@ -4,6 +4,7 @@ import { createStorage } from "unstorage";
 import type { Storage } from "unstorage";
 import memoryDriver from "unstorage/drivers/memory";
 import type { MapoAiUserContext } from "../runtime/server/auth/user";
+import { DEFAULT_LIMITS } from "../runtime/server/run/options";
 import {
   MAPO_AI_CONTRACT_VERSION,
   MAPO_AI_GATEWAY_PATH,
@@ -189,8 +190,50 @@ describe("GET /_mapo/ai/status", () => {
       contract: MAPO_AI_CONTRACT_VERSION,
       allowed: true,
       admin: false,
+      providers: [],
+      limits: DEFAULT_LIMITS,
     });
     expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("lists the providers the app enables, with their models and the defaults", async () => {
+    runtime.config.mapoAi = {
+      secret: SECRET,
+      admin: {},
+      providers: { mock: { models: ["mock", "mock-large"], timeout: 30 } },
+      default: { provider: "mock", models: { extract: "mock-large" } },
+      limits: { perUserPerMinute: 5 },
+    };
+
+    const response = await (await gateway())(statusRequest(asUser("editor")));
+
+    expect(await response.json()).toEqual({
+      contract: MAPO_AI_CONTRACT_VERSION,
+      allowed: true,
+      admin: false,
+      providers: [
+        { id: "mock", label: "Mock", models: ["mock", "mock-large"] },
+      ],
+      default: {
+        provider: "mock",
+        models: { fill: "mock", extract: "mock-large" },
+      },
+      limits: { ...DEFAULT_LIMITS, perUserPerMinute: 5 },
+    });
+  });
+
+  it("lists no provider the app enables that does not exist", async () => {
+    runtime.config.mapoAi = {
+      secret: SECRET,
+      admin: {},
+      providers: { acme: { models: ["a"] } },
+    };
+
+    const response = await (await gateway())(statusRequest(asUser("editor")));
+
+    const body: unknown = await response.json();
+    expect(body).toMatchObject({ providers: [] });
+    expect(body).not.toHaveProperty("default");
   });
 
   it("shows the AI's admins the state of the storage, never the secret", async () => {
@@ -202,6 +245,8 @@ describe("GET /_mapo/ai/status", () => {
       allowed: true,
       admin: true,
       storage: { open: true, secret: "set", mounted: true, driver: "memory" },
+      providers: [],
+      limits: DEFAULT_LIMITS,
     });
     expect(JSON.stringify(body)).not.toContain(SECRET);
   });

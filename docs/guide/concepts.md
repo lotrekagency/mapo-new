@@ -29,7 +29,7 @@ export default defineNuxtConfig({
 | `@mapomodule/i18n`  | A wrapper around `@nuxtjs/i18n` with Mapo's English and Italian catalogs and `useMapoT()`.                                                                 |
 | `@mapomodule/utils` | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …). Not a Nuxt module, not auto-imported.                                                  |
 | `@mapomodule/mcp`   | A development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration.                                      |
-| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway (`/_mapo/ai/*`), answering `status` to signed-in users only, and its encrypted storage. |
+| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway (`/_mapo/ai/*`), `status` and `run` with a mock or the app's provider, and its storage. |
 
 Backend integrations ship as separate packages. The Camomilla CMS one is [`@mapomodule/mapo-integrations-camomilla`](/modules/camomilla); any other backend gets [its own small integration](/modules/integrations-howto).
 

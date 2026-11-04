@@ -4,20 +4,21 @@ Local rules for the AI-assisted data entry package. The root [`AGENTS.md`](../..
 
 ## What this package is
 
-An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers `GET status` to signed-in users: the version of its contract, whether they administer the AI and, for admins, the state of the storage. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; no route writes to it yet.
+An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers signed-in users: `GET status`, what it offers them (and to admins the state of the storage), and `POST run`, which builds what the AI may fill from a record's two descriptions, composes the prompt in layers, calls a **provider** (Mapo's `mock`, or one the app registers and enables) and answers the sanitized outcome of each field. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; `run` writes its audit there.
 
 ## Layout
 
 ```text
 src/
-  module.ts                  Nuxt module: the gateway routes (addServerHandler), the storage plugin, the secret and the
-                             access options in private runtime config, the default mount at `ready`, the hook's types
+  module.ts                  Nuxt module: the gateway routes (addServerHandler), the plugins, the server's auto-imports
+                             (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures), the secret and the
+                             options in private runtime config, the default mount at `ready`, the hooks' types
   storage.ts                 build time: the file-system default of the `mapo-ai` mount, as Nitro does for `data`
   access.ts                  build time: the `admin` and `users` options, read with a warning for what cannot be read
   index.ts                   public types (MapoAiOptions, MapoAiStatus, MapoAiUserContext…), also re-exported by
                              mapomodule/types
   runtime/shared/            pure TypeScript shared by the module, the server and the browser:
-                               gateway.ts  route prefix, contract version, response shapes
+                               gateway.ts  route prefix, contract version, the routes' bodies and responses
                                dialect.ts  the `x-mapo-ai` keyword (hint, exclude) of the JSON Schema dialect
                                entity.ts   the entity model: what the AI may fill, built from the backend schema
                                            and the form's fields, with skipped fields and warnings; objects as
@@ -40,14 +41,27 @@ src/
                                nitro.ts    the wiring: readMapoAiCaller(event), requireMapoAiSession(event),
                                            requireMapoAiAdmin(event), requireModelPermission(); Nitro's local fetch,
                                            the hooks, the cross-site check
-                               hooks.ts    the `mapo-ai:user` hook, typed for the app's server code
+                               hooks.ts    the `mapo-ai:user` and `mapo-ai:prompt` hooks, typed for the app's server code
+  runtime/server/run/        the `run` route's parts:
+                               request.ts  the body as outside data: JSON by type, a size bound, zod on the envelope
+                               contract.ts the contract, built by the gateway from the two descriptions of each entity
+                               options.ts  the options of `run`, read at build time and at runtime by the same rules; pure
+                               policy.ts   which provider and model a request gets; pure
+                               limiter.ts  each user's calls of the last minute, in memory; pure
+                               audit.ts    the audit record, its key, its validator, its write
+                               run.ts      the operation, its dependencies passed in; the `mapo-ai:prompt` context
+                               nitro.ts    the wiring: runtime config, registry, storage, limiter, the prompt hooks
+  runtime/server/providers/  types.ts (MapoAiProvider, MapoAiProviderError), registry.ts (registerMapoAiProvider, the ids
+                             Mapo keeps), mock.ts (the mock provider and its fixtures)
+  runtime/server/prompts/    base.ts (Mapo's base rules, MAPO_AI_PROMPT_VERSION), compose.ts (the prompt in layers)
   runtime/server/storage/    the sealed storage of the gateway's state:
                                sealed.ts   envelopes (AES-256-GCM, WebCrypto), a key per purpose (HKDF), users as keyed
                                            hashes, expiry, the sweep; pure, the storage and the secret are passed in
                                secret.ts   NUXT_MAPO_AI_SECRET read as outside data; the log lines about it
                                nitro.ts    the wiring to the mount and the runtime config: useMapoAiStorage(event),
                                            and mapoAiStorageState(event) for `status`
-  runtime/server/plugins/    Nitro plugins: storage.ts checks the storage when the server starts and sweeps hourly
+  runtime/server/plugins/    Nitro plugins: storage.ts checks the storage when the server starts and sweeps hourly;
+                             providers.ts names in the log the providers `run` will not call
   runtime/server/routes/     Nitro handlers, one file per route
   __tests__/                 Vitest; gateway routes on a bare h3 app; the storage's wiring, its plugin and the
                              module with `nitropack/runtime` and `@nuxt/kit` mocked
@@ -57,7 +71,7 @@ src/
 
 1. **Opt-in, nothing loaded otherwise.** An app without `mapo.ai` must not get a route, a plugin, a component or a dependency loaded from this package. Keep the check in `packages/mapomodule/src/module.ts`.
 2. **Options arrive with their behaviour.** An option is added in the change that makes it do something, with a default, JSDoc and a row in `docs/modules/ai.md`. No option is documented before it works.
-3. **Gateway routes live under `/_mapo/ai/`**, never under `/api/*`, where backend integrations proxy to the real backend. The prefix and the gateway's version (`MAPO_AI_CONTRACT_VERSION`) are in `runtime/shared/gateway.ts`; raise it when a route, a body or a response changes in a way an older client cannot read. The format of a task contract has its own version, `AI_CONTRACT_FORMAT_VERSION` in `contract.ts`; a change to it that the gateway reads raises both.
+3. **Gateway routes live under `/_mapo/ai/`**, never under `/api/*`, where backend integrations proxy to the real backend. The prefix and the gateway's version (`MAPO_AI_CONTRACT_VERSION`) are in `runtime/shared/gateway.ts`; raise it when a route, a body or a response changes in a way an older client cannot read. The format of a task contract has its own version, `AI_CONTRACT_FORMAT_VERSION` in `contract.ts`. No route carries a contract, since the gateway compiles it (`run/contract.ts`), but every provider receives one (`request.contract`): a change to its format breaks an app's provider (`feat(ai)!`), and raises the gateway's version only when a body or a response changes with it.
 4. **Server code imports explicitly**: `h3` for handlers and helpers (a dependency), `nitropack/runtime` for runtime config and storage (`nitropack` goes in devDependencies, for its types). Never `#imports`: auto-imports do not run in `node_modules`, and the package is type-checked with plain `tsc`.
 5. **`runtime/shared/` stays pure**: no Nuxt, Nitro, Vue or Node imports, so the browser and the server can both use it. It may import the pure helpers of `@mapomodule/utils` and, by subpath, the form's schema reader and writer (`@mapomodule/form/runtime/composables/useFormFromSchema`, `@mapomodule/form/runtime/utils/fieldsToJsonSchema`).
 6. **Secrets stay on the server.** Keys and secrets go in the private `runtimeConfig`, never in `runtimeConfig.public`, a response, a log or an audit record. They are set at runtime, from the environment (`NUXT_MAPO_AI_SECRET`): a value written in the Nuxt config is copied into the server bundle, and the module warns about it.
@@ -68,6 +82,7 @@ src/
 11. **The state is sealed, and fails closed.** What the gateway keeps goes through `useMapoAiStorage(event)`, never `useStorage()` directly. Without a usable secret or a mount the storage is closed: no clear text, no memory of one process. A record that does not open is never deleted: only its expiry or a new value removes it. Stored values are outside data (rule 7): read them with a validator.
 12. **Every route starts with the session.** A handler calls `requireMapoAiSession(event)`, or `requireMapoAiAdmin(event)`, before it reads anything else, and sets `Cache-Control: no-store` when the answer is the user's own; only a route that tells the user what they may do, as `status`, uses `readMapoAiCaller(event)` and answers a refused user (`allowed: false`) instead of a 403. The gateway keeps no session of its own: it forwards the request's `cookie`, and no other header, to `userInfoApi` by Nitro's local fetch, as core restores the session. A backend that cannot say who is signed in gets a 502, never a 401. A rule that cannot be read picks fewer users, never more; an app narrows access with the `mapo-ai:user` hook, which can only refuse: its `allowed` is a latch, so a later hook never undoes an earlier refusal. Permissions are read by `userPermissions()` of `@mapomodule/utils`, as the auth store reads them.
 13. **No pattern runs unbounded.** A field's patterns come from the schemas, which may come from outside: the sanitizer runs one only when `patterns.ts` bounds its work on the value, and a value whose pattern could not be tested (too costly, unreadable, or failing while it runs) is kept and never verified. A new way of testing values against an outside expression gets the same bound.
+14. **`run` builds what it asks, and spends last.** The gateway compiles the contract itself from the descriptions the page sends (`run/contract.ts`), never from a contract a client sends, so the rules a contract holds inside hold by construction; zod reads only the envelope. The order in `runMapoAi()` keeps the cost for last: provider, model, permission and the user's limit (looked at, not counted) come before the contract and the hooks, and the limit counts a call only once they have passed; without the storage no call is made. A provider is called only when `mapo.ai.providers` enables it, gets copies of what it is asked, and its answer is outside data, read as plain JSON; the call is audited as soon as it answers, before its answer is read. The prompt is composed in the gateway: what the server holds (Mapo's base rules, the app's, the admin's) comes before what the request writes, and an app's rules and hooks add, never remove. The audit holds metadata only, never the source, the instructions or the values. An option of `run` that cannot be read never widens what may spend: a provider is not enabled, a limit is `0`.
 
 ## Change together
 
@@ -80,10 +95,15 @@ src/
 | How the meta-module installs it  | `packages/mapomodule/src/module.ts`, `docs/guide/concepts.md`, `packages/mapomodule/README.md`                  |
 | What the package does, in a line | `docs/guide/concepts.md`, `docs/guide/feature-status.md`, `mcp/src/runtime/core/instructions.ts`                |
 | A value kind or a skip reason    | `entity.ts`; `contract.ts` (`KIND_RULES`, `PROSE_KINDS`); `convert()` in `sanitize.ts`; the tables of the tests |
-| The contract's shape             | `AI_CONTRACT_FORMAT_VERSION` (and the gateway's when it reads it), `expectPortable()`, `sanitize.ts`            |
+| The contract's shape             | `AI_CONTRACT_FORMAT_VERSION`, `expectPortable()`, `sanitize.ts`, the mock (it reads `request.contract`)         |
 | A tag of rich text               | `markdown.ts` and the extensions of `MapoWygEditor`: the editor must accept every tag the AI's HTML has         |
 | A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests        |
 | A storage purpose                | `STORAGE_PURPOSES` in `storage/sealed.ts`; never rename one that has records: its key comes from the name       |
+| An option of `run`               | `run/options.ts` and its warnings, `MapoAiOptions` in `index.ts`, `module.test.ts`, the docs' options           |
+| The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), `run.test.ts`, the run section of the docs                 |
+| A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                               |
+| A failure of a provider          | `MapoAiProviderFailure`, `FAILURES` in `run/run.ts`, the audit's validator, the errors in the docs              |
+| A provider of Mapo               | `MAPO_PROVIDERS` and the reserved ids in `providers/registry.ts`, its options in `run/options.ts`               |
 | The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests              |
 
 ## Verify
@@ -95,4 +115,4 @@ pnpm --filter @mapomodule/ai typecheck
 pnpm --filter @mapomodule/ai lint
 ```
 
-Live: `apps/example-e2e` sets `mapo.ai`, so the gateway answers while `pnpm dev:example-e2e` runs: `curl http://localhost:3000/_mapo/ai/status` gets a 401, and with the mock API's session cookie, `-H 'cookie: __mapo_session=admin'` (a superuser) or `__mapo_session=editor`, the user's status. Without `NUXT_MAPO_AI_SECRET` the dev server warns that it seals with a temporary secret, and the state goes to `apps/example-e2e/.data/mapo-ai`. Stop the dev server afterwards.
+Live: `apps/example-e2e` sets `mapo.ai`, so the gateway answers while `pnpm dev:example-e2e` runs: `curl http://localhost:3000/_mapo/ai/status` gets a 401, and with the mock API's session cookie, `-H 'cookie: __mapo_session=admin'` (a superuser) or `__mapo_session=editor`, the user's status. `run` calls the mock, which the app enables: post `{"task":"fill","entity":{"fields":{…}},"parts":[{"kind":"text","text":"Title: About us"}]}` with `content-type: application/json` and the same cookie, and add `#mock:refusal` or `#mock:rate-limit` to the text for its failures. Without `NUXT_MAPO_AI_SECRET` the dev server warns that it seals with a temporary secret, and the state, the audit records of `run` included, goes to `apps/example-e2e/.data/mapo-ai`. Stop the dev server afterwards.

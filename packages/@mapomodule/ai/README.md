@@ -1,6 +1,6 @@
 # @mapomodule/ai
 
-AI-assisted data entry for Mapo backoffices. **Experimental**: today the module installs the AI gateway on the app's Nitro server, with an encrypted storage for its state, and the gateway answers one route, `GET /_mapo/ai/status`, to signed-in users. Routes, responses and options can change in any release while the package is experimental.
+AI-assisted data entry for Mapo backoffices. **Experimental**: today the module installs the AI gateway on the app's Nitro server, with an encrypted storage for its state. The gateway answers signed-in users: `GET /_mapo/ai/status`, and `POST /_mapo/ai/run`, which asks a provider to fill a record from a source, or to extract the records it describes, and answers one outcome per field. The only provider Mapo ships is a mock; an app can register its own. Routes, responses and options can change in any release while the package is experimental.
 
 ## Installation
 
@@ -23,7 +23,7 @@ On its own it reads the `mapoAi` key:
 pnpm add @mapomodule/ai@next
 ```
 
-The gateway knows the user from the backend session, through `userInfoApi`; the options `admin` and `users` say who administers the AI and who may use it. Its state is sealed with a secret of at least 32 characters, set at runtime in the server's environment: `NUXT_MAPO_AI_SECRET` (for example `openssl rand -base64 32`). Mapo v2 is published on the `next` dist-tag while it is in beta.
+The gateway knows the user from the backend session, through `userInfoApi`; the options `admin` and `users` say who administers the AI and who may use it, and `providers` which providers `run` may call. Its state is sealed with a secret of at least 32 characters, set at runtime in the server's environment: `NUXT_MAPO_AI_SECRET` (for example `openssl rand -base64 32`). Mapo v2 is published on the `next` dist-tag while it is in beta.
 
 ## Documentation
 

@@ -40,8 +40,9 @@ import type {
 /**
  * Version of the contract's format: it goes up when a contract or the answer
  * it asks for changes shape. Not the gateway's `MAPO_AI_CONTRACT_VERSION`
- * (`gateway.ts`), which versions the routes; a contract travels in a route's
- * body, so a change here that the gateway reads raises that one too.
+ * (`gateway.ts`), which versions the routes: no route carries a contract,
+ * since the gateway compiles it, but every provider receives one
+ * (`request.contract`), an app's own included.
  */
 export const AI_CONTRACT_FORMAT_VERSION = 2;
 
@@ -1230,7 +1231,8 @@ function fitSchema(
  *
  * @param source The entity, its model and the records its relations may point to.
  * @param options `language` for translatable values.
- * @returns The contract, plain JSON: the browser sends it to the gateway.
+ * @returns The contract, plain JSON: the gateway compiles it for each call
+ *   to `run`, and a page can compile the same.
  * @throws When the schema is too large for the providers even with every
  *   list in the descriptions: thousands of fields, or names too long.
  *
@@ -1265,7 +1267,8 @@ export function compileFillContract(
  * @param sources The entities, each with a unique `type` and, when given, a
  *   unique `endpoint`.
  * @param options `language` for translatable values.
- * @returns The contract, plain JSON: the browser sends it to the gateway.
+ * @returns The contract, plain JSON: the gateway compiles it for each call
+ *   to `run`, and a page can compile the same.
  * @throws When an entity has no type, two share a type or an endpoint, or
  *   the schema is too large for the providers even with every list in the
  *   descriptions.

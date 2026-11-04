@@ -1,17 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isRecord } from "../runtime/shared/guards";
+import { DEFAULT_VERIFICATION_RULES } from "../runtime/shared/sanitize";
+
+/** The options of `run` the module writes when the app sets none of them. */
+const RUN_DEFAULTS = {
+  providers: {},
+  default: { models: {} },
+  instructions: { all: "", fill: "", extract: "" },
+  verification: { ...DEFAULT_VERIFICATION_RULES },
+  limits: {
+    perUserPerMinute: 20,
+    maxSourceChars: 100_000,
+    maxInstructionsChars: 2_000,
+  },
+  audit: { retentionDays: 90 },
+};
 
 /** What the mocked `@nuxt/kit` collects from the module's setup. */
 const kit = vi.hoisted(() => {
   const state: {
     handlers: unknown[];
     plugins: unknown[];
+    imports: unknown[];
     warnings: unknown[];
     templates: Array<{ template: unknown; context: unknown }>;
     nitro: { options: unknown };
   } = {
     handlers: [],
     plugins: [],
+    imports: [],
     warnings: [],
     templates: [],
     nitro: { options: {} },
@@ -24,6 +41,7 @@ vi.mock("@nuxt/kit", () => ({
   createResolver: () => ({ resolve: (path: string) => `resolved:${path}` }),
   addServerHandler: (handler: unknown) => kit.handlers.push(handler),
   addServerPlugin: (plugin: unknown) => kit.plugins.push(plugin),
+  addServerImports: (imports: unknown[]) => kit.imports.push(...imports),
   addTypeTemplate: (template: unknown, context: unknown) =>
     kit.templates.push({ template, context }),
   useLogger: () => ({ warn: (message: unknown) => kit.warnings.push(message) }),
@@ -52,6 +70,7 @@ beforeEach(() => {
   vi.resetModules();
   kit.handlers = [];
   kit.plugins = [];
+  kit.imports = [];
   kit.warnings = [];
   kit.templates = [];
 });
@@ -62,7 +81,11 @@ describe("the module", () => {
 
     await setup(runtimeConfig);
 
-    expect(runtimeConfig.mapoAi).toEqual({ secret: "", admin: {} });
+    expect(runtimeConfig.mapoAi).toEqual({
+      secret: "",
+      admin: {},
+      ...RUN_DEFAULTS,
+    });
     expect(runtimeConfig.public).toEqual({});
     expect(kit.warnings).toEqual([]);
   });
@@ -80,6 +103,7 @@ describe("the module", () => {
       secret: written,
       other: 1,
       admin: {},
+      ...RUN_DEFAULTS,
     });
     expect(kit.warnings).toHaveLength(1);
     expect(String(kit.warnings[0])).toContain("NUXT_MAPO_AI_SECRET");
@@ -105,15 +129,37 @@ describe("the module", () => {
     });
   });
 
-  it("registers the storage plugin and the status route", async () => {
+  it("registers the plugins, the routes and what the app's server code uses without an import", async () => {
     await setup({ public: {} });
 
-    expect(kit.plugins).toEqual(["resolved:./runtime/server/plugins/storage"]);
+    expect(kit.plugins).toEqual([
+      "resolved:./runtime/server/plugins/storage",
+      "resolved:./runtime/server/plugins/providers",
+    ]);
     expect(kit.handlers).toEqual([
       {
         route: "/_mapo/ai/status",
         method: "get",
         handler: "resolved:./runtime/server/routes/status.get",
+      },
+      {
+        route: "/_mapo/ai/run",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/run.post",
+      },
+    ]);
+    expect(kit.imports).toEqual([
+      {
+        name: "registerMapoAiProvider",
+        from: "resolved:./runtime/server/providers/registry",
+      },
+      {
+        name: "MapoAiProviderError",
+        from: "resolved:./runtime/server/providers/types",
+      },
+      {
+        name: "registerMapoAiMockFixtures",
+        from: "resolved:./runtime/server/providers/mock",
       },
     ]);
   });
@@ -149,6 +195,7 @@ describe("the access options", () => {
       secret: "",
       admin: { groups: ["ai-admin"] },
       users: { groups: ["editors"], permissions: ["change_article"] },
+      ...RUN_DEFAULTS,
     });
     expect(runtimeConfig.public).toEqual({});
     expect(kit.warnings).toEqual([]);
@@ -210,5 +257,184 @@ describe("the access options", () => {
 
     expect(runtimeConfig.mapoAi).toMatchObject({ admin: { groups: [] } });
     expect(kit.warnings).toHaveLength(1);
+  });
+});
+
+describe("the options of run", () => {
+  it("keeps them, complete, in the private runtime config", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: { mock: { models: ["mock", "mock-large"], timeout: 30 } },
+      default: { provider: "mock", models: { fill: "mock-large" } },
+      instructions: { all: "Prices are in euros." },
+      verification: { bareHours: true },
+      limits: { perUserPerMinute: 5 },
+      audit: { retentionDays: 30 },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { mock: { models: ["mock", "mock-large"], timeout: 30 } },
+      default: { provider: "mock", models: { fill: "mock-large" } },
+      instructions: { all: "Prices are in euros.", fill: "", extract: "" },
+      verification: { ...DEFAULT_VERIFICATION_RULES, bareHours: true },
+      limits: {
+        perUserPerMinute: 5,
+        maxSourceChars: 100_000,
+        maxInstructionsChars: 2_000,
+      },
+      audit: { retentionDays: 30 },
+    });
+    expect(runtimeConfig.public).toEqual({});
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("gives a provider without a timeout the default one, and leaves its models to it", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, { providers: { mock: {} } });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { mock: { timeout: 120 } },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { mock: object } }).providers.mock,
+    ).not.toHaveProperty("models");
+  });
+
+  it("leaves out a provider turned off with false", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, { providers: { mock: false } });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({ providers: {} });
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it.each([
+    [
+      "providers that are no object",
+      { providers: ["mock"] },
+      "mapo.ai.providers",
+    ],
+    [
+      "a provider that is no object",
+      { providers: { mock: true } },
+      "mapo.ai.providers.mock",
+    ],
+    [
+      "an id that is no provider's",
+      { providers: { Mock_1: {} } },
+      "mapo.ai.providers.Mock_1",
+    ],
+    [
+      "models that are no list",
+      { providers: { mock: { models: "mock" } } },
+      "mapo.ai.providers.mock.models",
+    ],
+    [
+      "a timeout that is no number of seconds",
+      { providers: { mock: { timeout: 0 } } },
+      "mapo.ai.providers.mock.timeout",
+    ],
+    [
+      "a key a provider does not have",
+      { providers: { mock: { baseURL: "http://x" } } },
+      '"baseURL"',
+    ],
+    [
+      "a limit that is no whole number",
+      { limits: { perUserPerMinute: 2.5 } },
+      "mapo.ai.limits.perUserPerMinute",
+    ],
+    [
+      "a limit below 0",
+      { limits: { maxSourceChars: -1 } },
+      "mapo.ai.limits.maxSourceChars",
+    ],
+    [
+      "a rule of verification of the wrong type",
+      { verification: { dateYear: "yes" } },
+      "mapo.ai.verification.dateYear",
+    ],
+    [
+      "a rule of verification that does not exist",
+      { verification: { years: true } },
+      '"years"',
+    ],
+    [
+      "instructions that are not text",
+      { instructions: { all: ["a"] } },
+      "mapo.ai.instructions.all",
+    ],
+    [
+      "a retention that is no number of days",
+      { audit: { retentionDays: -1 } },
+      "mapo.ai.audit.retentionDays",
+    ],
+  ])("warns about %s", async (_case, options, named) => {
+    await setup({ public: {} }, options);
+
+    expect(kit.warnings).toHaveLength(1);
+    expect(String(kit.warnings[0])).toContain(named);
+  });
+
+  it("enables no provider whose models cannot be read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, { providers: { mock: { models: "mock" } } });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { mock: { models: [] } },
+    });
+  });
+
+  it("makes a limit it cannot read the narrowest, 0, and keeps the default of a rule it cannot read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      limits: { perUserPerMinute: "many", maxInstructionsChars: -1 },
+      verification: { oneWordQuotes: "always", timeZones: false },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      limits: {
+        perUserPerMinute: 0,
+        maxSourceChars: 100_000,
+        maxInstructionsChars: 0,
+      },
+      verification: { oneWordQuotes: "unique", timeZones: false },
+    });
+  });
+
+  it("takes 0 as a limit: no call, no source, no instructions", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      limits: {
+        perUserPerMinute: 0,
+        maxSourceChars: 0,
+        maxInstructionsChars: 0,
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      limits: {
+        perUserPerMinute: 0,
+        maxSourceChars: 0,
+        maxInstructionsChars: 0,
+      },
+    });
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("warns that a default provider the app does not enable is not the default", async () => {
+    await setup(
+      { public: {} },
+      { providers: { mock: {} }, default: { provider: "acme" } },
+    );
+
+    expect(kit.warnings).toHaveLength(1);
+    expect(String(kit.warnings[0])).toContain('"acme"');
   });
 });

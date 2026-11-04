@@ -739,3 +739,46 @@ Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. S
 | `extension.order`     | `number`                                 | Order among the extensions of a placement, lower first. Default: `0`.                     |
 
 **Returns:** `() => void` — removes the extension.
+
+---
+
+## AI — `@mapomodule/ai`
+
+Experimental, installed with `mapo.ai`. Auto-imported in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai#providers).
+
+### `registerMapoAiProvider(provider)`
+
+Registers a provider the app implements, from a Nitro plugin. `run` calls it only when `mapo.ai.providers` enables its id, with the models it may use. See [Your own provider](/modules/ai#your-own-provider).
+
+| Parameter  | Type             | Default        | Description                                                                                                               |
+| ---------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `provider` | `MapoAiProvider` | — **required** | `id` (lowercase letters, digits and `-`, starting with a letter), `label?`, `capabilities`, `models?` and `run(request)`. |
+
+**Returns:** `void`. It throws a `TypeError` when the id is not a provider's id or `run` is missing, and an `Error` when the id is one Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`) or is registered already.
+
+---
+
+### `registerMapoAiMockFixtures(list)`
+
+Registers answers of the `mock` provider, from a Nitro plugin. See [Fixtures of the mock](/modules/ai#fixtures-of-the-mock).
+
+| Parameter | Type                           | Default        | Description                                                                                                                                                                                            |
+| --------- | ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list`    | `readonly MapoAiMockFixture[]` | — **required** | Each with a `name` (lowercase letters, digits, `-` and `_`), an `answer` written as a model writes it or a `refusal`, and optionally the `source` it answers without a mark and the `usage` to report. |
+
+**Returns:** `void`. It throws a `TypeError` when a name is not one, or a fixture has neither an answer nor a refusal, or both, and an `Error` when a name is registered already.
+
+---
+
+### `new MapoAiProviderError(failure, message, options?)`
+
+The error a provider's `run()` throws for a failure the gateway tells apart; any other error answers 502. See [Your own provider](/modules/ai#your-own-provider).
+
+| Parameter            | Type                    | Default        | Description                                                                                                    |
+| -------------------- | ----------------------- | -------------- | -------------------------------------------------------------------------------------------------------------- |
+| `failure`            | `MapoAiProviderFailure` | — **required** | `timeout` (504), `rate-limit` (503), `unavailable`, `invalid-response` or `refused-request` (502).             |
+| `message`            | `string`                | — **required** | For the server's log; the browser never sees it.                                                               |
+| `options.retryAfter` | `number`                | —              | For `rate-limit`: in how many seconds the provider takes calls again; the gateway answers it as `Retry-After`. |
+| `options.cause`      | `unknown`               | —              | The error behind it.                                                                                           |
+
+**Returns:** `MapoAiProviderError` — with its `failure`, and `retryAfter` when given.
