@@ -3,7 +3,9 @@
  *
  * The module's `addImports([...])` calls are the authoritative list of what an
  * app can call without importing anything — exactly what an assistant needs to
- * know, and what it cannot infer from `node_modules`.
+ * know, and what it cannot infer from `node_modules`. Only those calls are
+ * read: `addServerImports([...])` names what the app's server code imports,
+ * which is no composable of the app.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -30,6 +32,64 @@ interface Candidate {
   file: string;
 }
 
+/**
+ * The text between the parentheses of each `addImports(...)` call of a
+ * module, so the entries of other calls, such as `addServerImports`, are
+ * never read as the app's composables.
+ */
+function addImportsArguments(source: string): string[] {
+  const calls: string[] = [];
+  for (const match of source.matchAll(/\baddImports\s*\(/g)) {
+    const start = (match.index ?? 0) + match[0].length;
+    calls.push(source.slice(start, closingParenthesis(source, start)));
+  }
+  return calls;
+}
+
+/**
+ * Where the parenthesis opened just before `from` closes. Strings and
+ * comments are skipped: a parenthesis in them counts for nothing.
+ */
+function closingParenthesis(source: string, from: number): number {
+  let depth = 1;
+  let at = from;
+  while (at < source.length) {
+    const char = source[at];
+    const next = source[at + 1];
+    if (char === '"' || char === "'" || char === "`") {
+      at = afterString(source, at, char);
+      continue;
+    }
+    if (char === "/" && next === "/") {
+      const end = source.indexOf("\n", at);
+      at = end === -1 ? source.length : end;
+      continue;
+    }
+    if (char === "/" && next === "*") {
+      const end = source.indexOf("*/", at + 2);
+      at = end === -1 ? source.length : end + 2;
+      continue;
+    }
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (depth === 0) return at;
+    at++;
+  }
+  return source.length;
+}
+
+/** Where the string that opens at `at` with `quote` ends. */
+function afterString(source: string, at: number, quote: string): number {
+  let index = at + 1;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === "\\") index += 2;
+    else if (char === quote) return index + 1;
+    else index++;
+  }
+  return source.length;
+}
+
 /** Reads every `addImports` entry declared by the Mapo modules. */
 function collectCandidates(repoRoot: string): Candidate[] {
   const packagesDir = join(repoRoot, PACKAGES_ROOT);
@@ -46,7 +106,10 @@ function collectCandidates(repoRoot: string): Candidate[] {
     const source = readFileSync(moduleFile, "utf-8");
     const packageRoot = join(packagesDir, entry.name);
 
-    for (const match of source.matchAll(ADD_IMPORT_ENTRY)) {
+    const entries = addImportsArguments(source).flatMap((call) => [
+      ...call.matchAll(ADD_IMPORT_ENTRY),
+    ]);
+    for (const match of entries) {
       const [, name, from] = match;
       if (!name || !from) continue;
 
