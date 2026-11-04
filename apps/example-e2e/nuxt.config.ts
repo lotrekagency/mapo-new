@@ -27,11 +27,18 @@ export default defineNuxtConfig({
     },
 
     // AI-assisted data entry (experimental). Opt-in: the block installs the
-    // module, and the gateway answers at /_mapo/ai/status to a signed-in
-    // user. Superusers (the `admin` account) administer the AI by default.
-    // `run` calls the mock provider: no network, no key, no cost.
+    // module, and the gateway answers under /_mapo/ai/ to a signed-in user;
+    // superusers (the `admin` account) administer the AI by default. `run`
+    // calls the mock provider: no network, no key, no cost. Its timeout is
+    // short, so the "Timeout" sample of /ai/fill fails in 15 seconds. The
+    // rules of every prompt are in `instructions`; the rules that depend on
+    // the request, and who may use the AI, in server/plugins/mapo-ai-rules.ts;
+    // the mock's answers in server/plugins/mapo-ai-fixtures.ts.
     ai: {
-      providers: { mock: {} },
+      providers: { mock: { timeout: 15 } },
+      instructions: {
+        all: "The records are the pages of a city magazine: articles about the city, its people and its services.",
+      },
     },
 
     i18n: {

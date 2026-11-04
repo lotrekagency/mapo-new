@@ -4,15 +4,16 @@ Local rules for the AI-assisted data entry package. The root [`AGENTS.md`](../..
 
 ## What this package is
 
-An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers signed-in users: `GET status`, what it offers them (and to admins the state of the storage), and `POST run`, which builds what the AI may fill from a record's two descriptions, composes the prompt in layers, calls a **provider** (Mapo's `mock`, or one the app registers and enables) and answers the sanitized outcome of each field. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; `run` writes its audit there.
+An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers signed-in users: `GET status`, what it offers them (and to admins the state of the storage), and `POST run`, which builds what the AI may fill from a record's two descriptions, composes the prompt in layers, calls a **provider** (Mapo's `mock`, or one the app registers and enables) and answers the sanitized outcome of each field. In the browser, **`useMapoAiFill()`** fills a detail form through `run`: it writes each value a quote verifies into an empty field, and marks every other one for the operator. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; `run` writes its audit there.
 
 ## Layout
 
 ```text
 src/
   module.ts                  Nuxt module: the gateway routes (addServerHandler), the plugins, the server's auto-imports
-                             (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures), the secret and the
-                             options in private runtime config, the default mount at `ready`, the hooks' types
+                             (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures), the app's
+                             (useMapoAiFill), the secret and the options in private runtime config, the default mount at
+                             `ready`, the hooks' types
   storage.ts                 build time: the file-system default of the `mapo-ai` mount, as Nitro does for `data`
   access.ts                  build time: the `admin` and `users` options, read with a warning for what cannot be read
   index.ts                   public types (MapoAiOptions, MapoAiStatus, MapoAiUserContext…), also re-exported by
@@ -33,7 +34,12 @@ src/
                                            points of a map, dates, times and time zones, links
                                numbers.ts  numbers as the backend checks them (`multipleOf`)
                                patterns.ts the bound on a pattern's work, before the sanitizer runs it
+                               fill.ts     the browser's half of `run`: the request from the two descriptions, the
+                                           answer read as outside data, what goes into the form (`planMapoAiFill`),
+                                           the model's paths, and the operation `runMapoAiFill()`
                                guards.ts   type guards for outside values
+  runtime/composables/       useMapoAiFill.ts: the plan applied to a detail form, its marks, restore and undo, waiting
+                             and failing; for the browser, with Vue and `useNuxtApp()`
   runtime/server/auth/       who calls the gateway:
                                user.ts     the user read from `userInfoApi`'s answer (zod); the rules: admin, users,
                                            a model's permission; pure
@@ -83,6 +89,7 @@ src/
 12. **Every route starts with the session.** A handler calls `requireMapoAiSession(event)`, or `requireMapoAiAdmin(event)`, before it reads anything else, and sets `Cache-Control: no-store` when the answer is the user's own; only a route that tells the user what they may do, as `status`, uses `readMapoAiCaller(event)` and answers a refused user (`allowed: false`) instead of a 403. The gateway keeps no session of its own: it forwards the request's `cookie`, and no other header, to `userInfoApi` by Nitro's local fetch, as core restores the session. A backend that cannot say who is signed in gets a 502, never a 401. A rule that cannot be read picks fewer users, never more; an app narrows access with the `mapo-ai:user` hook, which can only refuse: its `allowed` is a latch, so a later hook never undoes an earlier refusal. Permissions are read by `userPermissions()` of `@mapomodule/utils`, as the auth store reads them.
 13. **No pattern runs unbounded.** A field's patterns come from the schemas, which may come from outside: the sanitizer runs one only when `patterns.ts` bounds its work on the value, and a value whose pattern could not be tested (too costly, unreadable, or failing while it runs) is kept and never verified. A new way of testing values against an outside expression gets the same bound.
 14. **`run` builds what it asks, and spends last.** The gateway compiles the contract itself from the descriptions the page sends (`run/contract.ts`), never from a contract a client sends, so the rules a contract holds inside hold by construction; zod reads only the envelope. The order in `runMapoAi()` keeps the cost for last: provider, model, permission and the user's limit (looked at, not counted) come before the contract and the hooks, and the limit counts a call only once they have passed; without the storage no call is made. A provider is called only when `mapo.ai.providers` enables it, gets copies of what it is asked, and its answer is outside data, read as plain JSON; the call is audited as soon as it answers, before its answer is read. The prompt is composed in the gateway: what the server holds (Mapo's base rules, the app's, the admin's) comes before what the request writes, and an app's rules and hooks add, never remove. The audit holds metadata only, never the source, the instructions or the values. An option of `run` that cannot be read never widens what may spend: a provider is not enabled, a limit is `0`.
+15. **The page writes only what the answer verifies on an empty field it shows, as the form writes, and undoes only its own.** `useMapoAiFill()` reads the answer of `run` as outside data (`readMapoAiFillResponse()`), and writes by itself only a value whose action is `apply`: verified, on a field that holds nothing and that the form shows. Everything else waits for the operator, marked at the field's value path, where the form looks. It writes only the keys the form's fields declare, through own properties and never through a segment that leads to a prototype, and as `useMapoForm()` writes: the field's accessor, every language of a `synci18n` field, `onChange`; keep the two in step. `restore()` and `undo()` put back only what still holds the AI's value, removing the keys and objects it added, and it removes only its own marks. The fields, the language and `isNew` are read after the `OPTIONS`. A related record is never written before someone finds it. Labels come from `mapo.ai.*`, and the shared `mapo.apply` and `mapo.restore`, in both catalogs of `@mapomodule/i18n`.
 
 ## Change together
 
@@ -100,11 +107,14 @@ src/
 | A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests        |
 | A storage purpose                | `STORAGE_PURPOSES` in `storage/sealed.ts`; never rename one that has records: its key comes from the name       |
 | An option of `run`               | `run/options.ts` and its warnings, `MapoAiOptions` in `index.ts`, `module.test.ts`, the docs' options           |
-| The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), `run.test.ts`, the run section of the docs                 |
+| The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), the reader in `shared/fill.ts`, `run.test.ts`, the docs    |
 | A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                               |
 | A failure of a provider          | `MapoAiProviderFailure`, `FAILURES` in `run/run.ts`, the audit's validator, the errors in the docs              |
 | A provider of Mapo               | `MAPO_PROVIDERS` and the reserved ids in `providers/registry.ts`, its options in `run/options.ts`               |
 | The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests              |
+| What goes into a form by itself  | `actionOf()` and `isEmptyFormValue()` in `fill.ts`, `fill.test.ts`, the table of the docs' "Fill a detail form" |
+| A mark or a message of the fill  | `mapo.ai.fill.*`, `mapo.ai.errors.*` in both `mapo.{en,it}.json` of `@mapomodule/i18n`; `useMapoAiFill.test.ts` |
+| How the form writes a value      | `writeField()` of `useMapoAiFill.ts`, which repeats `setFieldValue()` of the form's `useMapoForm.ts`            |
 
 ## Verify
 

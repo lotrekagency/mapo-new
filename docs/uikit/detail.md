@@ -309,6 +309,8 @@ detail.annotations.value = {
 
 These marks show with those of the `annotations` prop; on the same path the prop wins. Replace the map to change them, as with the prop. → [Field annotations](./form/annotations)
 
+`useMapoAiFill()` of `@mapomodule/ai` (experimental) does this with the values a language model reads from a source: → [Fill a detail form](/modules/ai#fill-a-detail-form)
+
 **One `OPTIONS` request per page.** `metadata()` returns the endpoint's `OPTIONS` response, requested once and shared: the detail asks for it to read the languages and, with `experimentalFieldsFromSchema`, the fields, and a component asking again gets the same answer without a new request. It is `undefined` when the endpoint has no `OPTIONS` metadata.
 
 ## How to: add an action to every detail page

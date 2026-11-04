@@ -22,6 +22,7 @@ const kit = vi.hoisted(() => {
     handlers: unknown[];
     plugins: unknown[];
     imports: unknown[];
+    appImports: unknown[];
     warnings: unknown[];
     templates: Array<{ template: unknown; context: unknown }>;
     nitro: { options: unknown };
@@ -29,6 +30,7 @@ const kit = vi.hoisted(() => {
     handlers: [],
     plugins: [],
     imports: [],
+    appImports: [],
     warnings: [],
     templates: [],
     nitro: { options: {} },
@@ -42,6 +44,7 @@ vi.mock("@nuxt/kit", () => ({
   addServerHandler: (handler: unknown) => kit.handlers.push(handler),
   addServerPlugin: (plugin: unknown) => kit.plugins.push(plugin),
   addServerImports: (imports: unknown[]) => kit.imports.push(...imports),
+  addImports: (imports: unknown[]) => kit.appImports.push(...imports),
   addTypeTemplate: (template: unknown, context: unknown) =>
     kit.templates.push({ template, context }),
   useLogger: () => ({ warn: (message: unknown) => kit.warnings.push(message) }),
@@ -71,6 +74,7 @@ beforeEach(() => {
   kit.handlers = [];
   kit.plugins = [];
   kit.imports = [];
+  kit.appImports = [];
   kit.warnings = [];
   kit.templates = [];
 });
@@ -160,6 +164,17 @@ describe("the module", () => {
       {
         name: "registerMapoAiMockFixtures",
         from: "resolved:./runtime/server/providers/mock",
+      },
+    ]);
+  });
+
+  it("gives the app's pages the composable that fills a detail form", async () => {
+    await setup({ public: {} });
+
+    expect(kit.appImports).toEqual([
+      {
+        name: "useMapoAiFill",
+        from: "resolved:./runtime/composables/useMapoAiFill",
       },
     ]);
   });

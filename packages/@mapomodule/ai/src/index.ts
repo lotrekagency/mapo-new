@@ -47,6 +47,20 @@ export type {
 export type { MapoAiProviderOptions } from "./runtime/server/run/options";
 export type { AiChoice } from "./runtime/shared/entity";
 export type {
+  MapoAiFillAction,
+  MapoAiFillEntity,
+  MapoAiFillEntry,
+  MapoAiFillResponse,
+} from "./runtime/shared/fill";
+export type {
+  MapoAiFill,
+  MapoAiFillCall,
+  MapoAiFillError,
+  MapoAiFillField,
+  MapoAiFillOptions,
+  MapoAiFillTarget,
+} from "./runtime/composables/useMapoAiFill";
+export type {
   AiAnswerWarning,
   AiDiscardReason,
   AiDroppedValue,

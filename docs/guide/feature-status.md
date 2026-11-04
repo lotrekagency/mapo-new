@@ -176,7 +176,8 @@ New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
 | Providers                   | ✅     | The `mock`, which answers without a model, and the providers an app registers with `registerMapoAiProvider()`                                                                |
 | Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; `run` writes its audit there                                                                                             |
 | Mapo's model providers      | 🔲     | Planned: OpenAI, Anthropic, OpenAI-compatible servers and local models                                                                                                       |
-| Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them                                                                                                    |
+| Filling forms from a source | ✅     | `useMapoAiFill()` sends a detail's fields and backend schema to `run`, writes each verified value into an empty field, and marks the others for the operator                 |
+| Magic Fill                  | 🔲     | Planned: a panel on every detail page, with files and a preview of the values, built on `useMapoAiFill()`                                                                    |
 | Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk                                                                                                 |
 
 ---

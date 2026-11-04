@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. Under it is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
 ## How a value travels
 
@@ -20,20 +20,24 @@ backend schema ──┐
                  ├──► entity model ──► contract ──► prompt ──► provider ──► answer ──► sanitizer ──► one outcome per field
 form fields ─────┘    entity.ts        contract.ts  prompts/   providers/   unknown    sanitize.ts   empty | filled | discarded
                       └──────────────────── the gateway, POST /_mapo/ai/run ─────────────────────┘
+                                                                                                        │
+                                       the form ◄── verified on an empty field: in; the rest: marked ◄──┘
+                                                    useMapoAiFill(), fill.ts
 ```
 
 1. **The entity model** says which fields the AI may fill, with their kind of value, limits and choices, and which fields it must leave alone, with the reason.
 2. **The contract** is the strict JSON Schema the model's answer must follow, the same for every provider, with the fields behind it.
 3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Today the only provider Mapo ships is the `mock`, which answers without a model; an app can register its own.
 4. **The sanitizer** reads the answer as outside data, turns each value into the form's type, discards what breaks a rule, and checks each value against the quotes the model gives from the source.
+5. **The page** applies the outcomes: `useMapoAiFill()` writes a verified value into an empty field, and marks every other one for the operator.
 
-A filled value is either **verified** or **to check**, and the difference matters: Magic Fill will apply a verified value without a preview, and show everything else to the operator first. Many of the core's rules exist to keep that word honest.
+A filled value is either **verified** or **to check**, and the difference matters: `useMapoAiFill()` applies a verified value on an empty field without a preview, and shows everything else to the operator first; Magic Fill will keep that rule. Many of the core's rules exist to keep that word honest.
 
 ## The package
 
 | File                              | Role                                                                                         |
 | --------------------------------- | -------------------------------------------------------------------------------------------- |
-| `src/module.ts`                   | The Nuxt module: routes, plugins, server imports, private secret and options, the hook types |
+| `src/module.ts`                   | The Nuxt module: routes, plugins, server and app imports, private runtime config, hook types |
 | `src/storage.ts`                  | At build time, the storage's default mount                                                   |
 | `src/access.ts`                   | At build time, the `admin` and `users` options                                               |
 | `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                             |
@@ -50,8 +54,10 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                          |
 | `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                  |
 | `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                  |
+| `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form           |
+| `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors           |
 
-The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, the state is sealed and fails closed, no pattern runs unbounded, and `run` builds what it asks and spends last.
+The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, the state is sealed and fails closed, no pattern runs unbounded, `run` builds what it asks and spends last, and the page writes only what the answer verifies on an empty field.
 
 ## The entity model
 
@@ -385,6 +391,55 @@ The audit has one record per call that reached the provider, in the `audit` purp
 - **Patterns get a rough bound**: on long values some harmless patterns are not applied, and their values are not verified.
 - **No streaming**: the browser waits for the whole answer, and a local model with a large schema can take minutes.
 
+## Filling a form
+
+`useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
+
+| File                                       | Role                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `src/runtime/shared/fill.ts`               | Pure: the request from the two descriptions, the answer read as outside data, the plan, the model's paths |
+| `src/runtime/composables/useMapoAiFill.ts` | The composable: the plan applied to the detail, the marks, `restore()` and `undo()`, waiting and failing  |
+
+### What goes in by itself
+
+For each field of the answer, `planMapoAiFill()` decides one action: `apply` for a verified value on an empty field, `confirm` for a value no quote proves or one that would replace what the field holds, `manual` for a related record, `discard` for a value the gateway discarded, `empty` for what the source does not give. Only `apply` writes by itself: a verified value cannot be worse than an empty field, while a value that replaces one asks the operator to compare, and a related record is a name the form cannot take before someone finds it (an id the AI picked from `relationChoices` waits too). A field is empty when it holds nothing, a blank text, an empty paragraph of the editor or an empty list; `false` and `0` are values, so a switch the backend sets to `false` keeps it until the operator applies. A field the form hides (`show`, `visible`) waits too: the operator would not see a value go in. A part of a field whose accessor converts the whole value (`seo.title` of such a field) is `manual`: it cannot be written alone. A related record is looked for anywhere in a value, not only in what a list's items say, and a list of items whose answer lacks the outcome of each item is not read at all. A list goes in whole, by its own `verified`, which holds only when every item is verified, none was taken out and the list is long enough.
+
+### Why the page builds the request
+
+The page holds both descriptions: the fields it renders, written with `fieldsToJsonSchema()`, and the backend's schema, read from the `OPTIONS` the detail asks for once (`metadata()`), with `metadataToJsonSchema()` or the page's own `schemaFromMetadata`. The gateway builds the entity model and the contract from them, as for any request of `run`. When `OPTIONS` fails, the fields alone describe the record: the form's own keep-out rules still hold, and every value goes into a field of the form, which the operator reviews before saving. The composable reads the fields, the language and whether the record is new only once `OPTIONS` answered: a detail that takes its languages or its fields from it (Camomilla, `experimentalFieldsFromSchema`) has them then, and not before.
+
+`runMapoAiFill()` is the whole round trip without a UI: it builds the request, posts it through the `post` it is given, reads the answer and plans it, writing nothing. The composable adds the state, the marks and the writes. A tool of a future agent can call the operation with its own `post` and its own form.
+
+### The answer as outside data
+
+The page reads the answer of `run` with a validator, `readMapoAiFillResponse()`, as the gateway reads a provider's: the server may run another version of the gateway, or a backend its own, and the composable writes what it reads into a form. An outcome it cannot read is left out, so nothing of it reaches the form; an answer that is no fill answer at all is an error. Keys stay data, `__proto__` included.
+
+### Writing into the form
+
+A field's value is at the path the form reads it from: its key, `translations.<language>.<key>` for a translatable field in the language the detail edits (the rule of the form's `valuePath()`, which a test keeps in step), and `seo.title` inside its object. The composable writes only the keys the form's fields declare (`declaredKeys()` of the schema it sent: `title.x` or `speakers.length` are not keys), through own properties, never through a segment that leads to a prototype, and a copy of the value. It writes as the form's `setFieldValue()` does, which it cannot call: through the accessor of the field or of its type in the registry, in every language for a `synci18n` field, then the field's `onChange`.
+
+Each write remembers what the path held, whether the key was there and which objects it made on the way (`translations.it`). `restore()` and `undo()` put a path back only while it holds what was written, compared as JSON: a value the operator changed afterwards stays theirs. A key the write added goes away again, and an object it made goes too once empty, so an undone form is the form it was, and the detail no longer counts it as changed. The form is read when the answer arrives, so a field the operator filled meanwhile counts as filled. A read-only form is neither asked nor written, and nothing is written while the detail saves or deletes its record (`isBusy`): the save may load the record back over a value, and leave a mark on a field that no longer holds it.
+
+### The marks
+
+The marks go to the detail's `annotations` channel, at the path the form looks at: the field's value path. A field with parts gets one mark for all of them (the form shows no mark at `seo.title`), which tells each part and applies or restores them together. The proof of a list comes from the quotes of its items, and its mark says when values were taken out or the list is too short. The composable keeps the marks it set and removes only those: a mark of another extension at another field stays, and one at the same field is replaced: it does not come back when the AI's goes. A mark of the page's `annotations` prop wins over the channel at the same path, so it hides the AI's. Each mark carries the actions of its field: Keep and Restore for a value that went in, Apply and Ignore for one that waits, Ignore alone for a related record or a discarded value. The labels come from the app's `$i18n` (`mapo.ai.fill.*`, and the shared `mapo.apply` and `mapo.restore`), read without a dependency on `@mapomodule/i18n`: without it, a label is its key.
+
+### Waiting and failing
+
+The call goes through `$mapoFetch` when the app has it, so a session that ended leads to the login page as anywhere in Mapo, and through `$fetch` otherwise. `cancel()`, a new `fill()` and the end of the component's scope stop the browser's wait; the gateway still finishes the call, which counts against the user's limit and is audited. The previous answer's marks and memory are replaced only when a new answer arrives: a call that fails or is cancelled leaves them as they were. An error keeps the gateway's status and its `Retry-After`, with a message from `mapo.ai.errors.*`; a `FetchError` without a status is the network, any other failure (the app's own `schemaFromMetadata` throwing) is a failure.
+
+### Strengths and weaknesses
+
+- **One rule decides what goes in by itself**, in a pure function with its tests: the same rule will serve Magic Fill's panel.
+- **The browser trusts no answer**: it reads it as outside data, and writes only at the paths it sent.
+- **The operator's work is never undone**: `restore()` and `undo()` put back only what the AI wrote and the field still holds, until the next answer or until the page is left.
+- **Related records wait**: the AI's name, or id, is shown, and the operator chooses the record; searching for it is Magic Fill's.
+- **A list goes in whole or waits**: there is no merge with the items a record already has.
+- **The marks and the memory of `undo()` live in the page**: a reload forgets them.
+- **`false` counts as a value**: a default `false` of a new record keeps a verified `true` waiting.
+- **The browser cannot stop the provider**: a cancelled call still costs.
+- **The form's write is copied, not called**: `useMapoForm()` keeps `setFieldValue()` to itself, so the composable repeats its steps (accessor, `synci18n`, `onChange`) and must follow it when it changes. It does not mark the field as touched, so the form's own validation of that field waits for Save.
+
 ## Testing
 
 The whole core, the storage and the gateway run without network or UI, with Vitest, in `packages/@mapomodule/ai/src/__tests__/`; the storage tests use unstorage's memory and file-system drivers, and the routes run on a bare h3 app, with the mock as the provider:
@@ -415,6 +470,14 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `registry.test.ts`  | The providers an app registers, and the ids Mapo keeps                                                                                             |
 | `providers.test.ts` | The providers the server's log names when it starts, as they will not be called                                                                    |
 | `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations, the options and what each warns about |
+
+The browser's half, also run in Node:
+
+| File                    | What it proves                                                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `fill.test.ts`          | The request from the two descriptions, the answer read as outside data, each action of the plan, the model's paths          |
+| `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
+| `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
 
 - `expectPortable()`, in `portable.ts`, walks a schema and fails on anything outside the portable subset; every contract test runs it.
 - A bug fix leaves a regression test that fails on the previous version.
@@ -471,6 +534,10 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 
 Change it in `prompts/base.ts` and raise `MAPO_AI_PROMPT_VERSION`, so every answer and audit record says which rules it was asked with. Keep the rules that protect: the source is data, nothing is invented. Once there is an evaluation set, measure the change with it before it ships.
 
+### Change what goes into the form by itself
+
+The rule is `actionOf()` in `fill.ts`, with `isEmptyFormValue()` for what counts as empty. Change it there, with a row in the tests of `planMapoAiFill()`, the table of [Fill a detail form](/modules/ai#fill-a-detail-form), and a message under `mapo.ai.fill` in both catalogs of `@mapomodule/i18n` when a mark changes. The rule decides what reaches a form without the operator: a value that goes in by itself must stay one a quote verifies.
+
 ### Add a tag of rich text
 
 Add it to `markdown.ts` and to the closed list in its tests, and make sure `MapoWygEditor` accepts it: the editor must keep every tag the AI's HTML has.
@@ -487,6 +554,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | The prompt, Verification, Limits, The audit      | The `run` route (written)                                        |
 | The secret and the storage                       | The encrypted storage (written)                                  |
 | Options                                          | Every option, in the change that makes it work (written to date) |
+| Fill a detail form                               | `useMapoAiFill()` (written)                                      |
 | Fill a form with Magic Fill                      | Magic Fill                                                       |
 | Verified and to check                            | Magic Fill, from the verification described on this page         |
 | Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
@@ -503,12 +571,11 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **A page of the reference app** that fills a form through the gateway, with the mock.
-2. **Readers** for text, PDF, images and spreadsheets.
-3. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
-4. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
-5. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
-6. **Magic Fill**, with an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
+1. **Readers** for text, PDF, images and spreadsheets.
+2. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
+3. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
+4. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
+5. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
 
 ### Nice to have
 

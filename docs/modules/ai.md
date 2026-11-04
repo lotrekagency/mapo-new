@@ -3,7 +3,7 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. The only provider Mapo ships is `mock`, which answers without a network; an app can register its own. No form fills itself yet: a page calls `run` and decides what to do with its answer. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. The only provider Mapo ships is `mock`, which answers without a network; an app can register its own. In the browser, `useMapoAiFill()` fills a detail form through `run`, from a component the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
@@ -17,8 +17,9 @@ The package is at its first building blocks. Today it installs the **AI gateway*
 - The prompt is composed in layers: Mapo's base rules, the app's (`instructions`, and the `mapo-ai:prompt` hook), the entity's context, the operator's instructions, then the source, which is data and never instructions.
 - The app sets the verification rules (`verification`) and the limits (`limits`): calls per user per minute, the length of a source and of the operator's instructions.
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model, the tokens and the outcome, never the contents, for 90 days by default (`audit`).
+- `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
-- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`).
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`).
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -321,6 +322,82 @@ The permission on the model keeps the gateway in step with an honest page, which
 | 503    | No provider is enabled, the storage is closed, or the provider is busy, with `Retry-After` when it says               |
 | 504    | The provider did not answer within its `timeout`                                                                      |
 
+## Fill a detail form
+
+`useMapoAiFill()` fills the form of a `MapoDetail` from a source the operator gives, through `run`. It sends the form's fields and the backend's schema of the record, read from the endpoint's `OPTIONS` that the detail asks for once, then applies the answer field by field:
+
+| The answer for a field                                     | In the form                                 | The mark on the field                                 |
+| ---------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------- |
+| A value a quote verifies, and the field is empty and shown | Goes in by itself                           | "Filled by the AI", with the quote; Keep, Restore     |
+| A value no quote proves, or one that would replace a value | Waits for the operator                      | "Proposed by the AI", with the value; Apply, Ignore   |
+| A related record                                           | Waits: the operator chooses it in the field | "To set by hand", with the AI's name or label; Ignore |
+| A value the gateway discarded                              | Never goes in                               | "Discarded", with the value and the reason; Ignore    |
+| Nothing: the source does not give it                       | Unchanged                                   | None                                                  |
+
+A field is empty when it holds nothing, a blank text, an empty paragraph or an empty list; `false` and `0` are values. A field the form hides (its `show` or `visible` says so) never takes a value by itself: it waits. A list goes in whole, never item by item, and by itself only when every item is verified and none was taken out. A value goes in as the form writes one: through the field's accessor, in every language for a `synci18n` field, then its `onChange`; a part of a field whose accessor converts its value, such as `seo.title` of such a field, waits to be set by hand. Nothing is saved: the operator reviews the form and saves it with the detail's own Save.
+
+Call it in a detail extension ([Detail page](/uikit/detail#how-to-add-an-action-to-every-detail-page)), with the detail's context:
+
+```vue
+<!-- app/components/AiFill.vue, registered with
+     defineDetailExtension({ key: "ai-fill", placement: "body-top", component: AiFill }) -->
+<script setup lang="ts">
+const detail = useMapoDetail();
+const ai = detail
+  ? useMapoAiFill(detail, { entity: { label: "Article", model: "article" } })
+  : undefined;
+const source = ref("");
+</script>
+
+<template>
+  <div v-if="ai" class="space-y-2">
+    <UTextarea v-model="source" class="w-full" aria-label="Source" />
+    <UButton :loading="ai.pending.value" @click="ai.fill(source)">Fill</UButton>
+    <UButton v-if="ai.pending.value" variant="soft" @click="ai.cancel()">
+      Cancel
+    </UButton>
+    <UButton variant="soft" @click="ai.undo()">Undo</UButton>
+    <UAlert
+      v-if="ai.error.value"
+      color="error"
+      :title="ai.error.value.message"
+    />
+  </div>
+</template>
+```
+
+| Argument                     | What it is                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `target`                     | The form: `useMapoDetail()` in a detail extension, or any object with `model`, `fields` and `annotations`, and optionally `sidebarFields`, `metadata()`, `isNew` (without it the record counts as new), `currentLang`, `languages`, `registry`, `readonly` and `isBusy` (`MapoAiFillTarget`) |
+| `options.entity`             | What the AI should know about the record: `label`, `description`, `model` (the permission the gateway asks: `add_` for a new record, `change_` otherwise), `exclude`, `relationChoices` and `evidence`, as in [the body of run](#send-the-record-and-the-source)                             |
+| `options.schemaFromMetadata` | Reads the backend's schema from the `OPTIONS` response, as the `MapoDetail` prop of the same name: pass the function the detail has. Default: `metadataToJsonSchema()`; return `undefined` to send the fields alone                                                                          |
+
+It returns:
+
+| Member                | What it is                                                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fill(source, call?)` | Sends the source, a text or its parts, with the operator's `call.instructions` and the `call.provider` to use; resolves once the answer is applied, and never rejects: a failure goes to `error`                                                           |
+| `apply(path)`         | Writes a value that waits, by the path of its field                                                                                                                                                                                                        |
+| `restore(path)`       | Puts back what the field held before the AI's value went in, when the field still holds that value                                                                                                                                                         |
+| `dismiss(path?)`      | Removes the mark of a field, or every mark; the values stay                                                                                                                                                                                                |
+| `undo()`              | Puts back every field that still holds the AI's value, as it was before, and removes the marks                                                                                                                                                             |
+| `cancel()`            | Stops waiting for the answer; the gateway still finishes the call, which counts against the user's limit                                                                                                                                                   |
+| `pending`             | A call waits for its answer                                                                                                                                                                                                                                |
+| `error`               | Why the last call got no answer: the gateway's `status` (`0` without one), a `message` for the operator and, when the gateway sends `Retry-After` (429, 503), `retryAfter` in seconds                                                                      |
+| `response`            | The last answer of `run`: the outcomes, or the model's refusal (`status: "refused"`)                                                                                                                                                                       |
+| `fields`              | Each field of the answer: its `key`, the `path` of its value in the model, the `action` (`apply`, `confirm`, `manual`, `discard`, `empty`), whether it `replaces` a value, whether the form shows it (`shown`), whether it is `applied`, and the `outcome` |
+
+- **Where a value goes.** A translatable field's value goes to `translations.<language>.<key>`, in the language the detail edits once its `OPTIONS` answered, which the request sends as `language`; a part of an object, such as `seo.title`, inside it. A key the form's fields do not declare is never written.
+- **The marks** go to the detail's `annotations` channel ([Field annotations](/uikit/form/annotations)), where the form looks for them: at the field. A field with parts, such as an SEO block, gets one mark that tells each part, with one Apply for the parts that wait. The AI's mark replaces the one another component set at the same field, and `dismiss()` and `undo()` remove only the AI's marks; a mark of the `annotations` prop of `MapoDetail` wins over the AI's at the same path.
+- **The operator's own changes stay.** `restore()` and `undo()` put a field back only while it holds what the AI wrote: a field the operator changed afterwards keeps the change. A key the AI added goes away again, and so does an object it made on the way (`translations.it`), so the form is as it was. What a field's `onChange` changed stays.
+- **A new `fill()`** stops waiting for the previous call. When its answer arrives, the previous answer's marks go; its values stay in the form, and `restore()` and `undo()` then reach only the new answer's. A call that fails or is cancelled leaves the previous answer as it was.
+- **A refusal is no error.** When the model refuses, `response` has `status: "refused"` and the model's text in `refusal`; when its answer did not have the shape asked, `result.readable` is `false` and every field is empty. Nothing is written, and `error` stays empty: show them from `response`.
+- **Errors.** The call goes through `$mapoFetch`, so a session that ended leads to the login page, and a 403 also shows the "permission denied" message. `error.message` says what happened in the app's language, and how long to wait when the gateway says.
+- **A read-only form** is neither asked nor written: a `MapoDetail` with `readonly`, or with a `permissionModel` the user may not add or change. While the detail saves or deletes its record (`isBusy`), nothing is written: an answer that arrives then waits, marked, for Apply.
+- **Labels** come from the `mapo.ai.fill.*` and `mapo.ai.errors.*` messages of `@mapomodule/i18n`, in English and Italian, with the shared `mapo.apply` and `mapo.restore`; an app overrides them as any `mapo.*` message.
+
+The reference app has a scenario: `/ai/fill/new` and `/ai/fill/1` in `apps/example-e2e`, with sources for every outcome of the mock, its failures, and the app's rules in `server/plugins/`; `/ai/status` shows what `status` answers the account signed in (`admin`, `editor` or `viewer`).
+
 ## Providers
 
 `run` calls only the providers `providers` enables, each with the models a request may ask for, its default first, and the seconds a call may take:
@@ -377,7 +454,7 @@ export default defineNitroPlugin(() => {
 });
 ```
 
-A fixture has a `name` (lowercase letters, digits, `-` and `_`), an `answer` written as a model writes it, or a `refusal`; optionally the `source` it answers without a mark, and the `usage` to report. The answer names the properties of the answer's schema: the field keys made safe, `seo.title` as `seo_title`. It may hold wrong values or quotes that are not in the source on purpose: they come back discarded or to check. `registerMapoAiMockFixtures()` is auto-imported in the server's code.
+A fixture has a `name` (lowercase letters, digits, `-` and `_`), an `answer` written as a model writes it, or a `refusal`; optionally the `source` it answers without a mark, and the `usage` to report. The answer names the properties of the answer's schema: the field keys made safe, `seo.title` as `seo_title`. Every value is written as the schema asks: text, `"true"` or `"false"`, a number in digits, `""` for what the source does not give, and a related record by the name to search for, or by its id when `relationChoices` lists the records (`{ record, item }` only where an extraction may link to an item of the same answer). It may hold wrong values or quotes that are not in the source on purpose: they come back discarded or to check. `registerMapoAiMockFixtures()` is auto-imported in the server's code; the reference app registers its own in `apps/example-e2e/server/plugins/mapo-ai-fixtures.ts`.
 
 ### Your own provider
 

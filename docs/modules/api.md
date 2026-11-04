@@ -744,7 +744,34 @@ Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. S
 
 ## AI — `@mapomodule/ai`
 
-Experimental, installed with `mapo.ai`. Auto-imported in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai#providers).
+Experimental, installed with `mapo.ai`. `useMapoAiFill()` is auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
+
+### `useMapoAiFill(target, options?)`
+
+Fills a detail form from a source, through the gateway's `run`: each value a quote verifies goes into an empty field by itself, and the others wait for the operator, marked on their fields. Call it in a detail extension. See [Fill a detail form](/modules/ai#fill-a-detail-form).
+
+| Parameter                    | Type                                    | Default                | Description                                                                                                                                                                                                 |
+| ---------------------------- | --------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `target`                     | `MapoAiFillTarget`                      | — **required**         | The form: `useMapoDetail()`, or an object with `model`, `fields` and `annotations`, and optionally `sidebarFields`, `metadata()`, `isNew`, `currentLang`, `languages`, `registry`, `readonly` and `isBusy`. |
+| `options.entity`             | `MapoAiFillEntity`                      | —                      | What the AI should know about the record: `label`, `description`, `model` (for the permission check), `exclude`, `relationChoices`, `evidence`.                                                             |
+| `options.schemaFromMetadata` | `(metadata) => JSONSchema \| undefined` | `metadataToJsonSchema` | Reads the backend's schema from the endpoint's `OPTIONS` response.                                                                                                                                          |
+
+**Returns:** `MapoAiFill`:
+
+| Member     | Type                                                                                      | Description                                                                                                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fill`     | `(source: string \| readonly MapoAiSourcePart[], call?: MapoAiFillCall) => Promise<void>` | Sends the source with `call.instructions` and `call.provider`, then writes and marks the answer. Never rejects: a failure goes to `error`. A new call stops the previous one's wait and removes its marks. |
+| `apply`    | `(path: string) => void`                                                                  | Writes the AI's value of a field that waits, by its path: one to confirm, or one put back with `restore()`.                                                                                                |
+| `restore`  | `(path: string) => void`                                                                  | Puts back what the field held before the AI's value went in, while the field still holds that value.                                                                                                       |
+| `dismiss`  | `(path?: string) => void`                                                                 | Removes the AI's mark of a field, or all of them; the values stay.                                                                                                                                         |
+| `undo`     | `() => void`                                                                              | Puts back every field that still holds the AI's value, as it was before, and removes the AI's marks.                                                                                                       |
+| `cancel`   | `() => void`                                                                              | Stops waiting for the answer; the gateway still finishes the call.                                                                                                                                         |
+| `pending`  | `Readonly<Ref<boolean>>`                                                                  | A call is waiting for its answer.                                                                                                                                                                          |
+| `error`    | `Readonly<Ref<MapoAiFillError \| undefined>>`                                             | `{ status, message, retryAfter? }`: why the last call got no answer; `status` is `0` without one.                                                                                                          |
+| `response` | `Readonly<Ref<MapoAiFillResponse \| undefined>>`                                          | The last answer of `run`: the outcomes, or the model's refusal.                                                                                                                                            |
+| `fields`   | `Readonly<Ref<readonly MapoAiFillField[]>>`                                               | Each field of the answer: `key`, `path`, `action`, `replaces`, `applied` and the `outcome`.                                                                                                                |
+
+---
 
 ### `registerMapoAiProvider(provider)`
 

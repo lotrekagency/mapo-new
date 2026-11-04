@@ -271,6 +271,52 @@
       "uploadFailed": "Upload failed",
       "fileTooLarge": "File \"{name}\" too large (max {max} MB)",
       "success": "{numberFiles} files successfully uploaded"
+    },
+    "ai": {
+      "fill": {
+        "applied": "Filled by the AI",
+        "confirm": "Proposed by the AI",
+        "manual": "To set by hand",
+        "discarded": "Discarded",
+        "proven": "The source says: “{quote}”",
+        "notProven": "No quote of the source proves it: check it.",
+        "proposes": "The AI proposes “{value}”.",
+        "proposesInstead": "The AI proposes “{value}” in place of the current value.",
+        "manualText": "The AI proposes “{value}”: choose the related record yourself.",
+        "tooFew": "Fewer than the field needs.",
+        "dropped": "Values taken out of the list: {n}. Check it.",
+        "manualField": "The AI proposes “{value}”: write it yourself, since this field converts its value.",
+        "items": "Items: {n}",
+        "keep": "Keep",
+        "ignore": "Ignore",
+        "reasons": {
+          "format": "“{value}” is not a valid value for this field.",
+          "not-listed": "“{value}” is not one of this field's choices.",
+          "too-short": "“{value}” is shorter than this field allows.",
+          "too-long": "“{value}” is longer than this field allows.",
+          "too-low": "{value} is lower than this field allows.",
+          "too-high": "{value} is higher than this field allows.",
+          "step": "{value} is not one of the values this field allows.",
+          "pattern": "“{value}” does not have the format this field asks for.",
+          "too-many-values": "The AI proposes more values than this field allows."
+        }
+      },
+      "errors": {
+        "signedOut": "Your session has ended: sign in again.",
+        "forbidden": "You cannot use the AI here.",
+        "unsupported": "The request to the AI could not be read.",
+        "tooLarge": "The text is longer than the AI accepts.",
+        "nothingToFill": "The AI has nothing to fill in this form.",
+        "rateLimited": "Too many requests to the AI: try again in a minute.",
+        "rateLimitedIn": "Too many requests to the AI: try again in {seconds} seconds.",
+        "providerFailed": "The AI did not answer properly: try again.",
+        "unavailable": "The AI is not available now: try again later.",
+        "unavailableIn": "The AI is busy: try again in {seconds} seconds.",
+        "timeout": "The AI took too long to answer.",
+        "network": "The server could not be reached.",
+        "badAnswer": "The server's answer could not be read.",
+        "failed": "The AI could not fill the form."
+      }
     }
   }
 }

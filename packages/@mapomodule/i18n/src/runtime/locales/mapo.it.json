@@ -271,6 +271,52 @@
       "uploadFailed": "Caricamento non riuscito",
       "fileTooLarge": "File \"{name}\" troppo grande (max {max} MB)",
       "success": "{numberFiles} file caricati con successo"
+    },
+    "ai": {
+      "fill": {
+        "applied": "Compilato dall'AI",
+        "confirm": "Proposto dall'AI",
+        "manual": "Da impostare a mano",
+        "discarded": "Scartato",
+        "proven": "Lo dice la sorgente: “{quote}”",
+        "notProven": "Nessuna citazione della sorgente lo prova: controllalo.",
+        "proposes": "L'AI propone “{value}”.",
+        "proposesInstead": "L'AI propone “{value}” al posto del valore attuale.",
+        "manualText": "L'AI propone “{value}”: scegli tu il record collegato.",
+        "tooFew": "Meno di quanti il campo ne chiede.",
+        "dropped": "Valori tolti dalla lista: {n}. Controllala.",
+        "manualField": "L'AI propone “{value}”: scrivilo tu, perché questo campo converte il suo valore.",
+        "items": "Elementi: {n}",
+        "keep": "Tieni",
+        "ignore": "Ignora",
+        "reasons": {
+          "format": "“{value}” non è un valore valido per questo campo.",
+          "not-listed": "“{value}” non è tra le scelte di questo campo.",
+          "too-short": "“{value}” è più corto di quanto il campo accetta.",
+          "too-long": "“{value}” è più lungo di quanto il campo accetta.",
+          "too-low": "{value} è più basso di quanto il campo accetta.",
+          "too-high": "{value} è più alto di quanto il campo accetta.",
+          "step": "{value} non è tra i valori che il campo accetta.",
+          "pattern": "“{value}” non ha il formato che il campo chiede.",
+          "too-many-values": "L'AI propone più valori di quanti il campo ne accetti."
+        }
+      },
+      "errors": {
+        "signedOut": "La sessione è scaduta: accedi di nuovo.",
+        "forbidden": "Non puoi usare l'AI qui.",
+        "unsupported": "La richiesta all'AI non si è potuta leggere.",
+        "tooLarge": "Il testo è più lungo di quanto l'AI accetta.",
+        "nothingToFill": "L'AI non ha nulla da compilare in questo form.",
+        "rateLimited": "Troppe richieste all'AI: riprova tra un minuto.",
+        "rateLimitedIn": "Troppe richieste all'AI: riprova tra {seconds} secondi.",
+        "providerFailed": "L'AI non ha risposto come doveva: riprova.",
+        "unavailable": "L'AI ora non è disponibile: riprova più tardi.",
+        "unavailableIn": "L'AI è occupata: riprova tra {seconds} secondi.",
+        "timeout": "L'AI ci ha messo troppo a rispondere.",
+        "network": "Il server non si raggiunge.",
+        "badAnswer": "La risposta del server non si è potuta leggere.",
+        "failed": "L'AI non è riuscita a compilare il form."
+      }
     }
   }
 }

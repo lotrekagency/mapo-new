@@ -16,7 +16,8 @@ Agents run live checks in `example-e2e` only (`pnpm dev:example-e2e`), and stop 
 ## `example-e2e`
 
 - **Accounts**: `admin`, `editor` and `viewer`, password equal to the username (`server/utils/session.ts`).
-- **Pages**: one per scenario under `app/pages/` (auth, permissions, roles, `form/*`, `list/*`, `media/*`, `menu/*`, i18n, feedback, sidebar). The sidebar is built from each page's `definePageMeta`, so a new page needs no menu configuration.
+- **Pages**: one per scenario under `app/pages/` (auth, permissions, roles, `form/*`, `list/*`, `media/*`, `menu/*`, `ai/*`, i18n, feedback, sidebar). The sidebar is built from each page's `definePageMeta`, so a new page needs no menu configuration.
+- **AI**: `mapo.ai` in `nuxt.config.ts` enables the mock provider; `server/plugins/mapo-ai-fixtures.ts` registers its answers and `server/plugins/mapo-ai-rules.ts` the app's rules (the `viewer` account kept out, a rule of the prompt); `shared/aiArticleSamples.ts` holds the sources the `/ai/fill` page sends.
 - **Mock API**: `server/api/**` with in-memory stores in `server/utils/`. It resets when the server restarts.
 - **`api-schema.json`** describes that mock API the way drf-spectacular would, for `mapo_backend_schema`. When an endpoint or a payload in `server/api/**` changes, update it in the same change.
 - **`devtools.componentInspector` is off** on purpose: its tracer injects an import that does not resolve under pnpm's isolated layout and breaks the dev server.

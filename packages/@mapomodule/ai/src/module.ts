@@ -1,4 +1,5 @@
 import {
+  addImports,
   addServerHandler,
   addServerImports,
   addServerPlugin,
@@ -24,9 +25,10 @@ export type { MapoAiOptions, MapoAiStatus } from "./index";
  * Registers the AI gateway on the app's own Nitro server, under
  * `/_mapo/ai/*`: `status`, and `run`, which calls the providers the app
  * enables. Its state goes to a sealed storage: the Nitro mount `mapo-ai`,
- * encrypted with `NUXT_MAPO_AI_SECRET`. Opt-in: the meta-module installs it
- * only when the app sets `mapo.ai`, so an app without that key loads
- * nothing of it.
+ * encrypted with `NUXT_MAPO_AI_SECRET`. The app's pages get
+ * `useMapoAiFill()`, which fills a detail form through `run`. Opt-in: the
+ * meta-module installs it only when the app sets `mapo.ai`, so an app
+ * without that key loads nothing of it.
  */
 export default defineNuxtModule<MapoAiOptions>({
   meta: {
@@ -110,6 +112,15 @@ export default defineNuxtModule<MapoAiOptions>({
       {
         name: "registerMapoAiMockFixtures",
         from: resolver.resolve("./runtime/server/providers/mock"),
+      },
+    ]);
+
+    // What the app's pages use, without an import: the composable that
+    // fills a detail form through the gateway.
+    addImports([
+      {
+        name: "useMapoAiFill",
+        from: resolver.resolve("./runtime/composables/useMapoAiFill"),
       },
     ]);
 

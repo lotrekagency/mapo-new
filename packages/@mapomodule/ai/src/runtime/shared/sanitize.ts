@@ -164,8 +164,8 @@ export type AiFieldOutcome =
       /**
        * A quote found in the source holds every value, nothing was taken out
        * of a list and the list is long enough; for a `list`, every item is
-       * verified. Magic Fill applies a verified value without a preview, so
-       * anything less needs the operator.
+       * verified. `useMapoAiFill()` applies a verified value on an empty
+       * field without a preview, so anything less needs the operator.
        */
       verified: boolean;
       /** The quotes the answer gives for the field, found or not; a list's are in its items. */

@@ -89,6 +89,27 @@ const sections = [
     ],
   },
   {
+    title: "AI (experimental)",
+    icon: "i-lucide-sparkles",
+    items: [
+      {
+        label: "AI gateway",
+        to: "/ai/status",
+        desc: "GET /_mapo/ai/status as admin, editor or viewer: allowed, admin, providers, limits, storage",
+      },
+      {
+        label: "Fill a new article",
+        to: "/ai/fill/new",
+        desc: "useMapoAiFill through run with the mock: verified values, marks, Apply, Undo, failures",
+      },
+      {
+        label: "Fill an existing article",
+        to: "/ai/fill/1",
+        desc: "A value that would replace one waits for Apply; Restore puts the old one back",
+      },
+    ],
+  },
+  {
     title: "UIKit",
     icon: "i-lucide-layout-dashboard",
     items: [
