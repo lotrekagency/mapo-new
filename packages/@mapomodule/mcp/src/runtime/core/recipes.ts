@@ -642,6 +642,46 @@ export const RECIPES: Recipe[] = [
     summary:
       "The Mapo Forms tab: the module config and the live field registry your forms read.",
   },
+  {
+    id: "ai-run",
+    task: "Ask the AI to fill a record from a source",
+    keywords: [
+      "mapo.ai",
+      "magic fill",
+      "language model",
+      "_mapo/ai/run",
+      "extract records",
+      "pasted text",
+      "proposed values",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Ask the AI",
+    seeAlso: ["uikit/form/schema-to-form.md"],
+    summary:
+      "Experimental, opt-in with mapo.ai: POST /_mapo/ai/run sends a record's backend schema and form fields with a source to an enabled provider and answers one checked outcome per field; no form fills itself yet.",
+  },
+  {
+    id: "ai-providers",
+    task: "Add an AI provider, or answer with the mock",
+    keywords: [
+      "registerMapoAiProvider",
+      "MapoAiProviderError",
+      "registerMapoAiMockFixtures",
+      "mapo.ai.providers",
+      "mock provider",
+      "fixtures",
+      "llm",
+      "openai",
+      "anthropic",
+      "ollama",
+    ],
+    doc: "modules/ai.md",
+    heading: "Providers",
+    seeAlso: ["modules/api.md"],
+    summary:
+      "mapo.ai.providers enables what run may call: Mapo's mock, which answers without a network from fixtures or Label: value lines, or a provider the app registers in a Nitro plugin with registerMapoAiProvider().",
+  },
 ];
 
 export interface RecipeMatch extends Recipe {

@@ -48,6 +48,8 @@ describe("matchRecipes", () => {
     ["TS2307 cannot find module mapomodule/types", "imports"],
     ["connect claude code or copilot through mcp", "ai-assistant"],
     ["set up the camomilla session cookie", "camomilla"],
+    ["ask the AI to fill a form from a pasted text", "ai-run"],
+    ["register my own LLM provider for the AI gateway", "ai-providers"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
