@@ -13,6 +13,22 @@ const knowledge = makeKnowledge({
 });
 
 describe("searchDocs", () => {
+  it("finds nothing for constructor in docs that never write it, without throwing", () => {
+    expect(searchDocs(knowledge, "constructor")).toEqual([]);
+  });
+
+  it("finds the section that writes constructor, from a knowledge base read back from JSON", () => {
+    const withWord = makeKnowledge({
+      "modules/utils.md":
+        "# Utils\n\n## Flags\n\nA model named constructor gets flags of its own.\n",
+    });
+    const loaded = JSON.parse(JSON.stringify(withWord)) as typeof withWord;
+
+    const [top] = searchDocs(loaded, "constructor");
+
+    expect(top?.heading).toBe("Flags");
+  });
+
   it("ranks the section that actually answers the question first", () => {
     const [top] = searchDocs(
       knowledge,

@@ -233,9 +233,14 @@ export function chunkMarkdown(path: string, markdown: string): DocChunk[] {
   return chunks;
 }
 
-/** Builds the BM25 inverted index over already-chunked docs. */
+/**
+ * Builds the BM25 inverted index over already-chunked docs. The postings
+ * are gathered in a `Map` and copied into the table at the end, so a word
+ * named like a property every object has (`constructor`) gets a list of
+ * its own instead of the inherited property.
+ */
 export function buildIndex(chunks: DocChunk[]): Bm25Index {
-  const terms: Record<string, Array<[number, number]>> = {};
+  const postingsByTerm = new Map<string, Array<[number, number]>>();
   const lengths: number[] = [];
 
   chunks.forEach((chunk, chunkIndex) => {
@@ -253,7 +258,9 @@ export function buildIndex(chunks: DocChunk[]): Bm25Index {
 
     let length = 0;
     for (const [term, frequency] of counts) {
-      (terms[term] ??= []).push([chunkIndex, frequency]);
+      const postings = postingsByTerm.get(term) ?? [];
+      postings.push([chunkIndex, frequency]);
+      postingsByTerm.set(term, postings);
       length += frequency;
     }
     lengths.push(length);
@@ -261,7 +268,12 @@ export function buildIndex(chunks: DocChunk[]): Bm25Index {
 
   const total = chunks.length;
   const avgLength = total ? lengths.reduce((a, b) => a + b, 0) / total : 0;
-  return { terms, lengths, avgLength, total };
+  return {
+    terms: Object.fromEntries(postingsByTerm),
+    lengths,
+    avgLength,
+    total,
+  };
 }
 
 /** Reads every doc under `docsRoot` and returns the full knowledge payload. */

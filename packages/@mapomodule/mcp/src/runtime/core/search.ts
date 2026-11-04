@@ -109,7 +109,10 @@ export function searchDocs(
     if (seenTerms.has(term)) continue;
     seenTerms.add(term);
 
-    const postings = index.terms[term];
+    // The table is plain JSON once loaded: a word like `constructor` must
+    // be one of its own keys, not a property every object inherits.
+    const isIndexed = Object.hasOwn(index.terms, term);
+    const postings = isIndexed ? index.terms[term] : undefined;
     if (!postings) continue;
 
     // Standard BM25 idf, floored so very common terms still contribute a little.

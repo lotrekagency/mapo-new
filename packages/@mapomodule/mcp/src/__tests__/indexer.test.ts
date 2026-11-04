@@ -29,6 +29,25 @@ describe("tokenize", () => {
   });
 });
 
+describe("buildIndex", () => {
+  it("indexes a word named like an object property, such as constructor", () => {
+    const chunks = chunkMarkdown(
+      "modules/utils.md",
+      "# Utils\n\n## Flags\n\nA model named constructor gets flags of its own.\n",
+    );
+
+    const index = buildIndex(chunks);
+
+    expect(Object.hasOwn(index.terms, "constructor")).toBe(true);
+    expect(index.terms.constructor).toEqual(
+      expect.arrayContaining([expect.any(Array)]),
+    );
+    expect(JSON.parse(JSON.stringify(index)).terms.constructor).toEqual(
+      index.terms.constructor,
+    );
+  });
+});
+
 describe("splitSections", () => {
   it("extracts the title and one section per H2", () => {
     const { title, sections } = splitSections(CRUD_LIST_DOC);
