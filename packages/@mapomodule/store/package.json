@@ -45,6 +45,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },
+  "dependencies": {
+    "@mapomodule/utils": "workspace:*"
+  },
   "peerDependencies": {
     "nuxt": ">=4.0.0",
     "pinia": ">=3.0.0"

@@ -406,6 +406,10 @@ importers:
         version: 3.3.11(typescript@6.0.3)
 
   packages/@mapomodule/store:
+    dependencies:
+      '@mapomodule/utils':
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       '@nuxt/kit':
         specifier: 4.4.2

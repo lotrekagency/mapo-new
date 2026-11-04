@@ -37,7 +37,7 @@ How the packages depend on each other:
 
 ```
 mapomodule
-├── @mapomodule/store    Pinia
+├── @mapomodule/store    → utils, Pinia
 ├── @mapomodule/i18n     @nuxtjs/i18n
 ├── @mapomodule/core     → store, utils
 ├── @mapomodule/form     → store, i18n, utils

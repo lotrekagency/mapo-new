@@ -2,6 +2,7 @@
 export { SnackTypeEnum, SidebarCookieEnum } from "./runtime/types";
 export type {
   MapoUser,
+  MapoPermission,
   ModelPermissions,
   SnackType,
   SnackMessage,

@@ -39,6 +39,32 @@ describe("auth store — permission payload shapes", () => {
     });
   });
 
+  it("keeps codenames off the prototypes, whatever the model is called", () => {
+    const auth = useAuthStore();
+    auth.setUser({
+      ...base,
+      all_permissions: ["view_constructor", "add___proto__"],
+    });
+    expect(
+      Object.getOwnPropertyDescriptor(auth.modelPermissions, "constructor")
+        ?.value,
+    ).toEqual({ view: true, add: false, change: false, delete: false });
+    expect("view" in Object).toBe(false);
+    expect("add" in {}).toBe(false);
+  });
+
+  it("reads permissions that are not a list as none, and says so, instead of throwing", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const auth = useAuthStore();
+    expect(() =>
+      auth.setUser({ ...base, all_permissions: "view_article" as never }),
+    ).not.toThrow();
+    expect(auth.isAuthenticated).toBe(true);
+    expect(auth.rawPermissions).toEqual([]);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
   it("drops pks and says so, instead of locking the user out in silence", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const auth = useAuthStore();

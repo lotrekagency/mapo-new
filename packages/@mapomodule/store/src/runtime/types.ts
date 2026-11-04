@@ -4,7 +4,8 @@
  * Camomilla alone uses all three shapes: `users/current/` serializes
  * `all_permissions` as full Django Permission objects, its user list serializes
  * `user_permissions` as bare pks, and plain codenames are what the rest of the
- * ecosystem sends. Only the codename is usable here — see `setUser`.
+ * ecosystem sends. Only the codename is usable here — see `permissionCodenames`
+ * in `@mapomodule/utils`, which `setUser` reads them with.
  */
 export type MapoPermission =
   | string
@@ -21,12 +22,8 @@ export interface MapoUser {
   groups?: string[];
 }
 
-export interface ModelPermissions {
-  view: boolean;
-  add: boolean;
-  change: boolean;
-  delete: boolean;
-}
+// One definition, in @mapomodule/utils, with the reading that fills it.
+export type { ModelPermissions } from "@mapomodule/utils";
 
 export enum SnackTypeEnum {
   Info = "info",

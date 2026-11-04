@@ -61,22 +61,22 @@ auth.reset(); // clear all state (called on logout and on 401 responses)
 
 ```ts
 interface MapoUser {
-  id: number;
+  id: string | number;
   username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  groups: string[];
-  user_permissions: string[];
-  all_permissions: string[];
-  is_superuser: boolean;
-  is_staff: boolean;
+  email?: string;
+  is_superuser?: boolean;
+  /** Codenames, objects with a `codename` (Django `Permission` objects), or pks */
+  all_permissions?: MapoPermission[];
+  user_permissions?: MapoPermission[];
+  groups?: string[];
 }
 ```
 
+Backends often send more, such as `first_name` or `is_staff`: `setUser` keeps the whole payload in `auth.info`.
+
 ### Permission parsing
 
-`setUser` calls `buildModelPermissions(user.all_permissions)` which parses codenames of the form `{action}_{model}` into a typed map:
+`setUser` reads the permissions with [`userPermissions()`](./utils.md#userpermissions-user) from `@mapomodule/utils`: the codenames of `all_permissions`, or of `user_permissions` when the first is missing, whether the backend sends plain codenames or objects with a `codename`. Codenames of the form `{action}_{model}` become a typed map:
 
 ```ts
 // Given: ['view_article', 'change_article']
@@ -84,7 +84,7 @@ auth.modelPermissions;
 // → { article: { view: true, add: false, change: true, delete: false } }
 ```
 
-This map is what the `permissions` route middleware reads against `route.meta.permissions`.
+This map is what `usePermissions()` reads (`canView`, `canAdd`, `canChange`, `canDelete`); the `permissions` route middleware matches `route.meta.permissions` against the raw codenames. Code on the server that reads the same user with `userPermissions()` gets the same permissions.
 
 ---
 

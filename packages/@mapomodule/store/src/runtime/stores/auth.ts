@@ -1,51 +1,6 @@
 import { defineStore } from "pinia";
-import type { MapoPermission, MapoUser, ModelPermissions } from "../types";
-
-/**
- * Builds model-level permission flags from raw codename permissions.
- *
- * Expected codename format: `<action>_<model>`, where action is one of
- * `view`, `add`, `change`, or `delete`.
- *
- * @param raw Raw permission codenames.
- * @returns Model-keyed permission map with CRUD booleans.
- */
-/**
- * Codenames, out of whatever shape the backend sent.
- *
- * A pk is dropped rather than stringified: nothing on the client can resolve one
- * to a codename, and keeping it would put a key in `rawPermissions` that no
- * check ever matches — an access denial dressed up as a granted permission.
- */
-function toCodenames(raw: MapoPermission[]): string[] {
-  const names = raw.flatMap((perm) => {
-    if (typeof perm === "string") return [perm];
-    const codename = (perm as { codename?: unknown })?.codename;
-    return typeof codename === "string" ? [codename] : [];
-  });
-  // Losing every permission silently locks the user out of every gated panel
-  // with nothing in the console to explain it.
-  if (raw.length && !names.length)
-    console.warn(
-      "[mapo] User payload carried permissions with no codename in them, so every model permission is off. Serialize them as codenames, or as objects with a `codename`.",
-    );
-  return names;
-}
-
-function buildModelPermissions(
-  raw: string[],
-): Record<string, ModelPermissions> {
-  const map: Record<string, ModelPermissions> = {};
-  for (const codename of raw) {
-    const match = codename.match(/^(view|add|change|delete)_(.+)$/);
-    if (!match) continue;
-    const [, action, model] = match as [string, string, string];
-    if (!map[model])
-      map[model] = { view: false, add: false, change: false, delete: false };
-    map[model]![action as keyof ModelPermissions] = true;
-  }
-  return map;
-}
+import { userPermissions } from "@mapomodule/utils";
+import type { MapoUser, ModelPermissions } from "../types";
 
 // The session credential is an HttpOnly cookie managed by the backend/proxy
 // and is intentionally not stored in the client state. Authentication is
@@ -82,11 +37,17 @@ export const useAuthStore = defineStore("mapo-auth", {
      */
     setUser(user: MapoUser) {
       this.info = user;
-      const perms = toCodenames(
-        user.all_permissions ?? user.user_permissions ?? [],
-      );
-      this.rawPermissions = perms;
-      this.modelPermissions = buildModelPermissions(perms);
+      // The shared reading of a user payload: server code that reads the
+      // same user with it gets the same permissions.
+      const { codenames, models, unreadable } = userPermissions(user);
+      // Losing every permission silently locks the user out of every gated
+      // panel with nothing in the console to explain it.
+      if (unreadable)
+        console.warn(
+          "[mapo] User payload carried permissions with no codename in them, so every model permission is off. Serialize them as codenames, or as objects with a `codename`.",
+        );
+      this.rawPermissions = codenames;
+      this.modelPermissions = models;
     },
 
     /**
