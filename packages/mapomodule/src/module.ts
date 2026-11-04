@@ -3,6 +3,7 @@ import {
   defineNuxtModule,
   hasNuxtModule,
   installModule,
+  useLogger,
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
 import type { MapoOptions } from "@mapomodule/core";
@@ -96,8 +97,18 @@ export default defineNuxtModule<MapoModuleOptions>({
     // never loads the module, its routes or its dependencies.
     const aiOptedOut = ai === false;
     const aiConfigured = ai !== undefined;
-    if (aiConfigured && !aiOptedOut && !hasNuxtModule("@mapomodule/ai")) {
+    const isAiListed = hasNuxtModule("@mapomodule/ai");
+    if (aiConfigured && !aiOptedOut && !isAiListed) {
       await installModule(await resolver.resolvePath("@mapomodule/ai"), ai);
+    }
+    // Listed in `modules` too, the module reads its own key, `mapoAi`, and
+    // what `mapo.ai` holds never reaches it: a lost `users` lets everyone in.
+    const hasAiOptions =
+      typeof ai === "object" && ai !== null && Object.keys(ai).length > 0;
+    if (isAiListed && hasAiOptions) {
+      useLogger("mapomodule").warn(
+        "mapo.ai has options, but @mapomodule/ai is also listed in `modules`, so it reads `mapoAi` and the options in `mapo.ai` are not applied. Move them to `mapoAi`, or take @mapomodule/ai out of `modules`.",
+      );
     }
   },
 }) satisfies NuxtModule<MapoModuleOptions>;

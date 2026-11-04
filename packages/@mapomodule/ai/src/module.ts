@@ -1,12 +1,14 @@
 import {
   addServerHandler,
   addServerPlugin,
+  addTypeTemplate,
   createResolver,
   defineNuxtModule,
   useLogger,
   useNitro,
 } from "@nuxt/kit";
 import type { NuxtModule } from "@nuxt/schema";
+import { accessRuleOption } from "./access";
 import type { MapoAiOptions } from "./index";
 import { MAPO_AI_GATEWAY_PATH } from "./runtime/shared/gateway";
 import { isRecord } from "./runtime/shared/guards";
@@ -31,7 +33,7 @@ export default defineNuxtModule<MapoAiOptions>({
 
   defaults: {},
 
-  setup(_options, nuxt) {
+  setup(options, nuxt) {
     const resolver = createResolver(import.meta.url);
     const logger = useLogger("@mapomodule/ai");
 
@@ -47,7 +49,27 @@ export default defineNuxtModule<MapoAiOptions>({
         "runtimeConfig.mapoAi.secret is set in the Nuxt config, so the build copies it into the server bundle. Set NUXT_MAPO_AI_SECRET in the server's environment instead.",
       );
     }
-    nuxt.options.runtimeConfig.mapoAi = { secret: "", ...configured };
+    // Who administers and who uses the AI, read by the gateway at runtime:
+    // private too, since the rules are the server's to apply.
+    const warn = (message: string) => logger.warn(message);
+    const admin = accessRuleOption(options.admin, "admin", warn) ?? {};
+    const users = accessRuleOption(options.users, "users", warn);
+    nuxt.options.runtimeConfig.mapoAi = {
+      secret: "",
+      ...configured,
+      admin,
+      ...(users ? { users } : {}),
+    };
+
+    // The `mapo-ai:user` hook, typed in the app's server code.
+    addTypeTemplate(
+      {
+        filename: "types/mapo-ai.d.ts",
+        getContents: () =>
+          `import "${resolver.resolve("./runtime/server/auth/hooks")}";\nexport {};\n`,
+      },
+      { nitro: true },
+    );
 
     // The state goes to the `mapo-ai` mount: the app's own driver, or the
     // file system. At `ready` Nitro exists, with its options resolved (the

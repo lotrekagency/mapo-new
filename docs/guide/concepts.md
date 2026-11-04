@@ -19,17 +19,17 @@ export default defineNuxtConfig({
 
 ## The packages
 
-| Package             | Role                                                                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `mapomodule`        | Meta-module. Reads `mapo` and installs the packages below: `@mapomodule/mcp` only in development, `@mapomodule/ai` only with `mapo.ai`.  |
-| `@mapomodule/core`  | Service layer: `$mapoFetch` with 401/403 handling, `useCrud`, `useMapoAuth`, the `auth`, `permissions` and `roles` route middleware.     |
-| `@mapomodule/store` | Pinia stores: `useAuthStore`, `useSnackStore`, `useConfirmStore`, `useSidebarStore`, plus `usePermissions`.                              |
-| `@mapomodule/uikit` | The admin shell (layouts, sidebar, topbar, login), `MapoList`, `MapoDetail`, the media manager, the menu manager, theming, MapoOverride. |
-| `@mapomodule/form`  | The form engine: `FieldDescriptor[]`, the field registry, `MapoForm`, `useMapoForm()`, the JSON Schema bridge.                           |
-| `@mapomodule/i18n`  | A wrapper around `@nuxtjs/i18n` with Mapo's English and Italian catalogs and `useMapoT()`.                                               |
-| `@mapomodule/utils` | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …). Not a Nuxt module, not auto-imported.                                |
-| `@mapomodule/mcp`   | A development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration.                    |
-| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway (`/_mapo/ai/*`), answering `status` only, and its encrypted storage.  |
+| Package             | Role                                                                                                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mapomodule`        | Meta-module. Reads `mapo` and installs the packages below: `@mapomodule/mcp` only in development, `@mapomodule/ai` only with `mapo.ai`.                    |
+| `@mapomodule/core`  | Service layer: `$mapoFetch` with 401/403 handling, `useCrud`, `useMapoAuth`, the `auth`, `permissions` and `roles` route middleware.                       |
+| `@mapomodule/store` | Pinia stores: `useAuthStore`, `useSnackStore`, `useConfirmStore`, `useSidebarStore`, plus `usePermissions`.                                                |
+| `@mapomodule/uikit` | The admin shell (layouts, sidebar, topbar, login), `MapoList`, `MapoDetail`, the media manager, the menu manager, theming, MapoOverride.                   |
+| `@mapomodule/form`  | The form engine: `FieldDescriptor[]`, the field registry, `MapoForm`, `useMapoForm()`, the JSON Schema bridge.                                             |
+| `@mapomodule/i18n`  | A wrapper around `@nuxtjs/i18n` with Mapo's English and Italian catalogs and `useMapoT()`.                                                                 |
+| `@mapomodule/utils` | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …). Not a Nuxt module, not auto-imported.                                                  |
+| `@mapomodule/mcp`   | A development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration.                                      |
+| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway (`/_mapo/ai/*`), answering `status` to signed-in users only, and its encrypted storage. |
 
 Backend integrations ship as separate packages. The Camomilla CMS one is [`@mapomodule/mapo-integrations-camomilla`](/modules/camomilla); any other backend gets [its own small integration](/modules/integrations-howto).
 
@@ -60,14 +60,14 @@ Each step is drawn out, call by call, in [Architecture & Flows](./architecture-f
 
 Mapo follows Django REST Framework conventions. Any backend works if it speaks them, directly or through an integration that adapts it.
 
-| Area         | Contract                                                                                                                                                                                              |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auth         | Three Nuxt-side endpoints — `authLoginUrl`, `logoutUrl`, `userInfoApi` — with a cookie session. The user payload carries `groups` and permission codenames (`all_permissions` or `user_permissions`). |
-| Lists        | `GET <endpoint>?page=&search=&ordering=` (plus your filters) returns `{ count, results }`.                                                                                                            |
-| Details      | `GET <endpoint>/<id>/`, `POST` to create, `PATCH` with only the changed fields to update, `DELETE`. A 400 response keyed by field is shown on those fields.                                           |
-| Permissions  | Django-style codenames such as `view_article` and `change_article`.                                                                                                                                   |
-| Translations | Translatable fields read and write `translations[<lang>].<field>` on the record.                                                                                                                      |
-| Media        | The media manager talks to media and folder endpoints through a replaceable adapter.                                                                                                                  |
+| Area         | Contract                                                                                                                                                                                                       |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth         | Three Nuxt-side endpoints — `authLoginUrl`, `logoutUrl`, `userInfoApi` — with a cookie session. The user payload carries an `id`, `groups` and permission codenames (`all_permissions` or `user_permissions`). |
+| Lists        | `GET <endpoint>?page=&search=&ordering=` (plus your filters) returns `{ count, results }`.                                                                                                                     |
+| Details      | `GET <endpoint>/<id>/`, `POST` to create, `PATCH` with only the changed fields to update, `DELETE`. A 400 response keyed by field is shown on those fields.                                                    |
+| Permissions  | Django-style codenames such as `view_article` and `change_article`.                                                                                                                                            |
+| Translations | Translatable fields read and write `translations[<lang>].<field>` on the record.                                                                                                                               |
+| Media        | The media manager talks to media and folder endpoints through a replaceable adapter.                                                                                                                           |
 
 The details are in [Custom backend integration](/howto/backend-integration) and in [Auth & permissions](/howto/auth-permissions).
 

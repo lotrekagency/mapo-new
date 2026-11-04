@@ -27,7 +27,8 @@ export default defineNuxtConfig({
     },
 
     // AI-assisted data entry (experimental). Opt-in: an empty block installs
-    // the module, and the gateway answers at /_mapo/ai/status.
+    // the module, and the gateway answers at /_mapo/ai/status to a signed-in
+    // user. Superusers (the `admin` account) administer the AI by default.
     ai: {},
 
     i18n: {

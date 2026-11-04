@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, with its `status` route and an encrypted storage on the server for its state, and the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript and is not part of the package's public types yet.
+Neither feature exists yet. Today the package installs the gateway, with its `status` route behind the backend session and an encrypted storage on the server for its state, and the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript and is not part of the package's public types yet.
 
 ## How a value travels
 
@@ -30,19 +30,21 @@ A filled value is either **verified** or **to check**, and the difference matter
 
 ## The package
 
-| File                              | Role                                                        |
-| --------------------------------- | ----------------------------------------------------------- |
-| `src/module.ts`                   | The Nuxt module: routes, storage plugin, private secret     |
-| `src/storage.ts`                  | At build time, the storage's default mount                  |
-| `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route            |
-| `src/runtime/server/storage/`     | The sealed storage of the gateway's state                   |
-| `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps     |
-| `src/runtime/shared/entity.ts`    | The entity model                                            |
-| `src/runtime/shared/contract.ts`  | The contract compiler                                       |
-| `src/runtime/shared/sanitize.ts`  | The sanitizer and the verification rules                    |
-| `src/runtime/shared/citations.ts` | Finding a quote in the source, and a value in a quote       |
-| `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes         |
-| `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude` |
+| File                              | Role                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `src/module.ts`                   | The Nuxt module: routes, storage plugin, private secret and access options, the hook's types |
+| `src/storage.ts`                  | At build time, the storage's default mount                                                   |
+| `src/access.ts`                   | At build time, the `admin` and `users` options                                               |
+| `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                             |
+| `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                      |
+| `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                    |
+| `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps                                      |
+| `src/runtime/shared/entity.ts`    | The entity model                                                                             |
+| `src/runtime/shared/contract.ts`  | The contract compiler                                                                        |
+| `src/runtime/shared/sanitize.ts`  | The sanitizer and the verification rules                                                     |
+| `src/runtime/shared/citations.ts` | Finding a quote in the source, and a value in a quote                                        |
+| `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                          |
+| `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                  |
 
 The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, and the state is sealed and fails closed.
 
@@ -182,13 +184,13 @@ Today only the core reads the rules. They will become an option of the app, then
 
 The gateway's state lives on the app's server, in the Nitro mount `mapo-ai`, and every record is sealed before it reaches the driver. No route writes to it yet; the gateway's routes will reach it through `useMapoAiStorage(event)`, which reads the secret through the request's event (on Cloudflare Workers the environment arrives with the request) and throws a 503 while the storage is closed.
 
-| File                                    | Role                                                                                    |
-| --------------------------------------- | --------------------------------------------------------------------------------------- |
-| `src/storage.ts`                        | At build time: mounts the file system at `mapo-ai` when the app mounts nothing there    |
-| `src/runtime/server/storage/sealed.ts`  | Envelopes, a key per purpose, users, expiry and the sweep; pure, as `runtime/shared` is |
-| `src/runtime/server/storage/secret.ts`  | `NUXT_MAPO_AI_SECRET`, read as outside data, and what the log says about it             |
-| `src/runtime/server/storage/nitro.ts`   | The wiring to the mount and the runtime config: `useMapoAiStorage(event)`               |
-| `src/runtime/server/plugins/storage.ts` | When the server starts, after the app's plugins: the checks, the first and hourly sweep |
+| File                                    | Role                                                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `src/storage.ts`                        | At build time: mounts the file system at `mapo-ai` when the app mounts nothing there                                    |
+| `src/runtime/server/storage/sealed.ts`  | Envelopes, a key per purpose, users, expiry and the sweep; pure, as `runtime/shared` is                                 |
+| `src/runtime/server/storage/secret.ts`  | `NUXT_MAPO_AI_SECRET`, read as outside data, and what the log says about it                                             |
+| `src/runtime/server/storage/nitro.ts`   | The wiring to the mount and the runtime config: `useMapoAiStorage(event)`, and `mapoAiStorageState(event)` for `status` |
+| `src/runtime/server/plugins/storage.ts` | When the server starts, after the app's plugins: the checks, the first and hourly sweep                                 |
 
 ### A sealed record
 
@@ -254,24 +256,74 @@ Without a mount, the storage is closed too, rather than kept in the memory of on
 - **No sweep where timers are not allowed at startup**, such as Cloudflare Workers: expired records go only when they are read.
 - **The default trusts Nitro's `node` flag**, not whether the file system keeps what is written: a serverless function on Node (`vercel`, `netlify`, `aws-lambda`) gets a folder that does not last, and the app must mount a driver.
 
+## Authentication
+
+Every route of the gateway starts with one of three functions of `auth/nitro.ts`:
+
+- `requireMapoAiSession(event)` for a route that acts: it refuses with 403 a user the app's rules refuse;
+- `requireMapoAiAdmin(event)` for what only the AI's admins may do;
+- `readMapoAiCaller(event)` for `status`, which answers a refused user (`allowed: false`) instead of refusing them.
+
+The gateway keeps no session of its own: the backend says who is signed in, as it does for the rest of the backoffice.
+
+| File                                 | Role                                                                                         |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `src/runtime/server/auth/user.ts`    | The user read from `userInfoApi`'s answer, and the rules: admin, users, a model's permission |
+| `src/runtime/server/auth/session.ts` | The answer of the backend for a cookie, and 30 seconds of memory of it; pure                 |
+| `src/runtime/server/auth/nitro.ts`   | The wiring: Nitro's local fetch, the runtime config, the hook, the cross-site check          |
+| `src/runtime/server/auth/hooks.ts`   | The `mapo-ai:user` hook, typed for the app's server code                                     |
+| `src/access.ts`                      | At build time: `admin` and `users` read, with a warning for what cannot be read              |
+
+### How a request is let in
+
+1. **A request that changes something must come from the app's pages.** For any method but GET, HEAD and OPTIONS, a `Sec-Fetch-Site` other than `same-origin` gets a 403 before the backend is asked: the session cookie would otherwise let another site spend the user's AI. A client that sends no `Sec-Fetch-Site` is let through: no browser, an old one, or a page served over plain HTTP.
+2. **The session.** The request's `cookie` header, and nothing else, goes to `userInfoApi` (from `runtimeConfig.public.mapoCore`, core's default otherwise) through `useNitroApp().localFetch`, under `app.baseURL`: the same path core's session restore takes, so the app's own proxy to the backend sees the call and handles its cookies as for any other. A URL with a protocol goes straight to the backend it names. A `userInfoApi` among the gateway's own routes would make every request call itself without end: the gateway refuses it, with a 502 and the reason in the log.
+3. **The backend's answer.** 401, or 403 as DRF's session authentication answers an anonymous request, means nobody is signed in: the gateway answers 401. Anything else that is not a user, such as a 5xx, a page that is not JSON, an object without an `id` or a backend that cannot be reached, gets a 502 and a line in the server's log. It is never a 401, which would send the browser to the login page for a backend that is only down.
+4. **The user** is read with zod, as outside data: an object with an `id`, text or a number. The other fields are read leniently and never grant more than they say: only `is_superuser: true` makes a superuser, only strings are groups, and the permissions are read by `userPermissions()` of `@mapomodule/utils`, which the auth store uses too, so the gateway and the interface read the same permissions. On superusers the gateway is stricter: the interface takes any true value of `is_superuser`, the gateway only `true`. The user and the payload are frozen, deep: they are remembered and handed to hooks.
+5. **The memory.** A user the backend returned is remembered for 30 seconds under a SHA-256 of the cookie, never the cookie itself, at most 1000 of them, the oldest going first; requests that arrive together with one cookie share one call. A refusal or a failure is not remembered.
+6. **The rules.** `admin`: superusers, and whom its groups or permissions pick. `users`: unset, everyone; set, superusers, the admins and whom it picks. Both are read again at every request from the private runtime config, where the environment may have replaced them: a rule that cannot be read picks nobody but superusers (and, for `users`, the admins), and the log says so once.
+7. **The app's hooks.** `mapo-ai:user` runs on every request `users` lets in, the remembered ones too, with the request, the user, the payload and whether the user is an admin. A hook refuses with `allowed = false`. The context's `allowed` is a latch: once it is false, setting it again changes nothing, and anything but `true` is a refusal, so the rules of two plugins that each refuse some users both hold. A hook that throws fails the request with a 500.
+8. **The answer.** A user the rules or a hook refuse is refused with 403 by `requireMapoAiSession`, and administers nothing. `status` answers them instead, with `allowed: false`.
+
+### Why `status` answers a refused user
+
+A page asks `status` to know whether to offer the AI at all, and "not for you" is a normal answer to that question, not a failure. As a 403 it would be an error on every page that asks, for a user who did nothing wrong, and through `$mapoFetch` core would show its permission-denied message on each of them. So `status` keeps the 401 for a missing session (the user must sign in, and `$mapoFetch` sends them to the login page) and answers a refusal with `allowed: false`; the routes that act keep the 403, because a call there from a refused user is a request that must not run.
+
+`requireModelPermission(session, model, action)` refuses a call on a record of a model the user may not fill: `add_` for a new record, `change_` for an existing one, superusers always passing. No route calls it yet: the model will come with the request, from the page that declares it; without one there is nothing to check. It keeps the gateway in step with an honest interface, which offers the AI only where the user may add or change; a crafted request can name another model, or none.
+
+### Strengths and weaknesses
+
+- **The backend stays the authority.** The gateway asks it, by the same path as core's session restore, so it works behind any backend integration that proxies `/api`, and a session the backend closes is closed for the gateway within 30 seconds.
+- **Thirty seconds of trust.** A closed session, or a permission taken away, still counts for up to 30 seconds. The memory is per process: every server instance asks on its own, and a restart forgets everything.
+- **Errors of the backend are not logouts.** A 502 leaves the browser's session alone; the log says what the backend answered.
+- **Configuration fails closed.** A rule that cannot be read, at build time or at runtime, picks fewer users, never more.
+- **The model comes from the browser.** The check keeps the gateway in step with an honest interface, and protects neither the data nor the cost: a crafted request can name a model the user may fill, or none, and is not checked. The gateway never writes to the backend, and the backend decides every save; what bounds the cost is the per-user limit and the audit log of the `run` route, still to come.
+- **The cross-site check trusts `Sec-Fetch-Site`.** Every current browser sends it, but only to HTTPS and `localhost`: on a site served over plain HTTP, and from an old browser, only the cookie's `SameSite` stands in the way. There is no `Origin` check, because a proxy in front of the app can change the host the server sees.
+- **Groups are strings**, as the auth store reads them: a backend that sends group objects or pks matches no group, in the gateway as in the interface.
+- **One backend call per session every 30 seconds, and every hook on every request**: a hook that asks something slow should keep its own memory.
+- **One line in the log per request while the backend is down**, as for core's session restore: nothing folds them together.
+
 ## Testing
 
 The whole core and the storage run without network or UI, with Vitest, in `packages/@mapomodule/ai/src/__tests__/`; the storage tests use unstorage's memory and file-system drivers:
 
-| File                | What it proves                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `entity.test.ts`    | Which fields the AI may fill, the merge rules, and that no keep-out flag is lost wherever a schema writes it |
-| `contract.test.ts`  | The schema stays portable (`expectPortable()`), the budget, the links of an extraction                       |
-| `sanitize.test.ts`  | Each kind read and discarded, limits, lists, relations, links, quotes and the verification rules             |
-| `citations.test.ts` | Finding quotes, numbers read one way, points of a map, dates, times, time zones and links                    |
-| `markdown.test.ts`  | The closed list of tags: everything else is text                                                             |
-| `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration      |
-| `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep   |
-| `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                            |
-| `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                             |
-| `plugin.test.ts`    | The plugin on a mocked Nitro: after the app's plugins, hourly, the log, the close, a runtime without timers  |
-| `nitro.test.ts`     | The wiring: closed with a 503 without a secret or a mount, the secret read through the event, the warnings   |
-| `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations  |
+| File                | What it proves                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entity.test.ts`    | Which fields the AI may fill, the merge rules, and that no keep-out flag is lost wherever a schema writes it                                       |
+| `contract.test.ts`  | The schema stays portable (`expectPortable()`), the budget, the links of an extraction                                                             |
+| `sanitize.test.ts`  | Each kind read and discarded, limits, lists, relations, links, quotes and the verification rules                                                   |
+| `citations.test.ts` | Finding quotes, numbers read one way, points of a map, dates, times, time zones and links                                                          |
+| `markdown.test.ts`  | The closed list of tags: everything else is text                                                                                                   |
+| `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |
+| `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep                                         |
+| `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                                                                  |
+| `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                                                                   |
+| `plugin.test.ts`    | The plugin on a mocked Nitro: after the app's plugins, hourly, the log, the close, a runtime without timers                                        |
+| `nitro.test.ts`     | The wiring: closed with a 503 without a secret or a mount, the secret read through the event, the warnings                                         |
+| `user.test.ts`      | The user read from a payload, the rules of `admin` and `users`, a model's permission, the hook's types                                             |
+| `session.test.ts`   | What each answer of the backend means, the 30 seconds of memory, the calls shared, the oldest forgotten                                            |
+| `status.test.ts`    | The route on a bare h3 app with a mocked Nitro: 401, 403, 502, admins, the hook, the cross-site check, a model's permission, the app's base URL    |
+| `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations, the access options and their warnings |
 
 - `expectPortable()`, in `portable.ts`, walks a schema and fails on anything outside the portable subset; every contract test runs it.
 - A bug fix leaves a regression test that fails on the previous version.
@@ -309,6 +361,14 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 3. Read them with a validator: what comes back is outside data, and may have been written by an older version.
 4. Never rename a purpose that has records: the key is derived from its name, and its records would no longer open.
 
+### Add a gateway route
+
+1. Add the handler to `src/runtime/server/routes/`, one file per route, and register it in `module.ts`.
+2. Start it with `requireMapoAiSession(event)`, or `requireMapoAiAdmin(event)`, before anything else, and set `Cache-Control: no-store` when the answer is the user's own. Only a route that tells the user what they may do, as `status` does, uses `readMapoAiCaller(event)` and answers a refused user.
+3. Read the body with zod: it is outside data.
+4. Describe the answer in `runtime/shared/gateway.ts`, raise `MAPO_AI_CONTRACT_VERSION` when an older client cannot read it, and add it to the routes of [AI-assisted entry](/modules/ai#the-gateway).
+5. Test it on a bare h3 app, as `status.test.ts` does: without a session, refused, as an admin.
+
 ### Add a tag of rich text
 
 Add it to `markdown.ts` and to the closed list in its tests, and make sure `MapoWygEditor` accepts it: the editor must keep every tag the AI's HTML has.
@@ -317,18 +377,19 @@ Add it to `markdown.ts` and to the closed list in its tests, and make sure `Mapo
 
 The module's documentation is written with the code, on this plan. [AI-assisted entry](/modules/ai) is for app developers and says only what works, because the MCP server serves it to assistants as fact. Its sections, and what fills each:
 
-| Section                                          | Filled by                                                |
-| ------------------------------------------------ | -------------------------------------------------------- |
-| What works today, Enable the module, The gateway | The gateway's first route (written)                      |
-| The secret and the storage                       | The encrypted storage (written)                          |
-| Options                                          | Each option, in the change that makes it work            |
-| Fill a form with Magic Fill                      | Magic Fill                                               |
-| Verified and to check                            | Magic Fill, from the verification described on this page |
-| Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets |
-| Providers and keys                               | The providers, and the keys on three levels              |
-| AI settings                                      | The settings page                                        |
-| Import several records                           | Import AI                                                |
-| Guarantees and limits                            | Every change                                             |
+| Section                                          | Filled by                                                        |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| What works today, Enable the module, The gateway | The gateway's first route (written)                              |
+| Who may use the gateway                          | The gateway's authentication (written)                           |
+| The secret and the storage                       | The encrypted storage (written)                                  |
+| Options                                          | Each option, in the change that makes it work (`admin`, `users`) |
+| Fill a form with Magic Fill                      | Magic Fill                                                       |
+| Verified and to check                            | Magic Fill, from the verification described on this page         |
+| Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
+| Providers and keys                               | The providers, and the keys on three levels                      |
+| AI settings                                      | The settings page                                                |
+| Import several records                           | Import AI                                                        |
+| Guarantees and limits                            | Every change                                                     |
 
 This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text.
 
@@ -338,7 +399,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **The gateway's run route**: authentication, policy, prompts composed in layers, a mock provider, the verification rules as an option of the app, and an audit log in the storage.
+1. **The gateway's run route**: policy, prompts composed in layers, a mock provider, the verification rules as an option of the app, and an audit log in the storage.
 2. **Readers** for text, PDF, images and spreadsheets.
 3. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
 4. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
@@ -356,6 +417,9 @@ Ideas with no place in the plan yet:
 - The limits of every declaration of a nested value, not only those of the one it is read from.
 - A point of a map from a place name, through a geocoder outside the model, verified against the place the source names.
 - Rotate the storage's secret: read with the previous one too, and seal again with the new one at the next write.
+- Tell the gateway an entity's model from the server, through the catalog, instead of taking it from the request.
+- Check `Origin` too, for browsers that send no `Sec-Fetch-Site`, once the host the server sees behind a proxy can be trusted.
+- Read group objects (`{ name }`) as names, in the auth store and the gateway together.
 - Expire a batch and its drafts through one record, instead of one expiry each.
 - Keep the drafts in the browser (IndexedDB), for installations that cannot have a server storage.
 - Versions on records, for two tabs that write the same one.

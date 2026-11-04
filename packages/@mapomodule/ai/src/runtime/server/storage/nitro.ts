@@ -8,6 +8,7 @@ import { createError } from "h3";
 import type { H3Event } from "h3";
 import { useRuntimeConfig, useStorage } from "nitropack/runtime";
 import { MAPO_AI_STORAGE_MOUNT } from "../../shared/gateway";
+import type { MapoAiStorageState } from "../../shared/gateway";
 import { isRecord } from "../../shared/guards";
 import { createSealedStorage } from "./sealed";
 import type { SealedStorage, UnreadableReason } from "./sealed";
@@ -80,6 +81,26 @@ export function useMapoAiStorage(event: H3Event): SealedStorage {
     };
   }
   return sealed.storage;
+}
+
+/**
+ * The state of the storage, for the AI's admins: whether it is open, what
+ * the secret is like (never its value), what is mounted at `mapo-ai`.
+ * @param event the request's event, through which the secret is read
+ */
+export function mapoAiStorageState(event: H3Event): MapoAiStorageState {
+  const secret = useMapoAiSecret(event);
+  const mounted = hasMapoAiMount();
+  const state: MapoAiStorageState = {
+    open: canSeal(secret) && mounted,
+    secret: secret.status,
+    mounted,
+  };
+  const driver = mounted
+    ? useStorage().getMount(MAPO_AI_STORAGE_MOUNT).driver.name
+    : undefined;
+  if (typeof driver === "string" && driver !== "") state.driver = driver;
+  return state;
 }
 
 function configuredSecret(event?: H3Event): unknown {

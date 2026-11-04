@@ -167,13 +167,14 @@ UI translations for every Mapo component, extensible by the consuming app. See [
 
 New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
 
-| Feature                     | Status | Notes                                                                        |
-| --------------------------- | ------ | ---------------------------------------------------------------------------- |
-| Opt-in installation         | ✅     | The meta-module installs the package only when the app sets `mapo.ai`        |
-| Gateway status route        | ✅     | `GET /_mapo/ai/status` answers with the gateway's contract version           |
-| Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; nothing writes to it yet |
-| Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them    |
-| Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk |
+| Feature                     | Status | Notes                                                                                                                                                                        |
+| --------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Opt-in installation         | ✅     | The meta-module installs the package only when the app sets `mapo.ai`                                                                                                        |
+| Gateway status route        | ✅     | `GET /_mapo/ai/status` tells a signed-in user the contract version, whether the app lets them use the AI and whether they administer it; admins also get the storage's state |
+| Gateway authentication      | ✅     | The backend session, through `userInfoApi`; `mapo.ai.admin`, `mapo.ai.users` and the `mapo-ai:user` hook                                                                     |
+| Encrypted state storage     | ✅     | Mount `mapo-ai`, sealed with `NUXT_MAPO_AI_SECRET`; nothing writes to it yet                                                                                                 |
+| Filling forms from a source | 🔲     | Planned: a language model proposes form values, the operator reviews them                                                                                                    |
+| Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk                                                                                                 |
 
 ---
 

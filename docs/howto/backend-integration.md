@@ -217,7 +217,7 @@ Before shipping, verify these all work:
 
 - [ ] `/api/auth/login` → backend login endpoint → sets `__mapo_session` cookie
 - [ ] `/api/auth/logout` → backend logout → clears `__mapo_session` cookie
-- [ ] `/api/profiles/me/` → returns user object with `username`, `email`, `groups`, `all_permissions`
+- [ ] `/api/profiles/me/` → returns user object with `id`, `username`, `email`, `groups`, `all_permissions`
 - [ ] All `/api/*` routes are proxied
 - [ ] `host` header is stripped (avoids `400 Bad Request` from some backends)
 - [ ] CSRF mechanism forwarded if required by backend

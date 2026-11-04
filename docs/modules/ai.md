@@ -3,15 +3,17 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway answers one route, `status`, and no route stores anything yet. No form filling, no providers and no options exist yet. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway answers one route, `status`, to signed-in users, and no route stores anything yet. No form filling and no providers exist yet. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
 
 - The module installs only when the app asks for it: an app without the `mapo.ai` key loads nothing of it.
-- The gateway answers `GET /_mapo/ai/status` with the version of its contract.
+- The gateway knows the user from the backend session: it forwards the request's cookie to `userInfoApi`, as Mapo does when it renders a page. Without a session it answers 401.
+- `GET /_mapo/ai/status` tells a signed-in user the version of the gateway's contract, whether the app lets them use the AI and whether they administer it; an admin also gets the state of the storage.
+- Two options say who administers the AI and who may use it, `admin` and `users`, and a Nitro plugin can narrow it further with the `mapo-ai:user` hook.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour. No route writes to it yet.
-- `mapomodule/types` exports `MapoAiOptions` and `MapoAiStatus`.
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus` and the types of the hook, `MapoAiUserContext` and `MapoAiUser`.
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -45,21 +47,131 @@ export default defineNuxtConfig({
 });
 ```
 
+Register it one way or the other. With `@mapomodule/ai` in `modules` beside `mapomodule`, the meta-module does not install it a second time, so the module reads `mapoAi` and the options in `mapo.ai` never reach it; the meta-module warns about it when `mapo.ai` holds options.
+
 ## The gateway
 
 The gateway is a set of routes on your app's own Nitro server, under `/_mapo/ai/`. The prefix sits outside `/api/*` on purpose: a backend integration that proxies `/api` to the real backend never catches these routes. In an app served under a base URL, the routes move with it: with `app.baseURL: "/backoffice/"` the status route is `/backoffice/_mapo/ai/status`.
 
-| Route                  | Answer                                                     |
-| ---------------------- | ---------------------------------------------------------- |
-| `GET /_mapo/ai/status` | `{ "contract": 1 }`: the version of the gateway's contract |
+| Route                  | Answer                                                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /_mapo/ai/status` | `{ "contract": 2, "allowed": true, "admin": false }`: the version of the gateway's contract, whether the app lets the user use the AI, and whether they administer it; an admin also gets `storage` |
 
-The contract version goes up when a route or a response changes in a way an older client cannot read. `status` gives every caller the same answer and carries no configuration and no user data.
+The contract version goes up when a route or a response changes in a way an older client cannot read. The answers are the user's own, so they carry `Cache-Control: no-store`.
 
 ```ts
 import type { MapoAiStatus } from "mapomodule/types";
 
+// In the browser the session cookie goes along with the request. During SSR
+// $fetch sends no cookie: use $mapoFetch there, which forwards it.
 const status = await $fetch<MapoAiStatus>("/_mapo/ai/status");
 ```
+
+To an admin, `storage` says whether the gateway can read and write its state, and why not, never the secret itself:
+
+```json
+{
+  "contract": 2,
+  "allowed": true,
+  "admin": true,
+  "storage": {
+    "open": true,
+    "secret": "set",
+    "mounted": true,
+    "driver": "fs-lite"
+  }
+}
+```
+
+`secret` is `set`, `temporary` (none is set and the server runs in development), or what keeps the storage closed: `missing`, `too-short` or `not-text` ([The secret and the storage](#the-secret-and-the-storage)). `driver` is the name of the driver mounted at `mapo-ai`, when it has one: `fs` with the module's default in `nuxt dev`, `fs-lite` on a Node server.
+
+### A user the app refuses
+
+`status` answers every signed-in user, also one the app's rules refuse ([Restrict who uses the AI](#restrict-who-uses-the-ai)). That user gets `"allowed": false`, `"admin": false` and no `storage`, with a 200; every other route of the gateway refuses them with 403.
+
+It is an answer and not an error on purpose. A page asks `status` to know whether to offer the AI at all, and "not for you" is a normal answer to that question. As a 403, every page that asks would have to handle an error for a user who did nothing wrong, and through `$mapoFetch` Mapo would show its permission-denied message on each of those pages. With `allowed`, a page asks and leaves the AI out:
+
+```ts
+import type { MapoAiStatus } from "mapomodule/types";
+
+const { fetch } = useMapoFetch();
+const { allowed } = await fetch<MapoAiStatus>("/_mapo/ai/status");
+```
+
+Every route of the gateway answers these errors:
+
+| Status | When                                                                                                                                                                                                                                |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 401    | Nobody is signed in: the request has no cookie, or the backend refuses its session                                                                                                                                                  |
+| 403    | The app's rules refuse the user: `users`, or a `mapo-ai:user` hook ([Who may use the gateway](#who-may-use-the-gateway)). `status` answers that user `"allowed": false` instead ([A user the app refuses](#a-user-the-app-refuses)) |
+| 502    | The backend cannot say who is signed in: it cannot be reached, it fails, or `userInfoApi` returns no user. The server's log says why, and the session is not touched                                                                |
+
+Called with `$mapoFetch`, these errors behave as for any backend call: a 401 sends the user to the login page, and a 403 shows Mapo's permission-denied message.
+
+## Who may use the gateway
+
+### The session
+
+The gateway does not log anybody in: it asks your backend who the request's session belongs to. It forwards the request's `cookie` header, and no other header, to [`userInfoApi`](/modules/core#options) (`/api/profiles/me/` by default), through your app's own server, the way Mapo restores the session when it renders a page. The proxy of a backend integration sees that call and handles its cookies as it does for any other, and in an app served under a base URL the call goes there too. A backend that answers 401, or 403 as Django REST Framework's session authentication answers a request without a session, means nobody is signed in.
+
+The user is the object `userInfoApi` returns: an `id`, `is_superuser: true` for a superuser, the strings of `groups`, and the permission codenames of `all_permissions`, or of `user_permissions` when the first is missing, read as Mapo's auth store reads them. A payload without an `id` is no user, and the gateway answers 502.
+
+The gateway remembers a user for 30 seconds, in the memory of the server process and under a hash of the cookie: a burst of calls asks the backend once, and a session closed on the backend, or a permission taken away, still counts for up to 30 seconds. Every server process keeps its own memory.
+
+### Admins
+
+`admin` names who administers the AI: superusers always, then anyone in one of its `groups` or with one of its `permissions`, codenames as `userInfoApi` sends them. Without it, only superusers do.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      admin: { groups: ["ai-admin"] },
+    },
+  },
+});
+```
+
+Today an admin is told the state of the storage in `status`.
+
+### Restrict who uses the AI
+
+Without `users`, every user `userInfoApi` returns may use the gateway. With it, only superusers, the AI's admins and the users it picks may; anyone else is refused: `status` answers them `"allowed": false`, every other route 403.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      users: { groups: ["editors"], permissions: ["change_article"] },
+    },
+  },
+});
+```
+
+When the rule is not a group or a permission, add it in a Nitro plugin, with the `mapo-ai:user` hook. A backoffice that lets in only the users its backend marks as internal, for example, gives the gateway the same rule; otherwise a user the backoffice turns away could still call the gateway with their session:
+
+```ts
+// server/plugins/mapo-ai-access.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook("mapo-ai:user", (context) => {
+    if (context.payload.is_internal !== true) context.allowed = false;
+  });
+});
+```
+
+The hook runs on every request the gateway lets in, after `users`, with:
+
+| Field     | What it holds                                                                                                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `event`   | The request                                                                                                                                                                                  |
+| `user`    | The user as the gateway reads them (`MapoAiUser`): `id`, `username`, `superuser`, `groups`, `permissions`, `models`                                                                          |
+| `payload` | The user exactly as `userInfoApi` returned them, with the fields the gateway does not read. Outside data: check a value's type first                                                         |
+| `admin`   | Whether the user administers the AI                                                                                                                                                          |
+| `allowed` | `true`; set it to `false` to refuse the user. Once a hook refuses, no later hook can let the user back in: setting `true` again changes nothing, and anything but `true` counts as a refusal |
+
+A hook only narrows: a user `users` refuses never reaches it, and the rules of two plugins that each refuse some users both hold. A hook that throws fails the request with a 500, so an error lets nobody in. `user` and `payload` are read-only, so a hook cannot change what the next request reads. The module types the hook in your app's server code.
 
 ## The secret and the storage
 
@@ -134,4 +246,13 @@ A record can carry an expiry. An expired record is never returned: it is removed
 
 ## Options
 
-None yet. Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. The secret is not an option: it is the environment variable `NUXT_MAPO_AI_SECRET`, read when the server starts.
+Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. Its options:
+
+| Option  | Type                                            | Default                       | Description                                                                |
+| ------- | ----------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `admin` | `{ groups?: string[]; permissions?: string[] }` | `{}`: superusers only         | Who administers the AI ([Admins](#admins))                                 |
+| `users` | `{ groups?: string[]; permissions?: string[] }` | Not set: every signed-in user | Who may use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai)) |
+
+The module reads both when the app builds, and warns about what it cannot read: a value it cannot read picks fewer users, never more, so a `users` that names no group or permission it can read lets in only superusers and the AI's admins. They reach the server in its private runtime config, never in the public one. Nuxt merges them as any configuration: across layers, and `mapoAi` with `mapo.ai`, lists add up instead of replacing each other, so a layer's `groups` and the app's are all kept.
+
+The secret is not an option: it is the environment variable `NUXT_MAPO_AI_SECRET`, read when the server starts.
