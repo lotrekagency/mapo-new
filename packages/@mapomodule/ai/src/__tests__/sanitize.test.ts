@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AiEntity, AiField, AiValueKind } from "../runtime/shared/entity";
 import {
   compileExtractContract,
@@ -415,6 +415,167 @@ describe("sanitizeFillAnswer — limits", () => {
     expect(result.warnings).toEqual([
       { kind: "unreadable-pattern", key: "tags", pattern: "(unclosed" },
     ]);
+  });
+});
+
+describe("sanitizeFillAnswer — patterns the server cannot afford", () => {
+  const source = (value: string) => `Il codice è ${value} per tutti`;
+  const quoted = (value: string) => [
+    { field: "code", quote: `codice è ${value}`, where: "" },
+  ];
+
+  it("verifies a value its cheap pattern accepts, as the control case", () => {
+    const field = aiField("code", "string", {
+      constraints: { patterns: ["^a+!$"] },
+    });
+    const value = `${"a".repeat(40)}!`;
+
+    expect(
+      sanitizeOne(field, value, source(value), quoted(value)).outcome,
+    ).toMatchObject({ status: "filled", value, verified: true });
+  });
+
+  it("never runs a pattern that backtracks without bound, and keeps the value to check", () => {
+    const field = aiField("code", "string", {
+      constraints: { patterns: ["^(a+)+$"] },
+    });
+    // Short enough that a matcher let loose finishes, and discards it.
+    const value = `${"a".repeat(25)}!`;
+    const started = performance.now();
+    const { outcome, result } = sanitizeOne(
+      field,
+      value,
+      source(value),
+      quoted(value),
+    );
+
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(outcome).toMatchObject({ status: "filled", value, verified: false });
+    expect(result.warnings).toContainEqual({
+      kind: "unchecked-pattern",
+      key: "code",
+      pattern: "^(a+)+$",
+    });
+  });
+
+  it("never runs a pattern whose counted repeat walks a long value from every position", () => {
+    const pattern = "a*a{5000}b";
+    const field = aiField("code", "string", {
+      constraints: { patterns: [pattern] },
+    });
+    const started = performance.now();
+    const { outcome, result } = sanitizeOne(field, "a".repeat(3000));
+
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(outcome).toMatchObject({ status: "filled", verified: false });
+    expect(result.warnings).toContainEqual({
+      kind: "unchecked-pattern",
+      key: "code",
+      pattern,
+    });
+  });
+
+  it("keeps a value whose pattern throws while it runs, never verified", () => {
+    const pattern = "^[a-z]+$";
+    const original = RegExp.prototype.test;
+    // Only the field's pattern throws, as on a value that exhausts the stack.
+    const test = vi
+      .spyOn(RegExp.prototype, "test")
+      .mockImplementation(function (this: RegExp, text: string) {
+        if (this.source === pattern) {
+          throw new RangeError("Maximum call stack size exceeded");
+        }
+        return original.call(this, text);
+      });
+    try {
+      const field = aiField("code", "string", {
+        constraints: { patterns: [pattern] },
+      });
+      const value = "abc";
+
+      const { outcome, result } = sanitizeOne(
+        field,
+        value,
+        source(value),
+        quoted(value),
+      );
+
+      expect(outcome).toMatchObject({
+        status: "filled",
+        value,
+        verified: false,
+      });
+      expect(result.warnings).toContainEqual({
+        kind: "unchecked-pattern",
+        key: "code",
+        pattern,
+      });
+    } finally {
+      test.mockRestore();
+    }
+  });
+
+  it("keeps a value whose pattern JavaScript cannot read, never verified", () => {
+    const field = aiField("code", "string", {
+      constraints: { patterns: ["^(?P<x>a)"] },
+    });
+    const value = "ABC123";
+
+    expect(
+      sanitizeOne(field, value, source(value), quoted(value)).outcome,
+    ).toMatchObject({ status: "filled", value, verified: false });
+  });
+
+  it("still discards a value a pattern it can afford refuses, beside one it cannot", () => {
+    const field = aiField("code", "string", {
+      constraints: { patterns: ["^(a+)+$", "^[0-9]+$"] },
+    });
+
+    expect(reasonOf(sanitizeOne(field, "aaa").outcome)).toBe("pattern");
+  });
+
+  it("runs a costly pattern only on a value short enough for it", () => {
+    const pattern = "^\\S+@\\S+\\.\\S+$";
+    const field = aiField("email", "string", {
+      constraints: { patterns: [pattern] },
+    });
+
+    expect(reasonOf(sanitizeOne(field, "no-at-sign").outcome)).toBe("pattern");
+    const { outcome, result } = sanitizeOne(field, "x".repeat(300));
+    expect(outcome).toMatchObject({ status: "filled", verified: false });
+    expect(result.warnings).toContainEqual({
+      kind: "unchecked-pattern",
+      key: "email",
+      pattern,
+    });
+  });
+
+  it("stops testing patterns once the answer has used its steps", () => {
+    // Each test costs about eight million steps: the answer's fifty million
+    // cover six of twenty.
+    const pattern = "^\\S+\\S+$";
+    const fields = Array.from({ length: 20 }, (_, index) =>
+      aiField(`f${index}`, "string", { constraints: { patterns: [pattern] } }),
+    );
+    const contract = fill(fields);
+    const value = "x".repeat(2000);
+    const result = sanitizeFillAnswer(
+      contract,
+      answer(
+        contract,
+        Object.fromEntries(fields.map((one) => [one.key, value])),
+      ),
+    );
+
+    const unchecked = result.warnings.filter(
+      (warning) => warning.kind === "unchecked-pattern",
+    );
+    expect(unchecked).toHaveLength(14);
+    expect(
+      Object.values(result.fields).every(
+        (outcome) => outcome.status === "filled",
+      ),
+    ).toBe(true);
   });
 });
 

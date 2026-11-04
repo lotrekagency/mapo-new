@@ -19,6 +19,12 @@
  * can be changed (`AiVerificationRules`), never so far that a value is
  * verified without a quote found in the source. Without the source's text
  * nothing is verified.
+ *
+ * A field's patterns are tested only when their work has a small bound
+ * (`patterns.ts`): they come from schemas that may come from outside, and a
+ * pattern written to backtrack would stall the process. A value whose
+ * pattern could not be tested, because it is too costly or JavaScript cannot
+ * read it, is kept and never verified.
  */
 import type { AiChoice } from "./entity";
 import { isMultipleOf } from "./numbers";
@@ -46,6 +52,13 @@ import {
 import type { CalendarDay, ClockTime, OneWordQuotes } from "./citations";
 import { isRecord } from "./guards";
 import { markdownLinks, markdownToHtml, markdownToText } from "./markdown";
+import {
+  MAX_ANSWER_PATTERN_STEPS,
+  MAX_PATTERN_STEPS,
+  patternCost,
+  patternSteps,
+} from "./patterns";
+import type { PatternCost } from "./patterns";
 
 // ─── The result ──────────────────────────────────────────────────────────────
 
@@ -184,7 +197,10 @@ export type AiFieldOutcome =
  * - `unknown-item`: a link to an item that is missing, of another type, the
  *   item itself, or named by a `ref` two items share;
  * - `unreadable-pattern`: a field's regular expression that JavaScript
- *   cannot read, not applied.
+ *   cannot read, not applied: the field's values are not verified;
+ * - `unchecked-pattern`: a field's regular expression whose work on a value
+ *   has no small bound (`patterns.ts`), not applied to it: the value is not
+ *   verified.
  */
 export type AiAnswerWarning =
   | { kind: "unexpected-shape"; path: string }
@@ -193,7 +209,8 @@ export type AiAnswerWarning =
   | { kind: "unknown-type"; path: string; type: string }
   | { kind: "repeated-ref"; path: string; ref: string }
   | { kind: "unknown-item"; path: string; item: string }
-  | { kind: "unreadable-pattern"; key: string; pattern: string };
+  | { kind: "unreadable-pattern"; key: string; pattern: string }
+  | { kind: "unchecked-pattern"; key: string; pattern: string };
 
 /** Each field the contract asks for, by field key. */
 export type AiFieldOutcomes = Record<string, AiFieldOutcome>;
@@ -319,8 +336,11 @@ export interface SanitizeOptions {
  * What a quote must hold for a value to be verified: one of some texts (the
  * value, its label), an address, rich text's words and links, a number, a
  * day, a time, or nothing more than being found (yes/no, a link to an item).
+ * `unchecked`: a limit of the value could not be tested, so no quote
+ * verifies it.
  */
 type Probe =
+  | { kind: "unchecked" }
   | { kind: "found" }
   | { kind: "text"; texts: string[] }
   | { kind: "coordinates"; lat: number; lng: number }
@@ -355,13 +375,18 @@ interface Reading {
   readings?: string[];
   rules: AiVerificationRules;
   warnings: AiAnswerWarning[];
-  /** Patterns already reported as unreadable, by field key. */
+  /** Patterns already reported, unreadable or too costly, by field key. */
   unreadable: Set<string>;
+  /** Each pattern's cost, read once per answer. */
+  patternCosts: Map<string, PatternCost>;
+  /** The steps the pattern tests of this answer may still take. */
+  patternStepsLeft: number;
 }
 
 const empty: Element = { kind: "empty" };
 const error = (reason: AiDiscardReason): Element => ({ kind: "error", reason });
 const FOUND: Probe = { kind: "found" };
+const UNCHECKED: Probe = { kind: "unchecked" };
 
 /** A control character but tab and line breaks: the backend refuses them, NUL first. */
 function isControl(char: string): boolean {
@@ -675,12 +700,15 @@ function linkRef(
   return record;
 }
 
-/** The first limit of the field the value breaks, if any. */
+/**
+ * The first limit of the field the value breaks, if any; `unchecked` when
+ * it breaks none of those tested but a pattern could not be tested.
+ */
 function brokenLimit(
   field: AiContractField,
   value: AiSingleValue,
   reading: Reading,
-): AiDiscardReason | undefined {
+): AiDiscardReason | "unchecked" | undefined {
   const limits = field.constraints;
   if (typeof value === "number") {
     const isTooLow =
@@ -706,11 +734,70 @@ function brokenLimit(
     return "too-short";
   if (limits.maxLength !== undefined && length > limits.maxLength)
     return "too-long";
+  let isUnchecked = false;
   for (const pattern of limits.patterns ?? []) {
-    const expression = regularExpression(field, pattern, reading);
-    if (expression && !expression.test(value)) return "pattern";
+    const expression = testablePattern(field, pattern, value, reading);
+    const matches = expression ? tested(expression, value) : undefined;
+    if (matches === false) return "pattern";
+    if (matches === undefined) {
+      isUnchecked = true;
+      if (expression) reportUnchecked(field, pattern, reading);
+    }
   }
+  return isUnchecked ? "unchecked" : undefined;
+}
+
+/**
+ * Whether `value` matches, or `undefined` when the matcher throws, as it
+ * does when a value is long enough to exhaust its stack.
+ */
+function tested(expression: RegExp, value: string): boolean | undefined {
+  try {
+    return expression.test(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A field's pattern, ready to test on `value`, when its work there has a
+ * small bound and the answer's tests have steps left; otherwise
+ * `undefined`, reported once per field and pattern.
+ */
+function testablePattern(
+  field: AiContractField,
+  pattern: string,
+  value: string,
+  reading: Reading,
+): RegExp | undefined {
+  const expression = regularExpression(field, pattern, reading);
+  if (!expression) return undefined;
+  let cost = reading.patternCosts.get(pattern);
+  if (!cost) {
+    cost = patternCost(pattern);
+    reading.patternCosts.set(pattern, cost);
+  }
+  const steps = patternSteps(cost, value.length);
+  const isCheap = steps <= MAX_PATTERN_STEPS;
+  const isWithinAnswer = steps <= reading.patternStepsLeft;
+  if (isCheap && isWithinAnswer) {
+    reading.patternStepsLeft -= steps;
+    return expression;
+  }
+  reportUnchecked(field, pattern, reading);
   return undefined;
+}
+
+/** Says once per field and pattern that the pattern could not be tested. */
+function reportUnchecked(
+  field: AiContractField,
+  pattern: string,
+  reading: Reading,
+): void {
+  const key = `${field.key}\u0000${pattern}`;
+  if (reading.unreadable.has(key)) return;
+  reading.unreadable.add(key);
+  reading.warnings.push({ kind: "unchecked-pattern", key: field.key, pattern });
 }
 
 /** A field's pattern as JavaScript reads it; reported once when it cannot. */
@@ -750,6 +837,7 @@ function element(
       : error("format");
   if (converted.kind !== "value") return converted;
   const broken = brokenLimit(field, converted.value, reading);
+  if (broken === "unchecked") return { ...converted, probe: UNCHECKED };
   return broken ? error(broken) : converted;
 }
 
@@ -769,6 +857,8 @@ function holdsProbe(
 ): boolean {
   const isOneWordQuote = isOneWord(quote);
   switch (probe.kind) {
+    case "unchecked":
+      return false;
     case "found":
       return !isOneWordQuote;
     case "text":
@@ -1241,6 +1331,8 @@ function readingOf(options: SanitizeOptions): Reading {
     rules: verificationRulesOf(options.rules),
     warnings: [],
     unreadable: new Set(),
+    patternCosts: new Map(),
+    patternStepsLeft: MAX_ANSWER_PATTERN_STEPS,
   };
 }
 

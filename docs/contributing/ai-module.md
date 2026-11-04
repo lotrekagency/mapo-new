@@ -45,8 +45,9 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/citations.ts` | Finding a quote in the source, and a value in a quote                                        |
 | `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                          |
 | `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                  |
+| `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                  |
 
-The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, and the state is sealed and fails closed.
+The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, the state is sealed and fails closed, and no pattern runs unbounded.
 
 ## The entity model
 
@@ -125,9 +126,20 @@ Lists and points changed the shape of the answer: `AI_CONTRACT_FORMAT_VERSION` i
 | `filled`    | The value typed for the form, its quotes, and `verified`. For a list, the values taken out (`dropped`) and whether it is shorter than its minimum (`tooFew`), both to check |
 | `discarded` | The reason (`format`, `not-listed`, `too-short`, `too-long`, `too-low`, `too-high`, `step`, `pattern`, `too-many-values`) and what the model wrote, for the operator to see |
 
-Values come back as the form saves them: numbers, booleans, normalized dates and times, choices mapped back to their value (`"1"` becomes `1`), relations as `{ id }`, `{ search }` or `{ item }`, a point as `{ lat, lng }`. Rich text arrives as restricted Markdown and becomes HTML from a closed list of tags, `p`, `ul`, `ol`, `li`, `strong`, `em`, and `a` with an `http` or `https` address; everything else becomes escaped text, so no HTML the model writes reaches the page. What the answer has that cannot be used becomes a warning, with its path in the answer.
+Values come back as the form saves them: numbers, booleans, normalized dates and times, choices mapped back to their value (`"1"` becomes `1`), relations as `{ id }`, `{ search }` or `{ item }`, a point as `{ lat, lng }`. Rich text arrives as restricted Markdown and becomes HTML from a closed list of tags, `p`, `ul`, `ol`, `li`, `strong`, `em`, and `a` with an `http` or `https` address; everything else becomes escaped text, so no HTML the model writes reaches the page. What the answer has that cannot be used becomes a warning, with its path in the answer. A field's pattern runs only within a bound on its work ([Patterns from outside](#patterns-from-outside)): a value whose pattern could not be tested is kept and never verified.
 
 A list's outcome holds its items: each with its template, the outcome of each of its fields and its own `verified`. An item without a value is skipped, since models pad lists; one that is not an object, names no template of the list, or has every value discarded is taken out (`dropped`). An item is verified when every value it gives is, none was discarded and it has every value its fields require; an item that repeats one before it, or follows a template, is not, since no quote proves a second item or which kind of block it is. A list is verified only when every item is, none was taken out and it is long enough; too many items discard it (`too-many-values`). Its value is the items as the form saves them, dotted keys as nested objects and `_template` when the items vary, every key as data (`__proto__` included). `outcomesByPath(fields)` gives every outcome under the path of its value in the form, the way the form's annotations are keyed: `speakers.0.name`, with the indexes of the list's value. A value inside a list is applied with its list: only the list's own `verified` lets Magic Fill skip the preview.
+
+### Patterns from outside
+
+The sanitizer tests a field's patterns on the AI's values, and the patterns come from the schemas, which may come from outside. JavaScript's matcher backtracks: `^(a+)+$` takes about a second on 28 characters, and twice as long with each two more, and a counted repeat such as `a{5000}` walks the value one character at a time, from every position. Before a pattern runs, `patterns.ts` reads it into its parts and bounds, for the value's length, the ways each part can match and the steps it takes to try them all, as a backtracking matcher would:
+
+- a sequence tries the rest after each way of its first part, and alternatives add up;
+- a repeat walks its rounds and gives them back; a repeat of something that matches several ways multiplies them at each round, and a repeat of something that can match nothing is not bounded by the value's length;
+- a back-reference has no bound;
+- a pattern without `^` is tried from every position.
+
+A test runs when its bound is at most ten million steps, and the tests of one answer share fifty million. A value whose pattern could not be tested is kept and never verified: one too costly, one JavaScript cannot read, and one whose matcher fails while it runs, as it does when a value is long enough to exhaust its stack. The bound is rough on purpose: it may call a harmless pattern costly, as `^([a-z]|[0-9])+$`.
 
 ## Verification
 
@@ -311,7 +323,8 @@ The whole core and the storage run without network or UI, with Vitest, in `packa
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `entity.test.ts`    | Which fields the AI may fill, the merge rules, and that no keep-out flag is lost wherever a schema writes it                                       |
 | `contract.test.ts`  | The schema stays portable (`expectPortable()`), the budget, the links of an extraction                                                             |
-| `sanitize.test.ts`  | Each kind read and discarded, limits, lists, relations, links, quotes and the verification rules                                                   |
+| `sanitize.test.ts`  | Each kind read and discarded, limits, lists, relations, links, quotes, the verification rules, the patterns the server cannot afford               |
+| `patterns.test.ts`  | The bound on a pattern's work: what has none, what it grows with, the lengths it allows                                                            |
 | `citations.test.ts` | Finding quotes, numbers read one way, points of a map, dates, times, time zones and links                                                          |
 | `markdown.test.ts`  | The closed list of tags: everything else is text                                                                                                   |
 | `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |

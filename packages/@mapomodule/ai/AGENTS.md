@@ -31,6 +31,7 @@ src/
                                citations.ts finding a quote in the source, and a value in a quote: words, numbers,
                                            points of a map, dates, times and time zones, links
                                numbers.ts  numbers as the backend checks them (`multipleOf`)
+                               patterns.ts the bound on a pattern's work, before the sanitizer runs it
                                guards.ts   type guards for outside values
   runtime/server/auth/       who calls the gateway:
                                user.ts     the user read from `userInfoApi`'s answer (zod); the rules: admin, users,
@@ -66,6 +67,7 @@ src/
 10. **Every action is an operation.** What the UI does is also callable without the UI, with typed input and output and its dependencies passed in. Writes to the backend always need the operator's confirmation; the gateway itself never writes to the backend.
 11. **The state is sealed, and fails closed.** What the gateway keeps goes through `useMapoAiStorage(event)`, never `useStorage()` directly. Without a usable secret or a mount the storage is closed: no clear text, no memory of one process. A record that does not open is never deleted: only its expiry or a new value removes it. Stored values are outside data (rule 7): read them with a validator.
 12. **Every route starts with the session.** A handler calls `requireMapoAiSession(event)`, or `requireMapoAiAdmin(event)`, before it reads anything else, and sets `Cache-Control: no-store` when the answer is the user's own; only a route that tells the user what they may do, as `status`, uses `readMapoAiCaller(event)` and answers a refused user (`allowed: false`) instead of a 403. The gateway keeps no session of its own: it forwards the request's `cookie`, and no other header, to `userInfoApi` by Nitro's local fetch, as core restores the session. A backend that cannot say who is signed in gets a 502, never a 401. A rule that cannot be read picks fewer users, never more; an app narrows access with the `mapo-ai:user` hook, which can only refuse: its `allowed` is a latch, so a later hook never undoes an earlier refusal. Permissions are read by `userPermissions()` of `@mapomodule/utils`, as the auth store reads them.
+13. **No pattern runs unbounded.** A field's patterns come from the schemas, which may come from outside: the sanitizer runs one only when `patterns.ts` bounds its work on the value, and a value whose pattern could not be tested (too costly, unreadable, or failing while it runs) is kept and never verified. A new way of testing values against an outside expression gets the same bound.
 
 ## Change together
 
