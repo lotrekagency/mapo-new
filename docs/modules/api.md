@@ -348,6 +348,36 @@ Type guards.
 
 ---
 
+### `userPermissions(user)`
+
+| Parameter | Type      | Description                                                         |
+| --------- | --------- | ------------------------------------------------------------------- |
+| `user`    | `unknown` | The user payload as `userInfoApi` returns it, read as outside data. |
+
+**Returns:** `UserPermissions` — `{ codenames, models, unreadable }`: the codenames of `all_permissions`, or of `user_permissions` when the first is missing; the `ModelPermissions` of each model; whether the backend sent permissions with no codename in them.
+
+---
+
+### `permissionCodenames(raw)`
+
+| Parameter | Type      | Description                                                                                  |
+| --------- | --------- | -------------------------------------------------------------------------------------------- |
+| `raw`     | `unknown` | A list of permissions: codenames, objects with a `codename`, or pks. Anything else is empty. |
+
+**Returns:** `string[]` — The codenames, in the backend's order; pks and objects without a `codename` are dropped.
+
+---
+
+### `modelPermissions(codenames)`
+
+| Parameter   | Type                | Description                                  |
+| ----------- | ------------------- | -------------------------------------------- |
+| `codenames` | `readonly string[]` | Permission codenames such as `view_article`. |
+
+**Returns:** `Record<string, ModelPermissions>` — `{ view, add, change, delete }` for each model named by a codename `<action>_<model>`. A model named `__proto__` is left out.
+
+---
+
 ## JSON Schema Helpers — `@mapomodule/utils/jsonSchema`
 
 ### `resolveSchema(schema, defs, seen?, depth?)`

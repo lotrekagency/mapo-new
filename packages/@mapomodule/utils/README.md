@@ -1,6 +1,6 @@
 # @mapomodule/utils
 
-Plain TypeScript helpers shared by the `@mapomodule/*` packages: object and path utilities, formatting, endpoint normalization, menu trees, JSON Schema conditionals, and the readers of DRF metadata and OpenAPI documents. No Vue, no Nuxt, no side effects, so they are safe in server code and tests.
+Plain TypeScript helpers shared by the `@mapomodule/*` packages: object and path utilities, formatting, endpoint normalization, a user's permissions, menu trees, JSON Schema conditionals, and the readers of DRF metadata and OpenAPI documents. No Vue, no Nuxt, no side effects, so they are safe in server code and tests.
 
 It is not a Nuxt module and nothing is auto-imported: import what you need.
 
@@ -27,6 +27,7 @@ Apps already get it through `mapomodule`, but with pnpm's strict layout an app c
 | Formatting                                                                | `formatDate`, `humanFileSize`, `slugify`                                                                                              |
 | Timing                                                                    | `debounce`                                                                                                                            |
 | Endpoints                                                                 | `normalizeEndpoint`, `splitEndpointParams`                                                                                            |
+| Permissions                                                               | `userPermissions`, `permissionCodenames`, `modelPermissions`, the `ModelPermissions` and `UserPermissions` types                      |
 | Slots and menus                                                           | `slotNamespace`, `buildRouteTree`, `calcMaxMenuNestDepth`, the `MenuNode` type                                                        |
 | JSON Schema (`@mapomodule/utils/jsonSchema`, also exported from the root) | `matchesSchema`, `applyConditionals`, `hasConditionals`, `resolveSchema`, `extractDefs`, `getDefaultForSchema`, the `JSONSchema` type |
 | Backend schemas (same entries)                                            | `metadataToJsonSchema`, `drfMetadataToJsonSchema`, `openApiToJsonSchema`, `openApiModels`; `FIELD_KEYWORD`, `ATTRS_KEYWORD`           |

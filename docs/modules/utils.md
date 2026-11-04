@@ -254,3 +254,54 @@ import { filterObj } from "@mapomodule/utils";
 
 filterObj({ a: 1, b: 2, c: 3 }, ["a", "c"]); // { a: 1, c: 3 }
 ```
+
+---
+
+## `userPermissions(user)`
+
+Reads the permissions of a user payload, as `userInfoApi` returns it: `all_permissions` when the backend sends them (the user's own and those of their groups), otherwise `user_permissions`. It is pure, so code in the browser and code on the server that read the same user decide alike.
+
+```ts
+import { userPermissions } from "@mapomodule/utils";
+
+userPermissions({
+  id: 1,
+  username: "editor",
+  all_permissions: [{ codename: "view_article" }, "change_article", 4],
+});
+// → {
+//     codenames: ["view_article", "change_article"],
+//     models: { article: { view: true, add: false, change: true, delete: false } },
+//     unreadable: false,
+//   }
+```
+
+The payload is read as outside data, so it never throws: anything but an object has no permission. `unreadable` is `true` when the backend sent permissions and none of them carried a codename (bare pks, for example), so every model permission is off, which a caller should say.
+
+---
+
+## `permissionCodenames(raw)`
+
+The codenames in a list of permissions, whatever shape the backend sent: plain codenames, objects with a `codename` (Django `Permission` objects, as Camomilla's current user carries them) or bare pks. A pk is dropped: the payload alone cannot turn one into a codename. Anything that is not a list reads as no permission.
+
+```ts
+import { permissionCodenames } from "@mapomodule/utils";
+
+permissionCodenames(["add_page", { codename: "view_article" }, 4]); // ["add_page", "view_article"]
+```
+
+---
+
+## `modelPermissions(codenames)`
+
+The CRUD flags of each model, from the codenames of the form `<action>_<model>`, where the action is `view`, `add`, `change` or `delete`. Other codenames, such as `publish_article` or `blog.add_post`, are left out.
+
+```ts
+import { modelPermissions } from "@mapomodule/utils";
+import type { ModelPermissions } from "@mapomodule/utils";
+
+modelPermissions(["view_article", "add_blog_post"]);
+// → { article: { view: true, …false }, blog_post: { add: true, …false } }
+```
+
+A model named like a property every object has, such as `toString`, gets flags of its own; a model named `__proto__` is left out, so a codename can never write to an object's prototype.

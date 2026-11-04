@@ -22,6 +22,12 @@ export { slotNamespace } from "./slotNamespace.js";
 export { buildRouteTree, calcMaxMenuNestDepth } from "./menuHelpers.js";
 export type { MenuNode } from "./menuHelpers.js";
 export { normalizeEndpoint, splitEndpointParams } from "./normalizeEndpoint.js";
+export {
+  permissionCodenames,
+  modelPermissions,
+  userPermissions,
+} from "./permissions.js";
+export type { ModelPermissions, UserPermissions } from "./permissions.js";
 export type { JSONSchema } from "./jsonSchema/index.js";
 export {
   matchesSchema,
