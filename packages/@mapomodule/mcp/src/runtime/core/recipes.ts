@@ -691,13 +691,32 @@ export const RECIPES: Recipe[] = [
       "llm",
       "openai",
       "anthropic",
-      "ollama",
     ],
     doc: "modules/ai.md",
     heading: "Providers",
     seeAlso: ["modules/api.md"],
     summary:
-      "mapo.ai.providers enables what run may call: Mapo's mock, which answers without a network from fixtures or Label: value lines, or a provider the app registers in a Nitro plugin with registerMapoAiProvider().",
+      "mapo.ai.providers enables what run may call: Mapo's mock, which answers without a network from fixtures or Label: value lines, Mapo's providers for local models, or a provider the app registers in a Nitro plugin with registerMapoAiProvider().",
+  },
+  {
+    id: "ai-local-models",
+    task: "Use a local model, served by Ollama, LM Studio or vLLM, for the AI",
+    keywords: [
+      "ollama",
+      "local model",
+      "openai-compatible",
+      "lm studio",
+      "vllm",
+      "llama.cpp",
+      "self-hosted",
+      "baseURL",
+      "contextTokens",
+      "num_ctx",
+    ],
+    doc: "modules/ai.md",
+    heading: "Ollama",
+    summary:
+      "Experimental: enable ollama (Ollama 0.40.13 or later, through its own API, http://localhost:11434 unless baseURL says otherwise) or openai-compatible (baseURL up to /v1, contextTokens when the server's list does not say the context) in mapo.ai.providers, with the models to allow; keys go in NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY or NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY; a prompt the model cannot read whole answers 413, a cut answer 502.",
   },
 ];
 

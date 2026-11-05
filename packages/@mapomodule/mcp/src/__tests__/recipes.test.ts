@@ -55,6 +55,8 @@ describe("matchRecipes", () => {
     ["call the AI gateway's run route to extract records", "ai-run"],
     ["read the outcome of each field from the run route", "ai-run"],
     ["register my own LLM provider for the AI gateway", "ai-providers"],
+    ["use a local model with ollama for the AI", "ai-local-models"],
+    ["connect the AI gateway to LM Studio or vLLM", "ai-local-models"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
