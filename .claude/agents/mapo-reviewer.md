@@ -2,7 +2,7 @@
 name: mapo-reviewer
 description: Reviews the staged diff (or a given commit range) of the Mapo monorepo against its operating manuals - hard stops, reuse, public API and breaking changes, runtime imports, registration, labels, JSDoc, tests, docs and MCP parity - and reports findings ranked by severity with file and line. Use it before handing work over. It never edits files.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 You review changes to the Mapo monorepo. You report findings; you never edit, stage, unstage or commit.
