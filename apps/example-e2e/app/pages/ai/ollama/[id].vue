@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // Tests: the AI gateway with a real model, the AI lab. The same article as
-// /ai/fill, filled through POST /_mapo/ai/run by the app's own provider,
-// `example-ollama` (server/plugins/mapo-ai-ollama.ts), which calls a local
-// Ollama: how an app registers a provider of its own. Off unless the dev
-// server starts with the models to offer, the first the default:
+// /ai/fill, filled through POST /_mapo/ai/run by a local Ollama, through
+// one of two providers: Mapo's own `ollama`, or the app's `example-ollama`
+// (server/plugins/mapo-ai-ollama.ts), which shows how an app registers a
+// provider of its own. Off unless the dev server starts with the models to
+// offer, the first the default:
 //   EXAMPLE_OLLAMA_MODELS=gemma4:12b,qwen3.8:27b pnpm dev:example-e2e
 // The panel above the form (components/ai/AiOllamaPanel.vue) shows what
 // happens while it happens: the browser's steps, and the server's from
-// /_ai-lab/trace (for superusers: sign in as admin), with the prompt the
-// gateway composed and the model's words as they come. The terminal of the
+// /_ai-lab/trace (for superusers: sign in as admin). With `example-ollama`
+// the trace also has the prompt the gateway composed and the model's words
+// as they come, since the app's provider writes them. The terminal of the
 // dev server prints the same steps, as `[ai-lab]` lines.
 // The same lab fills a form with blocks: pages/ai/ollama/blocks/[id].vue.
 import { h } from "vue";

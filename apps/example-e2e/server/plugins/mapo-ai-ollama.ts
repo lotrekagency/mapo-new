@@ -7,7 +7,8 @@
 // nuxt.config.ts enables it in mapo.ai.providers from the same variable;
 // EXAMPLE_OLLAMA_URL changes Ollama's address. Every call is traced
 // (server/utils/aiLab.ts): in the terminal, and in the lab's page.
-// Mapo's own `ollama` provider comes with step 11 of the AI roadmap.
+// Mapo's own provider, `ollama`, calls the same Ollama: the lab's page offers
+// both, to compare them. This one also traces each call for the page.
 import {
   aiLabModels,
   finishAiLabTrace,

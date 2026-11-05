@@ -114,6 +114,18 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
       "#mock:invalid-json: an answer that is not JSON, so every field comes back empty.",
     text: "#mock:invalid-json\nTitle: About us",
   },
+  {
+    label: "Too long",
+    description:
+      "#mock:too-long: the prompt does not fit what the model reads, so the gateway answers 413.",
+    text: "#mock:too-long\nTitle: About us",
+  },
+  {
+    label: "Cut off",
+    description:
+      "#mock:truncated: the answer reached the most the model may write, so the gateway answers 502 and the page says why.",
+    text: "#mock:truncated\nTitle: About us",
+  },
 ];
 
 /**

@@ -3,7 +3,10 @@
 // The AI lab (app/pages/ai/ollama/[id].vue): a local model through the AI
 // gateway, off unless the dev server starts with EXAMPLE_OLLAMA_MODELS, the
 // models to offer, the first the default, such as "gemma4:12b,qwen3.8:27b".
-// server/plugins/mapo-ai-ollama.ts registers the provider it enables.
+// It enables two providers with them: Mapo's own `ollama`, and the app's
+// `example-ollama`, which server/plugins/mapo-ai-ollama.ts registers.
+// EXAMPLE_OLLAMA_URL is Ollama's address, when it is not the default.
+const ollamaURL = process.env.EXAMPLE_OLLAMA_URL;
 const ollamaModels = (process.env.EXAMPLE_OLLAMA_MODELS ?? "")
   .split(",")
   .map((model) => model.trim())
@@ -48,9 +51,17 @@ export default defineNuxtConfig({
     ai: {
       providers: {
         mock: { timeout: 15 },
-        // The AI lab's provider, with a local model's slow first answer in mind.
+        // The AI lab's providers, with a large form on a 27B model in mind:
+        // more than the 600 seconds a local provider of Mapo gets by default.
         ...(ollamaModels.length
-          ? { "example-ollama": { models: ollamaModels, timeout: 900 } }
+          ? {
+              ollama: {
+                models: ollamaModels,
+                timeout: 900,
+                ...(ollamaURL ? { baseURL: ollamaURL } : {}),
+              },
+              "example-ollama": { models: ollamaModels, timeout: 900 },
+            }
           : {}),
       },
       instructions: {

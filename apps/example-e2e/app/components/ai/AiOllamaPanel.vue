@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // The AI lab: a detail extension placed in "body-top" that fills the record
 // with a local model through the AI gateway, and shows what happens while it
-// happens. useMapoAiFill() does the work, as in AiFillPanel.vue, with the
-// app's own provider `example-ollama` (server/plugins/mapo-ai-ollama.ts),
-// which the dev server enables with EXAMPLE_OLLAMA_MODELS. The log puts
-// together the browser's steps and the server's, read from /_ai-lab/trace
-// while the call runs: the gateway's checks, the prompt it composed, the
-// model's words as they come, the answer. The page passes what the AI should
+// happens. useMapoAiFill() does the work, as in AiFillPanel.vue, with one of
+// the two providers the dev server enables with EXAMPLE_OLLAMA_MODELS:
+// Mapo's own `ollama`, or the app's `example-ollama`
+// (server/plugins/mapo-ai-ollama.ts). The log puts together the browser's
+// steps and the server's, read from /_ai-lab/trace while the call runs: the
+// gateway's checks and, from the app's provider, the prompt the gateway
+// composed and the model's words as they come. The page passes what the AI should
 // know about the record and the sources to offer: the article
 // (pages/ai/ollama/[id].vue) and the block page (pages/ai/ollama/blocks/[id].vue).
 import type {
@@ -48,27 +49,48 @@ interface LogLine {
   text: string;
 }
 
-const PROVIDER = "example-ollama";
+/**
+ * The lab's providers, Mapo's first: `ollama` reports nothing of its own to
+ * the trace, `example-ollama` writes its steps, the prompt and the model's
+ * words in it.
+ */
+const LAB_PROVIDERS = ["ollama", "example-ollama"];
 /** How often the page asks the server for its trace while a call runs. */
 const TRACE_EVERY_MS = 700;
 
 const detail = useMapoDetail();
 const ai = detail ? useMapoAiFill(detail, { entity: props.entity }) : undefined;
 
-// What the gateway gives the signed-in user: the lab's provider, when the
-// dev server enabled it.
+// What the gateway gives the signed-in user: the lab's providers, when the
+// dev server enabled them.
 const { fetch } = useMapoFetch();
 const status = ref<MapoAiStatus>();
+const providers = computed(() =>
+  LAB_PROVIDERS.flatMap((id) =>
+    (status.value?.providers ?? []).filter((one) => one.id === id),
+  ),
+);
+const providerId = ref("");
 const lab = computed(() =>
-  status.value?.providers?.find((one) => one.id === PROVIDER),
+  providers.value.find((one) => one.id === providerId.value),
 );
 const model = ref("");
 onMounted(async () => {
   status.value = await fetch<MapoAiStatus>("/_mapo/ai/status").catch(
     () => undefined,
   );
-  model.value = lab.value?.models[0] ?? "";
+  providerId.value = providers.value[0]?.id ?? "";
 });
+// Each provider offers its own models: the first, when the provider changes.
+watch(lab, (chosen) => {
+  model.value = chosen?.models[0] ?? "";
+});
+const providerItems = computed(() =>
+  providers.value.map((one) => ({
+    label: one.id === "ollama" ? "ollama (Mapo's)" : `${one.id} (the app's)`,
+    value: one.id,
+  })),
+);
 
 const source = ref(props.samples[0]?.text ?? "");
 const instructions = ref("");
@@ -176,12 +198,12 @@ async function fill() {
   startedAt.value = Date.now();
   now.value = startedAt.value;
   say(
-    `useMapoAiFill() reads the backend's schema (OPTIONS of ${detail?.endpoint.value}/) and the form's fields, and posts them with the source (${source.value.length} characters) to /_mapo/ai/run: provider ${PROVIDER}, model ${model.value}`,
+    `useMapoAiFill() reads the backend's schema (OPTIONS of ${detail?.endpoint.value}/) and the form's fields, and posts them with the source (${source.value.length} characters) to /_mapo/ai/run: provider ${providerId.value}, model ${model.value}`,
   );
   startWatching();
   await ai.fill(source.value, {
     instructions: instructions.value,
-    provider: { id: PROVIDER, model: model.value },
+    provider: { id: providerId.value, model: model.value },
   });
   await readTrace();
   stopWatching();
@@ -371,7 +393,7 @@ const waited = computed(() =>
             >AI lab: a local model, through the gateway</span
           >
           <UBadge v-if="lab" color="neutral" variant="subtle">
-            {{ PROVIDER }} · {{ model }}
+            {{ providerId }} · {{ model }}
           </UBadge>
         </div>
         <NuxtLink to="/ai/status" class="text-xs text-muted underline">
@@ -381,7 +403,7 @@ const waited = computed(() =>
     </template>
 
     <UAlert
-      v-if="status && !lab && isAllowed"
+      v-if="status && !providers.length && isAllowed"
       color="warning"
       variant="subtle"
       icon="i-lucide-power-off"
@@ -398,6 +420,14 @@ const waited = computed(() =>
     />
 
     <div class="flex flex-wrap items-center gap-2">
+      <USelect
+        v-if="providers.length"
+        v-model="providerId"
+        :items="providerItems"
+        size="sm"
+        class="w-52"
+        aria-label="Provider"
+      />
       <USelect
         v-if="lab"
         v-model="model"
@@ -418,6 +448,11 @@ const waited = computed(() =>
         {{ sample.label }}
       </UButton>
     </div>
+    <p v-if="providerId === 'ollama'" class="text-xs text-muted">
+      Mapo's own provider writes nothing to the lab's trace: the log shows the
+      browser and the gateway. Choose example-ollama, the app's provider, to
+      also see the prompt and the model's words as they come.
+    </p>
     <UTextarea
       v-model="source"
       :rows="7"
