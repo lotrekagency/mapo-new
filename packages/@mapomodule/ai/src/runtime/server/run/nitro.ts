@@ -1,17 +1,19 @@
 /**
  * `run` wired to the app's Nitro server: the options from the private
- * runtime config, the providers from the registry, the audit in the sealed
- * storage, the counts of this process, and the app's `mapo-ai:prompt`
- * hooks. The logic lives in `run.ts`, `policy.ts` and `options.ts`, which
- * the tests run without Nitro.
+ * runtime config, the providers from the registry (Mapo's that call a
+ * server built with its address and its key, read apart from the options),
+ * the audit in the sealed storage, the counts of this process, and the
+ * app's `mapo-ai:prompt` hooks. The logic lives in `run.ts`, `policy.ts`
+ * and `options.ts`, which the tests run without Nitro.
  */
 
 import type { H3Event } from "h3";
 import { useNitroApp, useRuntimeConfig } from "nitropack/runtime";
 import { mapoAiProvider } from "../providers/registry";
+import type { MapoAiServerSettings } from "../providers/registry";
 import { useMapoAiStorage } from "../storage/nitro";
 import { createRateLimiter } from "./limiter";
-import { readRunOptions } from "./options";
+import { plainKeyWarning, providerKeyOf, readRunOptions } from "./options";
 import type { MapoAiRunOptions } from "./options";
 import { policyOf } from "./policy";
 import type { MapoAiPolicy, UnusableProvider } from "./policy";
@@ -32,12 +34,39 @@ export function mapoAiRunOptions(event?: H3Event): MapoAiRunOptions {
 
 /** What `run` may call for this request, and its defaults. */
 export function mapoAiPolicy(event?: H3Event): MapoAiPolicy {
-  return policyOf(mapoAiRunOptions(event), mapoAiProvider).policy;
+  return currentPolicy(event).policy;
 }
 
 /** The providers the options enable that cannot be used, for the server's log. */
 export function unusableMapoAiProviders(event?: H3Event): UnusableProvider[] {
-  return policyOf(mapoAiRunOptions(event), mapoAiProvider).unusable;
+  return currentPolicy(event).unusable;
+}
+
+function currentPolicy(event?: H3Event): ReturnType<typeof policyOf> {
+  const config: unknown = useRuntimeConfig(event).mapoAi;
+  const options = readRunOptions(config, warnOnce);
+  return policyOf(options, (id) =>
+    mapoAiProvider(id, serverSettingsOf(config, options, id)),
+  );
+}
+
+/** The address, the key and the context a provider that calls a server is built with. */
+function serverSettingsOf(
+  config: unknown,
+  options: MapoAiRunOptions,
+  id: string,
+): MapoAiServerSettings {
+  const enabled = Object.hasOwn(options.providers, id)
+    ? options.providers[id]
+    : undefined;
+  const apiKey = providerKeyOf(config, id, noticeOnce);
+  const inClear = plainKeyWarning(id, enabled?.baseURL, apiKey);
+  if (inClear) noticeOnce(inClear);
+  return {
+    ...(enabled?.baseURL ? { baseURL: enabled.baseURL } : {}),
+    ...(apiKey ? { apiKey } : {}),
+    ...(enabled?.contextTokens ? { contextTokens: enabled.contextTokens } : {}),
+  };
 }
 
 /**
@@ -78,4 +107,11 @@ function warnOnce(message: string): void {
   if (warned.has(message)) return;
   warned.add(message);
   console.error(`[mapo-ai] In the runtime config, ${message}`);
+}
+
+/** Says once in the log what the server found about a provider's key. */
+function noticeOnce(message: string): void {
+  if (warned.has(message)) return;
+  warned.add(message);
+  console.warn(`[mapo-ai] ${message}`);
 }

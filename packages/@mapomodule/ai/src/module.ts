@@ -12,7 +12,12 @@ import {
 import type { NuxtModule } from "@nuxt/schema";
 import { accessRuleOption } from "./access";
 import type { MapoAiOptions } from "./index";
-import { readRunOptions } from "./runtime/server/run/options";
+import {
+  MAPO_AI_SERVER_PROVIDERS,
+  providerKeyOf,
+  providerKeyVariable,
+  readRunOptions,
+} from "./runtime/server/run/options";
 import { MAPO_AI_GATEWAY_PATH } from "./runtime/shared/gateway";
 import { isRecord } from "./runtime/shared/guards";
 import { addDefaultStorageMount } from "./storage";
@@ -70,12 +75,34 @@ export default defineNuxtModule<MapoAiOptions>({
         `mapo.ai.default.provider is "${run.default.provider}", which mapo.ai.providers does not enable: the first provider it enables is the default.`,
       );
     }
+    // The key of a provider that calls a server comes from the environment
+    // (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`), which fills only a place the
+    // runtime config has: each such provider gets one. A key written in the
+    // config is used, but the build copies it into the server bundle.
+    const providers = Object.fromEntries(
+      Object.entries(run.providers).map(([id, enabled]) => {
+        if (!MAPO_AI_SERVER_PROVIDERS.includes(id)) return [id, enabled];
+        const inOptions = providerKeyOf(options, id, warn);
+        const inRuntimeConfig = providerKeyOf(configured, id, warn);
+        const where = inOptions
+          ? `mapo.ai.providers.${id}.apiKey`
+          : `runtimeConfig.mapoAi.providers.${id}.apiKey`;
+        const written = inOptions ?? inRuntimeConfig;
+        if (written) {
+          logger.warn(
+            `${where} is set in the Nuxt config, so the build copies it into the server bundle. Set ${providerKeyVariable(id)} in the server's environment instead.`,
+          );
+        }
+        return [id, { ...enabled, apiKey: written ?? "" }];
+      }),
+    );
     nuxt.options.runtimeConfig.mapoAi = {
       secret: "",
       ...configured,
       admin,
       ...(users ? { users } : {}),
       ...run,
+      providers,
     };
 
     // The hooks, `mapo-ai:user` and `mapo-ai:prompt`, typed in the app's

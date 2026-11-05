@@ -310,6 +310,8 @@
         "rateLimited": "Too many requests to the AI: try again in a minute.",
         "rateLimitedIn": "Too many requests to the AI: try again in {seconds} seconds.",
         "providerFailed": "The AI did not answer properly: try again.",
+        "cutOff": "The AI's answer was too long and got cut off: try a shorter text, or another model.",
+        "tooLongForModel": "The text, with this form, is too long for the AI model: shorten it, or choose a model that reads more.",
         "unavailable": "The AI is not available now: try again later.",
         "unavailableIn": "The AI is busy: try again in {seconds} seconds.",
         "timeout": "The AI took too long to answer.",

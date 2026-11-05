@@ -310,6 +310,8 @@
         "rateLimited": "Troppe richieste all'AI: riprova tra un minuto.",
         "rateLimitedIn": "Troppe richieste all'AI: riprova tra {seconds} secondi.",
         "providerFailed": "L'AI non ha risposto come doveva: riprova.",
+        "cutOff": "La risposta dell'AI era troppo lunga ed è stata interrotta: prova con un testo più breve, o con un altro modello.",
+        "tooLongForModel": "Il testo, con questo form, è troppo lungo per il modello AI: accorcialo, o scegli un modello che ne legge di più.",
         "unavailable": "L'AI ora non è disponibile: riprova più tardi.",
         "unavailableIn": "L'AI è occupata: riprova tra {seconds} secondi.",
         "timeout": "L'AI ci ha messo troppo a rispondere.",

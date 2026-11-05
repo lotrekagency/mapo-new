@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MapoAiProvider } from "../runtime/server/providers/types";
+import { json, recorded, refusedConnection } from "./servers";
 
 /** What the mocked `nitropack/runtime` serves: the runtime config. */
 const runtime = vi.hoisted(() => {
@@ -71,6 +72,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function logged(spy: ReturnType<typeof vi.spyOn>): string[] {
@@ -144,5 +146,115 @@ describe("the providers plugin", () => {
     expect(logged(errors)).toEqual([
       expect.stringContaining('there is no provider "acme"'),
     ]);
+  });
+});
+
+describe("the providers plugin and the models of a server", () => {
+  it("says which models the server does not have, asking it with the provider's key", async () => {
+    const asked: Array<{ url: string; authorization: string | null }> = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      asked.push({
+        url,
+        authorization: new Headers(init.headers).get("authorization"),
+      });
+      return json(recorded("ollama-tags.json"));
+    });
+    runtime.config = {
+      mapoAi: {
+        providers: {
+          ollama: {
+            models: ["gemma4:12b", "llama3.1", "nope:1b"],
+            timeout: 600,
+            baseURL: "https://ollama.test:11434",
+            apiKey: "k-1",
+          },
+        },
+      },
+    };
+    await runPlugin();
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(logged(warnings)[0]).toContain(
+      'The provider "ollama" does not list "nope:1b", which mapo.ai.providers.ollama.models allows',
+    );
+    expect(asked).toEqual([
+      {
+        url: "https://ollama.test:11434/api/tags",
+        authorization: "Bearer k-1",
+      },
+    ]);
+    expect(logged(errors)).toEqual([]);
+  });
+
+  it("says when a server that lists its models cannot be reached", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw refusedConnection();
+    });
+    runtime.config = {
+      mapoAi: {
+        providers: {
+          ollama: {
+            models: ["m"],
+            timeout: 600,
+            baseURL: "http://ollama.test:11434",
+          },
+        },
+      },
+    };
+    await runPlugin();
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(logged(warnings)[0]).toContain(
+      'The models of the provider "ollama" could not be read: Ollama at http://ollama.test:11434 cannot be reached (ECONNREFUSED)',
+    );
+  });
+
+  it("says once that a key goes to another machine over plain http", async () => {
+    vi.stubGlobal("fetch", async () => json(recorded("ollama-tags.json")));
+    runtime.config = {
+      mapoAi: {
+        providers: {
+          ollama: {
+            models: ["gemma4:12b"],
+            timeout: 600,
+            baseURL: "http://gpu.lan:11434",
+            apiKey: "k-1",
+          },
+        },
+      },
+    };
+    await runPlugin();
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(logged(warnings)[0]).toContain(
+      'The provider "ollama" sends its key to gpu.lan:11434 over plain http',
+    );
+    expect(logged(warnings).join(" ")).not.toContain("k-1");
+  });
+
+  it("reads only the ids an app's provider lists", async () => {
+    runtime.config = {
+      mapoAi: { providers: { acme: { models: ["a", "b"] } } },
+    };
+    await runPlugin();
+    const { registerMapoAiProvider } =
+      await import("../runtime/server/providers/registry");
+    registerMapoAiProvider({
+      ...acme(),
+      listModels: async () => JSON.parse('[{ "id": "a" }, "b", { "id": 3 }]'),
+    });
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(logged(warnings)[0]).toContain(
+      'The provider "acme" does not list "b"',
+    );
   });
 });

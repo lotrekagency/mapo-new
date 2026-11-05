@@ -54,14 +54,19 @@ function answered(fields: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-/** A failure as `$fetch` rejects with it: a status, and the answer's headers. */
+/**
+ * A failure as `$fetch` rejects with it: a status, the answer's headers,
+ * and the answer itself in `data`, as the server sends an error.
+ */
 function fetchError(
   status: number,
   headers: Record<string, string> = {},
+  data?: Record<string, unknown>,
 ): Error {
   return Object.assign(new Error(`[POST] "/_mapo/ai/run": ${status}`), {
     statusCode: status,
     response: new Response(null, { status, headers }),
+    ...(data ? { data: { error: true, statusCode: status, data } } : {}),
   });
 }
 
@@ -490,6 +495,20 @@ describe("useMapoAiFill — waiting and failing", () => {
     const cases: Array<[Error, string]> = [
       [fetchError(503), "mapo.ai.errors.unavailable"],
       [fetchError(504), "mapo.ai.errors.timeout"],
+      [fetchError(413), "mapo.ai.errors.tooLarge"],
+      [fetchError(502, {}, { failure: "truncated" }), "mapo.ai.errors.cutOff"],
+      [
+        fetchError(413, {}, { failure: "too-long" }),
+        "mapo.ai.errors.tooLongForModel",
+      ],
+      [
+        fetchError(502, {}, { failure: "unavailable" }),
+        "mapo.ai.errors.providerFailed",
+      ],
+      [
+        fetchError(502, {}, { failure: "constructor" }),
+        "mapo.ai.errors.providerFailed",
+      ],
       [fetchError(422), "mapo.ai.errors.nothingToFill"],
       [fetchError(403), "mapo.ai.errors.forbidden"],
       [fetchError(500), "mapo.ai.errors.failed"],

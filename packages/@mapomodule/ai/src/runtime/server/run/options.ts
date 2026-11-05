@@ -13,6 +13,7 @@
 
 import type { MapoAiLimits } from "../../shared/gateway";
 import { isRecord } from "../../shared/guards";
+import { DEFAULT_OLLAMA_URL, serverURL } from "../providers/local";
 import { DEFAULT_VERIFICATION_RULES } from "../../shared/sanitize";
 import type { AiVerificationRules } from "../../shared/sanitize";
 
@@ -20,17 +21,48 @@ import type { AiVerificationRules } from "../../shared/sanitize";
 export interface MapoAiProviderOptions {
   /**
    * The models a request may ask for, the default first. Without it, the
-   * provider's own list: `["mock"]` for the mock.
+   * provider's own list: `["mock"]` for the mock. `ollama` and
+   * `openai-compatible` have none of their own: list the models the server
+   * has that the app allows.
    */
   models?: string[];
-  /** Seconds a call may take before the gateway gives up with a 504. */
+  /**
+   * Seconds a call may take before the gateway gives up with a 504: 600 for
+   * `ollama` and `openai-compatible`, 120 for the others, unless set.
+   */
   timeout?: number;
+  /**
+   * The address of the server, for Mapo's providers that call one:
+   * `ollama` (`http://localhost:11434` unless set) and `openai-compatible`
+   * (required, up to its `/v1`: `http://localhost:1234/v1`). An `http:` or
+   * `https:` address without credentials, query or fragment. Only the app
+   * sets it, here or in the environment; a request never does.
+   */
+  baseURL?: string;
+  /**
+   * For `openai-compatible`: the tokens the server's models read, when its
+   * list of models does not say it (vLLM's does). Such a server sets the
+   * context itself, and some cut a longer prompt in silence, rules
+   * included. With the context known, a prompt that cannot fit fails with
+   * 413 before the call, and one the server counted up to the context
+   * fails after it. Ollama's own provider, `ollama`, needs none: Ollama
+   * says each model's context, and refuses a prompt that does not fit.
+   */
+  contextTokens?: number;
 }
 
 /** The options of `run`, read and complete: every value has its default. */
 export interface MapoAiRunOptions {
   /** The providers enabled, by id, in the order the app lists them. */
-  providers: Record<string, { models?: string[]; timeout: number }>;
+  providers: Record<
+    string,
+    {
+      models?: string[];
+      timeout: number;
+      baseURL?: string;
+      contextTokens?: number;
+    }
+  >;
   /** What a request that names no provider or model gets, as the app wrote it. */
   default: { provider?: string; models: { fill?: string; extract?: string } };
   /** The app's rules, for every task and for each. */
@@ -42,6 +74,32 @@ export interface MapoAiRunOptions {
 
 /** Seconds a call to a provider may take, unless `timeout` says otherwise. */
 export const DEFAULT_PROVIDER_TIMEOUT = 120;
+/**
+ * Seconds a call to a local model may take, unless `timeout` says otherwise:
+ * a large form keeps a model on the app's own hardware busy for minutes.
+ */
+export const DEFAULT_LOCAL_PROVIDER_TIMEOUT = 600;
+/**
+ * Mapo's providers that call a server, with the server's address when the
+ * app sets none, and whether the app may say the models' context. Their
+ * entry of `mapo.ai.providers` takes `baseURL`, and the runtime config holds
+ * their key, `apiKey`, which the environment fills.
+ */
+const SERVER_PROVIDERS: ReadonlyMap<
+  string,
+  { baseURL?: string; takesContext?: boolean }
+> = new Map([
+  ["ollama", { baseURL: DEFAULT_OLLAMA_URL }],
+  ["openai-compatible", { takesContext: true }],
+]);
+/** The least context a server's models may be said to read. */
+const MIN_CONTEXT_TOKENS = 1024;
+/** The most context a server's models may be said to read. */
+const MAX_CONTEXT_TOKENS = 10_000_000;
+/** The ids of Mapo's providers that call a server, whose key the runtime config holds. */
+export const MAPO_AI_SERVER_PROVIDERS: readonly string[] = [
+  ...SERVER_PROVIDERS.keys(),
+];
 /** The limits of `run`, unless `mapo.ai.limits` says otherwise. */
 export const DEFAULT_LIMITS: Readonly<MapoAiLimits> = Object.freeze({
   perUserPerMinute: 20,
@@ -108,14 +166,149 @@ function providersOf(
       );
       continue;
     }
-    unknownKeys(entry, ["models", "timeout"], option, warn);
+    const server = SERVER_PROVIDERS.get(id);
+    // The key is read apart, by `providerKeyOf()`: it never joins the options.
+    const known = [
+      "models",
+      "timeout",
+      ...(server ? ["baseURL", "apiKey"] : []),
+      ...(server?.takesContext ? ["contextTokens"] : []),
+    ];
+    unknownKeys(entry, known, option, warn);
+    const baseURL = server
+      ? baseURLOf(entry.baseURL, server.baseURL, option, warn)
+      : undefined;
+    const hasNoServer = server !== undefined && baseURL === undefined;
+    if (hasNoServer) continue;
+    const context = server?.takesContext
+      ? contextOf(entry.contextTokens, option, warn)
+      : undefined;
+    if (context === null) continue;
     const models = modelsOf(entry.models, option, warn);
+    const timeout = server
+      ? DEFAULT_LOCAL_PROVIDER_TIMEOUT
+      : DEFAULT_PROVIDER_TIMEOUT;
     providers[id] = {
       ...(models ? { models } : {}),
-      timeout: timeoutOf(entry.timeout, option, warn),
+      timeout: timeoutOf(entry.timeout, option, warn, timeout),
+      ...(baseURL ? { baseURL } : {}),
+      ...(context !== undefined ? { contextTokens: context } : {}),
     };
   }
   return providers;
+}
+
+/**
+ * The context the app says a server's models read: `undefined` when it says
+ * none; `null`, with a warning, when it cannot be read. Then the provider is
+ * not enabled, since without the context it could let a cut prompt through.
+ */
+function contextOf(
+  value: unknown,
+  option: string,
+  warn: (message: string) => void,
+): number | null | undefined {
+  if (value === undefined || value === null) return undefined;
+  const isUsable =
+    Number.isInteger(value) &&
+    Number(value) >= MIN_CONTEXT_TOKENS &&
+    Number(value) <= MAX_CONTEXT_TOKENS;
+  if (isUsable) return Number(value);
+  warn(
+    `${option}.contextTokens is not a whole number of tokens from ${MIN_CONTEXT_TOKENS} to ${MAX_CONTEXT_TOKENS}, so the provider is not enabled.`,
+  );
+  return null;
+}
+
+/**
+ * The address of a provider's server: the app's, or the provider's own
+ * default. `undefined`, with a warning, for an address that cannot be read
+ * or a provider with no default: then the provider is not enabled, since
+ * the gateway calls only an address the app wrote.
+ */
+function baseURLOf(
+  value: unknown,
+  fallback: string | undefined,
+  option: string,
+  warn: (message: string) => void,
+): string | undefined {
+  const isUnset = value === undefined || value === null || value === "";
+  if (isUnset && fallback !== undefined) return fallback;
+  if (isUnset) {
+    warn(
+      `${option} has no baseURL, the address of its server, so the provider is not enabled.`,
+    );
+    return undefined;
+  }
+  const url = serverURL(value);
+  if (url === undefined) {
+    warn(
+      `${option}.baseURL is not an http or https address without credentials, query or fragment, so the provider is not enabled.`,
+    );
+  }
+  return url;
+}
+
+/**
+ * The key of one of Mapo's providers that call a server, from the runtime
+ * config, where the environment puts it
+ * (`NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`). It is read apart
+ * from the options, so a key never travels with them. Only text is a key:
+ * Nuxt reads a value of digits only as a number, and `true` as a boolean,
+ * so such a key is left out, and `warn` says so without the value.
+ * @param value the whole `mapo.ai` runtime config, or `mapo.ai`: outside data
+ */
+export function providerKeyOf(
+  value: unknown,
+  id: string,
+  warn?: (message: string) => void,
+): string | undefined {
+  const options = isRecord(value) ? value : {};
+  const providers = isRecord(options.providers) ? options.providers : {};
+  const entry = Object.hasOwn(providers, id) ? providers[id] : undefined;
+  const key = isRecord(entry) ? entry.apiKey : undefined;
+  const isUnset = key === undefined || key === null || key === "";
+  if (isUnset) return undefined;
+  if (typeof key !== "string") {
+    warn?.(
+      `The key of the provider "${id}" (${providerKeyVariable(id)}) is not text, as Nuxt reads a value of digits only or true and false, so the provider calls its server without a key.`,
+    );
+    return undefined;
+  }
+  return key.trim() !== "" ? key.trim() : undefined;
+}
+
+/**
+ * What the log says when a provider's key goes to a server over plain
+ * `http:`, other than this machine: the key, and the prompt with the
+ * source, travel in clear. `undefined` when they do not.
+ */
+export function plainKeyWarning(
+  id: string,
+  baseURL: string | undefined,
+  apiKey: string | undefined,
+): string | undefined {
+  if (!apiKey || !baseURL) return undefined;
+  let url: URL;
+  try {
+    url = new URL(baseURL);
+  } catch {
+    return undefined;
+  }
+  const isPlain = url.protocol === "http:";
+  const isThisMachine = ["localhost", "127.0.0.1", "[::1]"].includes(
+    url.hostname,
+  );
+  if (!isPlain || isThisMachine) return undefined;
+  return `The provider "${id}" sends its key to ${url.host} over plain http: the key, and every prompt with its source, travel in clear. Use https.`;
+}
+
+/**
+ * The environment's variable for the key of one of Mapo's providers that
+ * call a server, as Nuxt names it: `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`.
+ */
+export function providerKeyVariable(id: string): string {
+  return `NUXT_MAPO_AI_PROVIDERS_${id.replace(/-/g, "_").toUpperCase()}_API_KEY`;
 }
 
 function modelsOf(
@@ -148,15 +341,16 @@ function timeoutOf(
   value: unknown,
   option: string,
   warn: (message: string) => void,
+  fallback: number,
 ): number {
-  if (value === undefined) return DEFAULT_PROVIDER_TIMEOUT;
+  if (value === undefined) return fallback;
   const isUsable =
     typeof value === "number" && value > 0 && value <= MAX_TIMEOUT;
   if (isUsable) return value;
   warn(
-    `${option}.timeout is not a number of seconds above 0, up to ${MAX_TIMEOUT}, so it is ${DEFAULT_PROVIDER_TIMEOUT}.`,
+    `${option}.timeout is not a number of seconds above 0, up to ${MAX_TIMEOUT}, so it is ${fallback}.`,
   );
-  return DEFAULT_PROVIDER_TIMEOUT;
+  return fallback;
 }
 
 function defaultsOf(

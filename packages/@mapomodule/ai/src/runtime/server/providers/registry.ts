@@ -5,12 +5,55 @@
  * what may spend.
  */
 
+import { DEFAULT_OLLAMA_URL } from "./local";
 import { mockProvider } from "./mock";
+import { createOllamaProvider } from "./ollama";
+import { createOpenAiCompatibleProvider } from "./openaiCompatible";
 import type { MapoAiProvider } from "./types";
 
-/** Mapo's own providers, by id. */
-const MAPO_PROVIDERS: ReadonlyMap<string, MapoAiProvider> = new Map([
-  [mockProvider.id, mockProvider],
+/**
+ * What Mapo's providers that call a server are built from: the address
+ * `mapo.ai.providers` gives, and the key the environment gives.
+ */
+export interface MapoAiServerSettings {
+  /** The server's address, without the final `/`. */
+  baseURL?: string;
+  /** The key the server asks, from the environment. */
+  apiKey?: string;
+  /** The tokens the server's models read, as the app says it. */
+  contextTokens?: number;
+}
+
+/** Builds one of Mapo's providers; `undefined` for settings it cannot work with. */
+type ProviderFactory = (
+  settings: MapoAiServerSettings,
+) => MapoAiProvider | undefined;
+
+/** Mapo's own providers, by id, each built from its settings. */
+const MAPO_PROVIDERS: ReadonlyMap<string, ProviderFactory> = new Map<
+  string,
+  ProviderFactory
+>([
+  ["mock", () => mockProvider],
+  [
+    "ollama",
+    ({ baseURL, apiKey }) =>
+      createOllamaProvider({
+        baseURL: baseURL ?? DEFAULT_OLLAMA_URL,
+        ...(apiKey ? { apiKey } : {}),
+      }),
+  ],
+  [
+    "openai-compatible",
+    ({ baseURL, apiKey, contextTokens }) =>
+      baseURL
+        ? createOpenAiCompatibleProvider({
+            baseURL,
+            ...(apiKey ? { apiKey } : {}),
+            ...(contextTokens ? { contextTokens } : {}),
+          })
+        : undefined,
+  ],
 ]);
 
 /**
@@ -70,9 +113,16 @@ export function registerMapoAiProvider(provider: MapoAiProvider): void {
   registered.set(id, provider);
 }
 
-/** The provider with this id, Mapo's or the app's; `undefined` when there is none. */
-export function mapoAiProvider(id: string): MapoAiProvider | undefined {
-  return MAPO_PROVIDERS.get(id) ?? registered.get(id);
+/**
+ * The provider with this id, Mapo's or the app's; `undefined` when there is
+ * none. Mapo's providers that call a server are built from `settings`.
+ */
+export function mapoAiProvider(
+  id: string,
+  settings: MapoAiServerSettings = {},
+): MapoAiProvider | undefined {
+  const create = MAPO_PROVIDERS.get(id);
+  return create ? create(settings) : registered.get(id);
 }
 
 /** The ids of the providers the app registered, in their order. */

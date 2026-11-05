@@ -49,6 +49,35 @@ describe("registerMapoAiProvider", () => {
     expect(mapoAiProvider("acme")).toBeUndefined();
   });
 
+  it("builds Mapo's providers that call a server, with their address", async () => {
+    const { mapoAiProvider } = await registry();
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      return new Response(JSON.stringify({ models: [], data: [] }));
+    });
+    const signal = new AbortController().signal;
+
+    try {
+      await mapoAiProvider("ollama")?.listModels?.(signal);
+      await mapoAiProvider("ollama", {
+        baseURL: "http://gpu.local:11434",
+      })?.listModels?.(signal);
+      await mapoAiProvider("openai-compatible", {
+        baseURL: "http://llm.local:8000/v1",
+      })?.listModels?.(signal);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(asked).toEqual([
+      "http://localhost:11434/api/tags",
+      "http://gpu.local:11434/api/tags",
+      "http://llm.local:8000/v1/models",
+    ]);
+    expect(mapoAiProvider("openai-compatible")).toBeUndefined();
+  });
+
   it.each(["mock", "openai", "anthropic", "openai-compatible", "ollama"])(
     "refuses the id of a Mapo provider, %s",
     async (id) => {

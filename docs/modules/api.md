@@ -777,9 +777,9 @@ Fills a detail form from a source, through the gateway's `run`: each value a quo
 
 Registers a provider the app implements, from a Nitro plugin. `run` calls it only when `mapo.ai.providers` enables its id, with the models it may use. See [Your own provider](/modules/ai#your-own-provider).
 
-| Parameter  | Type             | Default        | Description                                                                                                               |
-| ---------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `provider` | `MapoAiProvider` | — **required** | `id` (lowercase letters, digits and `-`, starting with a letter), `label?`, `capabilities`, `models?` and `run(request)`. |
+| Parameter  | Type             | Default        | Description                                                                                                                                      |
+| ---------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `provider` | `MapoAiProvider` | — **required** | `id` (lowercase letters, digits and `-`, starting with a letter), `label?`, `capabilities`, `models?`, `listModels?(signal)` and `run(request)`. |
 
 **Returns:** `void`. It throws a `TypeError` when the id is not a provider's id or `run` is missing, and an `Error` when the id is one Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`) or is registered already.
 
@@ -799,11 +799,11 @@ Registers answers of the `mock` provider, from a Nitro plugin. See [Fixtures of 
 
 ### `new MapoAiProviderError(failure, message, options?)`
 
-The error a provider's `run()` throws for a failure the gateway tells apart; any other error answers 502. See [Your own provider](/modules/ai#your-own-provider).
+The error a provider's `run()` throws for a failure the gateway tells apart: `timeout` answers 504, `rate-limit` 503, `too-long` 413 and the others 502, as does any other error; the answer names the failure in `data.failure`. See [Your own provider](/modules/ai#your-own-provider).
 
 | Parameter            | Type                    | Default        | Description                                                                                                    |
 | -------------------- | ----------------------- | -------------- | -------------------------------------------------------------------------------------------------------------- |
-| `failure`            | `MapoAiProviderFailure` | — **required** | `timeout` (504), `rate-limit` (503), `unavailable`, `invalid-response` or `refused-request` (502).             |
+| `failure`            | `MapoAiProviderFailure` | — **required** | `timeout`, `rate-limit`, `too-long`, `unavailable`, `invalid-response`, `refused-request` or `truncated`.      |
 | `message`            | `string`                | — **required** | For the server's log; the browser never sees it.                                                               |
 | `options.retryAfter` | `number`                | —              | For `rate-limit`: in how many seconds the provider takes calls again; the gateway answers it as `Retry-After`. |
 | `options.cause`      | `unknown`               | —              | The error behind it.                                                                                           |

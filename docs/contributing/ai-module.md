@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
 ## How a value travels
 
@@ -27,7 +27,7 @@ form fields ─────┘    entity.ts        contract.ts  prompts/   provi
 
 1. **The entity model** says which fields the AI may fill, with their kind of value, limits and choices, and which fields it must leave alone, with the reason.
 2. **The contract** is the strict JSON Schema the model's answer must follow, the same for every provider, with the fields behind it.
-3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Today the only provider Mapo ships is the `mock`, which answers without a model; an app can register its own.
+3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, and two providers for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
 4. **The sanitizer** reads the answer as outside data, turns each value into the form's type, discards what breaks a rule, and checks each value against the quotes the model gives from the source.
 5. **The page** applies the outcomes: `useMapoAiFill()` writes a verified value into an empty field, and marks every other one for the operator.
 
@@ -43,7 +43,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                             |
 | `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                      |
 | `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation             |
-| `src/runtime/server/providers/`   | The provider interface, the registry and the mock                                            |
+| `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for local models            |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                    |
 | `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call   |
@@ -340,7 +340,7 @@ A page asks `status` to know whether to offer the AI at all, and "not for you" i
 | `src/runtime/server/run/audit.ts`         | The audit record: its key, its validator, its write                                                          |
 | `src/runtime/server/run/run.ts`           | The operation, with its dependencies passed in                                                               |
 | `src/runtime/server/run/nitro.ts`         | The wiring: the runtime config, the registry, the storage, the limiter, the `mapo-ai:prompt` hooks           |
-| `src/runtime/server/providers/`           | The provider interface (`types.ts`), the registry (`registry.ts`), the mock (`mock.ts`)                      |
+| `src/runtime/server/providers/`           | The interface (`types.ts`), the registry (`registry.ts`), the mock (`mock.ts`), the local models (below)     |
 | `src/runtime/server/prompts/`             | Mapo's base rules, versioned (`base.ts`), and the composition in layers (`compose.ts`)                       |
 | `src/runtime/server/plugins/providers.ts` | When the server starts: the providers that will not be called, in the log                                    |
 | `src/runtime/shared/patterns.ts`          | The bound on a pattern's work, before the sanitizer runs it                                                  |
@@ -359,11 +359,11 @@ The page sends the two descriptions of each record, its backend schema and its f
 
 ### Providers
 
-A provider implements `MapoAiProvider`: an id, its capabilities, optionally its own models, and `run(request)`, which gets the composed prompt, the source's parts, the schema, the contract and an abort signal. Each call gets its provider's `timeout`: the gateway aborts the signal when it is up, and stops waiting whatever the provider does. The provider gets copies of the contract and of the source, so what it does to them never changes what its answer is read against, and what it returns is outside data: the answer is read as plain JSON (a getter, a prototype or a cycle makes it unreadable), and the tokens as whole numbers from zero. A `MapoAiProviderError` says which failure to answer: 504, 503 with `Retry-After` (a count of seconds from zero, at most an hour), or 502; a failure the gateway does not know is a 502, audited as `error`.
+A provider implements `MapoAiProvider`: an id, its capabilities, optionally its own models, and `run(request)`, which gets the composed prompt, the source's parts, the schema, the contract and an abort signal. Each call gets its provider's `timeout`: the gateway aborts the signal when it is up, and stops waiting whatever the provider does. The provider gets copies of the contract and of the source, so what it does to them never changes what its answer is read against, and what it returns is outside data: the answer is read as plain JSON (a getter, a prototype or a cycle makes it unreadable), and the tokens as whole numbers from zero. A `MapoAiProviderError` says which failure to answer: 504, 503 with `Retry-After` (a count of seconds from zero, at most an hour), 413 for a prompt the model cannot read whole, or 502, and the answer names it in `data.failure`; a failure the gateway does not know is a 502, audited as `error`.
 
-The registry holds Mapo's providers and the app's. Registering makes a provider available; only `mapo.ai.providers` makes it usable, so one place says what may spend, and at start the server's log names the providers that will not be called. An app cannot register an id Mapo keeps, today's and the planned ones (`openai`, `anthropic`, `openai-compatible`, `ollama`), so an update of Mapo never takes over an app's provider.
+The registry holds Mapo's providers and the app's. Registering makes a provider available; only `mapo.ai.providers` makes it usable, so one place says what may spend, and at start the server's log names the providers that will not be called. An app cannot register an id Mapo keeps, today's (`mock`, `ollama`, `openai-compatible`) and the planned ones (`openai`, `anthropic`), so an update of Mapo never takes over an app's provider.
 
-The interface already holds what local models need: no key, the models a server lists (`listModels()`, not called yet), the context and the images of each model (`MapoAiModelInfo`), a time limit. The capabilities are declared, not read yet: the gateway sends text only, does not stream and calls no tool.
+The interface holds what local models need: no key, the models a server lists (`listModels()`, called when the server starts), the context and the images of each model (`MapoAiModelInfo`), a time limit. The capabilities are declared, not read yet: the gateway sends text only, waits for the whole answer and calls no tool.
 
 The mock (`mock.ts`) is a provider like the others, enabled the same way. It answers with a failure on command, then from a fixture, then by simple rules, and its answers go through the sanitizer like a model's, so tests and demos run the whole chain but the model. The app registers fixtures with `registerMapoAiMockFixtures()`.
 
@@ -389,7 +389,64 @@ The audit has one record per call that reached the provider, in the `audit` purp
 - **The descriptions come from the page.** What the AI may fill is what the page says, read with the gateway's own rules.
 - **Every text of a request reaches the model**: the entities' names and descriptions, the fields' labels, hints and descriptions in the schemas, the operator's instructions, the source. They come after what the server holds, but a user who crafts requests can steer the model for their own answers, which they review and the backend checks; `maxInstructionsChars` bounds the operator's instructions only.
 - **Patterns get a rough bound**: on long values some harmless patterns are not applied, and their values are not verified.
-- **No streaming**: the browser waits for the whole answer, and a local model with a large schema can take minutes.
+- **No streaming to the browser**: the providers stream from their server, but the browser waits for the whole answer, and a local model with a large schema can take minutes.
+
+## Local models
+
+Two of Mapo's providers call a model on the app's own servers: `ollama`, through Ollama's own API, and `openai-compatible`, through OpenAI's Chat Completions API, as LM Studio, vLLM and the server of llama.cpp speak it.
+
+| File                                               | Role                                                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `src/runtime/server/providers/ollama.ts`           | The `ollama` provider: the model's details, the context of each call, the streamed answer           |
+| `src/runtime/server/providers/openaiCompatible.ts` | The `openai-compatible` provider: `response_format`, the streamed events, the checks of the context |
+| `src/runtime/server/providers/http.ts`             | The calls: failures told apart, an error's text, a stream read line by line within a bound          |
+| `src/runtime/server/providers/local.ts`            | What both share: the server's address, the schema in the prompt, the tokens, the models' details    |
+
+### Without an SDK
+
+The providers call their servers with `fetch`: one or two endpoints each, a body built by hand, and the answer read as outside data, line by line. No package is added to every app that installs Mapo, the code runs on every runtime Nitro targets, and the same reading rules hold for every server. The price is ours to pay: when an API changes, the provider changes with it, and the tests on recorded answers say where. An SDK's types would not have spared the validation either, since an answer is outside data whatever its type says.
+
+### Where the server is, and its key
+
+Only the app says where a server is: `baseURL` in `mapo.ai.providers`, `http://localhost:11434` for Ollama unless set, or the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_BASE_URL`). A request never names a server, and the admin will not either: an address written from outside would let the gateway call any server of its network. An address is read as outside data (`serverURL()`): `http:` or `https:`, without credentials, query or fragment; one that cannot be read leaves the provider off. A key, for a server behind a proxy, comes from the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`): the module puts an empty `apiKey` in the private runtime config of each such provider, so Nuxt has a place to fill, and `providerKeyOf()` reads it apart from the options, so it never travels with them; a key of digits only, which Nuxt reads as a number, and a key sent over plain `http:` to another machine are said in the log, never the key. `mapoAiProvider(id, settings)` builds Mapo's providers from these settings at each request; what a server says about its models is kept ten minutes, by address. A provider never follows a redirect, which would send the prompt elsewhere, and of an error's JSON body it logs only the message: a validation error can repeat the request, source included.
+
+### What a call to Ollama does
+
+A probe on Ollama 0.40.13 showed why the provider is shaped as it is: a prompt of 13,912 tokens sent with a context of 512 reached the model as 258 tokens, with a 200 and no error, and the rules at the top of the prompt were gone. When the context fills while the model writes, Ollama also drops the start of the prompt to go on. So every call sends `truncate: false`, and Ollama refuses a prompt that does not fit with a 400 that says how many tokens it has, and `shift: false`, and a full context ends the answer. Both are fields of Ollama's chat request that its API reference does not list, so the provider calls only the version it was verified with, 0.40.13, or a later one, and still checks after the call that Ollama read the whole prompt. Each call:
+
+1. reads Ollama's version (`/api/version`) and the model's limit from `/api/show`, under a key named for its architecture (`qwen2.context_length`), both kept ten minutes; an older Ollama is refused, and asked again at the next call, so an update counts at once;
+2. puts the answer's schema in the prompt: `format` holds the answer to it, but the model never sees it, and without it a model does not read what each field holds. On a page of blocks, a model without the schema wrote a field name of its own and invented values, and with it filled six blocks of the right templates;
+3. asks a context for the prompt, estimated on the high side, and the answer: a power of two from 8192, at most the model's, since a new size reloads the model on the server. When Ollama counts more tokens than the estimate, the provider asks once more with room for Ollama's count, and fails with `too-long` when the model has none;
+4. caps the answer (`num_predict`) by the size of its schema, more for an extraction. Every value of the schema is a string, so the constrained answer does not stop a model that loops inside one, as one did in a probe: the cap does, and an answer that reaches it fails with `truncated`;
+5. turns the reasoning off (`think: false`), asks for the same answer each time (`temperature: 0`), and streams the answer. Node's `fetch` waits five minutes for a server's first bytes, whatever the gateway's `timeout` says, and Ollama sends them with the first words of the answer: streaming takes the writing out of those five minutes, but loading the model and reading the prompt stay in them. A probe measured 71 seconds before the first bytes, for 28,907 tokens of prompt on a 7B model. Past five minutes the call fails as a timeout, and the log names the cause;
+6. after the call, fails with `too-long` when Ollama counted the prompt below a sixth of its characters. Ollama's count includes the tokens it kept in its cache (a recorded answer counts 173 tokens, 172 of them cached), so a prompt read again is counted whole.
+
+### The checks of an OpenAI-compatible server
+
+Such a server sets its models' context itself, and does not take one per call. vLLM refuses a prompt and a cap (`max_tokens`) that do not fit together, and says how many tokens the prompt has, in one of two wordings ("5000 in the messages", "your request has 5000 input tokens"): the provider asks once more with the cap that fits, when at least 1024 tokens are left for the answer. llama.cpp refuses a prompt that does not fit without a count. Both become `too-long`; others cut the prompt in silence, as Ollama's own `/v1` does. The provider checks what it can:
+
+- with the context known, from the server's list of models (vLLM's `max_model_len`) or from the app (`contextTokens`), the cap leaves room for the prompt, a prompt that cannot fit fails before the call, and one the server counted up to the context, with no room left for an answer, fails after it;
+- after every call, a prompt counted below a sixth of its characters was cut;
+- these come before a cut answer: a prompt cut to fill the context, after which the answer ran out of room, is a prompt too long;
+- a stream that ends before a `finish_reason`, and an `error:` event, which llama.cpp sends when it fails while it answers, fail as `unavailable`; a server that sends no counts, with a known context, is said once in the log.
+
+Without a known context the second check is the only one, and it is weak: in the probe a prompt of 73,620 tokens, made of short tokens, came back counted as 16,386, above a sixth of its characters, and went through until `contextTokens` was set. Characters say too little about tokens to do better: a token held from 1.2 to more than 4 characters in the probes. The provider does not turn reasoning off either, since no parameter does so on every server and one a server does not know can fail the call.
+
+### When the server starts
+
+The providers plugin asks every provider `run` may call that lists its models (`listModels()`) for them, and warns about each model `mapo.ai.providers` allows that the list does not have, or that the server cannot be reached; neither stops the start. A model without a tag is listed by Ollama with `:latest`, so the list has both names.
+
+### Strengths and weaknesses
+
+- **A prompt never reaches Ollama's model cut**, on the version the provider was verified with, and an answer never comes back cut as if it were whole: both are failures with a name, 413 and 502, which the page tells apart.
+- **Ollama's two flags are not in its API reference.** A later Ollama could drop them; the check after the call would then catch only a gross cut, as on an OpenAI-compatible server without a known context.
+- **Five minutes for the first bytes**: a model that loads and reads a long prompt for longer cannot be called, whatever `timeout` says. Lifting the limit takes undici's own `Agent`, a package.
+- **No dependency**, and the same code on every runtime.
+- **A server's address and key are the app's alone**, read from its config or its environment.
+- **An OpenAI-compatible server without a known context can cut a prompt a little too long**, rules included; `contextTokens` closes the gap.
+- **Estimates, not counts**: the context asked of Ollama may be larger than needed, costing memory, or smaller, costing a second call; Ollama has no route that counts tokens.
+- **A model that reasons on an OpenAI-compatible server** spends time and tokens of the cap on it, unless the server turns it off.
+- **The models' details are kept per process**, ten minutes: a model pulled again with another context is seen late.
 
 ## Filling a form
 
@@ -467,8 +524,8 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `audit.test.ts`     | The record's key, its validator, its write in the user's space with its expiry                                                                     |
 | `prompts.test.ts`   | The base rules, the order of the layers, the marks around the source                                                                               |
 | `mock.test.ts`      | The mock's rules, its failures on command and its fixtures                                                                                         |
-| `registry.test.ts`  | The providers an app registers, and the ids Mapo keeps                                                                                             |
-| `providers.test.ts` | The providers the server's log names when it starts, as they will not be called                                                                    |
+| `registry.test.ts`  | The providers an app registers, the ids Mapo keeps, Mapo's providers built with their server                                                       |
+| `providers.test.ts` | The providers the log names at start, as they will not be called, and the models a server does not list; the local providers' settings and key     |
 | `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations, the options and what each warns about |
 
 The browser's half, also run in Node:
@@ -478,6 +535,15 @@ The browser's half, also run in Node:
 | `fill.test.ts`          | The request from the two descriptions, the answer read as outside data, each action of the plan, the model's paths          |
 | `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
 | `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
+
+The providers for local models, on the answers Ollama 0.40.13 sent on its two APIs, kept in `recorded/` and served by `servers.ts` through a fake `fetch` that keeps every call; record them again when a server's API changes:
+
+| File                       | What it proves                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `ollama.test.ts`           | The body, the key, the version, the context asked again, the cut prompt and answer, failures                        |
+| `openaiCompatible.test.ts` | The body, the cap, vLLM's refusals, the checks of the context, refusals, events, redirects                          |
+| `http.test.ts`             | The calls and their failures, an error's text, `Retry-After`, a stream read line by line, in chunks, within a bound |
+| `local.test.ts`            | A server's address, the tokens, the context asked, the models' details kept ten minutes                             |
 
 - `expectPortable()`, in `portable.ts`, walks a schema and fails on anything outside the portable subset; every contract test runs it.
 - A bug fix leaves a regression test that fails on the previous version.
@@ -525,10 +591,11 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 
 ### Add a provider of Mapo
 
-1. Write it in `src/runtime/server/providers/`, implementing `MapoAiProvider`, with recorded responses for its tests: success, refusal, truncation, invalid JSON, 429, 5xx.
-2. Add it to `MAPO_PROVIDERS` in `registry.ts`; its id is in `MAPO_AI_RESERVED_PROVIDER_IDS` already, or goes there in the same change.
-3. Read its options, such as a server's address, in `run/options.ts`, which warns about the keys it does not know, and document them.
-4. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
+1. Write it in `src/runtime/server/providers/`, implementing `MapoAiProvider`, built from its settings (`MapoAiServerSettings`) with the `fetch` passed in, so its tests serve recorded answers through `servers.ts`: success, refusal, truncation, invalid JSON, 429, 5xx.
+2. Call its server through `http.ts`: `callServer()` and `serverJson()` tell the failures apart, `readJsonLines()` and `readEvents()` read a stream within a bound.
+3. Add it to `MAPO_PROVIDERS` in `registry.ts`; its id is in `MAPO_AI_RESERVED_PROVIDER_IDS` already, or goes there in the same change.
+4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and a place for its key; document them.
+5. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
 
 ### Change a base rule
 
@@ -558,7 +625,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Fill a form with Magic Fill                      | Magic Fill                                                       |
 | Verified and to check                            | Magic Fill, from the verification described on this page         |
 | Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
-| Providers and keys                               | The mock and an app's own (written); Mapo's providers, the keys  |
+| Providers and keys                               | The mock, an app's own, local models (written); the cloud, keys  |
 | AI settings                                      | The settings page                                                |
 | Import several records                           | Import AI                                                        |
 | Guarantees and limits                            | Every change                                                     |
@@ -571,8 +638,8 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Readers** for text, PDF, images and spreadsheets.
-2. **Providers**: OpenAI, Anthropic and OpenAI-compatible servers, local ones included.
+1. **Providers in the cloud**: OpenAI and Anthropic.
+2. **Readers** for text, PDF, images and spreadsheets, with PDFs and images sent to the providers that read them.
 3. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
 4. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
 5. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
@@ -592,6 +659,10 @@ Ideas with no place in the plan yet:
 - Stop a provider's call when the browser that asked for it goes away.
 - A limit per user shared by the processes of a server, and caps by day or by cost, read from the audit.
 - Stream the answer to the browser, for slow local models.
+- Export the providers' factories, so an app can register a second server of a kind under an id of its own, such as a GPU machine beside a laptop's Ollama.
+- The context of each model of an OpenAI-compatible server, not one for the whole server; and a count of the prompt's tokens before the call, where a server offers one (vLLM's and llama.cpp's `/tokenize`).
+- Turn reasoning off on an OpenAI-compatible server, with the parameter each kind of server takes.
+- Tell in `status` the context of each model and whether it reads images, so a page can warn before it sends a long source.
 - Check `Origin` too, for browsers that send no `Sec-Fetch-Site`, once the host the server sees behind a proxy can be trusted.
 - Read group objects (`{ name }`) as names, in the auth store and the gateway together.
 - Expire a batch and its drafts through one record, instead of one expiry each.

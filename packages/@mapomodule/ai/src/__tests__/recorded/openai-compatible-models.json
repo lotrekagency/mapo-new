@@ -1,0 +1,35 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "qwen3.8:27b",
+      "object": "model",
+      "created": 1793632901,
+      "owned_by": "library"
+    },
+    {
+      "id": "gemma4:12b",
+      "object": "model",
+      "created": 1793631008,
+      "owned_by": "library"
+    },
+    {
+      "id": "qwen2.5:7b",
+      "object": "model",
+      "created": 1779050727,
+      "owned_by": "library"
+    },
+    {
+      "id": "llava:7b",
+      "object": "model",
+      "created": 1779040550,
+      "owned_by": "library"
+    },
+    {
+      "id": "llama3.1:latest",
+      "object": "model",
+      "created": 1744981525,
+      "owned_by": "library"
+    }
+  ]
+}

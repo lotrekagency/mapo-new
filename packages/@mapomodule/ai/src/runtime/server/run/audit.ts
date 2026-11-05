@@ -74,6 +74,8 @@ const AUDIT_RECORD = z.strictObject({
       "unavailable",
       "invalid-response",
       "refused-request",
+      "too-long",
+      "truncated",
       "error",
     ])
     .optional(),

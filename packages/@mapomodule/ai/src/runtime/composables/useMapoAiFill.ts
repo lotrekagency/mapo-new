@@ -196,6 +196,17 @@ const ERROR_MESSAGES: Readonly<Record<number, string>> = {
   504: "timeout",
 };
 
+/**
+ * The message of a provider's failure that has one of its own, by the name
+ * `run` gives it in `data.failure`: a cut answer, or a prompt the model
+ * cannot read whole, is not fixed by trying again, as the other failures
+ * of a 502 may be, and a long form can be what overflows, not only the text.
+ */
+const FAILURE_MESSAGES: ReadonlyMap<string, string> = new Map([
+  ["truncated", "cutOff"],
+  ["too-long", "tooLongForModel"],
+]);
+
 /** Messages that can say how long to wait, as `<message>In`. */
 const WAITING_MESSAGES = new Set(["rateLimited", "unavailable"]);
 
@@ -795,7 +806,8 @@ function errorOf(failure: unknown, t: Translate): MapoAiFillError {
   // `$fetch` rejects with a `FetchError`; one without a status got no answer.
   const isFetchFailure = isRecord(failure) && failure.name === "FetchError";
   const unanswered = isFetchFailure ? "network" : "failed";
-  const known = ERROR_MESSAGES[status];
+  const known =
+    FAILURE_MESSAGES.get(failureNameOf(failure)) ?? ERROR_MESSAGES[status];
   const name = status === 0 ? unanswered : (known ?? "failed");
   const saysWhen = retryAfter !== undefined && WAITING_MESSAGES.has(name);
   const message = t(`mapo.ai.errors.${saysWhen ? `${name}In` : name}`, {
@@ -815,6 +827,18 @@ function statusOf(failure: unknown): number {
     (one): one is number => typeof one === "number" && one > 0,
   );
   return status ?? 0;
+}
+
+/**
+ * The name `run` gives a provider's failure, in the answer's `data`:
+ * `$fetch` puts the answer in `data`, and the gateway's error its own `data`
+ * in it.
+ */
+function failureNameOf(failure: unknown): string {
+  const body = isRecord(failure) ? failure.data : undefined;
+  const data = isRecord(body) ? body.data : undefined;
+  const name = isRecord(data) ? data.failure : undefined;
+  return typeof name === "string" ? name : "";
 }
 
 /** The seconds of the answer's `Retry-After`, when it has one. */

@@ -1,0 +1,49 @@
+{
+  "models": [
+    {
+      "name": "qwen3.8:27b",
+      "model": "qwen3.8:27b",
+      "size": 18174721847,
+      "details": {
+        "family": "",
+        "parameter_size": ""
+      }
+    },
+    {
+      "name": "gemma4:12b",
+      "model": "gemma4:12b",
+      "size": 7714091504,
+      "details": {
+        "family": "",
+        "parameter_size": ""
+      }
+    },
+    {
+      "name": "qwen2.5:7b",
+      "model": "qwen2.5:7b",
+      "size": 4683087332,
+      "details": {
+        "family": "qwen2",
+        "parameter_size": "7.6B"
+      }
+    },
+    {
+      "name": "llava:7b",
+      "model": "llava:7b",
+      "size": 4733363377,
+      "details": {
+        "family": "llama",
+        "parameter_size": "7B"
+      }
+    },
+    {
+      "name": "llama3.1:latest",
+      "model": "llama3.1:latest",
+      "size": 4920753328,
+      "details": {
+        "family": "llama",
+        "parameter_size": "8.0B"
+      }
+    }
+  ]
+}

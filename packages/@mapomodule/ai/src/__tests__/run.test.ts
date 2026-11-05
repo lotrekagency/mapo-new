@@ -787,6 +787,31 @@ describe("POST /_mapo/ai/run — an answer of the mock", () => {
     ).toBe(502);
   });
 
+  it("answers 413 to a source too long for the model, and 502 to a cut answer, naming the failure", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const handle = await gateway();
+
+    const tooLong = await handle(runRequest(fillBody("#mock:too-long")));
+    const cut = await handle(runRequest(fillBody("#mock:truncated")));
+    const down = await handle(runRequest(fillBody("#mock:unavailable")));
+
+    expect(tooLong.status).toBe(413);
+    expect(await json(tooLong)).toMatchObject({
+      statusMessage: "The source is too long for this AI model",
+      data: { failure: "too-long" },
+    });
+    expect(cut.status).toBe(502);
+    expect(await json(cut)).toMatchObject({
+      data: { failure: "truncated" },
+    });
+    expect(await json(down)).toMatchObject({
+      data: { failure: "unavailable" },
+    });
+    expect((await auditRecords()).map((record) => record.failure)).toEqual(
+      expect.arrayContaining(["too-long", "truncated", "unavailable"]),
+    );
+  });
+
   it("extracts an item for each entity whose fields the lines name", async () => {
     const body = await json(
       await (

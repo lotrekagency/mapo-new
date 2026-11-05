@@ -3,7 +3,7 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. The only provider Mapo ships is `mock`, which answers without a network; an app can register its own. In the browser, `useMapoAiFill()` fills a detail form through `run`, from a component the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. Mapo ships three providers: `mock`, which answers without a network, and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiFill()` fills a detail form through `run`, from a component the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
@@ -13,7 +13,7 @@ The package is at its first building blocks. Today it installs the **AI gateway*
 - `GET /_mapo/ai/status` tells a signed-in user the version of the gateway's contract, whether the app lets them use the AI and whether they administer it, and the providers, models and limits they get; an admin also gets the state of the storage.
 - Two options say who administers the AI and who may use it, `admin` and `users`, and a Nitro plugin can narrow it further with the `mapo-ai:user` hook.
 - `POST /_mapo/ai/run` fills one record (`fill`) or extracts every record a source describes (`extract`). The page sends the record's two descriptions, its backend schema and its form's fields, and the source; the gateway builds what the AI may fill, composes the prompt, calls the provider and reads its answer: each field comes back empty, filled (verified by a quote of the source, or to check) or discarded with a reason. The gateway never writes to the backend.
-- The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command, and the ones an app registers with `registerMapoAiProvider()`.
+- The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command; `ollama`, a model served by Ollama; `openai-compatible`, a model served by LM Studio, vLLM, llama.cpp or another server that speaks OpenAI's Chat Completions API; and the ones an app registers with `registerMapoAiProvider()`.
 - The prompt is composed in layers: Mapo's base rules, the app's (`instructions`, and the `mapo-ai:prompt` hook), the entity's context, the operator's instructions, then the source, which is data and never instructions.
 - The app sets the verification rules (`verification`) and the limits (`limits`): calls per user per minute, the length of a source and of the operator's instructions.
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model, the tokens and the outcome, never the contents, for 90 days by default (`audit`).
@@ -314,13 +314,15 @@ The permission on the model keeps the gateway in step with an honest page, which
 | ------ | --------------------------------------------------------------------------------------------------------------------- |
 | 400    | The body is not JSON, not a request of `run`, or an entity has no description; the message names where, never a value |
 | 403    | A provider or a model the app does not enable; no permission on the record's model; a request from another origin     |
-| 413    | The body, the source or the operator's instructions are longer than the limits allow                                  |
+| 413    | The body, the source or the instructions exceed the limits, or the prompt does not fit what the model reads           |
 | 415    | The body is not `application/json`                                                                                    |
 | 422    | The AI may fill nothing, two entities of an extraction share an endpoint, or the descriptions are too large or deep   |
 | 429    | The user made `perUserPerMinute` calls in the last minute; `Retry-After` says when to try again                       |
-| 502    | The provider failed, or returned nothing the gateway can read                                                         |
+| 502    | The provider failed or refused the request, cut the answer at its cap, or sent nothing the gateway can read           |
 | 503    | No provider is enabled, the storage is closed, or the provider is busy, with `Retry-After` when it says               |
 | 504    | The provider did not answer within its `timeout`                                                                      |
+
+When the provider fails, the answer's `data.failure` names how: `timeout`, `rate-limit`, `unavailable`, `invalid-response`, `refused-request`, `too-long` (413), `truncated` (a cut answer, 502) or `error`. Why it failed goes to the server's log, never to the browser.
 
 ## Fill a detail form
 
@@ -392,7 +394,7 @@ It returns:
 - **The operator's own changes stay.** `restore()` and `undo()` put a field back only while it holds what the AI wrote: a field the operator changed afterwards keeps the change. A key the AI added goes away again, and so does an object it made on the way (`translations.it`), so the form is as it was. What a field's `onChange` changed stays.
 - **A new `fill()`** stops waiting for the previous call. When its answer arrives, the previous answer's marks go; its values stay in the form, and `restore()` and `undo()` then reach only the new answer's. A call that fails or is cancelled leaves the previous answer as it was.
 - **A refusal is no error.** When the model refuses, `response` has `status: "refused"` and the model's text in `refusal`; when its answer did not have the shape asked, `result.readable` is `false` and every field is empty. Nothing is written, and `error` stays empty: show them from `response`.
-- **Errors.** The call goes through `$mapoFetch`, so a session that ended leads to the login page, and a 403 also shows the "permission denied" message. `error.message` says what happened in the app's language, and how long to wait when the gateway says.
+- **Errors.** The call goes through `$mapoFetch`, so a session that ended leads to the login page, and a 403 also shows the "permission denied" message. `error.message` says what happened in the app's language, and how long to wait when the gateway says. An answer cut at its cap (`truncated`), and a prompt the model cannot read whole (`too-long`), have messages of their own, which suggest a shorter text or another model: trying again does not help.
 - **A read-only form** is neither asked nor written: a `MapoDetail` with `readonly`, or with a `permissionModel` the user may not add or change. While the detail saves or deletes its record (`isBusy`), nothing is written: an answer that arrives then waits, marked, for Apply.
 - **Labels** come from the `mapo.ai.fill.*` and `mapo.ai.errors.*` messages of `@mapomodule/i18n`, in English and Italian, with the shared `mapo.apply` and `mapo.restore`; an app overrides them as any `mapo.*` message.
 
@@ -414,7 +416,7 @@ export default defineNuxtConfig({
 });
 ```
 
-Without `models` a provider offers its own (`["mock"]` for the mock); without `timeout` a call may take 120 seconds. `false` turns off a provider a layer enables. `default` names what a request that names nothing gets: without it, or when it names a provider the app does not enable, that is the first provider listed and its first model. With no provider enabled, `run` answers 503.
+Without `models` a provider offers its own (`["mock"]` for the mock; `ollama` and `openai-compatible` have none, so list them); without `timeout` a call may take 120 seconds, or 600 with `ollama` and `openai-compatible`. `false` turns off a provider a layer enables. `default` names what a request that names nothing gets: without it, or when it names a provider the app does not enable, that is the first provider listed and its first model. With no provider enabled, `run` answers 503.
 
 ### The mock
 
@@ -429,6 +431,8 @@ Without `models` a provider offers its own (`["mock"]` for the mock); without `t
    | `#mock:rate-limit`            | Is rate-limited: `run` answers 503 with `Retry-After: 30` |
    | `#mock:unavailable`           | Is down: 502                                              |
    | `#mock:timeout`               | Never answers: 504 once the provider's `timeout` is up    |
+   | `#mock:too-long`              | Cannot read the whole prompt: 413                         |
+   | `#mock:truncated`             | Writes an answer cut at its cap: 502                      |
    | `#mock:slow`, `#mock:slow=10` | Waits 3 seconds, or the seconds given, then answers       |
 
 2. **A fixture**: an answer written by hand, which the app registers (below), for a source that names it with `#mock:fixture=<name>` or whose text it is, case and spaces aside. A source that names a fixture the app did not register gets a refusal.
@@ -455,6 +459,68 @@ export default defineNitroPlugin(() => {
 ```
 
 A fixture has a `name` (lowercase letters, digits, `-` and `_`), an `answer` written as a model writes it, or a `refusal`; optionally the `source` it answers without a mark, and the `usage` to report. The answer names the properties of the answer's schema: the field keys made safe, `seo.title` as `seo_title`. Every value is written as the schema asks: text, `"true"` or `"false"`, a number in digits, `""` for what the source does not give, and a related record by the name to search for, or by its id when `relationChoices` lists the records (`{ record, item }` only where an extraction may link to an item of the same answer). It may hold wrong values or quotes that are not in the source on purpose: they come back discarded or to check. `registerMapoAiMockFixtures()` is auto-imported in the server's code; the reference app registers its own in `apps/example-e2e/server/plugins/mapo-ai-fixtures.ts`.
+
+### Ollama
+
+`ollama` calls a model served by [Ollama](https://ollama.com) 0.40.13 or later, on the app's server or in its network, through Ollama's own API:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      providers: {
+        ollama: { models: ["gemma4:12b", "qwen3.8:27b"] },
+      },
+    },
+  },
+});
+```
+
+- `models` lists the models a request may ask for, the default first. Ollama may have more installed: only these are called. When the server starts, it asks Ollama for its models, and warns about each one `models` lists that Ollama does not have, or that Ollama cannot be reached.
+- `baseURL` is Ollama's address: `http://localhost:11434` unless set. Only the app sets it, here or with `NUXT_MAPO_AI_PROVIDERS_OLLAMA_BASE_URL`; a request never names a server.
+- When Ollama sits behind a proxy that asks for a token, set the token in the server's environment as `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`: the provider sends it as a bearer token. The options' type has no `apiKey`, on purpose: a key written in the Nuxt config anyway is used, but the build copies it into the server bundle, and the module warns about it. A key of digits only reaches the server as a number, which is not a key: the server's log says so.
+- `timeout` is 600 seconds unless set: a large form keeps a model on the app's own hardware busy for minutes.
+- The provider calls only Ollama 0.40.13 or later, the version it was verified with: it asks Ollama its version, every ten minutes, and refuses an older one (502), since an older Ollama may ignore what keeps it from cutting a prompt. A key sent over plain `http:` to another machine travels in clear, and the server's log says so.
+
+Each call:
+
+1. puts the answer's JSON Schema in the prompt, after the rules. Ollama holds the answer to the schema, but does not show it to the model, which would never read what each field holds, its limits, or the templates of a list's items;
+2. turns the model's reasoning off (`think: false`) and asks for the same answer each time (`temperature: 0`);
+3. asks a context large enough for the prompt and the answer, within what the model reads, which Ollama says for each model. By default Ollama cuts a prompt longer than the context, and drops the start of the prompt when the context fills up, without an error: the rules at the top go first. The provider tells Ollama to refuse instead, so a prompt that does not fit fails with 413 (`too-long`), with the count of its tokens in the server's log. A prompt Ollama counted well below its size, which only an Ollama that cut it would count, fails the same way;
+4. caps the answer by the size of its schema, more for an extraction: every value of the schema is a string, and a model can loop inside one. An answer that reaches the cap, or the end of the context, fails with 502 (`truncated`);
+5. streams the answer from Ollama, so the time the model takes to write it is limited only by `timeout`; the gateway answers the page once, with the whole answer. Loading the model and reading the prompt must take less than five minutes: Ollama sends its first bytes only with the first words of the answer, and Node's `fetch` waits five minutes for them. Past that, the call fails with 504.
+
+### OpenAI-compatible servers
+
+`openai-compatible` calls a model served by a server that speaks OpenAI's Chat Completions API, such as LM Studio, vLLM or the server of llama.cpp:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      providers: {
+        "openai-compatible": {
+          baseURL: "http://gpu.internal:1234/v1",
+          models: ["qwen3-32b"],
+          contextTokens: 32768,
+        },
+      },
+    },
+  },
+});
+```
+
+- `baseURL` is required: the address the server answers `/chat/completions` and `/models` under, usually ending in `/v1`. Without it the provider is not enabled. The environment can change it with `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_BASE_URL`, and set a key with `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`, sent as a bearer token.
+- `models` and `timeout` work as for Ollama, and so does the check of the models when the server starts.
+- Each call puts the answer's schema in the prompt and in `response_format`, caps the answer (`max_tokens`) and streams it. It does not turn a model's reasoning off: no parameter does so on every server, and one a server does not know can fail the call. Turn it off on the server for a model that reasons, or its reasoning takes time and tokens of the cap.
+- Such a server sets the context of its models itself. vLLM refuses a prompt and a cap that do not fit together, and says how many tokens the prompt has: the provider asks once more with the cap that fits, when an answer still has room, and fails with 413 otherwise; llama.cpp refuses a prompt that does not fit, also a 413. Others cut the prompt in silence, rules included. `contextTokens` says how many tokens the server's models read, when its list of models does not (vLLM's does): then the cap leaves room for the prompt, a prompt that cannot fit fails before the call, and one the server counted up to the context fails after it, as a prompt too long even when the answer then ran out of room. Without a context, a prompt cut a little can go through. For Ollama, use `ollama`, which refuses instead of cutting.
+- A stream that ends before the model says why it stopped, as when a server or a proxy drops the connection, and an error the server sends in the stream, as llama.cpp does, fail with 502. The provider does not follow a redirect: it would send the prompt to an address the app did not write.
+
+### Behind a proxy
+
+A call to a local model can take minutes, and the page waits for the whole answer. A proxy in front of the app's server may close the request first: nginx does after 60 seconds by default. Give `/_mapo/ai/run` a read timeout at least as long as the provider's `timeout`. The same holds for a proxy between the app's server and the model's: Mapo's providers stream, but a server sends its first bytes only once it has read the prompt.
 
 ### Your own provider
 
@@ -516,11 +582,12 @@ export default defineNuxtConfig({
 - `run(request)` gets the `task`, the `model`, the `prompt` (`instructions`, the part that stays the same, and `input`, the operator's instructions and the source), the source's `parts`, the JSON Schema of the answer (`schema`, in the subset every provider accepts in strict mode), the `contract` it was compiled from, and a `signal`, aborted when the `timeout` is up. The gateway stops waiting then, whatever the provider does. The contract and the parts are copies: changing them changes nothing the answer is read against.
 - It returns `{ status: "answered", output, usage }`, where `output` is the answer parsed from JSON (or the model's text, when it is not JSON: the answer then comes back with `readable: false`), or `{ status: "refused", refusal, usage }`. The gateway reads what it returns as outside data: `output` as plain JSON, so one it cannot copy as JSON is unreadable, token counts as whole numbers from zero, and anything else is a 502.
 - `capabilities` say what the provider can do. The gateway reads none of them yet: it sends text only, waits for the whole answer and calls no tools.
-- A `MapoAiProviderError` tells the gateway what failed: `timeout` (504), `rate-limit` (503, with `Retry-After` when `retryAfter` is a count of seconds, at most an hour), `unavailable`, `invalid-response` or `refused-request` (502). Any other error, or a failure the gateway does not know, is a 502 too. The message goes to the server's log, never to the browser.
+- `listModels(signal)`, optional, returns the models its server has (`MapoAiModelInfo[]`). The server calls it when it starts, and warns about each model `providers` allows that the list does not have, or that the list could not be read; a request may still ask only for the models `providers` lists.
+- A `MapoAiProviderError` tells the gateway what failed: `timeout` (504), `rate-limit` (503, with `Retry-After` when `retryAfter` is a count of seconds, at most an hour), `too-long` for a prompt the model cannot read whole (413), `unavailable`, `invalid-response`, `refused-request` or `truncated` for an answer cut at its cap (502). Any other error, or a failure the gateway does not know, is a 502 too. The message goes to the server's log, never to the browser.
 - An id is lowercase letters, digits and `-`, starting with a letter. `mock`, `openai`, `anthropic`, `openai-compatible` and `ollama` are kept for Mapo's own providers: registering one of them is an error.
 - A registered provider that `providers` does not enable is never called, and the server says so when it starts; so it does for one `providers` enables that does not exist or has no model.
 
-`registerMapoAiProvider()` and `MapoAiProviderError` are auto-imported in the server's code; the types are `MapoAiProvider`, `MapoAiProviderRequest` and `MapoAiProviderAnswer`, in `mapomodule/types`.
+`registerMapoAiProvider()` and `MapoAiProviderError` are auto-imported in the server's code; the types are `MapoAiProvider`, `MapoAiProviderRequest`, `MapoAiProviderAnswer` and `MapoAiModelInfo`, in `mapomodule/types`.
 
 The reference app registers one: `apps/example-e2e/server/plugins/mapo-ai-ollama.ts` calls a local Ollama through its native API, streamed, with a cap on the tokens of the answer, since a local model can loop inside a string value; the cap and the context grow with the answer's schema, so a large form is not cut. It is off unless the dev server starts with `EXAMPLE_OLLAMA_MODELS`, the models to offer (`gemma4:12b,qwen3.8:27b`), which its `nuxt.config.ts` also enables in `providers`.
 
@@ -706,13 +773,15 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | -------------- | --------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------- |
 | `admin`        | `{ groups?: string[]; permissions?: string[] }`                                         | `{}`: superusers only                  | Who administers the AI ([Admins](#admins))                                        |
 | `users`        | `{ groups?: string[]; permissions?: string[] }`                                         | Not set: every signed-in user          | Who may use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai))        |
-| `providers`    | `Record<string, { models?: string[]; timeout?: number } \| false>`                      | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their models ([Providers](#providers))          |
+| `providers`    | `Record<string, MapoAiProviderOptions \| false>`                                        | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their options ([Providers](#providers))         |
 | `default`      | `{ provider?: string; models?: { fill?: string; extract?: string } }`                   | The first provider and its first model | What a request that names no provider or model gets                               |
 | `instructions` | `{ all?: string; fill?: string; extract?: string }`                                     | `{}`                                   | The app's rules in every prompt ([The prompt](#the-prompt))                       |
 | `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks? }`                 | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification)) |
 | `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number }` | `20`, `100000`, `2000`                 | The limits of `run` ([Limits](#limits))                                           |
 | `audit`        | `{ retentionDays?: number }`                                                            | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                        |
 
+An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `ollama` and `openai-compatible` also take `baseURL`, and `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
+
 The module reads every option when the app builds, and warns about what it cannot read. A value it cannot read never widens what the AI may do: a `users` that names no group or permission it can read lets in only superusers and the AI's admins, a provider it cannot read is not enabled, and a limit it cannot read is `0`, the narrowest. A rule of verification, or the audit's retention, that it cannot read keeps its default. The options reach the server in its private runtime config, never in the public one, complete with their defaults, so the environment can change one when the server starts, with Nuxt's variables: `NUXT_MAPO_AI_LIMITS_PER_USER_PER_MINUTE=50`. An option with no default that the config does not set, such as `default.provider`, is not in the runtime config, so no variable reaches it. The server reads the options again with the same rules, and logs once a value it cannot read. Nuxt merges the options as any configuration: across layers, and `mapoAi` with `mapo.ai`, lists add up instead of replacing each other, so a layer's `groups` and the app's are all kept.
 
-The secret is not an option: it is the environment variable `NUXT_MAPO_AI_SECRET`, read when the server starts.
+The secret is not an option: it is the environment variable `NUXT_MAPO_AI_SECRET`, read when the server starts. The keys of `ollama` and `openai-compatible` go in the environment too: `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY` and `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`.

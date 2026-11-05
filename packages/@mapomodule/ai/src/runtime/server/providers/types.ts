@@ -13,7 +13,8 @@ import type { MapoAiPrompt } from "../prompts/compose";
 
 /**
  * What a provider can do. The gateway does not read it yet: it sends text
- * only, and waits for the whole answer.
+ * only, and waits for the whole answer, which a provider may stream from
+ * its server meanwhile.
  */
 export interface MapoAiProviderCapabilities {
   /**
@@ -26,7 +27,10 @@ export interface MapoAiProviderCapabilities {
   pdf: boolean;
   /** Reads images. The gateway sends none yet. */
   images: boolean;
-  /** Can stream its answer. The gateway does not stream yet. */
+  /**
+   * Streams the answer from its server. The gateway does not stream to the
+   * browser yet: it waits for the whole answer.
+   */
   streaming: boolean;
   /** Can call tools, for a conversational agent. The gateway calls none. */
   tools: boolean;
@@ -92,8 +96,9 @@ export interface MapoAiProvider {
   readonly models?: readonly string[];
   /**
    * The models its server has, for a server that can list them, such as
-   * a local one. The gateway does not call it yet: the models a request
-   * may use are those `mapo.ai.providers` allows.
+   * a local one. The server calls it when it starts, and warns about each
+   * model `mapo.ai.providers` allows that the list does not have; the
+   * models a request may use stay those `mapo.ai.providers` allows.
    */
   listModels?(signal: AbortSignal): Promise<MapoAiModelInfo[]>;
   /**
@@ -110,15 +115,21 @@ export interface MapoAiProvider {
  * - `rate-limit`: the provider asks to slow down, 503 with `Retry-After`;
  * - `unavailable`: the provider is down or failed, 502;
  * - `invalid-response`: its response could not be read at all, 502;
- * - `refused-request`: it refused the request itself (bad schema, too
- *   long), 502.
+ * - `refused-request`: it refused the request itself (a bad schema, a key,
+ *   a model it does not have), 502;
+ * - `too-long`: the prompt does not fit what the model reads, so the call
+ *   would cut it, or the server cut it: 413;
+ * - `truncated`: the answer reached the most the model may write, and was
+ *   cut: 502.
  */
 export type MapoAiProviderFailure =
   | "timeout"
   | "rate-limit"
   | "unavailable"
   | "invalid-response"
-  | "refused-request";
+  | "refused-request"
+  | "too-long"
+  | "truncated";
 
 /** A failure of a provider the gateway tells apart. The message goes to the server's log. */
 export class MapoAiProviderError extends Error {

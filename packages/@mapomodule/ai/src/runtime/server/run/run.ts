@@ -113,14 +113,25 @@ const FAILURES: Record<
     statusCode: 502,
     statusMessage: "The AI provider refused the request",
   },
+  "too-long": {
+    statusCode: 413,
+    statusMessage: "The source is too long for this AI model",
+  },
+  truncated: {
+    statusCode: 502,
+    statusMessage:
+      "The AI's answer was cut off: it reached the most the model may write",
+  },
   error: { statusCode: 502, statusMessage: "The AI provider failed" },
 };
 
 /**
  * Runs a request of `run` for the user of `session`.
- * @throws H3Error 403 (provider, model or permission), 422 (nothing to
- *   ask), 429 (the user's limit, with `data.retryAfter`), 503 (no provider;
- *   the provider busy, with `data.retryAfter` when it says), 502, 504
+ * @throws H3Error 403 (provider, model or permission), 413 (a prompt the
+ *   model cannot read whole), 422 (nothing to ask), 429 (the user's limit,
+ *   with `data.retryAfter`), 503 (no provider; the provider busy, with
+ *   `data.retryAfter` when it says), 502, 504. A failure of the provider
+ *   names itself in `data.failure`.
  */
 export async function runMapoAi(
   session: MapoAiSession,
@@ -220,7 +231,7 @@ export async function runMapoAi(
       failure === "rate-limit" ? retryAfterOf(error) : undefined;
     throw createError({
       ...FAILURES[failure],
-      ...(retryAfter !== undefined ? { data: { retryAfter } } : {}),
+      data: { failure, ...(retryAfter !== undefined ? { retryAfter } : {}) },
     });
   }
 

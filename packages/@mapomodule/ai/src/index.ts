@@ -105,9 +105,13 @@ export interface MapoAiOptions {
   /**
    * The providers `run` may call, by id, each with the models a request may
    * ask for (its default first) and the seconds a call may take. Only the
-   * providers listed here are called: Mapo's own (`mock`) and those the app
-   * registers with `registerMapoAiProvider()`. `false` turns off one a
-   * layer enables.
+   * providers listed here are called: Mapo's own (`mock`, and `ollama` and
+   * `openai-compatible` for models on the app's own servers, with their
+   * `baseURL`) and those the app registers with `registerMapoAiProvider()`.
+   * `false` turns off one a layer enables. The key of `ollama` or
+   * `openai-compatible`, for a server that asks one, goes in the server's
+   * environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`,
+   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`), not here.
    * @default {} (no provider: `run` answers 503)
    * @example { mock: { models: ["mock"], timeout: 120 } }
    */

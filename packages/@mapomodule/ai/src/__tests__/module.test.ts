@@ -317,6 +317,150 @@ describe("the options of run", () => {
     ).not.toHaveProperty("models");
   });
 
+  it("gives the local providers their server, 600 seconds and a place for their key", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: {
+        ollama: { models: ["gemma4:12b"] },
+        "openai-compatible": {
+          models: ["qwen"],
+          baseURL: "http://localhost:1234/v1/",
+          timeout: 900,
+        },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: {
+        ollama: {
+          models: ["gemma4:12b"],
+          timeout: 600,
+          baseURL: "http://localhost:11434",
+          apiKey: "",
+        },
+        "openai-compatible": {
+          models: ["qwen"],
+          timeout: 900,
+          baseURL: "http://localhost:1234/v1",
+          apiKey: "",
+        },
+      },
+    });
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("enables no local provider without a server it can read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: {
+        "openai-compatible": { models: ["qwen"] },
+        ollama: { models: ["x"], baseURL: "http://user:pass@ollama:11434" },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({ providers: {} });
+    expect(kit.warnings.map(String)).toEqual([
+      "mapo.ai.providers.openai-compatible has no baseURL, the address of its server, so the provider is not enabled.",
+      "mapo.ai.providers.ollama.baseURL is not an http or https address without credentials, query or fragment, so the provider is not enabled.",
+    ]);
+  });
+
+  it("keeps a key written in the Nuxt config, and warns that the build copies it", async () => {
+    const written = "key-written-in-the-config";
+    const runtimeConfig: Record<string, unknown> = {
+      public: {},
+      mapoAi: { providers: { ollama: { apiKey: "in-runtime-config" } } },
+    };
+
+    await setup(runtimeConfig, {
+      providers: {
+        "openai-compatible": {
+          models: ["qwen"],
+          baseURL: "http://llm:8000/v1",
+          apiKey: written,
+        },
+        ollama: { models: ["x"] },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: {
+        "openai-compatible": { apiKey: written },
+        ollama: { apiKey: "in-runtime-config" },
+      },
+    });
+    expect(kit.warnings.map(String)).toEqual([
+      "mapo.ai.providers.openai-compatible.apiKey is set in the Nuxt config, so the build copies it into the server bundle. Set NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY in the server's environment instead.",
+      "runtimeConfig.mapoAi.providers.ollama.apiKey is set in the Nuxt config, so the build copies it into the server bundle. Set NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY in the server's environment instead.",
+    ]);
+    expect(kit.warnings.join(" ")).not.toContain(written);
+  });
+
+  it("takes the context of an OpenAI-compatible server, and enables none it cannot read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: {
+        "openai-compatible": {
+          models: ["qwen"],
+          baseURL: "http://llm:8000/v1",
+          contextTokens: 16_384,
+        },
+        ollama: { models: ["x"], contextTokens: 8192 },
+      },
+    });
+    const { warnings: first } = kit;
+    const unreadable: Record<string, unknown> = { public: {} };
+    kit.warnings = [];
+    await setup(unreadable, {
+      providers: {
+        "openai-compatible": {
+          models: ["qwen"],
+          baseURL: "http://llm:8000/v1",
+          contextTokens: 100,
+        },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: {
+        "openai-compatible": { contextTokens: 16_384 },
+        ollama: { models: ["x"] },
+      },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { ollama: object } }).providers
+        .ollama,
+    ).not.toHaveProperty("contextTokens");
+    expect(first.map(String)).toEqual([
+      'mapo.ai.providers.ollama has no "contextTokens": ignored.',
+    ]);
+    expect(unreadable.mapoAi).toMatchObject({ providers: {} });
+    expect(kit.warnings.map(String)).toEqual([
+      "mapo.ai.providers.openai-compatible.contextTokens is not a whole number of tokens from 1024 to 10000000, so the provider is not enabled.",
+    ]);
+  });
+
+  it("takes no server and no key for a provider that calls none", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: { mock: { baseURL: "http://x", apiKey: "k" } },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { mock: { timeout: 120 } },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { mock: object } }).providers.mock,
+    ).not.toHaveProperty("apiKey");
+    expect(kit.warnings.map(String)).toEqual([
+      'mapo.ai.providers.mock has no "baseURL", "apiKey": ignored.',
+    ]);
+  });
+
   it("leaves out a provider turned off with false", async () => {
     const runtimeConfig: Record<string, unknown> = { public: {} };
 

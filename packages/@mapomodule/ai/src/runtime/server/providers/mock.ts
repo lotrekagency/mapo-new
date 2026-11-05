@@ -140,6 +140,18 @@ async function runMock(
       "The mock is down (#mock:unavailable)",
     );
   }
+  if (marks.has("too-long")) {
+    throw new MapoAiProviderError(
+      "too-long",
+      "The source does not fit the mock's context (#mock:too-long)",
+    );
+  }
+  if (marks.has("truncated")) {
+    throw new MapoAiProviderError(
+      "truncated",
+      "The mock's answer reached its cap (#mock:truncated)",
+    );
+  }
   if (marks.has("slow")) {
     await wait(slowSeconds(marks.get("slow")) * 1000, request.signal);
   }

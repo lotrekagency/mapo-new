@@ -1,0 +1,3 @@
+{
+  "error": "request (1647 tokens) exceeds the available context size (512 tokens), try increasing it"
+}

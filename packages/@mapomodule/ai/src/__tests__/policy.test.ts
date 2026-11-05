@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MapoAiProvider } from "../runtime/server/providers/types";
-import { readRunOptions } from "../runtime/server/run/options";
+import {
+  plainKeyWarning,
+  providerKeyOf,
+  providerKeyVariable,
+  readRunOptions,
+} from "../runtime/server/run/options";
 import {
   chooseProvider,
   policyOf,
@@ -177,5 +182,83 @@ describe("chooseProvider", () => {
     const { policy: none } = policy({});
 
     expect(refusal(() => chooseProvider(none, "fill", undefined))).toBe(503);
+  });
+});
+
+describe("the providers that call a server", () => {
+  it("read their server from the runtime config, never their key", () => {
+    const warnings: string[] = [];
+
+    const read = readRunOptions(
+      {
+        providers: {
+          ollama: {
+            models: ["m"],
+            timeout: 600,
+            baseURL: "http://ollama:11434",
+            apiKey: "secret-key",
+          },
+        },
+      },
+      (message) => warnings.push(message),
+    );
+
+    expect(read.providers).toEqual({
+      ollama: { models: ["m"], timeout: 600, baseURL: "http://ollama:11434" },
+    });
+    expect(JSON.stringify(read)).not.toContain("secret-key");
+    expect(warnings).toEqual([]);
+  });
+
+  it("take a key only as text, read apart, and say when one is not text", () => {
+    const warnings: string[] = [];
+    const warn = (message: string) => warnings.push(message);
+    const config = {
+      providers: {
+        ollama: { apiKey: " k-1 " },
+        "openai-compatible": { apiKey: 12_345_678 },
+        mock: { apiKey: "" },
+      },
+    };
+
+    expect(providerKeyOf(config, "ollama", warn)).toBe("k-1");
+    expect(providerKeyOf(config, "openai-compatible", warn)).toBeUndefined();
+    expect(providerKeyOf(config, "mock", warn)).toBeUndefined();
+    expect(providerKeyOf(config, "constructor", warn)).toBeUndefined();
+    expect(providerKeyOf(undefined, "ollama", warn)).toBeUndefined();
+    expect(warnings).toEqual([
+      'The key of the provider "openai-compatible" (NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY) is not text, as Nuxt reads a value of digits only or true and false, so the provider calls its server without a key.',
+    ]);
+    expect(warnings.join(" ")).not.toContain("12345678");
+  });
+
+  it("say when a key would travel in clear to another machine", () => {
+    expect(plainKeyWarning("ollama", "http://gpu.lan:11434", "k")).toBe(
+      'The provider "ollama" sends its key to gpu.lan:11434 over plain http: the key, and every prompt with its source, travel in clear. Use https.',
+    );
+    expect(
+      plainKeyWarning("ollama", "https://gpu.lan:11434", "k"),
+    ).toBeUndefined();
+    expect(
+      plainKeyWarning("ollama", "http://localhost:11434", "k"),
+    ).toBeUndefined();
+    expect(
+      plainKeyWarning("ollama", "http://127.0.0.1:11434", "k"),
+    ).toBeUndefined();
+    expect(
+      plainKeyWarning("ollama", "http://[::1]:11434", "k"),
+    ).toBeUndefined();
+    expect(
+      plainKeyWarning("ollama", "http://gpu.lan:11434", undefined),
+    ).toBeUndefined();
+  });
+
+  it("name the variable of their key as Nuxt does", () => {
+    expect(providerKeyVariable("ollama")).toBe(
+      "NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY",
+    );
+    expect(providerKeyVariable("openai-compatible")).toBe(
+      "NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY",
+    );
   });
 });

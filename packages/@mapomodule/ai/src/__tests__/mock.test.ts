@@ -236,6 +236,17 @@ describe("the mock's failures on command", () => {
     ).rejects.toMatchObject({ failure: "unavailable" });
   });
 
+  it("throws a source too long and a cut answer with #mock:too-long and #mock:truncated", async () => {
+    const { mockProvider } = await mock();
+
+    await expect(
+      mockProvider.run(request("#mock:too-long")),
+    ).rejects.toMatchObject({ failure: "too-long" });
+    await expect(
+      mockProvider.run(request("#mock:truncated")),
+    ).rejects.toMatchObject({ failure: "truncated" });
+  });
+
   it("never answers #mock:timeout until the gateway gives up", async () => {
     const { mockProvider } = await mock();
     const controller = new AbortController();
