@@ -396,7 +396,7 @@ It returns:
 - **A read-only form** is neither asked nor written: a `MapoDetail` with `readonly`, or with a `permissionModel` the user may not add or change. While the detail saves or deletes its record (`isBusy`), nothing is written: an answer that arrives then waits, marked, for Apply.
 - **Labels** come from the `mapo.ai.fill.*` and `mapo.ai.errors.*` messages of `@mapomodule/i18n`, in English and Italian, with the shared `mapo.apply` and `mapo.restore`; an app overrides them as any `mapo.*` message.
 
-The reference app has a scenario: `/ai/fill/new` and `/ai/fill/1` in `apps/example-e2e`, with sources for every outcome of the mock, its failures, and the app's rules in `server/plugins/`; `/ai/status` shows what `status` answers the account signed in (`admin`, `editor` or `viewer`).
+The reference app has a scenario: `/ai/fill/new` and `/ai/fill/1` in `apps/example-e2e`, with sources for every outcome of the mock, its failures, and the app's rules in `server/plugins/`; `/ai/status` shows what `status` answers the account signed in (`admin`, `editor` or `viewer`). With a local model, `/ai/ollama/new` fills the same article through the provider above, and shows what happens while it happens: the steps of the browser and of the server, the prompt the gateway composed and the words of the model as they come. `/ai/ollama/blocks/new` does the same on a complex form: every field type, two custom ones registered with `defineFormField()`, a repeater of blocks with nine templates and repeaters inside them, and repeaters the backend describes too, each item shown with what the gateway made of its values.
 
 ## Providers
 
@@ -521,6 +521,8 @@ export default defineNuxtConfig({
 - A registered provider that `providers` does not enable is never called, and the server says so when it starts; so it does for one `providers` enables that does not exist or has no model.
 
 `registerMapoAiProvider()` and `MapoAiProviderError` are auto-imported in the server's code; the types are `MapoAiProvider`, `MapoAiProviderRequest` and `MapoAiProviderAnswer`, in `mapomodule/types`.
+
+The reference app registers one: `apps/example-e2e/server/plugins/mapo-ai-ollama.ts` calls a local Ollama through its native API, streamed, with a cap on the tokens of the answer, since a local model can loop inside a string value; the cap and the context grow with the answer's schema, so a large form is not cut. It is off unless the dev server starts with `EXAMPLE_OLLAMA_MODELS`, the models to offer (`gemma4:12b,qwen3.8:27b`), which its `nuxt.config.ts` also enables in `providers`.
 
 ## The prompt
 

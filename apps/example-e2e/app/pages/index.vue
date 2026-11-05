@@ -107,6 +107,16 @@ const sections = [
         to: "/ai/fill/1",
         desc: "A value that would replace one waits for Apply; Restore puts the old one back",
       },
+      {
+        label: "AI lab: a local model",
+        to: "/ai/ollama/new",
+        desc: "A real model through the gateway (Ollama), with a live log: start the dev server with EXAMPLE_OLLAMA_MODELS",
+      },
+      {
+        label: "AI lab: a page of blocks",
+        to: "/ai/ollama/blocks/new",
+        desc: "The lab on a complex form: every field type, two custom ones, blocks and nested repeaters",
+      },
     ],
   },
   {

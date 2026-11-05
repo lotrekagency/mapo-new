@@ -13,8 +13,12 @@
 // - the Italian tab: Subtitle and Body are translatable, filled in the
 //   language of the tab;
 // - as viewer: the app's mapo-ai:user hook keeps the account out.
-import type { AnyFieldDescriptor } from "mapomodule/types";
 import AiFillPanel from "~/components/ai/AiFillPanel.vue";
+import {
+  AI_ARTICLE_FIELDS,
+  AI_ARTICLE_LANGUAGES,
+  AI_ARTICLE_SIDEBAR_FIELDS,
+} from "~/utils/aiArticleForm";
 
 definePageMeta({
   layout: "mapo-default",
@@ -30,46 +34,6 @@ const removeExtension = defineDetailExtension({
   component: AiFillPanel,
 });
 onUnmounted(removeExtension);
-
-const LANGUAGES = ["en", "it"];
-
-const fields: AnyFieldDescriptor[] = [
-  { key: "title", type: "text", label: "Title", required: true },
-  { key: "slug", type: "text", label: "Slug" },
-  { key: "subtitle", type: "text", label: "Subtitle", translatable: true },
-  { key: "excerpt", type: "textarea", label: "Excerpt" },
-  { key: "body", type: "editor", label: "Body", translatable: true },
-];
-
-const sidebarFields: AnyFieldDescriptor[] = [
-  {
-    key: "status",
-    type: "select",
-    label: "Status",
-    attrs: {
-      items: [
-        { label: "Draft", value: "draft" },
-        { label: "In review", value: "review" },
-        { label: "Ready", value: "ready" },
-        { label: "Published", value: "published" },
-      ],
-    },
-  },
-  { key: "featured", type: "switch", label: "Featured" },
-  { key: "reading_time", type: "number", label: "Reading time" },
-  { key: "published_at", type: "datetime", label: "Published at" },
-  {
-    key: "category",
-    type: "fks",
-    label: "Category",
-    attrs: {
-      endpoint: "/api/categories",
-      itemText: "name",
-      itemValue: "id",
-      returnObject: false,
-    },
-  },
-];
 </script>
 
 <template>
@@ -78,9 +42,9 @@ const sidebarFields: AnyFieldDescriptor[] = [
       :id="String(route.params.id)"
       endpoint="/api/articles"
       model-name="Article"
-      :fields="fields"
-      :sidebar-fields="sidebarFields"
-      :languages="LANGUAGES"
+      :fields="AI_ARTICLE_FIELDS"
+      :sidebar-fields="AI_ARTICLE_SIDEBAR_FIELDS"
+      :languages="AI_ARTICLE_LANGUAGES"
     />
   </div>
 </template>

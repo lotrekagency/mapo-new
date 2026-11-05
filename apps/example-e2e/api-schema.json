@@ -66,6 +66,76 @@
         }
       }
     },
+    "/api/pages": {
+      "get": {
+        "operationId": "pages_list",
+        "responses": {
+          "200": {
+            "description": "Paginated list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Page"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "pages_create",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pages/{id}": {
+      "get": {
+        "operationId": "pages_retrieve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "operationId": "categories_list",
@@ -235,6 +305,272 @@
             "type": "string",
             "format": "date-time",
             "readOnly": true
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "description": "A landing page made of blocks, filled by the AI lab's block page, /ai/ollama/blocks/[id].",
+        "required": ["title"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 120,
+            "pattern": "^[-a-zA-Z0-9_]+$"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "intro": {
+            "type": "string",
+            "description": "Rich text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageBlock"
+            },
+            "description": "A JSON field: the backend does not describe the blocks, the form's templates do."
+          },
+          "reviews": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/PageReview"
+            }
+          },
+          "locations": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/PageLocation"
+            }
+          },
+          "seo": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "permalink": {
+                "type": "string",
+                "maxLength": 200
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "review", "published"]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "show_until": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "show_in_menu": {
+            "type": "boolean"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "accent_color": {
+            "type": "string",
+            "maxLength": 7
+          },
+          "contact_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "website": {
+            "type": "string",
+            "format": "uri"
+          },
+          "country": {
+            "type": "string",
+            "enum": ["IT", "CH", "FR", "DE", "AT", "ES", "GB", "US"],
+            "nullable": true
+          },
+          "audiences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["families", "students", "tourists", "residents"]
+            }
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              }
+            ],
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "cover": {
+            "type": "object",
+            "nullable": true,
+            "description": "A media of the media manager."
+          },
+          "gallery": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Media of the media manager."
+          },
+          "video": {
+            "type": "object",
+            "nullable": true,
+            "description": "A media with its alt text and caption."
+          },
+          "brochure": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
+          },
+          "position": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "lat": {
+                "type": "number"
+              },
+              "lng": {
+                "type": "number"
+              }
+            }
+          },
+          "webhook_secret": {
+            "type": "string",
+            "maxLength": 64,
+            "writeOnly": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "PageBlock": {
+        "type": "object",
+        "description": "One block of a page: `_template` names it (hero, text, quote, faq, stats, event, columns, gallery, contact), the other properties are its fields.",
+        "required": ["_template"],
+        "properties": {
+          "_template": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PageReview": {
+        "type": "object",
+        "required": ["author"],
+        "properties": {
+          "author": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "stars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
+      "PageLocation": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "country": {
+            "type": "string",
+            "enum": ["IT", "CH", "FR", "DE", "AT", "ES", "GB", "US"],
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "opening_hours": {
+            "type": "array",
+            "maxItems": 7,
+            "items": {
+              "$ref": "#/components/schemas/PageOpeningHours"
+            }
+          }
+        }
+      },
+      "PageOpeningHours": {
+        "type": "object",
+        "required": ["day"],
+        "properties": {
+          "day": {
+            "type": "string",
+            "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+          },
+          "opens": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "closes": {
+            "type": "string",
+            "format": "time",
+            "nullable": true
+          },
+          "closed": {
+            "type": "boolean"
           }
         }
       },

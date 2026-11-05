@@ -10,7 +10,7 @@
 // back discarded. The sources are in shared/aiArticleSamples.ts.
 import { NO_SOURCE, NOTE, RELEASE } from "#shared/aiArticleSamples";
 
-/** Every field of the article form of app/pages/ai/fill/[id].vue, empty. */
+/** Every field of the article form (app/utils/aiArticleForm.ts), empty. */
 const EMPTY = {
   title: "",
   slug: "",

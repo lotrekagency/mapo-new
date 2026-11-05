@@ -1,4 +1,14 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// The AI lab (app/pages/ai/ollama/[id].vue): a local model through the AI
+// gateway, off unless the dev server starts with EXAMPLE_OLLAMA_MODELS, the
+// models to offer, the first the default, such as "gemma4:12b,qwen3.8:27b".
+// server/plugins/mapo-ai-ollama.ts registers the provider it enables.
+const ollamaModels = (process.env.EXAMPLE_OLLAMA_MODELS ?? "")
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean);
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/ui", "mapomodule"],
@@ -33,9 +43,16 @@ export default defineNuxtConfig({
     // short, so the "Timeout" sample of /ai/fill fails in 15 seconds. The
     // rules of every prompt are in `instructions`; the rules that depend on
     // the request, and who may use the AI, in server/plugins/mapo-ai-rules.ts;
-    // the mock's answers in server/plugins/mapo-ai-fixtures.ts.
+    // the mock's answers in server/plugins/mapo-ai-fixtures.ts. With
+    // EXAMPLE_OLLAMA_MODELS, `run` can also call a local model (the AI lab).
     ai: {
-      providers: { mock: { timeout: 15 } },
+      providers: {
+        mock: { timeout: 15 },
+        // The AI lab's provider, with a local model's slow first answer in mind.
+        ...(ollamaModels.length
+          ? { "example-ollama": { models: ollamaModels, timeout: 900 } }
+          : {}),
+      },
       instructions: {
         all: "The records are the pages of a city magazine: articles about the city, its people and its services.",
       },
