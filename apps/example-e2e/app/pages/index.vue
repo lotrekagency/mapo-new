@@ -117,6 +117,16 @@ const sections = [
         to: "/ai/ollama/blocks/new",
         desc: "The lab on a complex form: every field type, two custom ones, blocks and nested repeaters",
       },
+      {
+        label: "AI lab: a cloud model",
+        to: "/ai/cloud/new",
+        desc: "OpenAI or Anthropic through the gateway, with tokens, cache and an estimate of the cost: give the dev server a key",
+      },
+      {
+        label: "AI lab: a page of blocks in the cloud",
+        to: "/ai/cloud/blocks/new",
+        desc: "The cloud lab on the complex form: how a large schema fares, and what it costs",
+      },
     ],
   },
   {

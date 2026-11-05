@@ -12,6 +12,15 @@ const ollamaModels = (process.env.EXAMPLE_OLLAMA_MODELS ?? "")
   .map((model) => model.trim())
   .filter(Boolean);
 
+// The AI lab for cloud models (app/pages/ai/cloud/[id].vue): Mapo's
+// `openai` and `anthropic` providers, each on when the dev server has its
+// key, which Mapo reads from the environment at runtime and never from this
+// file. Only whether a key is there is read here: every call costs money.
+const hasOpenAiKey = Boolean(process.env.NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY);
+const hasAnthropicKey = Boolean(
+  process.env.NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY,
+);
+
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   modules: ["@nuxt/ui", "mapomodule"],
@@ -47,7 +56,8 @@ export default defineNuxtConfig({
     // rules of every prompt are in `instructions`; the rules that depend on
     // the request, and who may use the AI, in server/plugins/mapo-ai-rules.ts;
     // the mock's answers in server/plugins/mapo-ai-fixtures.ts. With
-    // EXAMPLE_OLLAMA_MODELS, `run` can also call a local model (the AI lab).
+    // EXAMPLE_OLLAMA_MODELS, `run` can also call a local model, and with a
+    // key, OpenAI's or Anthropic's models (the AI labs).
     ai: {
       providers: {
         mock: { timeout: 15 },
@@ -63,6 +73,11 @@ export default defineNuxtConfig({
               "example-ollama": { models: ollamaModels, timeout: 900 },
             }
           : {}),
+        // Mapo's defaults: their models, 300 seconds, a low effort and no
+        // prompt cache, each changed from the environment
+        // (NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_PROMPT_CACHE=true).
+        ...(hasOpenAiKey ? { openai: {} } : {}),
+        ...(hasAnthropicKey ? { anthropic: {} } : {}),
       },
       instructions: {
         all: "The records are the pages of a city magazine: articles about the city, its people and its services.",
