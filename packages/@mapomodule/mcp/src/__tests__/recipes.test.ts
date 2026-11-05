@@ -57,6 +57,11 @@ describe("matchRecipes", () => {
     ["register my own LLM provider for the AI gateway", "ai-providers"],
     ["use a local model with ollama for the AI", "ai-local-models"],
     ["connect the AI gateway to LM Studio or vLLM", "ai-local-models"],
+    ["use claude models from anthropic for the AI", "ai-cloud-models"],
+    ["set the openai api key for the AI gateway", "ai-cloud-models"],
+    ["turn on the prompt cache of the AI provider", "ai-cloud-models"],
+    ["raise the reasoning effort of the AI provider", "ai-cloud-models"],
+    ["set the api key of the ollama server", "ai-local-models"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
