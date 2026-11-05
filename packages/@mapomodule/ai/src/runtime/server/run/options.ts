@@ -13,6 +13,13 @@
 
 import type { MapoAiLimits } from "../../shared/gateway";
 import { isRecord } from "../../shared/guards";
+import {
+  DEFAULT_ANTHROPIC_URL,
+  DEFAULT_EFFORT,
+  DEFAULT_OPENAI_URL,
+  MAPO_AI_EFFORTS,
+} from "../providers/cloud";
+import type { MapoAiEffort } from "../providers/cloud";
 import { DEFAULT_OLLAMA_URL, serverURL } from "../providers/local";
 import { DEFAULT_VERIFICATION_RULES } from "../../shared/sanitize";
 import type { AiVerificationRules } from "../../shared/sanitize";
@@ -21,24 +28,52 @@ import type { AiVerificationRules } from "../../shared/sanitize";
 export interface MapoAiProviderOptions {
   /**
    * The models a request may ask for, the default first. Without it, the
-   * provider's own list: `["mock"]` for the mock. `ollama` and
+   * provider's own list: `["mock"]` for the mock, `["gpt-6.1-sol",
+   * "gpt-6-luna"]` for `openai`, `["claude-opus-5-5", "claude-sonnet-5-5",
+   * "claude-haiku-5-5"]` for `anthropic`. Any model of the provider may be
+   * listed, one newer than this version of Mapo too. `ollama` and
    * `openai-compatible` have none of their own: list the models the server
    * has that the app allows.
    */
   models?: string[];
   /**
-   * Seconds a call may take before the gateway gives up with a 504: 600 for
-   * `ollama` and `openai-compatible`, 120 for the others, unless set.
+   * Seconds a call may take before the gateway gives up with a 504: 300 for
+   * `openai` and `anthropic`, 600 for `ollama` and `openai-compatible`, 120
+   * for the others, unless set.
    */
   timeout?: number;
   /**
    * The address of the server, for Mapo's providers that call one:
-   * `ollama` (`http://localhost:11434` unless set) and `openai-compatible`
+   * `openai` (`https://api.openai.com/v1` unless set, or OpenAI's European
+   * `https://eu.api.openai.com/v1`, or a proxy), `anthropic`
+   * (`https://api.anthropic.com/v1` unless set), `ollama`
+   * (`http://localhost:11434` unless set) and `openai-compatible`
    * (required, up to its `/v1`: `http://localhost:1234/v1`). An `http:` or
    * `https:` address without credentials, query or fragment. Only the app
    * sets it, here or in the environment; a request never does.
    */
   baseURL?: string;
+  /**
+   * For `openai` and `anthropic`: how much the model reasons before it
+   * answers, `"low"`, `"medium"` or `"high"`. The reasoning is paid as
+   * written tokens and takes time; filling a form from the quotes of a
+   * source needs little of it.
+   * @default "low"
+   */
+  effort?: MapoAiEffort;
+  /**
+   * For `openai` and `anthropic`: keeps the stable part of the prompt (Mapo's
+   * rules, the app's, the record's description and the answer's schema) in
+   * the provider's prompt cache, never the source. The first call writes it,
+   * at a higher price for that part (1.25 times); the calls on the same kind
+   * of record that follow within the cache's time (5 minutes for Anthropic,
+   * 30 for OpenAI) read it at a fraction of the price. Off, nothing is
+   * written to a cache, unless an OpenAI model refuses the cache's
+   * options: then OpenAI caches that model's prompts by its own rules,
+   * and the server's log says so.
+   * @default false
+   */
+  promptCache?: boolean;
   /**
    * For `openai-compatible`: the tokens the server's models read, when its
    * list of models does not say it (vLLM's does). Such a server sets the
@@ -61,6 +96,10 @@ export interface MapoAiRunOptions {
       timeout: number;
       baseURL?: string;
       contextTokens?: number;
+      /** For a cloud provider, always: its default, unless the app set one. */
+      effort?: MapoAiEffort;
+      /** For a cloud provider, always: `false`, unless the app turned it on. */
+      promptCache?: boolean;
     }
   >;
   /** What a request that names no provider or model gets, as the app wrote it. */
@@ -80,17 +119,26 @@ export const DEFAULT_PROVIDER_TIMEOUT = 120;
  */
 export const DEFAULT_LOCAL_PROVIDER_TIMEOUT = 600;
 /**
+ * Seconds a call to a cloud model may take, unless `timeout` says otherwise:
+ * a fill streams in under a minute and a half, a long extraction in three
+ * to five minutes.
+ */
+export const DEFAULT_CLOUD_PROVIDER_TIMEOUT = 300;
+/**
  * Mapo's providers that call a server, with the server's address when the
- * app sets none, and whether the app may say the models' context. Their
- * entry of `mapo.ai.providers` takes `baseURL`, and the runtime config holds
- * their key, `apiKey`, which the environment fills.
+ * app sets none, whether the app may say the models' context, and whether
+ * they are a cloud's, with an effort and a prompt cache. Their entry of
+ * `mapo.ai.providers` takes `baseURL`, and the runtime config holds their
+ * key, `apiKey`, which the environment fills.
  */
 const SERVER_PROVIDERS: ReadonlyMap<
   string,
-  { baseURL?: string; takesContext?: boolean }
+  { baseURL?: string; takesContext?: boolean; isCloud?: boolean }
 > = new Map([
   ["ollama", { baseURL: DEFAULT_OLLAMA_URL }],
   ["openai-compatible", { takesContext: true }],
+  ["openai", { baseURL: DEFAULT_OPENAI_URL, isCloud: true }],
+  ["anthropic", { baseURL: DEFAULT_ANTHROPIC_URL, isCloud: true }],
 ]);
 /** The least context a server's models may be said to read. */
 const MIN_CONTEXT_TOKENS = 1024;
@@ -173,6 +221,7 @@ function providersOf(
       "timeout",
       ...(server ? ["baseURL", "apiKey"] : []),
       ...(server?.takesContext ? ["contextTokens"] : []),
+      ...(server?.isCloud ? ["effort", "promptCache"] : []),
     ];
     unknownKeys(entry, known, option, warn);
     const baseURL = server
@@ -185,17 +234,60 @@ function providersOf(
       : undefined;
     if (context === null) continue;
     const models = modelsOf(entry.models, option, warn);
-    const timeout = server
-      ? DEFAULT_LOCAL_PROVIDER_TIMEOUT
-      : DEFAULT_PROVIDER_TIMEOUT;
+    const timeout = defaultTimeoutOf(server);
     providers[id] = {
       ...(models ? { models } : {}),
       timeout: timeoutOf(entry.timeout, option, warn, timeout),
       ...(baseURL ? { baseURL } : {}),
       ...(context !== undefined ? { contextTokens: context } : {}),
+      // Always written, so the environment can change them at runtime
+      // (`NUXT_MAPO_AI_PROVIDERS_OPENAI_EFFORT`): it fills only a place the
+      // runtime config has.
+      ...(server?.isCloud
+        ? {
+            effort: effortOf(entry.effort, option, warn),
+            promptCache: promptCacheOf(entry.promptCache, option, warn),
+          }
+        : {}),
     };
   }
   return providers;
+}
+
+/** The seconds a provider's call may take when the app sets none. */
+function defaultTimeoutOf(server: { isCloud?: boolean } | undefined): number {
+  if (!server) return DEFAULT_PROVIDER_TIMEOUT;
+  return server.isCloud
+    ? DEFAULT_CLOUD_PROVIDER_TIMEOUT
+    : DEFAULT_LOCAL_PROVIDER_TIMEOUT;
+}
+
+/** How much a cloud model reasons: the app's choice, or `low`. */
+function effortOf(
+  value: unknown,
+  option: string,
+  warn: (message: string) => void,
+): MapoAiEffort {
+  const isUnset = value === undefined || value === null || value === "";
+  if (isUnset) return DEFAULT_EFFORT;
+  const effort = MAPO_AI_EFFORTS.find((one) => one === value);
+  if (effort) return effort;
+  warn(
+    `${option}.effort is not "low", "medium" or "high", so it is "${DEFAULT_EFFORT}".`,
+  );
+  return DEFAULT_EFFORT;
+}
+
+/** Whether a cloud provider writes the stable part of the prompt to its cache: off unless the app says `true`. */
+function promptCacheOf(
+  value: unknown,
+  option: string,
+  warn: (message: string) => void,
+): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "boolean") return value;
+  warn(`${option}.promptCache is not true or false, so it is false.`);
+  return false;
 }
 
 /**

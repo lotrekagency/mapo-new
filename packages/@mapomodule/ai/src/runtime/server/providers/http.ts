@@ -1,9 +1,9 @@
 /**
- * The HTTP side of Mapo's providers that call a server, such as Ollama or
- * an OpenAI-compatible one: the call, its failures told apart, the text of
- * an error, and an answer streamed line by line. What a server sends is
- * outside data: read as text within a bound, then as `unknown`. `fetch` is
- * passed in, so the tests serve recorded answers.
+ * The HTTP side of Mapo's providers that call a server, such as Ollama, an
+ * OpenAI-compatible one, OpenAI or Anthropic: the call, its failures told
+ * apart, the text of an error, and an answer streamed line by line. What a
+ * server sends is outside data: read as text within a bound, then as
+ * `unknown`. `fetch` is passed in, so the tests serve recorded answers.
  */
 
 import { isRecord } from "../../shared/guards";
@@ -21,6 +21,25 @@ export interface ProviderServer {
   /** The headers of every call: the key, when there is one. */
   headers: Record<string, string>;
   fetch: ServerFetch;
+  /**
+   * A server's text without the key: the provider's own key, wherever it
+   * appears, and what looks like one ({@link maskKeys}). Every server's
+   * text goes through it before a log, since a proxy may repeat the token
+   * it refused.
+   */
+  mask(text: string): string;
+}
+
+/** What an error response says, for the log and for telling failures apart. */
+export interface ErrorDetails {
+  /** The message, in one line, with the key masked; `""` when there is none. */
+  message: string;
+  /** The error's code, as OpenAI writes it: `insufficient_quota`, `context_length_exceeded`. */
+  code?: string;
+  /** The error's type, as Anthropic writes it: `rate_limit_error`, `overloaded_error`. */
+  type?: string;
+  /** The request's parameter the error is about, as OpenAI names it: `reasoning.effort`. */
+  param?: string;
 }
 
 /** Characters of an error's body read for the log. */
@@ -42,24 +61,46 @@ const TIMEOUT_CODES = new Set([
   "UND_ERR_CONNECT_TIMEOUT",
   "ETIMEDOUT",
 ]);
+/**
+ * A server's refusal of a prompt for the model's context, as vLLM, the
+ * server of llama.cpp, LM Studio, OpenAI and Anthropic word it: Anthropic
+ * also refuses a prompt and a cap that together "exceed context limit".
+ */
+export const CONTEXT_REFUSAL =
+  /context[ _](?:length|size|window)|maximum context|exceeds the available context|too many tokens|prompt is too long|exceeds? (?:the )?(?:configured |context )?limit/i;
+/**
+ * What looks like a key in a server's message: OpenAI repeats the key it
+ * refused, masked but for its last characters, and a proxy may repeat a
+ * bearer token.
+ */
+const KEY_LIKE = /\bsk-[\w*-]{6,}|\bBearer\s+[^\s'"]+/gi;
+/** The longest code, type or parameter of an error kept for the log. */
+const MAX_ERROR_NAME = 80;
 
 /**
- * The server a provider calls, with its key as a bearer token.
+ * The server a provider calls, with its key as a bearer token, or in the
+ * headers the provider's API asks for it.
  * @param label what it is, for the log: `Ollama`
  * @param settings its address, without the final `/`, and its key
+ * @param headers the headers of every call, the key among them, for an API
+ *   that takes the key otherwise: Anthropic's `x-api-key`
  */
 export function providerServer(
   label: string,
   settings: { baseURL: string; apiKey?: string; fetch?: ServerFetch },
+  headers?: Record<string, string>,
 ): ProviderServer {
-  const headers: Record<string, string> = settings.apiKey
-    ? { authorization: `Bearer ${settings.apiKey}` }
+  const { apiKey } = settings;
+  const bearer: Record<string, string> = apiKey
+    ? { authorization: `Bearer ${apiKey}` }
     : {};
   return {
     url: settings.baseURL,
     name: `${label} at ${settings.baseURL}`,
-    headers,
+    headers: headers ?? bearer,
     fetch: settings.fetch ?? ((url, init) => fetch(url, init)),
+    mask: (text) =>
+      maskKeys(apiKey ? text.split(apiKey).join("[a key]") : text),
   };
 }
 
@@ -67,20 +108,26 @@ export function providerServer(
  * Calls the server and returns its response, whatever its status.
  * @param path appended to the server's address: `/api/chat`
  * @param body sent as JSON; without it, a `GET`
+ * @param headers of this call only, beside the server's: a beta it asks for
  * @throws MapoAiProviderError `timeout` when the call was given up or timed
  *   out; `unavailable` when the server cannot be reached
  */
 export async function callServer(
   server: ProviderServer,
   path: string,
-  options: { body?: unknown; signal: AbortSignal },
+  options: {
+    body?: unknown;
+    signal: AbortSignal;
+    headers?: Record<string, string>;
+  },
 ): Promise<Response> {
   const hasBody = options.body !== undefined;
+  const headers = { ...options.headers, ...server.headers };
   const init: RequestInit = {
     method: hasBody ? "POST" : "GET",
     headers: hasBody
-      ? { "content-type": "application/json", ...server.headers }
-      : { ...server.headers },
+      ? { "content-type": "application/json", ...headers }
+      : headers,
     // A redirect would send the prompt, and the key, to an address the app
     // did not write: it is answered as a refusal, never followed.
     redirect: "manual",
@@ -106,7 +153,7 @@ export async function serverJson(
 ): Promise<unknown> {
   const response = await callServer(server, path, options);
   if (!response.ok) {
-    const message = await errorMessage(response, options.signal);
+    const message = await errorMessage(response, options.signal, server.mask);
     throw statusFailure(response, message, server.name);
   }
   const { text, complete } = await readText(
@@ -133,27 +180,66 @@ export async function serverJson(
  * JSON error (`error`, `error.message`, `message`, `detail`, or the first
  * `detail[].msg`), or the first characters of an answer that is not JSON.
  * Nothing else of a JSON body: some servers repeat the request in it, as
- * a validation error that quotes the source. `""` when it cannot be read.
+ * a validation error that quotes the source. What looks like a key is
+ * masked, by `mask` when the caller has the key ({@link maskKeys}
+ * otherwise). `""` when it cannot be read.
  */
 export async function errorMessage(
   response: Response,
   signal: AbortSignal,
+  mask: (text: string) => string = maskKeys,
 ): Promise<string> {
+  return (await errorDetails(response, signal, mask)).message;
+}
+
+/**
+ * What an error response says, as {@link errorMessage}, with the code,
+ * the type and the parameter a JSON error names: OpenAI writes
+ * `error.code`, `error.type` and `error.param`, Anthropic `error.type`.
+ * They tell failures apart better than the words of the message.
+ */
+export async function errorDetails(
+  response: Response,
+  signal: AbortSignal,
+  mask: (text: string) => string = maskKeys,
+): Promise<ErrorDetails> {
   let text: string;
   try {
     ({ text } = await readText(response, MAX_ERROR_CHARS, signal, ""));
   } catch {
-    return "";
+    return { message: "" };
   }
   let value: unknown;
   try {
     value = JSON.parse(text);
   } catch {
     // Not JSON, such as a proxy's page: its first words say what went wrong.
-    return text.replace(/\s+/g, " ").trim().slice(0, 200);
+    return { message: mask(text.replace(/\s+/g, " ").trim()).slice(0, 200) };
   }
   const said = messageOf(value);
-  return said.replace(/\s+/g, " ").trim().slice(0, 500);
+  const error = isRecord(value) && isRecord(value.error) ? value.error : {};
+  const nameOf = (field: unknown) =>
+    typeof field === "string" && field !== ""
+      ? { value: mask(field).slice(0, MAX_ERROR_NAME) }
+      : undefined;
+  const code = nameOf(error.code);
+  const type = nameOf(error.type);
+  const param = nameOf(error.param);
+  return {
+    message: mask(said.replace(/\s+/g, " ").trim()).slice(0, 500),
+    ...(code ? { code: code.value } : {}),
+    ...(type ? { type: type.value } : {}),
+    ...(param ? { param: param.value } : {}),
+  };
+}
+
+/**
+ * A server's message without what looks like a key: OpenAI's refusal of a
+ * key repeats it, masked but for its last characters, and a proxy may
+ * repeat a bearer token. The log names the key's variable, never the key.
+ */
+export function maskKeys(text: string): string {
+  return text.replace(KEY_LIKE, "[a key]");
 }
 
 /** The message a JSON error writes, in the forms servers use; `""` without one. */
@@ -312,8 +398,14 @@ export async function readJsonLines(
 export async function readEvents(
   response: Response,
   onData: (value: unknown) => boolean | void,
-  options: { signal: AbortSignal; name: string },
+  options: {
+    signal: AbortSignal;
+    name: string;
+    /** What masks the key in an error's message; {@link maskKeys} unless given. */
+    mask?: (text: string) => string;
+  },
 ): Promise<void> {
+  const mask = options.mask ?? maskKeys;
   let data: string[] = [];
   let done = false;
   const dispatch = (): boolean => {
@@ -333,7 +425,7 @@ export async function readEvents(
       // A comment, such as a server's keep-alive.
       if (line.startsWith(":")) return;
       if (line.startsWith("error:")) {
-        const said = messageOf(parseQuietly(line.slice("error:".length)));
+        const said = mask(messageOf(parseQuietly(line.slice("error:".length))));
         throw new MapoAiProviderError(
           "unavailable",
           `${options.name} failed while answering${said ? `: ${said.slice(0, 300)}` : ""}`,

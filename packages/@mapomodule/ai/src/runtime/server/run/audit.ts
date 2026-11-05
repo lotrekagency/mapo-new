@@ -33,6 +33,10 @@ export interface MapoAiAuditRecord {
     endpoint?: string;
     model?: string;
   }[];
+  /**
+   * The provider, and the model that answered: another than the one asked
+   * when the provider retried the call on it.
+   */
   provider: { id: string; model: string };
   /** The version of Mapo's base rules the prompt had. */
   prompt: number;
@@ -65,7 +69,12 @@ const AUDIT_RECORD = z.strictObject({
     .max(100),
   provider: z.strictObject({ id: TEXT, model: TEXT }),
   prompt: COUNT,
-  usage: z.strictObject({ inputTokens: COUNT, outputTokens: COUNT }),
+  usage: z.strictObject({
+    inputTokens: COUNT,
+    outputTokens: COUNT,
+    cacheReadTokens: COUNT.optional(),
+    cacheWriteTokens: COUNT.optional(),
+  }),
   outcome: z.enum(["answered", "refused", "failed"]),
   failure: z
     .enum([

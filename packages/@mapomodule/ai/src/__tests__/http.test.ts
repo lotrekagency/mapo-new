@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   callServer,
   errorMessage,
+  maskKeys,
   providerServer,
   readEvents,
   readJsonLines,
@@ -43,6 +44,7 @@ describe("callServer", () => {
     await callServer(server, "/api/chat", { body: { a: 1 }, signal });
     await callServer(server, "/api/tags", { signal });
 
+    // The call never follows a redirect, and gives up with the signal it is given.
     expect(calls).toEqual([
       {
         path: "/api/chat",
@@ -52,12 +54,16 @@ describe("callServer", () => {
           authorization: "Bearer k",
         },
         body: { a: 1 },
+        redirect: "manual",
+        signal,
       },
       {
         path: "/api/tags",
         method: "GET",
         headers: { authorization: "Bearer k" },
         body: undefined,
+        redirect: "manual",
+        signal,
       },
     ]);
     expect(server.name).toBe("Ollama at http://h:1");
@@ -347,5 +353,91 @@ describe("reading a stream", () => {
     );
 
     expect(failure.failure).toBe("timeout");
+  });
+});
+
+describe("the headers and the keys of a cloud's API", () => {
+  it("takes the key in the headers the API asks for, and adds a call's own", async () => {
+    const { fetch, calls } = fakeServer({ "/v1/messages": [json({})] });
+    const server = providerServer(
+      "Anthropic",
+      { baseURL: "https://api.test/v1", apiKey: "sk-ant-k", fetch },
+      { "x-api-key": "sk-ant-k", "anthropic-version": "2026-10-21" },
+    );
+
+    await callServer(server, "/messages", {
+      body: {},
+      signal,
+      headers: { "anthropic-beta": "a-beta", "x-api-key": "not-the-key" },
+    });
+
+    expect(calls[0]?.headers).toEqual({
+      "content-type": "application/json",
+      "x-api-key": "sk-ant-k",
+      "anthropic-version": "2026-10-21",
+      "anthropic-beta": "a-beta",
+    });
+  });
+
+  it("masks what looks like a key in a server's message", async () => {
+    expect(
+      maskKeys(
+        "Incorrect API key provided: sk-proj-********************WXYZ. See the docs.",
+      ),
+    ).toBe("Incorrect API key provided: [a key]. See the docs.");
+    expect(maskKeys("invalid sk-ant-api03-AbCdEf_123-xyz key")).toBe(
+      "invalid [a key] key",
+    );
+    expect(maskKeys("proxy saw Bearer abc.def.ghi and refused")).toBe(
+      "proxy saw [a key] and refused",
+    );
+    expect(maskKeys("a task-list of sk-1 items")).toBe(
+      "a task-list of sk-1 items",
+    );
+
+    const said = await errorMessage(
+      json(
+        { error: { message: "Incorrect API key provided: sk-proj-****WXYZ." } },
+        401,
+      ),
+      signal,
+    );
+    const page = await errorMessage(
+      new Response("<h1>401</h1> Bearer sk-live-secret-value rejected", {
+        status: 401,
+      }),
+      signal,
+    );
+
+    expect(said).toBe("Incorrect API key provided: [a key].");
+    expect(page).not.toContain("secret");
+    // A bearer token ends at a quote, which stays.
+    expect(maskKeys("rejected 'Bearer abc.def' here")).toBe(
+      "rejected '[a key]' here",
+    );
+  });
+
+  it("masks the server's exact key, whatever it looks like, in an error and in a stream's error line", async () => {
+    const server = providerServer("Proxy", {
+      baseURL: "https://proxy.test/v1",
+      apiKey: "gw_live_51x9",
+    });
+
+    const said = await errorMessage(
+      json({ error: { message: "token gw_live_51x9 is revoked" } }, 401),
+      signal,
+      server.mask,
+    );
+    const failure = await failureOf(
+      readEvents(
+        streamed('error: {"message":"token gw_live_51x9 is revoked"}\n\n'),
+        () => undefined,
+        { signal, name: "Proxy", mask: server.mask },
+      ),
+    );
+
+    expect(said).toBe("token [a key] is revoked");
+    expect(failure.message).toContain("token [a key] is revoked");
+    expect(failure.message).not.toContain("51x9");
   });
 });

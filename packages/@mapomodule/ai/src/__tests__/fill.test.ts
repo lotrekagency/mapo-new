@@ -171,6 +171,23 @@ describe("readMapoAiFillResponse", () => {
     expect(readMapoAiFillResponse(refusal)).toEqual(refusal);
   });
 
+  it("keeps the counts of the prompt cache, and leaves out those that are no number", () => {
+    const usage = {
+      inputTokens: 300,
+      outputTokens: 20,
+      cacheReadTokens: 250,
+      cacheWriteTokens: "50",
+    };
+
+    const response = readMapoAiFillResponse({ ...answered({}), usage });
+
+    expect(response?.usage).toEqual({
+      inputTokens: 300,
+      outputTokens: 20,
+      cacheReadTokens: 250,
+    });
+  });
+
   it("is no fill answer for an extraction, a missing provider or another status", () => {
     const fill = answered({});
 

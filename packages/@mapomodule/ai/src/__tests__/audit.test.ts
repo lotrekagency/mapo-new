@@ -46,6 +46,16 @@ describe("readAuditRecord", () => {
     expect(
       readAuditRecord({ ...RECORD, outcome: "failed", failure: "timeout" }),
     ).toMatchObject({ failure: "timeout" });
+    const cached = {
+      ...RECORD,
+      usage: {
+        inputTokens: 120,
+        outputTokens: 30,
+        cacheReadTokens: 100,
+        cacheWriteTokens: 0,
+      },
+    };
+    expect(readAuditRecord(structuredClone(cached))).toEqual(cached);
   });
 
   it.each([
@@ -54,6 +64,13 @@ describe("readAuditRecord", () => {
     [
       "with tokens that are no count",
       { ...RECORD, usage: { inputTokens: -1, outputTokens: 0 } },
+    ],
+    [
+      "with cached tokens that are no count",
+      {
+        ...RECORD,
+        usage: { inputTokens: 1, outputTokens: 0, cacheReadTokens: 0.5 },
+      },
     ],
     ["with an outcome that does not exist", { ...RECORD, outcome: "maybe" }],
     ["that is no object", "a record"],

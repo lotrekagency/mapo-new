@@ -10,6 +10,13 @@
  * same cut by a cap of 6 tokens; a prompt refused for the context, a model
  * it does not have, the details of a model (trimmed to the facts the
  * provider reads) and the lists of models.
+ *
+ * `documented/` holds what OpenAI's Responses API and Anthropic's Messages
+ * API answer, as their API references describe it: written by hand, not
+ * recorded, since the tests make no call with a key. The streamed answers
+ * answer the same request, with the events each API sends around the
+ * text (reasoning, thinking, pings); the others are their errors, their
+ * lists of models, a cut answer, a refusal and a fallback.
  */
 
 import { readFileSync } from "node:fs";
@@ -22,6 +29,11 @@ import { buildAiEntity } from "../runtime/shared/entity";
 /** The text of a recorded answer. */
 export function recorded(name: string): string {
   return readFileSync(new URL(`./recorded/${name}`, import.meta.url), "utf8");
+}
+
+/** The text of an answer as a provider's API reference describes it. */
+export function documented(name: string): string {
+  return readFileSync(new URL(`./documented/${name}`, import.meta.url), "utf8");
 }
 
 /** A body sent in chunks of `size` bytes, as a server streams one. */
@@ -65,6 +77,10 @@ export interface ServerCall {
   headers: Record<string, string>;
   /** The JSON body, parsed. */
   body: unknown;
+  /** How the call follows a redirect: `manual`, so it never does. */
+  redirect: RequestRedirect | undefined;
+  /** The signal the call was made with: the request's, so the gateway can stop it. */
+  signal: AbortSignal | null | undefined;
 }
 
 /** What the fake server answers a path, in order: a response, or an error `fetch` throws. */
@@ -88,7 +104,14 @@ export function fakeServer(answers: Record<string, Served[]>): {
     new Headers(init.headers).forEach((value, name) => {
       headers[name] = value;
     });
-    calls.push({ path, method: init.method ?? "GET", headers, body });
+    calls.push({
+      path,
+      method: init.method ?? "GET",
+      headers,
+      body,
+      redirect: init.redirect,
+      signal: init.signal,
+    });
     if (init.signal?.aborted) {
       throw new DOMException("This operation was aborted", "AbortError");
     }

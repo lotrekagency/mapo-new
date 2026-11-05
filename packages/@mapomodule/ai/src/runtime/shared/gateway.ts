@@ -192,12 +192,26 @@ export type MapoAiRunRequest = MapoAiFillRequest | MapoAiExtractRequest;
 export interface MapoAiUsage {
   /** Tokens of the prompt and the source the model read. */
   inputTokens: number;
-  /** Tokens of the answer the model wrote. */
+  /** Tokens of the answer the model wrote, its reasoning included. */
   outputTokens: number;
+  /**
+   * Of `inputTokens`, those read from the provider's prompt cache, which
+   * cost a fraction of the others. Absent when none were.
+   */
+  cacheReadTokens?: number;
+  /**
+   * Of `inputTokens`, those written to the provider's prompt cache, which
+   * cost more than the others, once. Absent when none were.
+   */
+  cacheWriteTokens?: number;
 }
 
 interface MapoAiRunAnswerBase {
-  /** The provider and the model that answered. */
+  /**
+   * The provider and the model that answered: another model than the one
+   * asked when the provider retried the call on it, as Anthropic does when
+   * its safety filters decline a request.
+   */
   provider: { id: string; model: string };
   /** The version of Mapo's base rules the prompt was composed with. */
   prompt: number;

@@ -78,6 +78,85 @@ describe("registerMapoAiProvider", () => {
     expect(mapoAiProvider("openai-compatible")).toBeUndefined();
   });
 
+  it("builds the cloud providers at their own address, or the app's, with their key", async () => {
+    const { mapoAiProvider } = await registry();
+    const asked: { url: string; headers: Headers }[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      asked.push({ url, headers: new Headers(init.headers) });
+      return new Response(JSON.stringify({ data: [] }));
+    });
+    const signal = new AbortController().signal;
+
+    try {
+      await mapoAiProvider("openai", { apiKey: "sk-1" })?.listModels?.(signal);
+      await mapoAiProvider("openai", {
+        baseURL: "https://eu.api.openai.com/v1",
+        apiKey: "sk-2",
+      })?.listModels?.(signal);
+      await mapoAiProvider("anthropic", { apiKey: "sk-ant-3" })?.listModels?.(
+        signal,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(asked.map((call) => call.url)).toEqual([
+      "https://api.openai.com/v1/models",
+      "https://eu.api.openai.com/v1/models",
+      "https://api.anthropic.com/v1/models?limit=1000",
+    ]);
+    expect(asked[0]?.headers.get("authorization")).toBe("Bearer sk-1");
+    expect(asked[2]?.headers.get("x-api-key")).toBe("sk-ant-3");
+    expect(mapoAiProvider("openai")?.models).toEqual([
+      "gpt-6.1-sol",
+      "gpt-6-luna",
+    ]);
+    expect(mapoAiProvider("anthropic")?.label).toBe("Anthropic");
+  });
+
+  it("builds the cloud providers with the effort and the prompt cache of their settings", async () => {
+    const { mapoAiProvider } = await registry();
+    const { documented, providerRequest } = await import("./servers");
+    const bodies: unknown[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      const name = url.endsWith("/responses")
+        ? "openai-answered.sse"
+        : "anthropic-answered.sse";
+      return new Response(documented(name), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+    const settings = {
+      apiKey: "sk-1",
+      effort: "high" as const,
+      promptCache: true,
+    };
+
+    try {
+      await mapoAiProvider("openai", settings)?.run(
+        providerRequest({ model: "gpt-6.1-sol" }),
+      );
+      await mapoAiProvider("anthropic", settings)?.run(
+        providerRequest({ model: "claude-opus-5-5" }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(bodies[0]).toMatchObject({
+      reasoning: { effort: "high" },
+      input: [
+        { content: [{ prompt_cache_breakpoint: { mode: "explicit" } }] },
+        { role: "user" },
+      ],
+    });
+    expect(bodies[1]).toMatchObject({
+      output_config: { effort: "high" },
+      system: [{ cache_control: { type: "ephemeral" } }],
+    });
+  });
+
   it.each(["mock", "openai", "anthropic", "openai-compatible", "ollama"])(
     "refuses the id of a Mapo provider, %s",
     async (id) => {

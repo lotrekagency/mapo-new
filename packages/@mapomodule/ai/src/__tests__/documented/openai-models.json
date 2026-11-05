@@ -1,0 +1,23 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "gpt-6.1-sol",
+      "object": "model",
+      "created": 1790000000,
+      "owned_by": "system"
+    },
+    {
+      "id": "gpt-6-luna",
+      "object": "model",
+      "created": 1788000000,
+      "owned_by": "system"
+    },
+    {
+      "id": "gpt-6-astra",
+      "object": "model",
+      "created": 1788000000,
+      "owned_by": "system"
+    }
+  ]
+}

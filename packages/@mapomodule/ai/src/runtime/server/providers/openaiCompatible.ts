@@ -31,6 +31,7 @@
 
 import { isRecord } from "../../shared/guards";
 import {
+  CONTEXT_REFUSAL,
   callServer,
   errorMessage,
   providerServer,
@@ -71,12 +72,6 @@ export interface OpenAiCompatibleSettings {
 /** What the servers say about their models, in this process. */
 const models = createModelInfoCache();
 
-/**
- * A server's refusal for the context, as vLLM, llama.cpp, LM Studio and
- * OpenAI word it.
- */
-const CONTEXT_REFUSAL =
-  /context[ _](?:length|size|window)|maximum context|exceeds the available context|too many tokens|prompt is too long/i;
 /**
  * The tokens of the prompt in vLLM's refusal: "(5000 in the messages, 4000
  * in the completion)", or "your request has 5000 input tokens".
@@ -274,7 +269,7 @@ async function chat(
     signal,
   });
   if (!response.ok) {
-    const message = await errorMessage(response, signal);
+    const message = await errorMessage(response, signal, server.mask);
     const isContext =
       response.status === 413 ||
       (response.status < 500 && CONTEXT_REFUSAL.test(message));
@@ -338,7 +333,7 @@ async function readAnswer(
         const error = isRecord(chunk.error) ? chunk.error.message : chunk.error;
         throw new MapoAiProviderError(
           "unavailable",
-          `${server.name} failed while answering: ${String(error).slice(0, 300)}`,
+          `${server.name} failed while answering: ${server.mask(String(error)).slice(0, 300)}`,
         );
       }
       if (isRecord(chunk.usage)) usage = chunk.usage;
@@ -351,7 +346,7 @@ async function readAnswer(
       if (typeof choice.finish_reason === "string")
         finish = choice.finish_reason;
     },
-    { signal: request.signal, name: server.name },
+    { signal: request.signal, name: server.name, mask: server.mask },
   );
   if (!events) {
     throw new MapoAiProviderError(

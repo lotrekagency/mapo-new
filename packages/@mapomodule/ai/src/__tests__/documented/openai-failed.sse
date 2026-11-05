@@ -1,0 +1,6 @@
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_0a1b2c","object":"response","created_at":1793900000,"status":"in_progress","model":"gpt-6.1-sol","output":[],"usage":null}}
+
+event: response.failed
+data: {"type":"response.failed","sequence_number":1,"response":{"id":"resp_0a1b2c","object":"response","created_at":1793900000,"status":"failed","model":"gpt-6.1-sol","output":[],"usage":{"input_tokens":2390,"input_tokens_details":{"cached_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":64},"total_tokens":2390},"error":{"code":"server_error","message":"The server had an error while processing your request."}}}
+

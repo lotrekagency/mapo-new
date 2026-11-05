@@ -5,15 +5,19 @@
  * what may spend.
  */
 
+import { createAnthropicProvider } from "./anthropic";
+import { DEFAULT_ANTHROPIC_URL, DEFAULT_OPENAI_URL } from "./cloud";
+import type { MapoAiEffort } from "./cloud";
 import { DEFAULT_OLLAMA_URL } from "./local";
 import { mockProvider } from "./mock";
 import { createOllamaProvider } from "./ollama";
+import { createOpenAiProvider } from "./openai";
 import { createOpenAiCompatibleProvider } from "./openaiCompatible";
 import type { MapoAiProvider } from "./types";
 
 /**
- * What Mapo's providers that call a server are built from: the address
- * `mapo.ai.providers` gives, and the key the environment gives.
+ * What Mapo's providers that call a server are built from: the address and
+ * the settings `mapo.ai.providers` gives, and the key the environment gives.
  */
 export interface MapoAiServerSettings {
   /** The server's address, without the final `/`. */
@@ -22,6 +26,23 @@ export interface MapoAiServerSettings {
   apiKey?: string;
   /** The tokens the server's models read, as the app says it. */
   contextTokens?: number;
+  /** How much a cloud model reasons. */
+  effort?: MapoAiEffort;
+  /** Whether a cloud provider keeps the stable part of the prompt in its cache. */
+  promptCache?: boolean;
+}
+
+/** What Mapo's cloud providers take of their settings. */
+function cloudSettings(
+  { baseURL, apiKey, effort, promptCache }: MapoAiServerSettings,
+  fallback: string,
+) {
+  return {
+    baseURL: baseURL ?? fallback,
+    ...(apiKey ? { apiKey } : {}),
+    ...(effort ? { effort } : {}),
+    ...(promptCache ? { promptCache } : {}),
+  };
 }
 
 /** Builds one of Mapo's providers; `undefined` for settings it cannot work with. */
@@ -53,6 +74,16 @@ const MAPO_PROVIDERS: ReadonlyMap<string, ProviderFactory> = new Map<
             ...(contextTokens ? { contextTokens } : {}),
           })
         : undefined,
+  ],
+  [
+    "openai",
+    (settings) =>
+      createOpenAiProvider(cloudSettings(settings, DEFAULT_OPENAI_URL)),
+  ],
+  [
+    "anthropic",
+    (settings) =>
+      createAnthropicProvider(cloudSettings(settings, DEFAULT_ANTHROPIC_URL)),
   ],
 ]);
 

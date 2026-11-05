@@ -95,7 +95,32 @@ describe("the providers plugin", () => {
   });
 
   it("says that a provider the options enable does not exist", async () => {
-    runtime.config = { mapoAi: { providers: { acme: {}, openai: {} } } };
+    // An id Mapo keeps for a provider it does not have yet.
+    try {
+      await enablesAProviderThatDoesNotExist();
+    } finally {
+      vi.doUnmock("../runtime/server/providers/registry");
+    }
+  });
+
+  async function enablesAProviderThatDoesNotExist() {
+    vi.doMock(
+      "../runtime/server/providers/registry",
+      async (importOriginal) => {
+        const original =
+          await importOriginal<
+            typeof import("../runtime/server/providers/registry")
+          >();
+        return {
+          ...original,
+          MAPO_AI_RESERVED_PROVIDER_IDS: [
+            ...original.MAPO_AI_RESERVED_PROVIDER_IDS,
+            "planned",
+          ],
+        };
+      },
+    );
+    runtime.config = { mapoAi: { providers: { acme: {}, planned: {} } } };
     await runPlugin();
 
     await vi.runAllTimersAsync();
@@ -106,6 +131,54 @@ describe("the providers plugin", () => {
       ),
       expect.stringContaining("this version of Mapo has no such provider"),
     ]);
+  }
+
+  it("says that a cloud provider has no key, without calling its API", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    runtime.config = {
+      mapoAi: { providers: { openai: { timeout: 300, apiKey: "" } } },
+    };
+    await runPlugin();
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(logged(warnings)[0]).toContain(
+      'The models of the provider "openai" could not be read: The provider "openai" has no key: set NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("checks the models of a cloud provider against those its key may use", async () => {
+    const calls: { url: string; headers: Headers }[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      calls.push({ url, headers: new Headers(init.headers) });
+      return json({
+        data: [
+          { id: "claude-opus-5-5", max_input_tokens: 1_000_000 },
+          { id: "claude-haiku-5-5", max_input_tokens: 1_000_000 },
+        ],
+        has_more: false,
+      });
+    });
+    runtime.config = {
+      mapoAi: {
+        providers: { anthropic: { timeout: 300, apiKey: "sk-ant-test" } },
+      },
+    };
+    await runPlugin();
+
+    await vi.runAllTimersAsync();
+    await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.anthropic.com/v1/models?limit=1000",
+    ]);
+    expect(calls[0]?.headers.get("x-api-key")).toBe("sk-ant-test");
+    expect(logged(warnings)[0]).toContain(
+      'The provider "anthropic" does not list "claude-sonnet-5-5"',
+    );
   });
 
   it("says that a provider has no model to call", async () => {

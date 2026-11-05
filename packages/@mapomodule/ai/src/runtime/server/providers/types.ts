@@ -73,11 +73,15 @@ export interface MapoAiProviderRequest {
 
 /**
  * A provider's answer: what the model wrote, parsed from JSON (or the text
- * itself when it is not JSON), or what it said instead of answering.
+ * itself when it is not JSON), or what it said instead of answering. With
+ * `model`, the model that answered, when it is not the one asked: a
+ * provider that retried the call on another model, as Anthropic does when
+ * its safety filters decline a request. The gateway's answer and its audit
+ * name that model.
  */
 export type MapoAiProviderAnswer =
-  | { status: "answered"; output: unknown; usage: MapoAiUsage }
-  | { status: "refused"; refusal: string; usage: MapoAiUsage };
+  | { status: "answered"; output: unknown; usage: MapoAiUsage; model?: string }
+  | { status: "refused"; refusal: string; usage: MapoAiUsage; model?: string };
 
 /** A source of answers the gateway can call. */
 export interface MapoAiProvider {
@@ -136,15 +140,29 @@ export class MapoAiProviderError extends Error {
   readonly failure: MapoAiProviderFailure;
   /** For `rate-limit`: in how many seconds the provider takes calls again, when it says. */
   readonly retryAfter?: number;
+  /**
+   * The tokens the call used before it failed, when the provider says them:
+   * a cut answer is paid up to its cap. The gateway's audit keeps them.
+   */
+  readonly usage?: MapoAiUsage;
+  /** The model that answered before the failure, when it is not the one asked. */
+  readonly model?: string;
 
   constructor(
     failure: MapoAiProviderFailure,
     message: string,
-    options: { retryAfter?: number; cause?: unknown } = {},
+    options: {
+      retryAfter?: number;
+      cause?: unknown;
+      usage?: MapoAiUsage;
+      model?: string;
+    } = {},
   ) {
     super(message, { cause: options.cause });
     this.name = "MapoAiProviderError";
     this.failure = failure;
     if (options.retryAfter !== undefined) this.retryAfter = options.retryAfter;
+    if (options.usage !== undefined) this.usage = options.usage;
+    if (options.model !== undefined) this.model = options.model;
   }
 }

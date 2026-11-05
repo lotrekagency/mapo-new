@@ -350,6 +350,86 @@ describe("the options of run", () => {
     expect(kit.warnings).toEqual([]);
   });
 
+  it("gives the cloud providers their address, 300 seconds, a low effort, no cache and a place for their key", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: {
+        openai: {},
+        anthropic: {
+          models: ["claude-sonnet-5-5"],
+          baseURL: "https://llm-proxy.example.org/anthropic/v1/",
+          effort: "medium",
+          promptCache: true,
+          timeout: 120,
+        },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: {
+        openai: {
+          timeout: 300,
+          baseURL: "https://api.openai.com/v1",
+          effort: "low",
+          promptCache: false,
+          apiKey: "",
+        },
+        anthropic: {
+          models: ["claude-sonnet-5-5"],
+          timeout: 120,
+          baseURL: "https://llm-proxy.example.org/anthropic/v1",
+          effort: "medium",
+          promptCache: true,
+          apiKey: "",
+        },
+      },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { openai: object } }).providers
+        .openai,
+    ).not.toHaveProperty("models");
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("keeps the low effort and no cache when the app's values cannot be read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: {
+        openai: { effort: "max", promptCache: "yes" },
+        ollama: { models: ["x"], effort: "high", promptCache: true },
+      },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { openai: { effort: "low", promptCache: false } },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { ollama: object } }).providers
+        .ollama,
+    ).not.toHaveProperty("effort");
+    expect(kit.warnings.map(String)).toEqual([
+      'mapo.ai.providers.openai.effort is not "low", "medium" or "high", so it is "low".',
+      "mapo.ai.providers.openai.promptCache is not true or false, so it is false.",
+      'mapo.ai.providers.ollama has no "effort", "promptCache": ignored.',
+    ]);
+  });
+
+  it("warns that a cloud provider's key written in the Nuxt config goes into the bundle", async () => {
+    const written = "sk-written-in-the-config";
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: { anthropic: { apiKey: written } },
+    });
+
+    expect(kit.warnings.map(String)).toEqual([
+      "mapo.ai.providers.anthropic.apiKey is set in the Nuxt config, so the build copies it into the server bundle. Set NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY in the server's environment instead.",
+    ]);
+    expect(kit.warnings.join(" ")).not.toContain(written);
+  });
+
   it("enables no local provider without a server it can read", async () => {
     const runtimeConfig: Record<string, unknown> = { public: {} };
 

@@ -19,10 +19,11 @@ const LIST_TIMEOUT_MS = 10_000;
  * call: one `mapo.ai.providers` enables that does not exist or has no
  * model, and one the app registers that `mapo.ai.providers` does not
  * enable. Registering a provider makes it available; only the options make
- * it usable. For a provider whose server lists its models, as the local
- * ones do, it also says which models the options allow that the server
- * does not have, or that the server cannot be reached; neither stops the
- * server from starting.
+ * it usable. For a provider whose server lists its models, as Mapo's do,
+ * it also says which models the options allow that the server does not
+ * have (or the key may not use), or that the list cannot be read: a server
+ * out of reach, a key missing or refused. None stops the server from
+ * starting.
  *
  * It runs once the app's own plugins have run (Nitro runs the plugins of
  * modules first), because those register the app's providers. Where the
@@ -80,7 +81,7 @@ async function checkModels(event?: H3Event): Promise<void> {
         );
       } catch (error) {
         console.warn(
-          `[mapo-ai] The models of the provider "${provider.id}" could not be read: ${describe(error)}. run fails until its server answers.`,
+          `[mapo-ai] The models of the provider "${provider.id}" could not be read: ${describe(error)}. Its calls fail as long as this lasts.`,
         );
         return;
       }

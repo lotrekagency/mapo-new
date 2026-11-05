@@ -93,6 +93,8 @@ const NO_USAGE: MapoAiUsage = { inputTokens: 0, outputTokens: 0 };
 
 /** The longest wait a provider may ask, in seconds. */
 const MAX_RETRY_AFTER = 3600;
+/** The longest name of a model a provider may say answered. */
+const MAX_MODEL_ID = 200;
 
 /** What the gateway answers for each failure of a provider. */
 const FAILURES: Record<
@@ -181,6 +183,7 @@ export async function runMapoAi(
     outcome: MapoAiAuditOutcome,
     usage: MapoAiUsage,
     failure?: MapoAiAuditRecord["failure"],
+    by: MapoAiAuditRecord["provider"] = provider,
   ) =>
     writeAuditSafely(deps.audit, {
       record: {
@@ -194,7 +197,7 @@ export async function runMapoAi(
         },
         task: request.task,
         entities: described.map((entity) => ({ ...entity })),
-        provider,
+        provider: by,
         prompt: prompt.version,
         usage,
         outcome,
@@ -224,7 +227,16 @@ export async function runMapoAi(
     console.error(
       `[mapo-ai] The provider "${provider.id}" (${provider.model}) failed: ${describe(error)}`,
     );
-    await audit("failed", NO_USAGE, failure);
+    // A failed call may be paid: a cut answer is, up to its cap. The audit
+    // keeps what the provider says it used, and the model that answered.
+    const spent = error instanceof MapoAiProviderError ? error : undefined;
+    const failedBy = modelOf(spent?.model);
+    await audit(
+      "failed",
+      spent?.usage ? usageOf(spent.usage) : NO_USAGE,
+      failure,
+      failedBy ? { id: provider.id, model: failedBy } : provider,
+    );
     // Only a busy provider says when to try again: a provider that is down
     // or failed has no time to give.
     const retryAfter =
@@ -235,9 +247,12 @@ export async function runMapoAi(
     });
   }
 
+  // The model that answered: another than the one asked when the provider
+  // retried the call on it, at that model's prices.
+  const by = answer.model ? { id: provider.id, model: answer.model } : provider;
   // The call is made and paid for: it is audited before its answer is read.
-  await audit(answer.status, answer.usage);
-  const base = { provider, prompt: prompt.version, usage: answer.usage };
+  await audit(answer.status, answer.usage, undefined, by);
+  const base = { provider: by, prompt: prompt.version, usage: answer.usage };
   if (answer.status === "refused") {
     return {
       task: request.task,
@@ -317,8 +332,8 @@ function describedEntity(entity: MapoAiRunEntity): MapoAiPromptEntity {
 
 /** A provider's answer, read as outside data. */
 type ProviderAnswer =
-  | { status: "answered"; output: unknown; usage: MapoAiUsage }
-  | { status: "refused"; refusal: string; usage: MapoAiUsage };
+  | { status: "answered"; output: unknown; usage: MapoAiUsage; model?: string }
+  | { status: "refused"; refusal: string; usage: MapoAiUsage; model?: string };
 
 /**
  * Calls the provider, within its time. When the time is up the gateway
@@ -363,11 +378,18 @@ async function callProvider(
 function providerAnswerOf(value: unknown): ProviderAnswer {
   const answer = isRecord(value) ? value : {};
   const usage = usageOf(answer.usage);
+  const model = modelOf(answer.model);
+  const by = model ? { model } : {};
   if (answer.status === "answered" && Object.hasOwn(answer, "output")) {
-    return { status: "answered", output: plainJson(answer.output), usage };
+    return {
+      status: "answered",
+      output: plainJson(answer.output),
+      usage,
+      ...by,
+    };
   }
   if (answer.status === "refused" && typeof answer.refusal === "string") {
-    return { status: "refused", refusal: answer.refusal, usage };
+    return { status: "refused", refusal: answer.refusal, usage, ...by };
   }
   throw new MapoAiProviderError(
     "invalid-response",
@@ -391,14 +413,31 @@ function plainJson(value: unknown): unknown {
   }
 }
 
-/** Token counts as whole numbers from zero; anything else counts as zero. */
+/** A model's name a provider gave: text of up to 200 characters, not blank. */
+function modelOf(value: unknown): string | undefined {
+  const isModel =
+    typeof value === "string" &&
+    value.trim() !== "" &&
+    value.length <= MAX_MODEL_ID;
+  return isModel ? value : undefined;
+}
+
+/**
+ * Token counts as whole numbers from zero; anything else counts as zero.
+ * The counts of the prompt cache, part of the prompt's, only when the
+ * provider gives some.
+ */
 function usageOf(value: unknown): MapoAiUsage {
   const usage = isRecord(value) ? value : {};
   const count = (given: unknown) =>
     Number.isInteger(given) && Number(given) >= 0 ? Number(given) : 0;
+  const read = count(usage.cacheReadTokens);
+  const written = count(usage.cacheWriteTokens);
   return {
     inputTokens: count(usage.inputTokens),
     outputTokens: count(usage.outputTokens),
+    ...(read > 0 ? { cacheReadTokens: read } : {}),
+    ...(written > 0 ? { cacheWriteTokens: written } : {}),
   };
 }
 

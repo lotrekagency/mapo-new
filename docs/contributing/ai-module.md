@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
 ## How a value travels
 
@@ -27,7 +27,7 @@ form fields ─────┘    entity.ts        contract.ts  prompts/   provi
 
 1. **The entity model** says which fields the AI may fill, with their kind of value, limits and choices, and which fields it must leave alone, with the reason.
 2. **The contract** is the strict JSON Schema the model's answer must follow, the same for every provider, with the fields behind it.
-3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, and two providers for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
+3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, two providers for models in a cloud, `openai` and `anthropic`, and two for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
 4. **The sanitizer** reads the answer as outside data, turns each value into the form's type, discards what breaks a rule, and checks each value against the quotes the model gives from the source.
 5. **The page** applies the outcomes: `useMapoAiFill()` writes a verified value into an empty field, and marks every other one for the operator.
 
@@ -43,7 +43,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                             |
 | `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                      |
 | `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation             |
-| `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for local models            |
+| `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models  |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                    |
 | `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call   |
@@ -340,7 +340,7 @@ A page asks `status` to know whether to offer the AI at all, and "not for you" i
 | `src/runtime/server/run/audit.ts`         | The audit record: its key, its validator, its write                                                          |
 | `src/runtime/server/run/run.ts`           | The operation, with its dependencies passed in                                                               |
 | `src/runtime/server/run/nitro.ts`         | The wiring: the runtime config, the registry, the storage, the limiter, the `mapo-ai:prompt` hooks           |
-| `src/runtime/server/providers/`           | The interface (`types.ts`), the registry (`registry.ts`), the mock (`mock.ts`), the local models (below)     |
+| `src/runtime/server/providers/`           | The interface (`types.ts`), the registry (`registry.ts`), the mock (`mock.ts`), the cloud and local models   |
 | `src/runtime/server/prompts/`             | Mapo's base rules, versioned (`base.ts`), and the composition in layers (`compose.ts`)                       |
 | `src/runtime/server/plugins/providers.ts` | When the server starts: the providers that will not be called, in the log                                    |
 | `src/runtime/shared/patterns.ts`          | The bound on a pattern's work, before the sanitizer runs it                                                  |
@@ -359,11 +359,11 @@ The page sends the two descriptions of each record, its backend schema and its f
 
 ### Providers
 
-A provider implements `MapoAiProvider`: an id, its capabilities, optionally its own models, and `run(request)`, which gets the composed prompt, the source's parts, the schema, the contract and an abort signal. Each call gets its provider's `timeout`: the gateway aborts the signal when it is up, and stops waiting whatever the provider does. The provider gets copies of the contract and of the source, so what it does to them never changes what its answer is read against, and what it returns is outside data: the answer is read as plain JSON (a getter, a prototype or a cycle makes it unreadable), and the tokens as whole numbers from zero. A `MapoAiProviderError` says which failure to answer: 504, 503 with `Retry-After` (a count of seconds from zero, at most an hour), 413 for a prompt the model cannot read whole, or 502, and the answer names it in `data.failure`; a failure the gateway does not know is a 502, audited as `error`.
+A provider implements `MapoAiProvider`: an id, its capabilities, optionally its own models, and `run(request)`, which gets the composed prompt, the source's parts, the schema, the contract and an abort signal. Each call gets its provider's `timeout`: the gateway aborts the signal when it is up, and stops waiting whatever the provider does. The provider gets copies of the contract and of the source, so what it does to them never changes what its answer is read against, and what it returns is outside data: the answer is read as plain JSON (a getter, a prototype or a cycle makes it unreadable), the tokens as whole numbers from zero, and the `model` that answered only as a name of up to 200 characters. A `MapoAiProviderError` says which failure to answer: 504, 503 with `Retry-After` (a count of seconds from zero, at most an hour), 413 for a prompt the model cannot read whole, or 502, and the answer names it in `data.failure`; a failure the gateway does not know is a 502, audited as `error`.
 
-The registry holds Mapo's providers and the app's. Registering makes a provider available; only `mapo.ai.providers` makes it usable, so one place says what may spend, and at start the server's log names the providers that will not be called. An app cannot register an id Mapo keeps, today's (`mock`, `ollama`, `openai-compatible`) and the planned ones (`openai`, `anthropic`), so an update of Mapo never takes over an app's provider.
+The registry holds Mapo's providers and the app's. Registering makes a provider available; only `mapo.ai.providers` makes it usable, so one place says what may spend, and at start the server's log names the providers that will not be called. An app cannot register an id Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`), so an update of Mapo never takes over an app's provider.
 
-The interface holds what local models need: no key, the models a server lists (`listModels()`, called when the server starts), the context and the images of each model (`MapoAiModelInfo`), a time limit. The capabilities are declared, not read yet: the gateway sends text only, waits for the whole answer and calls no tool.
+The interface holds what the providers that call a server need: no key (each is built with its own), the models a server lists (`listModels()`, called when the server starts), the context and the images of each model (`MapoAiModelInfo`), a time limit, and in an answer the model that answered, when it is not the one asked, and the counts of the provider's prompt cache. The capabilities are declared, not read yet: the gateway sends text only, waits for the whole answer and calls no tool.
 
 The mock (`mock.ts`) is a provider like the others, enabled the same way. It answers with a failure on command, then from a fixture, then by simple rules, and its answers go through the sanitizer like a model's, so tests and demos run the whole chain but the model. The app registers fixtures with `registerMapoAiMockFixtures()`.
 
@@ -448,6 +448,67 @@ The providers plugin asks every provider `run` may call that lists its models (`
 - **A model that reasons on an OpenAI-compatible server** spends time and tokens of the cap on it, unless the server turns it off.
 - **The models' details are kept per process**, ten minutes: a model pulled again with another context is seen late.
 
+## Cloud models
+
+Two of Mapo's providers call a model in a provider's cloud: `openai`, through OpenAI's Responses API, and `anthropic`, through Anthropic's Messages API, in its version 2026-10-21.
+
+| File                                        | Role                                                                                                                        |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/runtime/server/providers/openai.ts`    | The `openai` provider: the body of `/responses`, its streamed events, the end of a response (completed, incomplete, failed) |
+| `src/runtime/server/providers/anthropic.ts` | The `anthropic` provider: the body of `/messages`, its streamed events, refusals, fallbacks and the case of enum values     |
+| `src/runtime/server/providers/cloud.ts`     | What both share: their addresses, the effort, the cap with the reasoning's room, the key, the failures, refused parameters  |
+
+### What they share with the local ones, and what not
+
+They call their APIs through `http.ts`, like the local providers: the same failures, no redirect followed, a stream read within a bound, and an error's message only, with what looks like a key masked (`maskKeys()`), since OpenAI repeats the key it refuses, masked but for its last characters. Their options are read by the same reader (`SERVER_PROVIDERS` in `run/options.ts`, where `isCloud` gives them `effort` and `promptCache`), and their keys come from the environment in the same way (`NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`).
+
+They differ where the APIs do:
+
+- **The schema is not in the prompt.** Both providers show it to the model: OpenAI renders `text.format` into the prompt (its prompt cache counts it in the prefix), and Anthropic adds a system prompt with the schema, its descriptions included. Repeating it would pay for it twice; the schema of a large form weighs tens of thousands of tokens.
+- **No check of the context.** The APIs refuse a prompt that does not fit, with a message the provider reads as `too-long` (`CONTEXT_REFUSAL`); they never cut it in silence.
+- **The cap counts the reasoning.** `max_output_tokens` and `max_tokens` include what the model thinks before it answers, so the cap is the answer's room, from the schema, plus a room for the reasoning that grows with the effort (`cloudAnswerTokens()`): 8192 tokens for `low`, 16,384 for `medium`, 32,768 for `high`.
+- **A key, for the provider's own servers.** A call to `api.openai.com`, `eu.api.openai.com` or `api.anthropic.com` without a key fails before it is made, with the variable to set in the log (`needsKey()`); a call to another address goes without one, for a proxy that adds its own.
+- **Nothing to turn off.** Both stream, so Node's five minutes for the first bytes cover only the first token, which a cloud sends in seconds.
+
+### What a call does
+
+To OpenAI, `POST /responses`: the stable part of the prompt as a developer message and the variable part as the user's, `text.format` with the schema (`json_schema`, strict), `store: false`, `reasoning.effort`, `max_output_tokens`, and `prompt_cache_options` in explicit mode. The stream's text comes in `response.output_text.delta`, a refusal in `response.refusal.delta`, and the response ends with `response.completed`, `response.incomplete` (`max_output_tokens` is `truncated`, `content_filter` a refusal) or `response.failed`; an `error` event fails the call.
+
+To Anthropic, `POST /messages` with `anthropic-version: 2026-10-21`: the stable part as the system prompt and the variable part as the user's message, `output_config` with the schema and the effort, `max_tokens`, and `fallbacks: "default"` with its beta header. No `temperature`, `top_p` or `top_k`, which the version refuses, and no `thinking`: the current models think by default, and Opus 5.5 cannot stop. The stream's text comes in the `text_delta`s of text blocks (the thinking blocks are not the answer), the counts in `message_start` and `message_delta`, and why the model stopped in `message_delta`: `max_tokens` is `truncated`, `refusal` a refusal, `model_context_window_exceeded` `too-long`. The answer's text is then read with each listed value written as the schema writes it (`withEnumCase()` in `cloud.ts`): Anthropic does not guarantee the case of an `enum`'s values, so a string that matches one listed value but for case becomes that value, and one that matches none, or several, stays as it is, for the sanitizer to read.
+
+### The effort
+
+Both providers ask `low` unless the app says otherwise (`effort: "medium" | "high"`). Filling a form from the quotes of a source is routine work, and the sanitizer checks every value against its quote, so a deeper reasoning buys little and costs written tokens and time. `low` is the one value every current model of both providers takes: OpenAI's Sol and Astra have no `none`, and Opus 5.5 thinks at every effort. The option is read like any other, so the environment changes it (`NUXT_MAPO_AI_PROVIDERS_OPENAI_EFFORT=medium`).
+
+### The prompt cache
+
+Off by default, on with `promptCache: true`. When on, the provider marks the end of the stable part of the prompt, Mapo's rules, the app's, the entities' descriptions and with them the schema, and never the source: `cache_control` on Anthropic's system block, `prompt_cache_breakpoint` on OpenAI's developer message. The first call writes that part at 1.25 times its price, and the calls that follow within the cache's time, 5 minutes for Anthropic and 30 for OpenAI, read it at 0.05 to 0.1 times: it pays from the second call on the same kind of record, and costs a quarter more on the stable part of a call alone.
+
+Off has to mean off on OpenAI: its models from GPT-5.6 cache by themselves, with a breakpoint at the end of the latest user message, the source included, and bill the writing. So the provider sends `prompt_cache_options: { mode: "explicit" }`, which writes only at the breakpoints it marks, with every call (until a model refuses it, below), and marks none without `promptCache`. Anthropic writes nothing without a mark. `usage.cacheReadTokens` and `usage.cacheWriteTokens`, part of `inputTokens`, say what a call read and wrote, in the answer and the audit.
+
+### Refusals and fallbacks
+
+Opus 5.5 and Sonnet 5.5 run safety filters that can decline a harmless request, with `stop_reason: "refusal"` and a category (`bio`, `cyber`…). Every call to Anthropic asks for its fallbacks (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`): Anthropic retries a declined request, in the same stream, on the model it picks for that category, such as Claude Opus 5. That model is not in the app's list, and costs its own price, so the provider says which one answered. It knows a request fell back from a `fallback` block, or, for a request served by the fallback model again, which has no block, from an attempt of type `fallback_message` among its counts; it takes the model from that billed attempt first, then from the block, then from the message's start, which may carry the asked model's full, dated name. The answer then carries `model`, `run` puts it in its answer's `provider.model` and in the audit, and the provider says it in the log. The counts add up every attempt, the declined one too. Haiku 5.5 has no fallback, and some categories have none either: then the answer is a refusal, with the category. A server that does not take the fallbacks, such as a proxy to a cloud that has none, refuses them once, and the provider leaves them out (below).
+
+### Parameters a model does not take
+
+The app may list any model, one newer or older than Mapo's defaults. An older model may not take an effort (`reasoning` for OpenAI, `effort` for Anthropic), OpenAI's cache options, or Anthropic's fallbacks: the server refuses the call with a 400 that says the model does not take the parameter. `callCloud()` in `cloud.ts`, which both providers call, then leaves that parameter out and asks once more, at most once for each parameter. It reads a refusal by OpenAI's code and `param` when the error names them (`unsupported_parameter` on `reasoning.effort`), otherwise by words that name the parameter together with "unsupported", "unknown" or "not permitted": a refusal that only names it, such as a schema error about a field called `reasoning`, or a refusal of the cache's breakpoint alone, fails the call instead. A refusal for the money, the rate or the context is never read as one of a parameter. The parameter left out is remembered, by server and model, for ten minutes, only once a call without it is taken, so the next calls go without it; the log says so each time it is remembered, with what the calls lose: without OpenAI's cache options, OpenAI caches the model's prompts by its own rules, and may bill the writing. Only these optional parameters can go: never `store: false`, the schema or the cap.
+
+A failure after the call was taken, as an answer cut at its cap or an error in the stream, carries the usage the provider had read (`MapoAiProviderError.usage`), and the model that answered when Anthropic's fallback did (`model`): `run` audits a failed call with them, since it is paid. The providers mask the key in every text of a server that reaches the log: the exact key, which a proxy may repeat, and what looks like one (`ProviderServer.mask()`).
+
+### Strengths and weaknesses
+
+- **Strict structured outputs on both**: the answer has the shape asked, or the provider says why not.
+- **The model that answered is named**, in the answer, the audit and the log, even when Anthropic's fallback answered.
+- **No dependency**, and the same code on every runtime, as for the local models.
+- **The tests read answers written from the API references, not recorded** (`documented/`): the first real call can show a difference, and the AI lab is where it shows.
+- **OpenAI's cache options are new**, documented for its models from GPT-5.6; an older model costs one refused call before they are left out.
+- **Anthropic's enums are not exact**: the provider rewrites a value that differs from a listed one only by case, and walks the answer along the schema to do it (objects, arrays, an `anyOf` of objects); a value that differs otherwise reaches the sanitizer as written.
+- **The fallback cannot be turned off**: a model the app does not list may answer, at its own price. The counts of a fallback add up two models' tokens under the name of the one that answered.
+- **No count of the tokens before a call**: a long source goes to the API, which refuses it; Anthropic's free `count_tokens` would tell first, at the price of a call.
+- **`low` may miss a hard mapping** that a deeper reasoning would get; `effort` raises it for the app, not per request.
+- **Anthropic's API has no European region**; OpenAI's European endpoint asks for a project made in Europe.
+
 ## Filling a form
 
 `useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
@@ -525,7 +586,7 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `prompts.test.ts`   | The base rules, the order of the layers, the marks around the source                                                                               |
 | `mock.test.ts`      | The mock's rules, its failures on command and its fixtures                                                                                         |
 | `registry.test.ts`  | The providers an app registers, the ids Mapo keeps, Mapo's providers built with their server                                                       |
-| `providers.test.ts` | The providers the log names at start, as they will not be called, and the models a server does not list; the local providers' settings and key     |
+| `providers.test.ts` | The providers the log names at start, as they will not be called, and the models a server does not list; the providers' settings and key           |
 | `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations, the options and what each warns about |
 
 The browser's half, also run in Node:
@@ -536,7 +597,7 @@ The browser's half, also run in Node:
 | `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
 | `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
 
-The providers for local models, on the answers Ollama 0.40.13 sent on its two APIs, kept in `recorded/` and served by `servers.ts` through a fake `fetch` that keeps every call; record them again when a server's API changes:
+The providers that call a server: the local ones on the answers Ollama 0.40.13 sent on its two APIs, kept in `recorded/`, and the cloud ones on the answers of OpenAI and Anthropic as their API references describe them, written by hand in `documented/`; `servers.ts` serves both through a fake `fetch` that keeps every call. Record them again when a server's API changes, and record the cloud ones once a real call can:
 
 | File                       | What it proves                                                                                                      |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -544,6 +605,9 @@ The providers for local models, on the answers Ollama 0.40.13 sent on its two AP
 | `openaiCompatible.test.ts` | The body, the cap, vLLM's refusals, the checks of the context, refusals, events, redirects                          |
 | `http.test.ts`             | The calls and their failures, an error's text, `Retry-After`, a stream read line by line, in chunks, within a bound |
 | `local.test.ts`            | A server's address, the tokens, the context asked, the models' details kept ten minutes                             |
+| `openai.test.ts`           | The body, the key, the effort, the cache's breakpoint, the end of a response, refusals, parameters left out         |
+| `anthropic.test.ts`        | The body and headers, the effort, the cache's mark and counts, refusals, fallbacks, parameters left out, enum case  |
+| `cloud.test.ts`            | The cap with the reasoning's room, the key a call needs, the counts, refused parameters, stream errors, enum case   |
 
 - `expectPortable()`, in `portable.ts`, walks a schema and fails on anything outside the portable subset; every contract test runs it.
 - A bug fix leaves a regression test that fails on the previous version.
@@ -594,7 +658,7 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 1. Write it in `src/runtime/server/providers/`, implementing `MapoAiProvider`, built from its settings (`MapoAiServerSettings`) with the `fetch` passed in, so its tests serve recorded answers through `servers.ts`: success, refusal, truncation, invalid JSON, 429, 5xx.
 2. Call its server through `http.ts`: `callServer()` and `serverJson()` tell the failures apart, `readJsonLines()` and `readEvents()` read a stream within a bound.
 3. Add it to `MAPO_PROVIDERS` in `registry.ts`; its id is in `MAPO_AI_RESERVED_PROVIDER_IDS` already, or goes there in the same change.
-4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and a place for its key; document them.
+4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and a place for its key, and, with `isCloud`, `effort` and `promptCache`; document them. A cloud's provider builds on `cloud.ts`.
 5. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
 
 ### Change a base rule
@@ -625,7 +689,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Fill a form with Magic Fill                      | Magic Fill                                                       |
 | Verified and to check                            | Magic Fill, from the verification described on this page         |
 | Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
-| Providers and keys                               | The mock, an app's own, local models (written); the cloud, keys  |
+| Providers and keys                               | The mock, an app's own, local models, the cloud (written); keys  |
 | AI settings                                      | The settings page                                                |
 | Import several records                           | Import AI                                                        |
 | Guarantees and limits                            | Every change                                                     |
@@ -638,11 +702,10 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Providers in the cloud**: OpenAI and Anthropic.
-2. **Readers** for text, PDF, images and spreadsheets, with PDFs and images sent to the providers that read them.
-3. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
-4. **The AI settings page**, where admins also set the verification rules and the extra words that name a secret.
-5. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
+1. **Readers** for text, PDF, images and spreadsheets, with PDFs and images sent to the providers that read them.
+2. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
+3. **The AI settings page**, where admins also set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists.
+4. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
 
 ### Nice to have
 
@@ -662,6 +725,10 @@ Ideas with no place in the plan yet:
 - Export the providers' factories, so an app can register a second server of a kind under an id of its own, such as a GPU machine beside a laptop's Ollama.
 - The context of each model of an OpenAI-compatible server, not one for the whole server; and a count of the prompt's tokens before the call, where a server offers one (vLLM's and llama.cpp's `/tokenize`).
 - Turn reasoning off on an OpenAI-compatible server, with the parameter each kind of server takes.
+- An option to turn Anthropic's fallbacks off, and the price of each attempt of a fallback in the audit.
+- Count a prompt's tokens before an Anthropic call (`count_tokens`, free), to warn before a long source.
+- The batch APIs of OpenAI and Anthropic, at half the price, for Import AI.
+- Claude and OpenAI's models through Amazon Bedrock, Google Vertex AI or Azure, for a region in Europe.
 - Tell in `status` the context of each model and whether it reads images, so a page can warn before it sends a long source.
 - Check `Origin` too, for browsers that send no `Sec-Fetch-Site`, once the host the server sees behind a proxy can be trusted.
 - Read group objects (`{ name }`) as names, in the auth store and the gateway together.

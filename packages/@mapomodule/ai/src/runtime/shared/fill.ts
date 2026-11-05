@@ -172,10 +172,17 @@ function providerOf(value: unknown): { id: string; model: string } | undefined {
 
 function usageOf(value: unknown): MapoAiUsage | undefined {
   if (!isRecord(value)) return undefined;
-  const { inputTokens, outputTokens } = value;
+  const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } =
+    value;
   const isInput = typeof inputTokens === "number";
   const isOutput = typeof outputTokens === "number";
-  return isInput && isOutput ? { inputTokens, outputTokens } : undefined;
+  if (!isInput || !isOutput) return undefined;
+  return {
+    inputTokens,
+    outputTokens,
+    ...(typeof cacheReadTokens === "number" ? { cacheReadTokens } : {}),
+    ...(typeof cacheWriteTokens === "number" ? { cacheWriteTokens } : {}),
+  };
 }
 
 function fillResultOf(value: unknown): AiFillResult | undefined {

@@ -263,7 +263,7 @@ async function chat(
   const { signal } = request;
   const response = await callServer(server, "/api/chat", { body, signal });
   if (!response.ok) {
-    const message = await errorMessage(response, signal);
+    const message = await errorMessage(response, signal, server.mask);
     const match = response.status === 400 ? TOO_LONG.exec(message) : null;
     const counted = tokenCount(match ? Number(match[1]) : undefined);
     if (counted !== undefined) return { counted };
@@ -291,7 +291,7 @@ async function readAnswer(
       if (piece.error !== undefined) {
         throw new MapoAiProviderError(
           "unavailable",
-          `${server.name} failed while answering: ${String(piece.error).slice(0, 300)}`,
+          `${server.name} failed while answering: ${server.mask(String(piece.error)).slice(0, 300)}`,
         );
       }
       const message = isRecord(piece.message) ? piece.message : {};

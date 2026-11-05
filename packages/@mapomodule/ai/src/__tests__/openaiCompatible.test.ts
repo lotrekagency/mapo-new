@@ -540,6 +540,22 @@ describe("the openai-compatible provider", () => {
     expect(empty.failure).toBe("invalid-response");
   });
 
+  it("masks the server's key in an error it sends in the stream", async () => {
+    const { provider } = compatible(
+      {
+        [MODELS]: [listed()],
+        [CHAT]: [events({ error: { message: "token k-live-90ab rejected" } })],
+      },
+      { apiKey: "k-live-90ab" },
+    );
+
+    const failure = await failureOf(provider.run(providerRequest()));
+
+    expect(failure.failure).toBe("unavailable");
+    expect(failure.message).toContain("token [a key] rejected");
+    expect(failure.message).not.toContain("90ab");
+  });
+
   it("reads events with comments, data without a space, CRLF and no last blank line", async () => {
     const text =
       ": keep-alive\r\n\r\n" +

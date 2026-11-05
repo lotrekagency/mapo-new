@@ -11,6 +11,7 @@ import type { MapoAiAuditRecord } from "../runtime/server/run/audit";
 import type { MapoAiPromptContext } from "../runtime/server/run/run";
 import { createSealedStorage } from "../runtime/server/storage/sealed";
 import { MAPO_AI_GATEWAY_PATH } from "../runtime/shared/gateway";
+import { documented } from "./servers";
 import type {
   MapoAiRunRequest,
   MapoAiRunResponse,
@@ -958,6 +959,182 @@ describe("POST /_mapo/ai/run — the prompt and the app's providers", () => {
     expect((await auditRecords())[0]?.entities).toEqual([
       { label: "Article", model: "article" },
     ]);
+  });
+
+  it("names the model that answered when the provider retried on another, with the cache's counts, in the answer and the audit", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: {} },
+    };
+    const { registerMapoAiProvider } = await providers();
+    registerMapoAiProvider({
+      ...capturing([]),
+      run: async () => ({
+        status: "answered",
+        output: { values: { title: "", summary: "", status: "" } },
+        model: "acme-fallback",
+        usage: {
+          inputTokens: 300,
+          outputTokens: 20,
+          cacheReadTokens: 250,
+          cacheWriteTokens: 40,
+        },
+      }),
+    });
+
+    const response = await (
+      await gateway()
+    )(runRequest(fillBody("Title: About us")));
+    const answer = await json(response);
+
+    const usage = {
+      inputTokens: 300,
+      outputTokens: 20,
+      cacheReadTokens: 250,
+      cacheWriteTokens: 40,
+    };
+    expect(response.status).toBe(200);
+    expect(answer).toMatchObject({
+      provider: { id: "acme", model: "acme-fallback" },
+      usage,
+    });
+    expect((await auditRecords())[0]).toMatchObject({
+      outcome: "answered",
+      provider: { id: "acme", model: "acme-fallback" },
+      usage,
+    });
+  });
+
+  it("audits a failed call with what the provider says it used, and the model that answered", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: {} },
+    };
+    const { registerMapoAiProvider, MapoAiProviderError } = {
+      ...(await providers()),
+      ...(await import("../runtime/server/providers/types")),
+    };
+    registerMapoAiProvider({
+      ...capturing([]),
+      run: async () => {
+        throw new MapoAiProviderError("truncated", "cut at its cap", {
+          usage: { inputTokens: 2210, outputTokens: 12288 },
+          model: "acme-fallback",
+        });
+      },
+    });
+
+    const response = await (
+      await gateway()
+    )(runRequest(fillBody("Title: About us")));
+
+    expect(response.status).toBe(502);
+    // The cut answer is paid: the audit keeps its tokens, never zero.
+    expect((await auditRecords())[0]).toMatchObject({
+      outcome: "failed",
+      failure: "truncated",
+      provider: { id: "acme", model: "acme-fallback" },
+      usage: { inputTokens: 2210, outputTokens: 12288 },
+    });
+  });
+
+  it("calls Mapo's cloud provider with the effort and the prompt cache the runtime config holds", async () => {
+    const bodies: unknown[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return new Response(documented("openai-answered.sse"), {
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: {
+        openai: {
+          timeout: 300,
+          baseURL: "https://llm-proxy.test/v1",
+          effort: "high",
+          promptCache: true,
+          apiKey: "sk-from-the-environment",
+        },
+      },
+    };
+
+    try {
+      const response = await (
+        await gateway()
+      )(
+        runRequest(
+          fillBody("Title: About us", {
+            provider: { id: "openai", model: "gpt-6.1-sol" },
+          }),
+        ),
+      );
+      expect(response.status).toBe(200);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(bodies[0]).toMatchObject({
+      reasoning: { effort: "high" },
+      input: [
+        {
+          role: "developer",
+          content: [{ prompt_cache_breakpoint: { mode: "explicit" } }],
+        },
+        { role: "user" },
+      ],
+    });
+  });
+
+  it("keeps the model asked when a provider names a blank one", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: {} },
+    };
+    const { registerMapoAiProvider } = await providers();
+    registerMapoAiProvider({
+      ...capturing([]),
+      run: async () => ({
+        status: "refused",
+        refusal: "no",
+        model: "   ",
+        usage: { inputTokens: 1, outputTokens: 1 },
+      }),
+    });
+
+    const answer = await json(
+      await (
+        await gateway()
+      )(runRequest(fillBody("Title: About us"))),
+    );
+
+    expect(answer.provider).toEqual({ id: "acme", model: "acme-1" });
+  });
+
+  it("keeps the model asked when a provider names another that is no model's name", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: {} },
+    };
+    const { registerMapoAiProvider } = await providers();
+    registerMapoAiProvider({
+      ...capturing([]),
+      run: async () => ({
+        status: "refused",
+        refusal: "no",
+        model: "x".repeat(201),
+        usage: { inputTokens: 1, outputTokens: 1 },
+      }),
+    });
+
+    const answer = await json(
+      await (
+        await gateway()
+      )(runRequest(fillBody("Title: About us"))),
+    );
+
+    expect(answer.provider).toEqual({ id: "acme", model: "acme-1" });
   });
 
   it("answers 502 for a provider that returns neither an answer nor a refusal, and audits it", async () => {

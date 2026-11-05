@@ -45,6 +45,7 @@ export type {
   MapoAiPromptEntity,
 } from "./runtime/server/run/run";
 export type { MapoAiProviderOptions } from "./runtime/server/run/options";
+export type { MapoAiEffort } from "./runtime/server/providers/cloud";
 export type { AiChoice } from "./runtime/shared/entity";
 export type {
   MapoAiFillAction,
@@ -105,13 +106,16 @@ export interface MapoAiOptions {
   /**
    * The providers `run` may call, by id, each with the models a request may
    * ask for (its default first) and the seconds a call may take. Only the
-   * providers listed here are called: Mapo's own (`mock`, and `ollama` and
-   * `openai-compatible` for models on the app's own servers, with their
-   * `baseURL`) and those the app registers with `registerMapoAiProvider()`.
-   * `false` turns off one a layer enables. The key of `ollama` or
-   * `openai-compatible`, for a server that asks one, goes in the server's
-   * environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`,
-   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`), not here.
+   * providers listed here are called: Mapo's own (`mock`; `openai` and
+   * `anthropic` for OpenAI's and Anthropic's models, with an `effort` and an
+   * optional `promptCache`; `ollama` and `openai-compatible` for models on
+   * the app's own servers, with their `baseURL`) and those the app registers
+   * with `registerMapoAiProvider()`. `false` turns off one a layer enables.
+   * A provider's key goes in the server's environment, not here:
+   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`,
+   * `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`,
+   * `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`,
+   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`.
    * @default {} (no provider: `run` answers 503)
    * @example { mock: { models: ["mock"], timeout: 120 } }
    */

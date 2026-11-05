@@ -50,7 +50,10 @@ function currentPolicy(event?: H3Event): ReturnType<typeof policyOf> {
   );
 }
 
-/** The address, the key and the context a provider that calls a server is built with. */
+/**
+ * The address, the key and the settings (the context, a cloud's effort and
+ * prompt cache) a provider that calls a server is built with.
+ */
 function serverSettingsOf(
   config: unknown,
   options: MapoAiRunOptions,
@@ -66,6 +69,8 @@ function serverSettingsOf(
     ...(enabled?.baseURL ? { baseURL: enabled.baseURL } : {}),
     ...(apiKey ? { apiKey } : {}),
     ...(enabled?.contextTokens ? { contextTokens: enabled.contextTokens } : {}),
+    ...(enabled?.effort ? { effort: enabled.effort } : {}),
+    ...(enabled?.promptCache ? { promptCache: true } : {}),
   };
 }
 
