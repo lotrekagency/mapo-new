@@ -737,6 +737,25 @@ export const RECIPES: Recipe[] = [
       "mapo.ai.providers enables what run may call: Mapo's mock, which answers without a network from fixtures or Label: value lines, Mapo's providers for OpenAI, Anthropic and local models, or a provider the app registers in a Nitro plugin with registerMapoAiProvider().",
   },
   {
+    id: "ai-keys",
+    task: "Assign AI provider keys and models to groups or users, or let operators use their own token",
+    keywords: [
+      "_mapo/ai/keys",
+      "_mapo/ai/token",
+      "assign a key",
+      "key per group",
+      "group",
+      "personal token",
+      "own token",
+      "key level",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Keys",
+    summary:
+      "Experimental: each call uses the key nearest the user: their own token where an admin's assignment allows it (PUT /_mapo/ai/token), else the first key up the admins' assignments (the user's, their groups' by the admins' order, everyone's: PUT /_mapo/ai/keys, PUT /_mapo/ai/keys/groups), else the project's in the environment. The nearest assignment also narrows the models; personal tokens are off unless allowed; status says the level and the last four characters, never the key; a provider with no key at any level answers 503.",
+  },
+  {
     id: "ai-cloud-models",
     task: "Use OpenAI or Anthropic (Claude) models for the AI",
     keywords: [
@@ -755,7 +774,7 @@ export const RECIPES: Recipe[] = [
     doc: "modules/ai.md",
     heading: "OpenAI",
     summary:
-      "Experimental: enable openai (Responses API, gpt-6.1-sol and gpt-6-luna unless models says otherwise) or anthropic (Messages API, claude-opus-5-5, claude-sonnet-5-5 and claude-haiku-5-5) in mapo.ai.providers, with the project's key in NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY or NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY, never in the config; effort is \"low\" unless set, promptCache is off unless set, timeout 300 seconds; Anthropic retries a request its safety filters decline on a fallback model, which the answer's provider.model names.",
+      "Experimental: enable openai (Responses API, gpt-6.1-sol and gpt-6-luna unless models says otherwise) or anthropic (Messages API, claude-opus-5-5, claude-sonnet-5-5 and claude-haiku-5-5) in mapo.ai.providers, with the project's key in NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY or NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY, never in the config (the AI's admins can assign their own over it); effort is \"low\" unless set, promptCache is off unless set, timeout 300 seconds; Anthropic retries a request its safety filters decline on a fallback model, which the answer's provider.model names.",
   },
   {
     id: "ai-local-models",

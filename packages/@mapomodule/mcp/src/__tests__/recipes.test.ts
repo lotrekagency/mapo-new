@@ -66,6 +66,8 @@ describe("matchRecipes", () => {
     ["give the AI a csv spreadsheet instead of pasted text", "ai-read-files"],
     ["replace the reader of html files in the AI gateway", "ai-readers"],
     ["turn off xlsx files for the AI", "ai-readers"],
+    ["assign a different openai key to the editors group", "ai-keys"],
+    ["let an operator use their own personal token for the AI", "ai-keys"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
