@@ -61,6 +61,11 @@ export default defineNuxtConfig({
     ai: {
       providers: {
         mock: { timeout: 15 },
+        // The keys lab (/ai/keys): the app's provider that calls no model and
+        // says which key the gateway's chain gave it
+        // (server/plugins/mapo-ai-keys.ts). Its project's key, if any, comes
+        // from NUXT_MAPO_AI_PROVIDERS_EXAMPLE_KEYS_API_KEY.
+        "example-keys": { timeout: 15 },
         // The AI lab's providers, with a large form on a 27B model in mind:
         // more than the 600 seconds a local provider of Mapo gets by default.
         ...(ollamaModels.length

@@ -6,6 +6,8 @@ const SESSION_COOKIE = "__mapo_session";
 // Mock users for E2E testing — password equals username for all accounts.
 // admin   → superuser, all permissions, groups: ['admin']
 // editor  → staff, article CRUD + view_user, groups: ['editors']
+// writer  → article CRUD, groups: ['editors', 'reporters'] (the AI keys lab:
+//           a user in two groups, whose key depends on their order)
 // viewer  → read-only (view_article only), no groups
 const MOCK_USERS: Record<string, object> = {
   admin: {
@@ -44,6 +46,15 @@ const MOCK_USERS: Record<string, object> = {
       "view_user",
     ],
     groups: ["editors"],
+  },
+  writer: {
+    id: 4,
+    username: "writer",
+    email: "writer@example.com",
+    is_superuser: false,
+    all_permissions: ["view_article", "add_article", "change_article"],
+    user_permissions: ["view_article", "add_article", "change_article"],
+    groups: ["editors", "reporters"],
   },
   viewer: {
     id: 3,

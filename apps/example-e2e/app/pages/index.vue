@@ -98,6 +98,11 @@ const sections = [
         desc: "GET /_mapo/ai/status as admin, editor or viewer: allowed, admin, providers, limits, storage",
       },
       {
+        label: "AI keys",
+        to: "/ai/keys",
+        desc: "Which key a call uses: the admins' assignments, the order of the groups, the users' own tokens",
+      },
+      {
         label: "Fill a new article",
         to: "/ai/fill/new",
         desc: "useMapoAiFill through run with the mock: verified values, marks, Apply, Undo, failures",
@@ -222,6 +227,7 @@ const sections = [
       Navigate to a test page from the sidebar or the cards below. Login
       credentials: <code class="bg-elevated px-1 rounded">admin/admin</code>,
       <code class="bg-elevated px-1 rounded">editor/editor</code>,
+      <code class="bg-elevated px-1 rounded">writer/writer</code>,
       <code class="bg-elevated px-1 rounded">viewer/viewer</code>.
     </p>
 
