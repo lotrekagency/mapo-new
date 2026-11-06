@@ -756,6 +756,25 @@ export const RECIPES: Recipe[] = [
       "Experimental: each call uses the key nearest the user: their own token where an admin's assignment allows it (PUT /_mapo/ai/token), else the first key up the admins' assignments (the user's, their groups' by the admins' order, everyone's: PUT /_mapo/ai/keys, PUT /_mapo/ai/keys/groups), else the project's in the environment. The nearest assignment also narrows the models; personal tokens are off unless allowed; status says the level and the last four characters, never the key; a provider with no key at any level answers 503.",
   },
   {
+    id: "ai-settings",
+    task: "Give users and admins a page to choose AI providers and models, manage keys and check the connection",
+    keywords: [
+      "MapoAiSettings",
+      "ai-settings",
+      "mapo.ai.settings",
+      "settings page",
+      "usersApi",
+      "groupsApi",
+      "preference",
+      "check the connection",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "AI settings",
+    summary:
+      "Experimental: the module adds an AI settings page at /ai-settings (mapo.ai.settings.path moves it, false leaves it out for <MapoAiSettings /> in a page of the app). Each user saves their provider and model (PUT /_mapo/ai/preferences), sees their key, saves their own token where allowed and checks the connection (POST /_mapo/ai/test, which lists the provider's models with their key, at no cost); admins assign keys, searching the backend's users and groups through mapo.ai.settings.usersApi and groupsApi.",
+  },
+  {
     id: "ai-cloud-models",
     task: "Use OpenAI or Anthropic (Claude) models for the AI",
     keywords: [

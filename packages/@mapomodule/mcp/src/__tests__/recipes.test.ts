@@ -68,6 +68,8 @@ describe("matchRecipes", () => {
     ["turn off xlsx files for the AI", "ai-readers"],
     ["assign a different openai key to the editors group", "ai-keys"],
     ["let an operator use their own personal token for the AI", "ai-keys"],
+    ["add a settings page for the AI to my backoffice", "ai-settings"],
+    ["let users pick their AI model and check the connection", "ai-settings"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
