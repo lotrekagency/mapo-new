@@ -70,6 +70,14 @@ describe("matchRecipes", () => {
     ["let an operator use their own personal token for the AI", "ai-keys"],
     ["add a settings page for the AI to my backoffice", "ai-settings"],
     ["let users pick their AI model and check the connection", "ai-settings"],
+    [
+      "keep a vault field away from the AI with secretWords",
+      "ai-admin-settings",
+    ],
+    [
+      "let the admins add an OpenAI model without a deploy",
+      "ai-admin-settings",
+    ],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

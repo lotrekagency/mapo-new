@@ -775,6 +775,25 @@ export const RECIPES: Recipe[] = [
       "Experimental: the module adds an AI settings page at /ai-settings (mapo.ai.settings.path moves it, false leaves it out for <MapoAiSettings /> in a page of the app). Each user saves their provider and model (PUT /_mapo/ai/preferences), sees their key, saves their own token where allowed and checks the connection (POST /_mapo/ai/test, which lists the provider's models with their key, at no cost); admins assign keys, searching the backend's users and groups through mapo.ai.settings.usersApi and groupsApi.",
   },
   {
+    id: "ai-admin-settings",
+    task: "Let the AI's admins change its instructions, verification rules, secret fields and models without a deploy",
+    keywords: [
+      "secretWords",
+      "adminModels",
+      "fallbacks",
+      "admin instructions",
+      "verification rules",
+      "secret field",
+      "add a model",
+      "how the AI works",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "How the AI works",
+    summary:
+      "Experimental: on the AI settings page the AI's admins change how the AI works in the whole app (GET/PUT /_mapo/ai/settings, POST /_mapo/ai/settings/preview): their instructions (layer 3 of the prompt, after Mapo's and the app's), the rules of verification over mapo.ai.verification, words that keep a field from the AI besides Mapo's and mapo.ai.secretWords, the prompt cache of openai and anthropic, Anthropic's fallbacks (off; on only where the app's anthropic.fallbacks leaves them on), and models they add where the app sets providers.<id>.adminModels: true, saved once the provider's server lists them. The app's options stay the defaults; changes are audited, and an unreadable record closes the AI with 503.",
+  },
+  {
     id: "ai-cloud-models",
     task: "Use OpenAI or Anthropic (Claude) models for the AI",
     keywords: [
