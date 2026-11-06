@@ -3,23 +3,24 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiFill()` fills a detail form through `run`, from a component the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), reads a file into text (`read`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiRead()` sends a file to `read` and `useMapoAiFill()` fills a detail form through `run`, from components the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
 
 - The module installs only when the app asks for it: an app without the `mapo.ai` key loads nothing of it.
 - The gateway knows the user from the backend session: it forwards the request's cookie to `userInfoApi`, as Mapo does when it renders a page. Without a session it answers 401.
-- `GET /_mapo/ai/status` tells a signed-in user the version of the gateway's contract, whether the app lets them use the AI and whether they administer it, and the providers, models and limits they get; an admin also gets the state of the storage.
+- `GET /_mapo/ai/status` tells a signed-in user the version of the gateway's contract, whether the app lets them use the AI and whether they administer it, and the providers, models, limits and readers they get; an admin also gets the state of the storage.
 - Two options say who administers the AI and who may use it, `admin` and `users`, and a Nitro plugin can narrow it further with the `mapo-ai:user` hook.
 - `POST /_mapo/ai/run` fills one record (`fill`) or extracts every record a source describes (`extract`). The page sends the record's two descriptions, its backend schema and its form's fields, and the source; the gateway builds what the AI may fill, composes the prompt, calls the provider and reads its answer: each field comes back empty, filled (verified by a quote of the source, or to check) or discarded with a reason. The gateway never writes to the backend.
 - The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command; `openai`, OpenAI's models through its Responses API; `anthropic`, Claude through Anthropic's Messages API; `ollama`, a model served by Ollama; `openai-compatible`, a model served by LM Studio, vLLM, llama.cpp or another server that speaks OpenAI's Chat Completions API; and the ones an app registers with `registerMapoAiProvider()`.
+- `POST /_mapo/ai/read` reads a file into the text `run` takes, with the reader of its format: text, Markdown, JSON, HTML, CSV and XLSX. An app puts its own reader in place of any of Mapo's or adds one (`registerMapoAiReader()`), touches up what any reader read (the `mapo-ai:read` hook), and turns a format off without code (`readers`). In the browser, `useMapoAiRead()` sends a file.
 - The prompt is composed in layers: Mapo's base rules, the app's (`instructions`, and the `mapo-ai:prompt` hook), the entity's context, the operator's instructions, then the source, which is data and never instructions.
-- The app sets the verification rules (`verification`) and the limits (`limits`): calls per user per minute, the length of a source and of the operator's instructions.
+- The app sets the verification rules (`verification`) and the limits (`limits`): calls per user per minute, the length of a source and of the operator's instructions, the size of a file.
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model answered, the tokens (those of the provider's prompt cache among them) and the outcome, never the contents, for 90 days by default (`audit`).
 - `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
-- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`).
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -59,10 +60,11 @@ Register it one way or the other. With `@mapomodule/ai` in `modules` beside `map
 
 The gateway is a set of routes on your app's own Nitro server, under `/_mapo/ai/`. The prefix sits outside `/api/*` on purpose: a backend integration that proxies `/api` to the real backend never catches these routes. In an app served under a base URL, the routes move with it: with `app.baseURL: "/backoffice/"` the status route is `/backoffice/_mapo/ai/status`.
 
-| Route                  | Answer                                                                                                                                                                                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /_mapo/ai/status` | The version of the gateway's contract, whether the app lets the user use the AI and whether they administer it; to a user the app lets in, the `providers` with their models, the `default` and the `limits`; to an admin, also `storage` |
-| `POST /_mapo/ai/run`   | What the AI proposes for a record, or for the records of a source, read field by field ([Ask the AI](#ask-the-ai))                                                                                                                        |
+| Route                  | Answer                                                                                                                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /_mapo/ai/status` | The version of the gateway's contract, whether the app lets the user use the AI and whether they administer it; to a user the app lets in, the `providers` with their models, the `default`, the `limits` and the `readers`; to an admin, also `storage` |
+| `POST /_mapo/ai/read`  | The text of a file, as `run` takes it, or why there is none ([Read a file](#read-a-file))                                                                                                                                                                |
+| `POST /_mapo/ai/run`   | What the AI proposes for a record, or for the records of a source, read field by field ([Ask the AI](#ask-the-ai))                                                                                                                                       |
 
 The contract version goes up when a route or a response changes in a way an older client cannot read. The answers are the user's own, so they carry `Cache-Control: no-store`.
 
@@ -74,7 +76,7 @@ import type { MapoAiStatus } from "mapomodule/types";
 const status = await $fetch<MapoAiStatus>("/_mapo/ai/status");
 ```
 
-To a user the app lets in, `providers` lists what `run` may call for them, `default` what it calls when a request names nothing, and `limits` the limits of `run` ([Limits](#limits)). An empty `providers`, and no `default`, means `run` has no provider to call. To an admin, `storage` says whether the gateway can read and write its state, and why not, never the secret itself:
+To a user the app lets in, `providers` lists what `run` may call for them, `default` what it calls when a request names nothing, `limits` the limits of `run` and `read` ([Limits](#limits)), and `readers` the formats `read` takes, the app's readers first ([Read a file](#read-a-file)). An empty `providers`, and no `default`, means `run` has no provider to call. To an admin, `storage` says whether the gateway can read and write its state, and why not, never the secret itself:
 
 ```json
 {
@@ -95,16 +97,31 @@ To a user the app lets in, `providers` lists what `run` may call for them, `defa
   "limits": {
     "perUserPerMinute": 20,
     "maxSourceChars": 100000,
-    "maxInstructionsChars": 2000
-  }
+    "maxInstructionsChars": 2000,
+    "maxFileBytes": 10485760
+  },
+  "readers": [
+    {
+      "id": "text",
+      "label": "Text",
+      "extensions": ["txt"],
+      "types": ["text/plain"]
+    },
+    {
+      "id": "csv",
+      "label": "CSV",
+      "extensions": ["csv", "tsv"],
+      "types": ["text/csv", "text/tab-separated-values"]
+    }
+  ]
 }
 ```
 
-`secret` is `set`, `temporary` (none is set and the server runs in development), or what keeps the storage closed: `missing`, `too-short` or `not-text` ([The secret and the storage](#the-secret-and-the-storage)). `driver` is the name of the driver mounted at `mapo-ai`, when it has one: `fs` with the module's default in `nuxt dev`, `fs-lite` on a Node server.
+`secret` is `set`, `temporary` (none is set and the server runs in development), or what keeps the storage closed: `missing`, `too-short` or `not-text` ([The secret and the storage](#the-secret-and-the-storage)). `driver` is the name of the driver mounted at `mapo-ai`, when it has one: `fs` with the module's default in `nuxt dev`, `fs-lite` on a Node server. `readers` lists every reader that is on, the app's first: the example is cut to two of Mapo's six.
 
 ### A user the app refuses
 
-`status` answers every signed-in user, also one the app's rules refuse ([Restrict who uses the AI](#restrict-who-uses-the-ai)). That user gets the `contract`, `"allowed": false` and `"admin": false`, with a 200, and nothing more: no `storage`, `providers`, `default` or `limits`. Every other route of the gateway refuses them with 403.
+`status` answers every signed-in user, also one the app's rules refuse ([Restrict who uses the AI](#restrict-who-uses-the-ai)). That user gets the `contract`, `"allowed": false` and `"admin": false`, with a 200, and nothing more: no `storage`, `providers`, `default`, `limits` or `readers`. Every other route of the gateway refuses them with 403.
 
 It is an answer and not an error on purpose. A page asks `status` to know whether to offer the AI at all, and "not for you" is a normal answer to that question. As a 403, every page that asks would have to handle an error for a user who did nothing wrong, and through `$mapoFetch` Mapo would show its permission-denied message on each of those pages. With `allowed`, a page asks and leaves the AI out:
 
@@ -123,7 +140,7 @@ Every route of the gateway answers these errors:
 | 403    | The app's rules refuse the user: `users`, or a `mapo-ai:user` hook ([Who may use the gateway](#who-may-use-the-gateway)). `status` answers that user `"allowed": false` instead ([A user the app refuses](#a-user-the-app-refuses)) |
 | 502    | The backend cannot say who is signed in: it cannot be reached, it fails, or `userInfoApi` returns no user. The server's log says why, and the session is not touched                                                                |
 
-A route that changes something, as `run`, also refuses with 403 a request a browser marks as sent from another origin (`Sec-Fetch-Site` other than `same-origin`). Called with `$mapoFetch`, these errors behave as for any backend call: a 401 sends the user to the login page, and a 403 shows Mapo's permission-denied message. `run` has errors of its own ([Errors of run](#errors-of-run)).
+The two routes that take a POST, `read` and `run`, also refuse with 403 a request a browser marks as sent from another origin (`Sec-Fetch-Site` other than `same-origin`). Called with `$mapoFetch`, these errors behave as for any backend call: a 401 sends the user to the login page, and a 403 shows Mapo's permission-denied message. `run` and `read` have errors of their own ([Errors of run](#errors-of-run), [What read answers](#what-read-answers)).
 
 ## Who may use the gateway
 
@@ -399,6 +416,142 @@ It returns:
 - **Labels** come from the `mapo.ai.fill.*` and `mapo.ai.errors.*` messages of `@mapomodule/i18n`, in English and Italian, with the shared `mapo.apply` and `mapo.restore`; an app overrides them as any `mapo.*` message.
 
 The reference app has a scenario: `/ai/fill/new` and `/ai/fill/1` in `apps/example-e2e`, with sources for every outcome of the mock, its failures, and the app's rules in `server/plugins/`; `/ai/status` shows what `status` answers the account signed in (`admin`, `editor` or `viewer`). With a local model, `/ai/ollama/new` fills the same article through [Ollama](#ollama), with Mapo's `ollama` or the app's own provider ([Your own provider](#your-own-provider)), and shows what happens while it happens: the steps of the browser and of the server and, through the app's provider, the prompt the gateway composed and the words of the model as they come. `/ai/ollama/blocks/new` does the same on a complex form: every field type, two custom ones registered with `defineFormField()`, a repeater of blocks with nine templates and repeaters inside them, and repeaters the backend describes too, each item shown with what the gateway made of its values. With a key of OpenAI or Anthropic in the dev server's environment, `/ai/cloud/new` and `/ai/cloud/blocks/new` fill the same two forms with [OpenAI](#openai) or [Anthropic](#anthropic), and say what each call took: the time, the tokens, the prompt cache's share, the model that answered and an estimate of the cost.
+
+## Read a file
+
+`POST /_mapo/ai/read` reads a file the operator gives into the parts of a source: the text `run` takes. The page sends one file; the gateway reads it with the reader of its format and answers its text, which the page shows, and sends to `run` when the operator asks. Reading a file calls no AI, and the gateway keeps nothing of it.
+
+| Format   | Extensions                | Reader     | What `run` gets                                                                                                                                                                                                                                               |
+| -------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Text     | `.txt`                    | `text`     | The text as the file writes it                                                                                                                                                                                                                                |
+| Markdown | `.md`, `.markdown`        | `markdown` | The text, with its marks                                                                                                                                                                                                                                      |
+| JSON     | `.json`                   | `json`     | The text as the file writes it, every digit of a number included; a damaged file is `failed`                                                                                                                                                                  |
+| HTML     | `.html`, `.htm`, `.xhtml` | `html`     | The text a person reads on the page, in Markdown: headings, paragraphs, lists, quotes, bold and italic, links to the web, an email or a phone, tables. Scripts, styles, the page's title, comments, menus (`nav`), the controls of a form and images stay out |
+| CSV      | `.csv`, `.tsv`            | `csv`      | The sheet whole, as a Markdown table, its first row the header                                                                                                                                                                                                |
+| Excel    | `.xlsx`                   | `xlsx`     | Each sheet with something in it, whole, as a Markdown table under a heading with the sheet's name                                                                                                                                                             |
+
+- **Which reader.** A file goes to the reader of its name's extension, and only when no reader takes the extension, or the name has none, to the reader of its media type: a `.csv` that Windows declares as `application/vnd.ms-excel` is read as CSV.
+- **The text.** A file that is neither UTF-8 nor UTF-16 with its byte order mark is read as Windows-1252, as the spreadsheets and the editors of Western Europe write it; an HTML page in the encoding its `<meta charset>` names. A file with NUL characters, such as a binary one, is no text: it is `failed`.
+- **Sheets.** A row goes on a line, its cells between `|`, so the AI reads which column a value is in; rows and columns with nothing in them go. A CSV's delimiter is the one a first line `sep=;` names, or the first of tab, `;`, `|` and `,` that splits the first rows, so a CSV that writes decimals with a comma reads with `;`. A cell of a workbook gives its value, not its format: a date as `2026-03-02`, with its time when it has one, a number with up to 15 significant digits (`25%` is `0.25`), a formula the value the spreadsheet computed. Hidden sheets and rows are read like the others, and every sheet counts toward the length of the text. The old `.xls` is not read. A workbook is `failed` before the reader reads it when its XML unzips into more than 20 MB, counted as it unzips, when a part unzips into more than its ZIP declares, when its sheets hold more than 2 million cells, counting the empty ones up to the last row and column of each, or when it has more than 10,000 parts.
+- **Web pages.** The HTML reader is no browser: it applies no CSS, so what a style hides is read, and it cannot tell a page's content from its header and footer, which reach the AI too.
+- **Other formats.** Mapo has no reader for PDFs, images or Word documents (PDFs and images are planned): such a file is `unsupported`, unless the app registers a reader for it ([Replace or add a reader](#replace-or-add-a-reader)).
+- **Whole or not at all.** A file whose text is longer than `limits.maxSourceChars` is `too-long`: a source goes to `run` whole, never cut. The file itself may have up to `limits.maxFileBytes` bytes, 10 MB by default ([Limits](#limits)).
+
+### Send a file
+
+`useMapoAiRead()`, auto-imported in the app's components, sends a file to `read`. Its parts go to `run` as they are, each named after the file:
+
+```ts
+const { read } = useMapoAiRead();
+const answer = await read(file); // a File, from an <input type="file">
+if (answer.status === "read") await ai?.fill(answer.parts); // ai: useMapoAiFill()
+```
+
+`read(file, options?)` posts the file with `$mapoFetch`, as the field `file` of a form (`multipart/form-data`), and reads the answer as outside data; `options.name` names a `Blob` that has none, and `options.signal` stops waiting. It rejects with the error of the call (`$fetch`'s, with the HTTP status in `statusCode`), and with a `MapoAiReadAnswerError` (its `name`) for an answer it cannot read. A page that lets the operator edit the text before sending it sends the text instead: `fill(text)`.
+
+### What read answers
+
+| `status`      | What it means                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`        | `parts`, the source as `run` takes it, each part named after the file; `reader`, the id of the reader that read it                     |
+| `unsupported` | No reader takes the file's format, or the app has turned its reader off                                                                |
+| `empty`       | The reader found no text in the file                                                                                                   |
+| `too-long`    | The file's text has `chars` characters, more than `run` takes                                                                          |
+| `failed`      | The reader could not read the file: damaged, not the format its name says, or locked. The server's log says why, never the file's name |
+
+```json
+{
+  "status": "read",
+  "reader": "csv",
+  "parts": [
+    {
+      "kind": "text",
+      "text": "| Title | Status |\n| --- | --- |\n| Ten years of open data | In review |",
+      "name": "articles.csv"
+    }
+  ]
+}
+```
+
+These are answers, not errors, so a page that reads several files goes on with the others. The errors are the request's: 401 without a session; 403 for a user the app keeps out, or a request from another site; 502 when the backend cannot say who is signed in; 415 for a body that is no form; 413 for a file larger than `limits.maxFileBytes`, or any file when it is `0`; 400 for a form with no file, or more than one. `status` lists the formats the gateway reads (`readers`), from which a page builds the `accept` of its file input, and the largest file (`limits.maxFileBytes`).
+
+### Replace or add a reader
+
+Every way of reading can be replaced by the app. In a Nitro plugin, `registerMapoAiReader()`, auto-imported in the server's code, registers a reader: with the id of one of Mapo's (`text`, `markdown`, `json`, `html`, `csv`, `xlsx`) it takes that reader's place, and with an id of its own it adds a format. The app's readers come before Mapo's, so one that lists an extension of Mapo's reads it.
+
+```ts
+// server/plugins/mapo-ai-readers.ts
+export default defineNitroPlugin(() => {
+  registerMapoAiReader({
+    id: "ics",
+    label: "Calendar event",
+    extensions: ["ics"],
+    types: ["text/calendar"],
+    read(file) {
+      const text = eventText(new TextDecoder().decode(file.bytes)); // the app's own
+      return text ? [{ kind: "text", text, name: file.name }] : [];
+    },
+  });
+});
+```
+
+| Member       | What it is                                                                                                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | Lowercase letters, digits and `-`, starting with a letter                                                                                                                                                |
+| `label`      | Its name for people, in `status`                                                                                                                                                                         |
+| `extensions` | The extensions it reads, without the dot                                                                                                                                                                 |
+| `types`      | The media types it reads, for a file whose extension no reader lists, or that has none                                                                                                                   |
+| `read(file)` | Reads the file (`name`, `type`, `bytes`) into text parts, `{ kind: "text", text, name? }`, synchronously or not; it throws when it cannot read the file, and returns no part when the file holds no text |
+
+The gateway reads what a reader returns as outside data, as it reads a provider's answer: an entry that is no text part is left out, a text is trimmed and a blank one goes, a part's name is cut to 200 characters, and a reader that throws, or leaves more parts than the 20 `run` takes, makes the file `failed`. Registering an id twice throws, and so does a reader that is none: an id that is not a reader's, no `read()`, or no extension and no media type.
+
+### Touch up what is read
+
+The `mapo-ai:read` hook runs for every file a reader has read, after its reader, Mapo's or the app's: through `context.parts` it changes a part's text, removes parts or adds some. A file no reader takes (`unsupported`) never reaches it.
+
+```ts
+// server/plugins/mapo-ai-readers.ts
+export default defineNitroPlugin((nitroApp) => {
+  // The editors' internal notes stay out of the AI.
+  nitroApp.hooks.hook("mapo-ai:read", (context) => {
+    for (const part of context.parts) {
+      part.text = part.text
+        .split("\n")
+        .filter((line) => !/^\s*internal:/i.test(line))
+        .join("\n");
+    }
+  });
+});
+```
+
+The hook runs with:
+
+| Field           | What it holds                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `event`         | The request                                                                                     |
+| `user`, `admin` | Who sent the file, as the gateway reads them (`MapoAiUser`), and whether they administer the AI |
+| `file`          | Its `name`, `type` and `size` in bytes, never its content                                       |
+| `reader`        | The id of the reader that read it                                                               |
+| `parts`         | What the reader read, `{ kind: "text", text, name? }`: change a text, remove parts or add some  |
+
+`file` and `user` are read-only. A hook that throws makes the file `failed`; what the hooks leave is read as a reader's, and measured against `limits.maxSourceChars`. The hook sees files only: a text the page sends to `run` itself, such as a pasted one, never goes through it, so it is no boundary for what reaches a provider.
+
+### Turn a format off
+
+`readers` turns a reader off by its id, Mapo's or the app's, without code:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      readers: { xlsx: false },
+    },
+  },
+});
+```
+
+A file of a format that is off is `unsupported`, even when its media type names a reader that is on, and `status` does not list the reader. Every reader of Mapo has its place in the runtime config, so the environment turns one off when the server starts: `NUXT_MAPO_AI_READERS_XLSX=false`. A reader of the app's has its place once `readers` names it (`ics: true`). A value that is neither `true` nor `false` turns the reader off, and the build warns about it.
 
 ## Providers
 
@@ -759,17 +912,19 @@ export default defineNuxtConfig({
         perUserPerMinute: 20,
         maxSourceChars: 100000,
         maxInstructionsChars: 2000,
+        maxFileBytes: 10485760,
       },
     },
   },
 });
 ```
 
-- `perUserPerMinute`: the calls to `run` one user may make in the last sixty seconds; `0` takes none. The count lives in the memory of the server process: a restart forgets it, and each process of a server with several counts for itself. A request the gateway refuses before calling the provider does not count; one past the limit gets a 429 with `Retry-After`.
-- `maxSourceChars`: the characters of the source, all its parts together, counted as JavaScript counts a string's `length`; `0` lets through only an empty source.
+- `perUserPerMinute`: the calls to `run` one user may make in the last sixty seconds; `0` takes none. `read` calls no AI, and has no limit of calls. The count lives in the memory of the server process: a restart forgets it, and each process of a server with several counts for itself. A request the gateway refuses before calling the provider does not count; one past the limit gets a 429 with `Retry-After`.
+- `maxSourceChars`: the characters of the source, all its parts together, counted as JavaScript counts a string's `length`; `0` lets through only an empty source. `read` reads no file into more: a longer one is `too-long`.
 - `maxInstructionsChars`: the characters of the operator's instructions; `0` lets operators send none.
+- `maxFileBytes`: the bytes of a file `read` takes, 10 MB (10485760) by default; `0` takes none.
 
-Past either length the request gets a 413. Besides the source and the instructions, a body may have 2 MB for the entities' descriptions. A larger one gets a 413 too: at once when its `Content-Length` says so, otherwise as soon as what has arrived passes the bound, before the rest is read.
+Past either length of `run` the request gets a 413. Besides the source and the instructions, a body of `run` may have 2 MB for the entities' descriptions. A larger one gets a 413 too: at once when its `Content-Length` says so, otherwise as soon as what has arrived passes the bound, before the rest is read. A request of `read` is bounded the same way: its body may have `maxFileBytes` bytes and 16 KB more for the form's own headers, and a file larger than `maxFileBytes` gets a 413, as does any file when it is `0`.
 
 ## The audit
 
@@ -852,19 +1007,20 @@ A record can carry an expiry. An expired record is never returned: it is removed
 
 Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. Its options:
 
-| Option         | Type                                                                                    | Default                                | Description                                                                       |
-| -------------- | --------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------- |
-| `admin`        | `{ groups?: string[]; permissions?: string[] }`                                         | `{}`: superusers only                  | Who administers the AI ([Admins](#admins))                                        |
-| `users`        | `{ groups?: string[]; permissions?: string[] }`                                         | Not set: every signed-in user          | Who may use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai))        |
-| `providers`    | `Record<string, MapoAiProviderOptions \| false>`                                        | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their options ([Providers](#providers))         |
-| `default`      | `{ provider?: string; models?: { fill?: string; extract?: string } }`                   | The first provider and its first model | What a request that names no provider or model gets                               |
-| `instructions` | `{ all?: string; fill?: string; extract?: string }`                                     | `{}`                                   | The app's rules in every prompt ([The prompt](#the-prompt))                       |
-| `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks? }`                 | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification)) |
-| `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number }` | `20`, `100000`, `2000`                 | The limits of `run` ([Limits](#limits))                                           |
-| `audit`        | `{ retentionDays?: number }`                                                            | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                        |
+| Option         | Type                                                                                                           | Default                                | Description                                                                              |
+| -------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `admin`        | `{ groups?: string[]; permissions?: string[] }`                                                                | `{}`: superusers only                  | Who administers the AI ([Admins](#admins))                                               |
+| `users`        | `{ groups?: string[]; permissions?: string[] }`                                                                | Not set: every signed-in user          | Who may use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai))               |
+| `providers`    | `Record<string, MapoAiProviderOptions \| false>`                                                               | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their options ([Providers](#providers))                |
+| `default`      | `{ provider?: string; models?: { fill?: string; extract?: string } }`                                          | The first provider and its first model | What a request that names no provider or model gets                                      |
+| `instructions` | `{ all?: string; fill?: string; extract?: string }`                                                            | `{}`                                   | The app's rules in every prompt ([The prompt](#the-prompt))                              |
+| `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks? }`                                        | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification))        |
+| `readers`      | `Record<string, boolean>`                                                                                      | `{}`: every reader on                  | The readers of `read` turned off, or on, by id ([Turn a format off](#turn-a-format-off)) |
+| `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number; maxFileBytes?: number }` | `20`, `100000`, `2000`, `10485760`     | The limits of `run` and `read` ([Limits](#limits))                                       |
+| `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |
 
 An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
 
-The module reads every option when the app builds, and warns about what it cannot read. A value it cannot read never widens what the AI may do: a `users` that names no group or permission it can read lets in only superusers and the AI's admins, a provider it cannot read is not enabled, and a limit it cannot read is `0`, the narrowest. A rule of verification, or the audit's retention, that it cannot read keeps its default. The options reach the server in its private runtime config, never in the public one, complete with their defaults, so the environment can change one when the server starts, with Nuxt's variables: `NUXT_MAPO_AI_LIMITS_PER_USER_PER_MINUTE=50`. An option with no default that the config does not set, such as `default.provider`, is not in the runtime config, so no variable reaches it. The server reads the options again with the same rules, and logs once a value it cannot read. Nuxt merges the options as any configuration: across layers, and `mapoAi` with `mapo.ai`, lists add up instead of replacing each other, so a layer's `groups` and the app's are all kept.
+The module reads every option when the app builds, and warns about what it cannot read. A value it cannot read never widens what the AI may do: a `users` that names no group or permission it can read lets in only superusers and the AI's admins, a provider it cannot read is not enabled, a reader whose value it cannot read is off, and a limit it cannot read is `0`, the narrowest. A rule of verification, or the audit's retention, that it cannot read keeps its default. The options reach the server in its private runtime config, never in the public one, complete with their defaults, so the environment can change one when the server starts, with Nuxt's variables: `NUXT_MAPO_AI_LIMITS_PER_USER_PER_MINUTE=50`. An option with no default that the config does not set, such as `default.provider`, is not in the runtime config, so no variable reaches it. The server reads the options again with the same rules, and logs once a value it cannot read. Nuxt merges the options as any configuration: across layers, and `mapoAi` with `mapo.ai`, lists add up instead of replacing each other, so a layer's `groups` and the app's are all kept.
 
 The secret is not an option: it is the environment variable `NUXT_MAPO_AI_SECRET`, read when the server starts. The providers' keys go in the environment too: `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY` and `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`.

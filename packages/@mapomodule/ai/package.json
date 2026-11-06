@@ -50,6 +50,7 @@
     "@mapomodule/form": "workspace:*",
     "@mapomodule/utils": "workspace:*",
     "h3": "^1.15.11",
+    "read-excel-file": "^9.3.14",
     "zod": "^4.1.13"
   },
   "peerDependencies": {

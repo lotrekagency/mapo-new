@@ -2,16 +2,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isRecord } from "../runtime/shared/guards";
 import { DEFAULT_VERIFICATION_RULES } from "../runtime/shared/sanitize";
 
-/** The options of `run` the module writes when the app sets none of them. */
+/** Mapo's readers, each on, as the module writes them when the app turns none off. */
+const READERS_ON = {
+  text: true,
+  markdown: true,
+  json: true,
+  html: true,
+  csv: true,
+  xlsx: true,
+};
+
+/** The options of `run` and `read` the module writes when the app sets none of them. */
 const RUN_DEFAULTS = {
   providers: {},
   default: { models: {} },
   instructions: { all: "", fill: "", extract: "" },
   verification: { ...DEFAULT_VERIFICATION_RULES },
+  readers: READERS_ON,
   limits: {
     perUserPerMinute: 20,
     maxSourceChars: 100_000,
     maxInstructionsChars: 2_000,
+    maxFileBytes: 10 * 1024 * 1024,
   },
   audit: { retentionDays: 90 },
 };
@@ -147,6 +159,11 @@ describe("the module", () => {
         handler: "resolved:./runtime/server/routes/status.get",
       },
       {
+        route: "/_mapo/ai/read",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/read.post",
+      },
+      {
         route: "/_mapo/ai/run",
         method: "post",
         handler: "resolved:./runtime/server/routes/run.post",
@@ -165,16 +182,24 @@ describe("the module", () => {
         name: "registerMapoAiMockFixtures",
         from: "resolved:./runtime/server/providers/mock",
       },
+      {
+        name: "registerMapoAiReader",
+        from: "resolved:./runtime/server/readers/registry",
+      },
     ]);
   });
 
-  it("gives the app's pages the composable that fills a detail form", async () => {
+  it("gives the app's pages the composables that fill a detail form and read a file", async () => {
     await setup({ public: {} });
 
     expect(kit.appImports).toEqual([
       {
         name: "useMapoAiFill",
         from: "resolved:./runtime/composables/useMapoAiFill",
+      },
+      {
+        name: "useMapoAiRead",
+        from: "resolved:./runtime/composables/useMapoAiRead",
       },
     ]);
   });
@@ -297,11 +322,58 @@ describe("the options of run", () => {
         perUserPerMinute: 5,
         maxSourceChars: 100_000,
         maxInstructionsChars: 2_000,
+        maxFileBytes: 10 * 1024 * 1024,
       },
       audit: { retentionDays: 30 },
     });
     expect(runtimeConfig.public).toEqual({});
     expect(kit.warnings).toEqual([]);
+  });
+
+  it("gives every reader of Mapo its place, so the environment can turn one off", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      readers: { xlsx: false, ics: true },
+      limits: { maxFileBytes: 1024 },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      readers: { ...READERS_ON, xlsx: false, ics: true },
+      limits: { maxFileBytes: 1024 },
+    });
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("turns off a reader whose value cannot be read, and ignores an id that is no reader's", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      readers: { html: "no", "Not An Id": false },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      readers: { ...READERS_ON, html: false },
+    });
+    expect(kit.warnings).toEqual([
+      expect.stringContaining(
+        "mapo.ai.readers.html is not true or false, so the reader is off",
+      ),
+      expect.stringContaining(
+        "mapo.ai.readers.Not An Id: a reader's id is lowercase letters",
+      ),
+    ]);
+  });
+
+  it("turns every reader on when mapo.ai.readers cannot be read", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, { readers: ["xlsx"] });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({ readers: READERS_ON });
+    expect(kit.warnings).toEqual([
+      expect.stringContaining("mapo.ai.readers is not an object of readers"),
+    ]);
   });
 
   it("gives a provider without a timeout the default one, and leaves its models to it", async () => {

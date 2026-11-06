@@ -41,7 +41,7 @@ Mapo v2 is in beta and published on the `next` dist-tag. The `latest` tag still 
 | [`@mapomodule/i18n`](packages/@mapomodule/i18n)   | `@nuxtjs/i18n` v10 wrapper with Mapo's English and Italian catalogs and `useMapoT()`                                                                               |
 | [`@mapomodule/utils`](packages/@mapomodule/utils) | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …): not a Nuxt module, imported explicitly                                                         |
 | [`@mapomodule/mcp`](packages/@mapomodule/mcp)     | Development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration                                                 |
-| [`@mapomodule/ai`](packages/@mapomodule/ai)       | Experimental, opt-in with `mapo.ai`: AI-assisted data entry. Today the AI gateway (`/_mapo/ai/*`), its encrypted storage, and `useMapoAiFill()` for detail forms   |
+| [`@mapomodule/ai`](packages/@mapomodule/ai)       | Experimental, opt-in with `mapo.ai`: AI-assisted data entry. Today the AI gateway (`/_mapo/ai/*`) with readers of files, its storage, and `useMapoAiFill()`        |
 
 Backend integrations ship from their own repositories. [`@mapomodule/mapo-integrations-camomilla`](https://github.com/camomillacms/mapo-integrations-camomilla) proxies a [Camomilla CMS](https://github.com/lotrekagency/camomilla) backend; any other backend gets [its own small integration](https://lotrekagency.github.io/mapo-new/modules/integrations-howto).
 

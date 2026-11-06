@@ -744,7 +744,7 @@ Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. S
 
 ## AI — `@mapomodule/ai`
 
-Experimental, installed with `mapo.ai`. `useMapoAiFill()` is auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
+Experimental, installed with `mapo.ai`. `useMapoAiFill()` and `useMapoAiRead()` are auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
 
 ### `useMapoAiFill(target, options?)`
 
@@ -770,6 +770,25 @@ Fills a detail form from a source, through the gateway's `run`: each value a quo
 | `error`    | `Readonly<Ref<MapoAiFillError \| undefined>>`                                             | `{ status, message, retryAfter? }`: why the last call got no answer; `status` is `0` without one.                                                                                                          |
 | `response` | `Readonly<Ref<MapoAiFillResponse \| undefined>>`                                          | The last answer of `run`: the outcomes, or the model's refusal.                                                                                                                                            |
 | `fields`   | `Readonly<Ref<readonly MapoAiFillField[]>>`                                               | Each field of the answer: `key`, `path`, `action`, `replaces`, `applied` and the `outcome`.                                                                                                                |
+
+---
+
+### `useMapoAiRead()`
+
+Reads the operator's files into text through the gateway's `read`, as `run` takes it: for a page that lets the operator give the AI a file instead of a pasted text. Reading calls no AI and keeps nothing of the file. See [Send a file](/modules/ai#send-a-file).
+
+**Returns:** `MapoAiRead`:
+
+| Member | Type                                                                       | Description                                                                                                                                                                                                                                                                                             |
+| ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read` | `(file: Blob, options?: MapoAiReadOptions) => Promise<MapoAiReadResponse>` | Posts the file, as the field `file` of a form, and resolves with the answer: `status: "read"` with the `parts` to give `useMapoAiFill().fill()`, or `unsupported`, `empty`, `too-long`, `failed`. It rejects with the error of the call, and with `MapoAiReadAnswerError` for an answer it cannot read. |
+
+`options` of `read`:
+
+| Option   | Type          | Default                        | Description                        |
+| -------- | ------------- | ------------------------------ | ---------------------------------- |
+| `name`   | `string`      | The `File`'s name, else `file` | The name of a `Blob` that has none |
+| `signal` | `AbortSignal` | —                              | Stops waiting for the answer       |
 
 ---
 
@@ -809,3 +828,15 @@ The error a provider's `run()` throws for a failure the gateway tells apart: `ti
 | `options.cause`      | `unknown`               | —              | The error behind it.                                                                                           |
 
 **Returns:** `MapoAiProviderError` — with its `failure`, and `retryAfter` when given.
+
+---
+
+### `registerMapoAiReader(reader)`
+
+Registers a reader of files the app implements, from a Nitro plugin: in place of Mapo's reader with the same id, or for a format of its own. The gateway gives a file to the reader of its name's extension, the app's before Mapo's, and only then to the reader of its media type; `mapo.ai.readers` turns a reader off by its id. See [Replace or add a reader](/modules/ai#replace-or-add-a-reader).
+
+| Parameter | Type           | Default        | Description                                                                                                                                                                                                                                                          |
+| --------- | -------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reader`  | `MapoAiReader` | — **required** | `id` (lowercase letters, digits and `-`, starting with a letter; `text`, `markdown`, `json`, `html`, `csv` and `xlsx` are Mapo's), `label?`, `extensions` (without the dot), `types?` (media types) and `read(file)`, which returns text parts or a promise of them. |
+
+**Returns:** `void`. It throws a `TypeError` when the id is not a reader's, `read` is missing, or the reader lists no extension and no media type (or one that is none), and an `Error` when the id is registered already.

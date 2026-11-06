@@ -12,6 +12,7 @@ import {
 import type { NuxtModule } from "@nuxt/schema";
 import { accessRuleOption } from "./access";
 import type { MapoAiOptions } from "./index";
+import { MAPO_AI_READER_IDS } from "./runtime/server/readers/registry";
 import {
   MAPO_AI_SERVER_PROVIDERS,
   providerKeyOf,
@@ -28,10 +29,12 @@ export type { MapoAiOptions, MapoAiStatus } from "./index";
  * Mapo AI-assisted data entry (experimental).
  *
  * Registers the AI gateway on the app's own Nitro server, under
- * `/_mapo/ai/*`: `status`, and `run`, which calls the providers the app
- * enables. Its state goes to a sealed storage: the Nitro mount `mapo-ai`,
+ * `/_mapo/ai/*`: `status`; `read`, which reads a file into text with
+ * Mapo's readers or the app's; and `run`, which calls the providers the
+ * app enables. Its state goes to a sealed storage: the Nitro mount `mapo-ai`,
  * encrypted with `NUXT_MAPO_AI_SECRET`. The app's pages get
- * `useMapoAiFill()`, which fills a detail form through `run`. Opt-in: the
+ * `useMapoAiFill()`, which fills a detail form through `run`, and
+ * `useMapoAiRead()`, which reads a file through `read`. Opt-in: the
  * meta-module installs it only when the app sets `mapo.ai`, so an app
  * without that key loads nothing of it.
  */
@@ -96,6 +99,12 @@ export default defineNuxtModule<MapoAiOptions>({
         return [id, { ...enabled, apiKey: written ?? "" }];
       }),
     );
+    // Every reader of Mapo has its place, so the environment can turn one
+    // off at runtime (`NUXT_MAPO_AI_READERS_XLSX=false`).
+    const readers = {
+      ...Object.fromEntries(MAPO_AI_READER_IDS.map((id) => [id, true])),
+      ...run.readers,
+    };
     nuxt.options.runtimeConfig.mapoAi = {
       secret: "",
       ...configured,
@@ -103,10 +112,11 @@ export default defineNuxtModule<MapoAiOptions>({
       ...(users ? { users } : {}),
       ...run,
       providers,
+      readers,
     };
 
-    // The hooks, `mapo-ai:user` and `mapo-ai:prompt`, typed in the app's
-    // server code.
+    // The hooks, `mapo-ai:user`, `mapo-ai:prompt` and `mapo-ai:read`, typed
+    // in the app's server code.
     addTypeTemplate(
       {
         filename: "types/mapo-ai.d.ts",
@@ -140,14 +150,22 @@ export default defineNuxtModule<MapoAiOptions>({
         name: "registerMapoAiMockFixtures",
         from: resolver.resolve("./runtime/server/providers/mock"),
       },
+      {
+        name: "registerMapoAiReader",
+        from: resolver.resolve("./runtime/server/readers/registry"),
+      },
     ]);
 
-    // What the app's pages use, without an import: the composable that
-    // fills a detail form through the gateway.
+    // What the app's pages use, without an import: the composables that
+    // fill a detail form and read a file through the gateway.
     addImports([
       {
         name: "useMapoAiFill",
         from: resolver.resolve("./runtime/composables/useMapoAiFill"),
+      },
+      {
+        name: "useMapoAiRead",
+        from: resolver.resolve("./runtime/composables/useMapoAiRead"),
       },
     ]);
 
@@ -155,6 +173,11 @@ export default defineNuxtModule<MapoAiOptions>({
       route: `${MAPO_AI_GATEWAY_PATH}/status`,
       method: "get",
       handler: resolver.resolve("./runtime/server/routes/status.get"),
+    });
+    addServerHandler({
+      route: `${MAPO_AI_GATEWAY_PATH}/read`,
+      method: "post",
+      handler: resolver.resolve("./runtime/server/routes/read.post"),
     });
     addServerHandler({
       route: `${MAPO_AI_GATEWAY_PATH}/run`,

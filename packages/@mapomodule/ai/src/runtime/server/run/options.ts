@@ -1,6 +1,7 @@
 /**
- * The options of `run`: the providers it may call, its defaults, the app's
- * rules, the verification rules, its limits and the audit's retention.
+ * The options of `run` and `read`: the providers `run` may call, its
+ * defaults, the app's rules, the verification rules, the readers `read`
+ * leaves on, the limits and the audit's retention.
  * They are read twice, with the same rules: when the app builds, from
  * `mapo.ai`, with a warning for each value that cannot be read; when the
  * server runs, from the private runtime config, where the environment may
@@ -107,6 +108,11 @@ export interface MapoAiRunOptions {
   /** The app's rules, for every task and for each. */
   instructions: { all: string; fill: string; extract: string };
   verification: AiVerificationRules;
+  /**
+   * The readers the app turns on or off, by id, as it wrote them: a reader
+   * not here is on.
+   */
+  readers: Record<string, boolean>;
   limits: MapoAiLimits;
   audit: { retentionDays: number };
 }
@@ -153,6 +159,7 @@ export const DEFAULT_LIMITS: Readonly<MapoAiLimits> = Object.freeze({
   perUserPerMinute: 20,
   maxSourceChars: 100_000,
   maxInstructionsChars: 2_000,
+  maxFileBytes: 10 * 1024 * 1024,
 });
 /** Days an audit record is kept, unless `mapo.ai.audit.retentionDays` says otherwise. */
 export const DEFAULT_RETENTION_DAYS = 90;
@@ -160,7 +167,7 @@ export const DEFAULT_RETENTION_DAYS = 90;
 const MAX_TIMEOUT = 3600;
 const MAX_RETENTION_DAYS = 3650;
 const MAX_MODEL_ID = 200;
-/** A provider's id: lowercase letters, digits and `-`, starting with a letter. */
+/** A provider's id, or a reader's: lowercase letters, digits and `-`, starting with a letter. */
 const PROVIDER_ID = /^[a-z][a-z0-9-]{0,63}$/;
 const TASKS = ["fill", "extract"] as const;
 const RULE_NAMES = Object.keys(
@@ -182,6 +189,7 @@ export function readRunOptions(
     default: defaultsOf(options.default, warn),
     instructions: instructionsOf(options.instructions, warn),
     verification: verificationOf(options.verification, warn),
+    readers: readersOf(options.readers, warn),
     limits: limitsOf(options.limits, warn),
     audit: auditOf(options.audit, warn),
   };
@@ -542,6 +550,39 @@ function verificationOf(
   return rules;
 }
 
+/**
+ * The readers the app turns on or off. A value that cannot be read turns
+ * the reader off: the app wrote something about it, and a reader it meant
+ * to turn off must not read.
+ */
+function readersOf(
+  value: unknown,
+  warn: (message: string) => void,
+): Record<string, boolean> {
+  const readers: Record<string, boolean> = {};
+  if (value === undefined || value === null) return readers;
+  if (!isRecord(value)) {
+    warn(
+      "mapo.ai.readers is not an object of readers by id, each true or false, so every reader is on.",
+    );
+    return readers;
+  }
+  for (const [id, on] of Object.entries(value)) {
+    const option = `mapo.ai.readers.${id}`;
+    if (!PROVIDER_ID.test(id)) {
+      warn(
+        `${option}: a reader's id is lowercase letters, digits and "-", starting with a letter, so it is ignored.`,
+      );
+      continue;
+    }
+    if (typeof on !== "boolean") {
+      warn(`${option} is not true or false, so the reader is off.`);
+    }
+    readers[id] = on === true;
+  }
+  return readers;
+}
+
 function limitsOf(
   value: unknown,
   warn: (message: string) => void,
@@ -551,7 +592,7 @@ function limitsOf(
   const names = Object.keys(DEFAULT_LIMITS) as (keyof MapoAiLimits)[];
   if (!isRecord(value)) {
     warn(
-      "mapo.ai.limits is not { perUserPerMinute?, maxSourceChars?, maxInstructionsChars? }, so every limit is 0: run takes no call.",
+      "mapo.ai.limits is not { perUserPerMinute?, maxSourceChars?, maxInstructionsChars?, maxFileBytes? }, so every limit is 0: run takes no call, and read no file.",
     );
     for (const name of names) limits[name] = 0;
     return limits;

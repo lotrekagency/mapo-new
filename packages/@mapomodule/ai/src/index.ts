@@ -14,6 +14,8 @@ export type {
   MapoAiFillRequest,
   MapoAiLimits,
   MapoAiProviderStatus,
+  MapoAiReaderStatus,
+  MapoAiReadResponse,
   MapoAiRunEntity,
   MapoAiRunRequest,
   MapoAiRunResponse,
@@ -39,6 +41,11 @@ export type {
   MapoAiProviderRequest,
 } from "./runtime/server/providers/types";
 export type { MapoAiMockFixture } from "./runtime/server/providers/mock";
+export type {
+  MapoAiReadContext,
+  MapoAiReader,
+  MapoAiReadFile,
+} from "./runtime/server/readers/types";
 export type { MapoAiPrompt } from "./runtime/server/prompts/compose";
 export type {
   MapoAiPromptContext,
@@ -53,6 +60,11 @@ export type {
   MapoAiFillEntry,
   MapoAiFillResponse,
 } from "./runtime/shared/fill";
+export type {
+  MapoAiReadDependencies,
+  MapoAiReadOptions,
+} from "./runtime/shared/read";
+export type { MapoAiRead } from "./runtime/composables/useMapoAiRead";
 export type {
   MapoAiFill,
   MapoAiFillCall,
@@ -145,10 +157,22 @@ export interface MapoAiOptions {
    */
   verification?: Partial<AiVerificationRules>;
   /**
-   * The limits of `run`: the calls one user may make in a minute (counted
-   * in the memory of each server process), the characters of a source, and
-   * those of the operator's own instructions (`0` lets operators send none).
-   * @default { perUserPerMinute: 20, maxSourceChars: 100000, maxInstructionsChars: 2000 }
+   * The readers `read` reads files with, by id, each `true` or `false`:
+   * Mapo's (`text`, `markdown`, `json`, `html`, `csv`, `xlsx`) and those the
+   * app registers with `registerMapoAiReader()`. Every reader is on unless
+   * turned off here, or in the environment (`NUXT_MAPO_AI_READERS_XLSX=false`
+   * for one of Mapo's). A file of a format that is off is `unsupported`.
+   * @default {} (every reader on)
+   * @example { xlsx: false }
+   */
+  readers?: Record<string, boolean>;
+  /**
+   * The limits of `run` and `read`: the calls one user may make in a minute
+   * (counted in the memory of each server process), the characters of a
+   * source (`read` reads no file into more), those of the operator's own
+   * instructions (`0` lets operators send none), and the bytes of a file
+   * `read` takes (`0` takes none).
+   * @default { perUserPerMinute: 20, maxSourceChars: 100000, maxInstructionsChars: 2000, maxFileBytes: 10485760 }
    */
   limits?: Partial<MapoAiLimits>;
   /**

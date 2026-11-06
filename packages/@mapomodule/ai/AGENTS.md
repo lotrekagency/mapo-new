@@ -4,16 +4,16 @@ Local rules for the AI-assisted data entry package. The root [`AGENTS.md`](../..
 
 ## What this package is
 
-An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers signed-in users: `GET status`, what it offers them (and to admins the state of the storage), and `POST run`, which builds what the AI may fill from a record's two descriptions, composes the prompt in layers, calls a **provider** (Mapo's `mock`, `openai`, `anthropic`, `ollama` or `openai-compatible`, or one the app registers and enables) and answers the sanitized outcome of each field. In the browser, **`useMapoAiFill()`** fills a detail form through `run`: it writes each value a quote verifies into an empty field, and marks every other one for the operator. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; `run` writes its audit there.
+An experimental, opt-in Nuxt module. The meta-module installs it only when the app sets `mapo.ai`; registered on its own it reads `mapoAi`. Today it registers the **AI gateway** on the app's Nitro server, under `/_mapo/ai/*`. The gateway knows the user from the **backend session**, forwarding the request's cookie to `userInfoApi`, and answers signed-in users: `GET status`, what it offers them (and to admins the state of the storage); `POST read`, which reads a file into the text `run` takes, with the reader of its format, Mapo's or one the app registers in its place or for a format of its own; and `POST run`, which builds what the AI may fill from a record's two descriptions, composes the prompt in layers, calls a **provider** (Mapo's `mock`, `openai`, `anthropic`, `ollama` or `openai-compatible`, or one the app registers and enables) and answers the sanitized outcome of each field. In the browser, **`useMapoAiRead()`** sends a file to `read`, and **`useMapoAiFill()`** fills a detail form through `run`: it writes each value a quote verifies into an empty field, and marks every other one for the operator. The gateway's state has a **sealed storage**: the Nitro mount `mapo-ai`, every record encrypted with a key derived from `NUXT_MAPO_AI_SECRET`; `run` writes its audit there.
 
 ## Layout
 
 ```text
 src/
   module.ts                  Nuxt module: the gateway routes (addServerHandler), the plugins, the server's auto-imports
-                             (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures), the app's
-                             (useMapoAiFill), the secret and the options in private runtime config, the default mount at
-                             `ready`, the hooks' types
+                             (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures, registerMapoAiReader),
+                             the app's (useMapoAiFill, useMapoAiRead), the secret and the options in private runtime config,
+                             every reader of Mapo's place in it, the default mount at `ready`, the hooks' types
   storage.ts                 build time: the file-system default of the `mapo-ai` mount, as Nitro does for `data`
   access.ts                  build time: the `admin` and `users` options, read with a warning for what cannot be read
   index.ts                   public types (MapoAiOptions, MapoAiStatus, MapoAiUserContext…), also re-exported by
@@ -37,9 +37,12 @@ src/
                                fill.ts     the browser's half of `run`: the request from the two descriptions, the
                                            answer read as outside data, what goes into the form (`planMapoAiFill`),
                                            the model's paths, and the operation `runMapoAiFill()`
+                               read.ts     the browser's half of `read`: the file sent as a form, the answer read as
+                                           outside data (`readMapoAiFile()`)
                                guards.ts   type guards for outside values
   runtime/composables/       useMapoAiFill.ts: the plan applied to a detail form, its marks, restore and undo, waiting
-                             and failing; for the browser, with Vue and `useNuxtApp()`
+                             and failing; useMapoAiRead.ts: a file sent to `read`; poster.ts: how both call the gateway
+                             (`$mapoFetch`); for the browser, with Vue and `useNuxtApp()`
   runtime/server/auth/       who calls the gateway:
                                user.ts     the user read from `userInfoApi`'s answer (zod); the rules: admin, users,
                                            a model's permission; pure
@@ -47,11 +50,12 @@ src/
                                nitro.ts    the wiring: readMapoAiCaller(event), requireMapoAiSession(event),
                                            requireMapoAiAdmin(event), requireModelPermission(); Nitro's local fetch,
                                            the hooks, the cross-site check
-                               hooks.ts    the `mapo-ai:user` and `mapo-ai:prompt` hooks, typed for the app's server code
+                               hooks.ts    the `mapo-ai:user`, `mapo-ai:prompt` and `mapo-ai:read` hooks, typed for the
+                                           app's server code
   runtime/server/run/        the `run` route's parts:
                                request.ts  the body as outside data: JSON by type, a size bound, zod on the envelope
                                contract.ts the contract, built by the gateway from the two descriptions of each entity
-                               options.ts  the options of `run`, read at build time and at runtime by the same rules; pure
+                               options.ts  the options of `run` and `read`, read at build time and at runtime alike; pure
                                policy.ts   which provider and model a request gets; pure
                                limiter.ts  each user's calls of the last minute, in memory; pure
                                audit.ts    the audit record, its key, its validator, its write
@@ -64,6 +68,12 @@ src/
                              ollama.ts, openaiCompatible.ts, with local.ts (the server's address, the schema in the
                              prompt, the tokens, the models' details); http.ts for all (calls, failures, masked keys,
                              streams read within a bound)
+  runtime/server/readers/    the `read` route's parts: types.ts (MapoAiReader, the hook's context), registry.ts
+                             (registerMapoAiReader, Mapo's readers, the reader of a file), text.ts (bytes as text; text,
+                             Markdown, JSON), html.ts (HTML into Markdown, a tokenizer of its own), sheets.ts (CSV and XLSX
+                             into Markdown tables, the CSV parser, the bound on what an XLSX unzips), read.ts (the
+                             operation), upload.ts (the request), nitro.ts (the wiring: the readers on, limits, hooks)
+  runtime/server/body.ts     a request's body read up to a bound, for `run` and `read`
   runtime/server/prompts/    base.ts (Mapo's base rules, MAPO_AI_PROMPT_VERSION), compose.ts (the prompt in layers)
   runtime/server/storage/    the sealed storage of the gateway's state:
                                sealed.ts   envelopes (AES-256-GCM, WebCrypto), a key per purpose (HKDF), users as keyed
@@ -98,6 +108,7 @@ src/
 15. **The page writes only what the answer verifies on an empty field it shows, as the form writes, and undoes only its own.** `useMapoAiFill()` reads the answer of `run` as outside data (`readMapoAiFillResponse()`), and writes by itself only a value whose action is `apply`: verified, on a field that holds nothing and that the form shows. Everything else waits for the operator, marked at the field's value path, where the form looks. It writes only the keys the form's fields declare, through own properties and never through a segment that leads to a prototype, and as `useMapoForm()` writes: the field's accessor, every language of a `synci18n` field, `onChange`; keep the two in step. `restore()` and `undo()` put back only what still holds the AI's value, removing the keys and objects it added, and it removes only its own marks. The fields, the language and `isNew` are read after the `OPTIONS`. A related record is never written before someone finds it. Labels come from `mapo.ai.*`, and the shared `mapo.apply` and `mapo.restore`, in both catalogs of `@mapomodule/i18n`.
 16. **A local model never reads a cut prompt in silence.** Mapo's providers for local models call only the address the app sets (`baseURL`, read by `serverURL()`), never one from a request. They put the answer's schema in the prompt, cap the answer by the schema's size, stream from the server, and turn a prompt the model cannot read whole into `too-long` and an answer cut at its cap into `truncated`: Ollama gets `truncate: false` and `shift: false`, since by default it cuts the prompt, rules first, without an error, and the provider calls only the Ollama version it was verified with or a later one; an OpenAI-compatible server is checked against the context its list or `contextTokens` says, before and after the call, and a prompt cut to the context is `too-long` even when the answer then ran out of room. Both local providers check after the call that the server read the whole prompt. Calls go through `http.ts`, which reads what a server sends within a bound, follows no redirect and logs only the message of an error.
 17. **A cloud model is asked for what the app allows, and named when another answers.** `openai` and `anthropic` send the schema only as the API's structured output (the API shows it to the model), store nothing at OpenAI (`store: false`), send no sampling parameter, ask the app's `effort` (`low` by default) and cap the answer with room for the reasoning. They write to a prompt cache only with `promptCache`, after the stable part and never on the source, and otherwise mark nothing, so OpenAI writes nothing by itself; a model that refuses the cache's options gets none, and the log says that OpenAI then caches by its own rules. A call to the provider's own servers without a key fails before it is made. A model whose refusal says it does not take an optional parameter (an effort, the cache's options, Anthropic's fallbacks) is asked again without it, through `callCloud()`, and its calls leave it out for ten minutes once a call without it is taken; a refusal for the money, the rate or the context is never read as one of a parameter, and `store`, the schema and the cap are never dropped. A failure after the call was taken carries its usage, which the audit keeps. Anthropic's fallbacks may answer with a model the app does not list: the provider's answer names it (`model`), and `run` puts it in its answer and its audit. Anthropic does not guarantee the case of an `enum`'s values, so its provider writes a value that differs from its schema's only by case as the schema does (`withEnumCase()`), and only when one value matches.
+18. **A file becomes text, whole, by a reader the app can replace.** `read` takes one file per request, read up to `maxFileBytes` before the form is parsed. It goes to the reader of its name's extension, then of its media type, the app's readers before Mapo's, and an app's reader with the id of one of Mapo's takes its place; `mapo.ai.readers` turns any off, and a format that is off stays off: when readers list the extension and all are off, the media type never brings the file to another (`readerOf()`). Every reader writes text parts named after the file, and checks the content, never trusting the name or the type; a format that unpacks (XLSX) is bounded by what it really unpacks, never by what it declares, and by what the library will build from it (a sheet's grid), before the library reads it; a reader's dependency is imported inside `read()`, and no work grows faster than the file (the HTML reader caps the marks open at once). What a reader or a `mapo-ai:read` hook gives is outside data (`partsOf()`), and a text longer than `maxSourceChars` is `too-long`, never cut. `read` keeps nothing and calls no AI, and its log names no file. The hook sees files only: it is no boundary for what reaches a provider.
 
 ## Change together
 
@@ -119,6 +130,8 @@ src/
 | A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                               |
 | A failure of a provider          | `MapoAiProviderFailure`, `FAILURES` in `run/run.ts`, the audit's validator, the docs, `useMapoAiFill.ts`        |
 | A provider of Mapo               | `MAPO_PROVIDERS`, reserved ids; `SERVER_PROVIDERS` in `run/options.ts`; `__tests__/recorded/` or `documented/`  |
+| A reader of Mapo                 | `MAPO_READERS` in `readers/registry.ts`; its format in `docs/modules/ai.md`; `status.test.ts`, `module.test.ts` |
+| The answer of `read`             | `MapoAiReadResponse` in `shared/gateway.ts`, `readMapoAiReadResponse()` in `shared/read.ts`, `read.test.ts`     |
 | The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests              |
 | What goes into a form by itself  | `actionOf()` and `isEmptyFormValue()` in `fill.ts`, `fill.test.ts`, the table of the docs' "Fill a detail form" |
 | A mark or a message of the fill  | `mapo.ai.fill.*`, `mapo.ai.errors.*` in both `mapo.{en,it}.json` of `@mapomodule/i18n`; `useMapoAiFill.test.ts` |

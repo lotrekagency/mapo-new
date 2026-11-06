@@ -61,8 +61,25 @@ export interface MapoAiStatus {
    * user the app lets in, when a provider is enabled.
    */
   default?: MapoAiDefaults;
-  /** The limits of `run`. For a user the app lets in. */
+  /** The limits of `run` and `read`. For a user the app lets in. */
   limits?: MapoAiLimits;
+  /**
+   * The formats `read` takes: Mapo's readers the app has not turned off,
+   * then the app's own. For a user the app lets in.
+   */
+  readers?: MapoAiReaderStatus[];
+}
+
+/** A format `read` takes, as `status` lists it. */
+export interface MapoAiReaderStatus {
+  /** The reader's id: `csv`, or the id of the app's own. */
+  id: string;
+  /** Its name for people, when it has one. */
+  label?: string;
+  /** The extensions of the files it reads, lowercase, without the dot: `csv`. */
+  extensions: string[];
+  /** The media types of the files it reads: `text/csv`. */
+  types: string[];
 }
 
 /** A provider `run` may call, as `status` lists it. */
@@ -83,14 +100,19 @@ export interface MapoAiDefaults {
   models: { fill: string; extract: string };
 }
 
-/** The limits of `run`, from `mapo.ai.limits`. */
+/** The limits of `run` and `read`, from `mapo.ai.limits`. */
 export interface MapoAiLimits {
   /** Calls to `run` one user may make in a minute, in one server process. */
   perUserPerMinute: number;
-  /** Characters of the source a request may send, all its parts together. */
+  /**
+   * Characters of the source a request of `run` may send, all its parts
+   * together; `read` reads no file into more.
+   */
   maxSourceChars: number;
   /** Characters of the operator's own instructions; `0` lets operators send none. */
   maxInstructionsChars: number;
+  /** Bytes of a file `read` takes; `0` lets operators send none. */
+  maxFileBytes: number;
 }
 
 // ─── run ─────────────────────────────────────────────────────────────────────
@@ -240,6 +262,38 @@ export type MapoAiRunResponse =
       /** What the model said instead of answering. */
       refusal: string;
     });
+
+// ─── read ────────────────────────────────────────────────────────────────────
+
+/**
+ * The answer of `POST /_mapo/ai/read`: what became of the file it was
+ * sent. Only `read` gives parts, the source as `run` takes it; the others
+ * say why there are none:
+ * - `unsupported`: no reader takes the file's format, or the app has
+ *   turned its reader off (`mapo.ai.readers`);
+ * - `empty`: the reader found no text in it;
+ * - `too-long`: its text has more characters than `run` takes
+ *   (`maxSourceChars`), and a source goes to `run` whole or not at all;
+ * - `failed`: the reader could not read it: damaged, not the format its
+ *   name says, or locked.
+ */
+export type MapoAiReadResponse =
+  | {
+      status: "read";
+      /** The reader that read it: `csv`, or the id of the app's own. */
+      reader: string;
+      /** The parts read: one at least, each with the file's name. */
+      parts: MapoAiSourcePart[];
+    }
+  | { status: "unsupported" }
+  | { status: "empty"; reader: string }
+  | {
+      status: "too-long";
+      reader: string;
+      /** The characters of its text. */
+      chars: number;
+    }
+  | { status: "failed"; reader: string };
 
 /**
  * The secret the storage seals with, as the server found it: `set` (the

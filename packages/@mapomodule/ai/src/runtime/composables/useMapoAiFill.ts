@@ -25,7 +25,6 @@ import {
   writeModelValue,
 } from "../shared/fill";
 import type {
-  MapoAiFillDependencies,
   MapoAiFillEntity,
   MapoAiFillEntry,
   MapoAiFillResponse,
@@ -34,6 +33,7 @@ import type {
 import type { MapoAiSourcePart } from "../shared/gateway";
 import { isRecord } from "../shared/guards";
 import type { AiFieldOutcome } from "../shared/sanitize";
+import { gatewayPoster } from "./poster";
 
 /**
  * The form `useMapoAiFill()` fills: what it reads and what it writes. The
@@ -245,7 +245,7 @@ export function useMapoAiFill<T extends object>(
 ): MapoAiFill {
   const app = useNuxtApp();
   const t = translatorOf(app);
-  const post = posterOf(app);
+  const post = gatewayPoster(app);
 
   const pending = shallowRef(false);
   const error = shallowRef<MapoAiFillError>();
@@ -767,33 +767,6 @@ function translatorOf(app: object): Translate {
     const text: unknown = Reflect.apply(translate, i18n, [key, params]);
     return typeof text === "string" ? text : key;
   };
-}
-
-type Fetcher = (
-  request: string,
-  options: { method: "POST"; body: unknown; signal?: AbortSignal },
-) => Promise<unknown>;
-
-function isFetcher(value: unknown): value is Fetcher {
-  return typeof value === "function";
-}
-
-/**
- * Posts with `$mapoFetch` of `@mapomodule/core`, so a session that ended
- * leads to the login page as everywhere in Mapo; with `$fetch` without it.
- */
-function posterOf(app: object): MapoAiFillDependencies["post"] {
-  const mapoFetch: unknown = Reflect.get(app, "$mapoFetch");
-  const globalFetch: unknown = Reflect.get(globalThis, "$fetch");
-  const fetcher = isFetcher(mapoFetch)
-    ? mapoFetch
-    : isFetcher(globalFetch)
-      ? globalFetch
-      : undefined;
-  return (path, body, { signal }) =>
-    fetcher
-      ? fetcher(path, { method: "POST", body, signal })
-      : Promise.reject(new Error("No $fetch to call the AI gateway with"));
 }
 
 /** The error of a call, for the operator. */

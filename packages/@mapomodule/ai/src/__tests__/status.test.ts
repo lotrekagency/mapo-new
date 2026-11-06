@@ -11,6 +11,43 @@ import {
 } from "../runtime/shared/gateway";
 
 const SECRET = "status-test-secret-0123456789-abcdefghijk";
+
+/** Mapo's readers, as status lists them when the app turns none off. */
+const READERS = [
+  { id: "text", label: "Text", extensions: ["txt"], types: ["text/plain"] },
+  {
+    id: "markdown",
+    label: "Markdown",
+    extensions: ["md", "markdown"],
+    types: ["text/markdown", "text/x-markdown"],
+  },
+  {
+    id: "json",
+    label: "JSON",
+    extensions: ["json"],
+    types: ["application/json"],
+  },
+  {
+    id: "html",
+    label: "HTML",
+    extensions: ["html", "htm", "xhtml"],
+    types: ["text/html", "application/xhtml+xml"],
+  },
+  {
+    id: "csv",
+    label: "CSV",
+    extensions: ["csv", "tsv"],
+    types: ["text/csv", "text/tab-separated-values"],
+  },
+  {
+    id: "xlsx",
+    label: "Excel",
+    extensions: ["xlsx"],
+    types: [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ],
+  },
+];
 const statusPath = `${MAPO_AI_GATEWAY_PATH}/status`;
 const actionPath = `${MAPO_AI_GATEWAY_PATH}/action`;
 const adminPath = `${MAPO_AI_GATEWAY_PATH}/admin-only`;
@@ -192,6 +229,7 @@ describe("GET /_mapo/ai/status", () => {
       admin: false,
       providers: [],
       limits: DEFAULT_LIMITS,
+      readers: READERS,
     });
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -219,6 +257,33 @@ describe("GET /_mapo/ai/status", () => {
         models: { fill: "mock", extract: "mock-large" },
       },
       limits: { ...DEFAULT_LIMITS, perUserPerMinute: 5 },
+      readers: READERS,
+    });
+  });
+
+  it("lists the formats read takes: the app's readers first, without those mapo.ai.readers turns off", async () => {
+    runtime.config.mapoAi = {
+      secret: SECRET,
+      admin: {},
+      readers: { xlsx: false, json: false, csv: true },
+    };
+    const { registerMapoAiReader } =
+      await import("../runtime/server/readers/registry");
+    registerMapoAiReader({
+      id: "ics",
+      extensions: [".ICS"],
+      types: ["Text/Calendar"],
+      read: () => [],
+    });
+
+    const response = await (await gateway())(statusRequest(asUser("editor")));
+
+    const body: unknown = await response.json();
+    expect(body).toMatchObject({
+      readers: [
+        { id: "ics", extensions: ["ics"], types: ["text/calendar"] },
+        ...READERS.filter((reader) => !["xlsx", "json"].includes(reader.id)),
+      ],
     });
   });
 
@@ -247,6 +312,7 @@ describe("GET /_mapo/ai/status", () => {
       storage: { open: true, secret: "set", mounted: true, driver: "memory" },
       providers: [],
       limits: DEFAULT_LIMITS,
+      readers: READERS,
     });
     expect(JSON.stringify(body)).not.toContain(SECRET);
   });

@@ -11,7 +11,7 @@ The module will help an operator enter data with a language model, in two ways:
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`, and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
 ## How a value travels
 
@@ -25,6 +25,8 @@ form fields ─────┘    entity.ts        contract.ts  prompts/   provi
                                                     useMapoAiFill(), fill.ts
 ```
 
+Before them, a file the operator gives becomes text: `POST /_mapo/ai/read` reads it with the reader of its format, and the page sends that text as the source of `run` ([Reading files](#reading-files)).
+
 1. **The entity model** says which fields the AI may fill, with their kind of value, limits and choices, and which fields it must leave alone, with the reason.
 2. **The contract** is the strict JSON Schema the model's answer must follow, the same for every provider, with the fields behind it.
 3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, two providers for models in a cloud, `openai` and `anthropic`, and two for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
@@ -35,27 +37,30 @@ A filled value is either **verified** or **to check**, and the difference matter
 
 ## The package
 
-| File                              | Role                                                                                         |
-| --------------------------------- | -------------------------------------------------------------------------------------------- |
-| `src/module.ts`                   | The Nuxt module: routes, plugins, server and app imports, private runtime config, hook types |
-| `src/storage.ts`                  | At build time, the storage's default mount                                                   |
-| `src/access.ts`                   | At build time, the `admin` and `users` options                                               |
-| `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                             |
-| `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                      |
-| `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation             |
-| `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models  |
-| `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                   |
-| `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                    |
-| `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call   |
-| `src/runtime/shared/entity.ts`    | The entity model                                                                             |
-| `src/runtime/shared/contract.ts`  | The contract compiler                                                                        |
-| `src/runtime/shared/sanitize.ts`  | The sanitizer and the verification rules                                                     |
-| `src/runtime/shared/citations.ts` | Finding a quote in the source, and a value in a quote                                        |
-| `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                          |
-| `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                  |
-| `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                  |
-| `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form           |
-| `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors           |
+| File                              | Role                                                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `src/module.ts`                   | The Nuxt module: routes, plugins, server and app imports, private runtime config, hook types                                 |
+| `src/storage.ts`                  | At build time, the storage's default mount                                                                                   |
+| `src/access.ts`                   | At build time, the `admin` and `users` options                                                                               |
+| `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                                                             |
+| `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                                                      |
+| `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation                                             |
+| `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models                                  |
+| `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
+| `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run` and `read`                                                                    |
+| `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
+| `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
+| `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call                                   |
+| `src/runtime/shared/entity.ts`    | The entity model                                                                                                             |
+| `src/runtime/shared/contract.ts`  | The contract compiler                                                                                                        |
+| `src/runtime/shared/sanitize.ts`  | The sanitizer and the verification rules                                                                                     |
+| `src/runtime/shared/citations.ts` | Finding a quote in the source, and a value in a quote                                                                        |
+| `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                                                          |
+| `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                                                  |
+| `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                                                  |
+| `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form                                           |
+| `src/runtime/shared/read.ts`      | The browser's half of `read`: the file sent as a form, the answer read                                                       |
+| `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors; `useMapoAiRead()`: a file sent to `read` |
 
 The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, the state is sealed and fails closed, no pattern runs unbounded, `run` builds what it asks and spends last, and the page writes only what the answer verifies on an empty field.
 
@@ -293,7 +298,7 @@ The gateway keeps no session of its own: the backend says who is signed in, as i
 | `src/runtime/server/auth/user.ts`    | The user read from `userInfoApi`'s answer, and the rules: admin, users, a model's permission |
 | `src/runtime/server/auth/session.ts` | The answer of the backend for a cookie, and 30 seconds of memory of it; pure                 |
 | `src/runtime/server/auth/nitro.ts`   | The wiring: Nitro's local fetch, the runtime config, the hook, the cross-site check          |
-| `src/runtime/server/auth/hooks.ts`   | The `mapo-ai:user` and `mapo-ai:prompt` hooks, typed for the app's server code               |
+| `src/runtime/server/auth/hooks.ts`   | The `mapo-ai:user`, `mapo-ai:prompt` and `mapo-ai:read` hooks, typed for server code         |
 | `src/access.ts`                      | At build time: `admin` and `users` read, with a warning for what cannot be read              |
 
 ### How a request is let in
@@ -375,7 +380,7 @@ The source goes between two marks with a random id, made for each prompt, which 
 
 ### Limits and the audit
 
-The limit per user counts the calls of the last sixty seconds in the memory of the process, as the sessions are remembered: nothing is written per call, a restart forgets, and a server with several processes allows the limit in each. `0` is a limit too: no call, no source, no instructions; and a limit that cannot be read, in the Nuxt config or in the environment, is `0` rather than its default, so a mistake never lets more through. A shared count in the sealed storage would not be exact either, since the storage has no atomic increment, and calls made together would get through; caps by day or by cost can be read from the audit.
+The limit per user counts the calls of the last sixty seconds in the memory of the process, as the sessions are remembered: nothing is written per call, a restart forgets, and a server with several processes allows the limit in each. `0` is a limit too: no call, no source, no instructions, no file; and a limit that cannot be read, in the Nuxt config or in the environment, is `0` rather than its default, so a mistake never lets more through. A shared count in the sealed storage would not be exact either, since the storage has no atomic increment, and calls made together would get through; caps by day or by cost can be read from the audit.
 
 The audit has one record per call that reached the provider, in the `audit` purpose and in the space of the user. The day and time in the record's name (`2026:11:04:t101530123-<random>`) list a day's records together, and tell nothing the expiry, which is in clear, does not tell already. A record holds no contents, and is read back with a zod validator, since it may come from an older version.
 
@@ -509,6 +514,60 @@ A failure after the call was taken, as an answer cut at its cap or an error in t
 - **`low` may miss a hard mapping** that a deeper reasoning would get; `effort` raises it for the app, not per request.
 - **Anthropic's API has no European region**; OpenAI's European endpoint asks for a project made in Europe.
 
+## Reading files
+
+`POST /_mapo/ai/read` turns a file into text parts, the source `run` takes. The page sends the file, shows the text, and sends it to `run`: the two routes stay apart, and `run` takes text only.
+
+| File                                     | Role                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `src/runtime/server/readers/types.ts`    | `MapoAiReader`, the file a reader gets, the context of the `mapo-ai:read` hook              |
+| `src/runtime/server/readers/registry.ts` | Mapo's readers, `registerMapoAiReader()`, the order of the readers, the reader of a file    |
+| `src/runtime/server/readers/text.ts`     | The bytes as text (UTF-8, UTF-16, Windows-1252), and the readers of text, Markdown and JSON |
+| `src/runtime/server/readers/html.ts`     | HTML into Markdown, with a tokenizer of its own                                             |
+| `src/runtime/server/readers/sheets.ts`   | CSV and XLSX into Markdown tables, the CSV parser, the bound on what an XLSX unzips         |
+| `src/runtime/server/readers/read.ts`     | The operation: the reader, the hooks, the parts read as outside data, the measure           |
+| `src/runtime/server/readers/upload.ts`   | The request: one file in a form, read within the bound                                      |
+| `src/runtime/server/readers/nitro.ts`    | The wiring: the readers that are on, the limits, the hooks                                  |
+
+### Why text, and why a route of its own
+
+Every reader writes text. The formats of the first readers are text already, or tables, and a text reaches every provider the same way, a local model's too. The quotes are then verified on the text the model read: a model that read a page's HTML would quote words a tag splits, which the verification cannot find. The page gets the text before it sends it, so the operator sees what the AI will read, and can cut it. `read` keeps nothing, so no file waits on the server, with its storage and its expiry; the text crosses the browser twice, a few hundred kilobytes at most.
+
+How PDFs and images are read is decided with them, after these readers: as text too, through a reader of their own, or as the file itself for the providers that read it.
+
+### Which reader reads a file
+
+A file goes to the reader of its name's extension, then, when no reader takes the extension, to the reader of its declared media type. The extension comes first because the declared type is the browser's guess: Windows declares a `.csv` as `application/vnd.ms-excel` where Excel is installed. Neither is trusted: each reader checks the content (a NUL character is no text, an XLSX is a ZIP, JSON parses), and a file that is not what its name says is `failed`.
+
+The app's readers come before Mapo's, in the order the app registers them, and a reader with the id of one of Mapo's takes its place. Three ways change the reading, one role each: a reader of the app replaces how a format is read, the `mapo-ai:read` hook touches up what any reader read, and `mapo.ai.readers` turns a format off without code. A format that is off stays off: `readerOf()` takes the first reader that is on among those that list the extension, and looks at the media type only when no reader lists the extension, on or off, so a `.csv` is never read as plain text because `csv` is off and the browser declared `text/plain`.
+
+### What the gateway checks
+
+- **The size, before it parses.** The body is read up to `maxFileBytes` plus 16 KB for the form, and refused as soon as it passes (`readLimitedBytes()` in `body.ts`, which `run` shares); the runtime then parses the form (`Response.formData()`), which must hold one file in the field `file`.
+- **What a reader or a hook gives.** Both may be the app's code, so their parts are outside data (`partsOf()` in `read.ts`): text parts only, trimmed, a name cut to 200 characters; more parts than the 20 `run` takes is `failed`.
+- **Whole or not at all.** A text longer than `maxSourceChars` is `too-long`, never cut: a cut sheet would lose its last rows, and a cut page its end, without a word.
+- **What a workbook unzips.** An XLSX is a ZIP: a few kilobytes can unzip into gigabytes, and `read-excel-file` holds what it unzips in memory, sizing its output by what the ZIP's directory declares. `checkWorkbook()` unzips the XML first, as a stream (`DecompressionStream`, on every runtime, with no dependency), each part up to the size its directory declares and all of them up to 20 MB: a part that unzips into more than it declares is a damaged or crafted file, refused before it is all unzipped. It reads the directory from the last end record, as the unzipper does, and refuses more than 10,000 entries; a ZIP64 directory is refused too, since its counts and offsets read as too many entries or as damaged.
+- **The cells of a workbook.** `read-excel-file` fills a sheet's grid in memory, every row as wide as the widest, from the first row to the last: one cell in the last column (`XFD`) of each row costs 16,384 cells a row, from a file of a few kilobytes. `checkWorkbook()` counts the rows and the cells of the XML it unzipped, by their references and as they come, and refuses more than 2 million.
+- **No file's name in the log.** A name can say whose data a file holds: a failure is logged with the reader's id and the file's size.
+
+### The readers
+
+- **Text, Markdown, JSON**: the text as the file writes it. JSON is parsed only to tell a damaged file, never written again: `JSON.stringify` would round a 20-digit id.
+- **HTML**: a tokenizer of its own, with no DOM, which Nitro's runtimes do not have, and no dependency. It writes Markdown, so the AI can carry headings, lists, links, bold and italic into a rich text field, whose restricted Markdown takes them. It skips what a person does not read, a menu (`nav`) included; it keeps a link's address to the web, an email or a phone, for a URL or an email field; a table becomes a Markdown table, a table in a cell its words. It decodes Latin-1's and typography's named characters, every numeric one, and Windows-1252's own range (`&#146;`) as browsers do.
+- **CSV**: a parser of its own, RFC 4180 in forty lines, where `papaparse` would add a package and its types. The delimiter is Excel's `sep=` line, else the first of tab, `;`, `|` and `,` that splits the first row and half of the first twenty: `;` before `,`, since a CSV that writes decimals with a comma separates with `;`.
+- **XLSX**: `read-excel-file` (MIT), in its `universal` build, which unzips with `fflate` and parses with a SAX parser: plain JavaScript, on every runtime of Nitro. It is imported with the first workbook, so a server that reads none never loads it. A cell gives its value: a date in ISO form, a number with 15 significant digits, as a spreadsheet keeps it.
+
+### Strengths and weaknesses
+
+- **One text for every provider**, verified as the model read it, and shown to the operator first.
+- **Every way of reading can be replaced** by the app, Mapo's included, and any turned off without code.
+- **One dependency**, for XLSX, loaded only when a workbook comes.
+- **A sheet goes whole**: a large one is `too-long` rather than sampled, and a workbook counts all its sheets: the operator cannot pick one sheet yet.
+- **A cell's format is lost**: `25%` reads `0.25`, an amount its number; hidden rows and sheets are read.
+- **The HTML reader is no browser**: it does not apply the CSS (`display: none` is read), nor know which part of a page is its content, so a page's header and footer reach the AI.
+- **The hook is no boundary**: a text the page sends to `run` itself never goes through it, so an app that must keep something away from every provider needs a check where `run` reads its source.
+- **No limit of calls on `read`**: it calls no AI, but a large workbook costs the server memory and time.
+
 ## Filling a form
 
 `useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
@@ -588,6 +647,8 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `registry.test.ts`  | The providers an app registers, the ids Mapo keeps, Mapo's providers built with their server                                                       |
 | `providers.test.ts` | The providers the log names at start, as they will not be called, and the models a server does not list; the providers' settings and key           |
 | `module.test.ts`    | The module on a mocked kit: the secret private and empty, the warning, the default mount, the registrations, the options and what each warns about |
+| `readers.test.ts`   | Mapo's readers on files written in the test: encodings, Markdown, JSON, HTML's cases, CSV's delimiters and quotes, workbooks and their bound       |
+| `read.test.ts`      | `read` on a bare h3 app: who calls it, the form and its bounds, every answer, the app's readers and hooks, the operation, the registry             |
 
 The browser's half, also run in Node:
 
@@ -596,6 +657,7 @@ The browser's half, also run in Node:
 | `fill.test.ts`          | The request from the two descriptions, the answer read as outside data, each action of the plan, the model's paths          |
 | `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
 | `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
+| `useMapoAiRead.test.ts` | The answer of `read` read as outside data, the file sent as a form, the composable through `$mapoFetch`                     |
 
 The providers that call a server: the local ones on the answers Ollama 0.40.13 sent on its two APIs, kept in `recorded/`, and the cloud ones on the answers of OpenAI and Anthropic as their API references describe them, written by hand in `documented/`; `servers.ts` serves both through a fake `fetch` that keeps every call. Record them again when a server's API changes, and record the cloud ones once a real call can:
 
@@ -610,6 +672,7 @@ The providers that call a server: the local ones on the answers Ollama 0.40.13 s
 | `cloud.test.ts`            | The cap with the reasoning's room, the key a call needs, the counts, refused parameters, stream errors, enum case   |
 
 - `expectPortable()`, in `portable.ts`, walks a schema and fails on anything outside the portable subset; every contract test runs it.
+- `workbook()`, in `workbooks.ts`, writes an XLSX from its sheets, a ZIP stored without compression, so a test shows what a workbook holds instead of carrying a binary file; `zip()` can declare other sizes than the entries have, as a ZIP that unzips into more than it weighs.
 - A bug fix leaves a regression test that fails on the previous version.
 - Answers recorded from real models are reduced to minimal cases and kept as tests, so the rules are checked against what models actually write, not only against answers written by hand.
 
@@ -661,6 +724,13 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and a place for its key, and, with `isCloud`, `effort` and `promptCache`; document them. A cloud's provider builds on `cloud.ts`.
 5. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
 
+### Add a reader of Mapo
+
+1. Write it in `src/runtime/server/readers/`, as a `MapoAiReader`: it reads the bytes as outside data, throws for a file it cannot read, and returns text parts named after the file (`textParts()`).
+2. Add it to `MAPO_READERS` in `registry.ts`: its id becomes one of Mapo's, which an app's reader can take the place of, and which `mapo.ai.readers` and the environment can turn off.
+3. Import a dependency inside `read()`, so a server that reads no such file never loads it; bound what it holds in memory by what it really unpacks, as `checkWorkbook()` does for a workbook, never by what the file declares.
+4. Test it in `readers.test.ts` on files written in the test, and add it to the formats of [Read a file](/modules/ai#read-a-file), to `READERS` in `status.test.ts` and to `READERS_ON` in `module.test.ts`.
+
 ### Change a base rule
 
 Change it in `prompts/base.ts` and raise `MAPO_AI_PROMPT_VERSION`, so every answer and audit record says which rules it was asked with. Keep the rules that protect: the source is data, nothing is invented. Once there is an evaluation set, measure the change with it before it ships.
@@ -686,6 +756,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | The secret and the storage                       | The encrypted storage (written)                                  |
 | Options                                          | Every option, in the change that makes it work (written to date) |
 | Fill a detail form                               | `useMapoAiFill()` (written)                                      |
+| Read a file                                      | The readers of text and sheets (written); PDFs and images        |
 | Fill a form with Magic Fill                      | Magic Fill                                                       |
 | Verified and to check                            | Magic Fill, from the verification described on this page         |
 | Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
@@ -702,7 +773,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Readers** for text, PDF, images and spreadsheets, with PDFs and images sent to the providers that read them.
+1. **Readers for PDFs and images**: a PDF's text, and images and scans, as text through a reader of their own or as the file for the providers that read it; then the `where` of a quote, the part it names, can narrow its search.
 2. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
 3. **The AI settings page**, where admins also set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists.
 4. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
@@ -726,6 +797,10 @@ Ideas with no place in the plan yet:
 - The context of each model of an OpenAI-compatible server, not one for the whole server; and a count of the prompt's tokens before the call, where a server offers one (vLLM's and llama.cpp's `/tokenize`).
 - Turn reasoning off on an OpenAI-compatible server, with the parameter each kind of server takes.
 - An option to turn Anthropic's fallbacks off, and the price of each attempt of a fallback in the audit.
+- Pick the sheets of a workbook, or a range of rows, before `run`: today a workbook goes whole.
+- A hook where `run` reads its source, for an app that must keep something away from every provider, pasted text included.
+- A limit of calls on `read`, and reading a large workbook without holding it all in memory.
+- A reader of a web page's main content only, without its header, menus and footer.
 - Count a prompt's tokens before an Anthropic call (`count_tokens`, free), to warn before a long source.
 - The batch APIs of OpenAI and Anthropic, at half the price, for Import AI.
 - Claude and OpenAI's models through Amazon Bedrock, Google Vertex AI or Azure, for a region in Europe.
