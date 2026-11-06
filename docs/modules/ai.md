@@ -973,7 +973,7 @@ The context is read-only: a hook adds rules, and cannot remove what Mapo, `instr
 
 ## Verification
 
-A filled value is verified when a quote the AI gives is found in the source, as whole words, and holds the value: its text, its number or its choice's label; a date its day and year, a time its hours and minutes. The app can change the rules, never so far that a value is verified without a quote found in the source:
+A filled value is verified when a quote the AI gives is found in the source, as whole words, and holds the value: its text, its number (by default the only number the quote writes) or its choice's label; a date its day and year, a time its hours and minutes. The app can change the rules, never so far that a value is verified without a quote found in the source:
 
 ```ts
 // nuxt.config.ts
@@ -989,6 +989,9 @@ export default defineNuxtConfig({
 | `timeZones`     | `true`     | A date and time verifies only with the time zone of its quote                    |
 | `oneWordQuotes` | `"unique"` | A quote of one word counts when the source writes it once; with `"never"`, never |
 | `richTextLinks` | `true`     | Rich text verifies only when its quote writes the address of each of its links   |
+| `soleNumber`    | `true`     | A number verifies only when its quote writes no other number, a date included    |
+
+With `soleNumber`, anything in a number's quote that reads as another number keeps it to check: `6 stars out of 5` verifies neither 6 nor 5, and so does a date, a time, a range (`5-10`) or a number that could be two (`1.500`, 1500 or 1.5). The same number written twice, or in two unambiguous ways (`1'200` and `1200`), verifies. The values of a list quoted together (`Seats: 120, 80`) verify only with a quote each.
 
 A field's pattern runs on the server only when a bound on its work, for the value's length, stays small. A pattern that can backtrack for minutes, such as `^(a+)+$`, a long counted repeat on a long value, such as `a{5000}`, one JavaScript cannot read and one whose matcher fails while it runs are not applied: the value is kept and never verified, and a warning (`unchecked-pattern`, `unreadable-pattern`) says so. The backend still checks every value it saves.
 
@@ -1107,7 +1110,7 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | `providers`    | `Record<string, MapoAiProviderOptions \| false>`                                                               | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their options ([Providers](#providers))                |
 | `default`      | `{ provider?: string; models?: { fill?: string; extract?: string } }`                                          | The first provider and its first model | What a request that names no provider or model gets                                      |
 | `instructions` | `{ all?: string; fill?: string; extract?: string }`                                                            | `{}`                                   | The app's rules in every prompt ([The prompt](#the-prompt))                              |
-| `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks? }`                                        | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification))        |
+| `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks?, soleNumber? }`                           | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification))        |
 | `readers`      | `Record<string, boolean>`                                                                                      | `{}`: every reader on                  | The readers of `read` turned off, or on, by id ([Turn a format off](#turn-a-format-off)) |
 | `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number; maxFileBytes?: number }` | `20`, `100000`, `2000`, `10485760`     | The limits of `run` and `read` ([Limits](#limits))                                       |
 | `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |

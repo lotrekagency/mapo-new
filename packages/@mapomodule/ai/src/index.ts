@@ -166,7 +166,7 @@ export interface MapoAiOptions {
    * What a quote must hold for a value to be verified, rule by rule; the
    * rules left out keep their prudent default. No rule verifies a value
    * without a quote found in the source.
-   * @default { dateYear: true, bareHours: false, timeZones: true, oneWordQuotes: "unique", richTextLinks: true }
+   * @default { dateYear: true, bareHours: false, timeZones: true, oneWordQuotes: "unique", richTextLinks: true, soleNumber: true }
    */
   verification?: Partial<AiVerificationRules>;
   /**

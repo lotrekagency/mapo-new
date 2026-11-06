@@ -253,6 +253,16 @@ export function numbersIn(text: string): number[] {
   return [...found];
 }
 
+/**
+ * Every number a text writes in digits, in order, each read as
+ * {@link numbersIn} reads it, or `undefined` when it could be two
+ * (`1.500`). A verification that wants a number alone in its quote counts
+ * an unreadable one too: it might be the value the source means.
+ */
+export function numberTokensIn(text: string): (number | undefined)[] {
+  return Array.from(text.matchAll(NUMBER), ([token]) => readNumber(token));
+}
+
 // ─── Points of a map ─────────────────────────────────────────────────────────
 
 /** A point of a map, in decimal degrees. */

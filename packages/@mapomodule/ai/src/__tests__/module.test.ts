@@ -338,7 +338,7 @@ describe("the options of run", () => {
       providers: { mock: { models: ["mock", "mock-large"], timeout: 30 } },
       default: { provider: "mock", models: { fill: "mock-large" } },
       instructions: { all: "Prices are in euros." },
-      verification: { bareHours: true },
+      verification: { bareHours: true, soleNumber: false },
       limits: { perUserPerMinute: 5 },
       audit: { retentionDays: 30 },
     });
@@ -347,7 +347,11 @@ describe("the options of run", () => {
       providers: { mock: { models: ["mock", "mock-large"], timeout: 30 } },
       default: { provider: "mock", models: { fill: "mock-large" } },
       instructions: { all: "Prices are in euros.", fill: "", extract: "" },
-      verification: { ...DEFAULT_VERIFICATION_RULES, bareHours: true },
+      verification: {
+        ...DEFAULT_VERIFICATION_RULES,
+        bareHours: true,
+        soleNumber: false,
+      },
       limits: {
         perUserPerMinute: 5,
         maxSourceChars: 100_000,

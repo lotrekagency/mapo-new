@@ -41,6 +41,7 @@ import {
   isCalendarDate,
   isOneWord,
   isQuoted,
+  numberTokensIn,
   numbersIn,
   pointsIn,
   searchableSource,
@@ -273,6 +274,15 @@ export interface AiVerificationRules {
   oneWordQuotes: OneWordQuotes;
   /** Rich text verifies only when its quote writes the address of each of its links too. */
   richTextLinks: boolean;
+  /**
+   * A number verifies only when its quote writes no other number in digits:
+   * `6 stars out of 5` verifies neither 6 nor 5, since the quote does not
+   * say which is the value. A number that could be two (`1.500`), a date, a
+   * time or a range in the quote counts as another number too. The same
+   * number written twice, or in two unambiguous ways, verifies. Off, a
+   * number verifies when its quote writes it anywhere.
+   */
+  soleNumber: boolean;
 }
 
 /**
@@ -287,6 +297,7 @@ export const DEFAULT_VERIFICATION_RULES: Readonly<AiVerificationRules> =
     timeZones: true,
     oneWordQuotes: "unique",
     richTextLinks: true,
+    soleNumber: true,
   });
 
 /**
@@ -315,6 +326,7 @@ export function verificationRulesOf(value: unknown): AiVerificationRules {
         ? oneWord
         : defaults.oneWordQuotes,
     richTextLinks: flag("richTextLinks", defaults.richTextLinks),
+    soleNumber: flag("soleNumber", defaults.soleNumber),
   };
 }
 
@@ -846,9 +858,10 @@ function element(
 /**
  * The quote holds the value: the whole text as words (a summary longer than
  * its quotes is never verified), with rich text's links; the number as the
- * source writes it in one unambiguous way; the day, the time and the time
- * zone as the rules ask; or nothing more for a value that needs only the
- * quote. A quote of one word holds only a value it is whole.
+ * source writes it in one unambiguous way, and with `soleNumber` as the only
+ * number the quote writes; the day, the time and the time zone as the rules
+ * ask; or nothing more for a value that needs only the quote. A quote of
+ * one word holds only a value it is whole.
  */
 function holdsProbe(
   probe: Probe,
@@ -872,10 +885,17 @@ function holdsProbe(
         probe.links.every((link) => writesLink(quote, link));
       return hasWords && hasLinks;
     }
-    case "number":
-      return numbersIn(quote).some((number) =>
+    case "number": {
+      const isWritten = numbersIn(quote).some((number) =>
         isSameNumber(number, probe.value),
       );
+      // Another number in the quote could be the value the source means:
+      // one that reads otherwise, or one that could be two (`1.500`).
+      const isAlone = numberTokensIn(quote).every(
+        (number) => number !== undefined && isSameNumber(number, probe.value),
+      );
+      return isWritten && (isAlone || !rules.soleNumber);
+    }
     case "coordinates":
       // The pair the quote writes, in its order and with its hemispheres.
       return pointsIn(quote).some(

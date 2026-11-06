@@ -1035,7 +1035,95 @@ describe("sanitizeFillAnswer — verification rules", () => {
       timeZones: true,
       oneWordQuotes: "unique",
       richTextLinks: true,
+      soleNumber: true,
     });
+  });
+
+  it("does not verify a number its quote writes beside another number", () => {
+    // A local model wrote 5 stars for a review of "6 stars out of 5".
+    const review = "Our verdict: 6 stars out of 5, the best show of the year.";
+    const stars = aiField("stars", "number");
+
+    expect(verifiedOf(stars, "5", review, "6 stars out of 5")).toBe(false);
+    expect(verifiedOf(stars, "6", review, "6 stars out of 5")).toBe(false);
+  });
+
+  it("verifies a number its quote writes alone, or twice, or as another number written the same", () => {
+    const source =
+      "Seats: 120. Yes, 120 seats; 1'200 people came, 1200 in all.";
+    const seats = aiField("seats", "number");
+    const people = aiField("people", "number");
+
+    expect(verifiedOf(seats, "120", source, "Seats: 120")).toBe(true);
+    expect(verifiedOf(seats, "120", source, "Yes, 120 seats")).toBe(true);
+    expect(verifiedOf(seats, "120", source, "Seats: 120. Yes, 120 seats")).toBe(
+      true,
+    );
+    expect(
+      verifiedOf(people, "1200", source, "1'200 people came, 1200 in all"),
+    ).toBe(true);
+  });
+
+  it("does not verify a number beside one that could be two, or beside a date", () => {
+    const source =
+      "Rated 5 stars, 1.500 reviews. 12 tickets left on 14/10/2026. Change: -5 and 5.";
+    const stars = aiField("stars", "number");
+    const tickets = aiField("tickets", "number");
+    const change = aiField("change", "number");
+
+    // `1.500` is 1500 or 1.5: it might be the value the source means.
+    expect(verifiedOf(stars, "5", source, "Rated 5 stars, 1.500 reviews")).toBe(
+      false,
+    );
+    expect(
+      verifiedOf(tickets, "12", source, "12 tickets left on 14/10/2026"),
+    ).toBe(false);
+    expect(verifiedOf(change, "-5", source, "Change: -5 and 5")).toBe(false);
+    expect(
+      verifiedOf(tickets, "12", source, "12 tickets left on 14/10/2026", {
+        soleNumber: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("verifies a number another of its quotes writes alone", () => {
+    const review = "Our verdict: 6 stars out of 5. Rating: 5 stars.";
+    const stars = aiField("stars", "number");
+
+    const { outcome } = sanitizeOne(stars, "5", review, [
+      quote("stars", "6 stars out of 5"),
+      quote("stars", "Rating: 5 stars"),
+    ]);
+
+    expect(outcome).toMatchObject({ status: "filled", verified: true });
+  });
+
+  it("verifies the numbers of a list only from quotes that write each alone", () => {
+    const source =
+      "Seats: 120, 80. The big hall has 120 seats, the small one 80 seats.";
+    const seats = aiField("seats", "number", { multiple: true });
+
+    const shared = sanitizeOne(seats, ["120", "80"], source, [
+      quote("seats", "Seats: 120, 80"),
+    ]);
+    const apart = sanitizeOne(seats, ["120", "80"], source, [
+      quote("seats", "The big hall has 120 seats"),
+      quote("seats", "the small one 80 seats"),
+    ]);
+
+    expect(shared.outcome).toMatchObject({ verified: false });
+    expect(apart.outcome).toMatchObject({ verified: true });
+  });
+
+  it("verifies a number anywhere in its quote with soleNumber off", () => {
+    const review = "Our verdict: 6 stars out of 5, the best show of the year.";
+    const stars = aiField("stars", "number");
+
+    expect(
+      verifiedOf(stars, "5", review, "6 stars out of 5", { soleNumber: false }),
+    ).toBe(true);
+    expect(verificationRulesOf({ soleNumber: false }).soleNumber).toBe(false);
+    expect(verificationRulesOf({ soleNumber: "no" }).soleNumber).toBe(true);
   });
 
   it("does not verify the midnight a model adds to a day without a time", () => {
