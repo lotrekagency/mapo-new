@@ -33,9 +33,11 @@ export default defineNuxtConfig({
     // admins assign on the settings page, never from this file; and Ollama's,
     // with EXAMPLE_OLLAMA_MODELS. No mock: a provider without a key says so.
     ai: {
+      // adminModels lets the AI's admins add a model on the settings page
+      // ("How the AI works"), once the provider's server lists it.
       providers: {
-        openai: {},
-        anthropic: {},
+        openai: { adminModels: true },
+        anthropic: { adminModels: true },
         ...(ollamaModels.length ? { ollama: { models: ollamaModels } } : {}),
       },
       // The backend's users and groups, which the settings page searches

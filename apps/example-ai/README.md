@@ -28,7 +28,7 @@ The app enables Mapo's `openai` and `anthropic` providers, as a project does. Ea
 - the project's keys, in `apps/example-ai/.env`, which git ignores: `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`;
 - or no project's key: sign in as `admin` and assign one on the settings page, to everyone, a group or a user.
 
-Without any key, the status page says that `run` refuses the provider. Checking the connection lists the provider's models with the key the account gets, which costs nothing; this app makes no other call.
+Both set `adminModels: true`, so the admin can add a model the provider's server lists, in the settings page's "How the AI works", where the admins also change the AI's instructions, rules of verification, secret fields, prompt cache and Anthropic's fallbacks. Without any key, the status page says that `run` refuses the provider. Checking the connection lists the provider's models with the key the account gets, which costs nothing; this app makes no other call.
 
 `EXAMPLE_OLLAMA_MODELS` (`gemma4:12b,qwen3.8:27b`) also enables Mapo's `ollama` provider with those models, at `http://localhost:11434` unless `NUXT_MAPO_AI_PROVIDERS_OLLAMA_BASE_URL` says otherwise.
 
