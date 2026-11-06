@@ -87,6 +87,9 @@ export default defineNuxtConfig({
       instructions: {
         all: "The records are the pages of a city magazine: articles about the city, its people and its services.",
       },
+      // The module's AI settings page lives in apps/example-ai: here the keys
+      // lab (/ai/keys) shows the same routes as they are.
+      settings: { path: false },
     },
 
     i18n: {

@@ -7,11 +7,12 @@ Local rules for the demo and reference apps. The root [`AGENTS.md`](../AGENTS.md
 | App                   | Port | Backend                              | Use it for                                                                 |
 | --------------------- | ---- | ------------------------------------ | -------------------------------------------------------------------------- |
 | `example-e2e`         | 3000 | In-memory mock in `server/api/**`    | The reference app: one page per scenario, the live check, the MCP test bed |
+| `example-ai`          | 3002 | In-memory mock in `server/api/**`    | The AI module as a project enables it: AI settings, AI status              |
 | `example`             | 3000 | A real Camomilla instance on `:8000` | The core demo with the published `@mapomodule/mapo-integrations-camomilla` |
 | `example-theme`       | 3001 | None                                 | Theming layers, layout slots, MapoOverride                                 |
 | `example-custom-form` | 3001 | Mock routes in `server/`             | Replacing the field registry with Vuetify components                       |
 
-Agents run live checks in `example-e2e` only (`pnpm dev:example-e2e`), and stop the server afterwards. `example` needs a backend that is not part of this repository.
+Agents run live checks in `example-e2e` (`pnpm dev:example-e2e`), and in `example-ai` (`pnpm dev:example-ai`) for the AI settings page, and stop the server afterwards. `example` needs a backend that is not part of this repository.
 
 ## `example-e2e`
 
@@ -22,6 +23,14 @@ Agents run live checks in `example-e2e` only (`pnpm dev:example-e2e`), and stop 
 - **`api-schema.json`** describes that mock API the way drf-spectacular would, for `mapo_backend_schema`. When an endpoint or a payload in `server/api/**` changes, update it in the same change.
 - **`devtools.componentInspector` is off** on purpose: its tracer injects an import that does not resolve under pnpm's isolated layout and breaks the dev server.
 - **A new page 404s** until the dev server restarts.
+
+## `example-ai`
+
+- **What it is**: an app that enables `@mapomodule/ai` as a real project does, and nothing else. `mapo.ai` in `nuxt.config.ts` installs the module and with it the AI settings page (`/ai-settings`, in the sidebar's footer); the app's only page, `app/pages/index.vue`, shows `GET /_mapo/ai/status` (providers, models, where each key comes from, the default, the user's preference, the limits, the storage).
+- **Providers**: Mapo's `openai` and `anthropic`, always on, with no mock: a provider without a key says so. Their keys come from the server's environment (`apps/example-ai/.env`, gitignored) or from the keys the `admin` account assigns on the settings page. `EXAMPLE_OLLAMA_MODELS` also enables `ollama`. Checking the connection lists a provider's models, at no cost; the app makes no other call to a model.
+- **Accounts**: `admin` (a superuser, so an admin of the AI), `editor` (group `editors`), `writer` (`editors` and `reporters`) and `viewer` (no group), password equal to the username (`server/utils/session.ts`). `server/api/users` and `server/api/groups` list them as a DRF backend would, for `mapo.ai.settings.usersApi` and `groupsApi`.
+- **The secret**: without `NUXT_MAPO_AI_SECRET` the dev server seals with a temporary secret, and after a restart the admins' keys sealed with the old one close the AI with a 503 until `.data/mapo-ai` is removed.
+- `example-e2e` turns the settings page off (`mapo.ai.settings.path: false`) and keeps its keys lab, `/ai/keys`.
 
 ## Rules
 

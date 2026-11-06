@@ -98,6 +98,24 @@ importers:
         specifier: ^3.5.40
         version: 3.5.42(typescript@6.0.3)
 
+  apps/example-ai:
+    dependencies:
+      '@nuxt/ui':
+        specifier: ^4.7.0
+        version: 4.7.1(@tiptap/extensions@3.22.5)(@tiptap/y-tiptap@3.0.3)(embla-carousel@8.6.0)(tailwindcss@4.2.4)(typescript@6.0.3)(vite@8.2.2)(vue-router@5.2.0)(vue@3.5.42)(yjs@13.6.30)
+      mapomodule:
+        specifier: workspace:*
+        version: link:../../packages/mapomodule
+      nuxt:
+        specifier: ^4.5.1
+        version: 4.5.2(@types/node@25.6.0)(eslint@10.2.1)(rolldown@1.2.6)(typescript@6.0.3)(vite@8.2.2)(vue-tsc@3.3.4)
+      vue:
+        specifier: ^3.5.40
+        version: 3.5.42(typescript@6.0.3)
+      vue-router:
+        specifier: ^5.2.0
+        version: 5.2.0(rolldown@1.2.6)(vite@8.2.2)(vue@3.5.42)
+
   apps/example-custom-form:
     dependencies:
       '@mapomodule/core':

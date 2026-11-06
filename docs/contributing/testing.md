@@ -91,6 +91,8 @@ pnpm dev:example-e2e          # http://localhost:3000
 
 - Stop the dev server when you are done.
 
+The AI settings page is checked in `apps/example-ai` instead (`pnpm dev:example-ai`, http://localhost:3002), which enables the AI module as a project does, with the same accounts; `apps/example-e2e` turns that page off.
+
 To typecheck an app as its users would:
 
 ```bash

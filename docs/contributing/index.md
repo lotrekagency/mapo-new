@@ -48,6 +48,7 @@ To try your changes in a project that installed Mapo from npm, including a backo
 | `packages/@mapomodule/`     | The published `@mapomodule/*` packages                                            |
 | `packages/mapomodule/`      | The `mapomodule` meta-module                                                      |
 | `apps/example-e2e/`         | The reference app: one page per scenario, an in-memory mock API, the MCP test bed |
+| `apps/example-ai/`          | The AI module as a project enables it: AI settings page, AI status, mock backend  |
 | `apps/example/`             | Core demo against a real Camomilla backend                                        |
 | `apps/example-theme/`       | Theming and MapoOverride demo, no backend                                         |
 | `apps/example-custom-form/` | Custom field registry demo (Vuetify fields)                                       |
@@ -104,7 +105,7 @@ wip: stuff                                  ✘
 The commit type drives the version bump of the affected packages (see [Release Process](/guide/release-process)): `fix` is a patch, `feat` a minor, `feat!` or a `BREAKING CHANGE` footer a major. Choose it for what the change means to consumers.
 
 - Types in use: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `style`.
-- The scope is the package or area: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `ai`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-theme`, `deps`, `ci`.
+- The scope is the package or area: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `ai`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-ai`, `example-theme`, `deps`, `ci`.
 - A sweeping mechanical change (formatting, renames across packages) is its own commit.
 
 ## CI and releases

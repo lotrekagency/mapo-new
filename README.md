@@ -66,6 +66,7 @@ Run `pnpm build` once after cloning: the packages resolve each other from `dist/
 | Script                   | App                                                    | Port | Backend                         | What it shows                                                                                  |
 | ------------------------ | ------------------------------------------------------ | ---- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `pnpm dev:example-e2e`   | [`apps/example-e2e`](apps/example-e2e)                 | 3000 | In-memory mock API              | The reference app: one page per scenario, the MCP test bed. Log in as `admin` / `admin`        |
+| `pnpm dev:example-ai`    | [`apps/example-ai`](apps/example-ai)                   | 3002 | In-memory mock API              | The AI module as a project turns it on: the AI settings page and the AI status                 |
 | `pnpm dev:example`       | [`apps/example`](apps/example)                         | 3000 | A Camomilla instance on `:8000` | The core demo, with the published Camomilla integration                                        |
 | `pnpm dev:example-theme` | [`apps/example-theme`](apps/example-theme)             | 3001 | None                            | CSS tokens, Nuxt UI defaults, layout slots, MapoOverride, a custom field                       |
 | `pnpm dev:example-form`  | [`apps/example-custom-form`](apps/example-custom-form) | 3001 | Mock routes in `server/`        | `core` and `form` without UIKit or Nuxt UI, with the field registry swapped for Vuetify fields |
@@ -138,6 +139,7 @@ Pull requests to `main` run the `CI` workflow (build, lint, typecheck, test), an
 packages/@mapomodule/      the @mapomodule/* packages
 packages/mapomodule/       the meta-module
 apps/example-e2e/          reference app: one page per scenario, in-memory mock API, MCP test bed
+apps/example-ai/           the AI module alone: AI settings page, AI status, small mock backend
 apps/example/              core demo against a real Camomilla backend
 apps/example-theme/        theming and MapoOverride demo, no backend
 apps/example-custom-form/  core and form with Vuetify fields, no UIKit

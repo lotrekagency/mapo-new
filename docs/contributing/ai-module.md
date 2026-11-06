@@ -662,7 +662,7 @@ The components use Nuxt UI and Tailwind utilities. Tailwind generates only the c
 - **The preference never widens anything**: it applies only within what the user is given.
 - **Labels in two languages**, from `mapo.ai.settings.*`; the sidebar's label is a plain text, `settings.label`, since the sidebar does not translate route labels.
 - **Lint**: the components carry the Vue template formatting warnings that Prettier and ESLint disagree on, as form and uikit do.
-- **No component tests**: the logic the components rely on is tested in the server and in `shared/settings.ts`; the page itself is checked live, in `apps/example-e2e`.
+- **No component tests**: the logic the components rely on is tested in the server and in `shared/settings.ts`; the page itself is checked live, in `apps/example-ai`, which turns the module on as a project does; `apps/example-e2e` turns the page off (`settings: { path: false }`) and keeps its keys lab.
 
 ## Filling a form
 

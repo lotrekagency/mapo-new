@@ -73,6 +73,7 @@ packages/
   mapomodule            meta-module: `mapo` config key, installs everything (ai only with `mapo.ai`), mapomodule/types aggregator
 apps/
   example-e2e           reference app: one page per scenario, in-memory mock API, MCP test bed
+  example-ai            the AI module as a project enables it: AI settings page, AI status, small mock backend (:3002)
   example               core demo against a real Camomilla backend (needs one on :8000)
   example-theme         theming and MapoOverride demo, no backend (:3001)
   example-custom-form   custom field registry demo with Vuetify fields
@@ -177,7 +178,7 @@ The sync table is in [mcp-server § what to update](docs/contributing/mcp-server
 
 ## 9. Commits and the closing report
 
-**Commits** (only when asked): a Conventional Commit title, `type(scope): summary`, validated by commitlint. Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `style`. Scopes: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `ai`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-theme`, `deps`, `ci`. A sweeping mechanical change is its own commit.
+**Commits** (only when asked): a Conventional Commit title, `type(scope): summary`, validated by commitlint. Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `style`. Scopes: `core`, `store`, `uikit`, `form`, `utils`, `i18n`, `mcp`, `ai`, `mapomodule`, `docs`, `example`, `example-e2e`, `example-ai`, `example-theme`, `deps`, `ci`. A sweeping mechanical change is its own commit.
 
 **Closing report**, in the user's language:
 

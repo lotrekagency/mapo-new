@@ -19,6 +19,7 @@
     "dev:example-theme": "pnpm --filter @mapomodule/example-theme dev",
     "dev:example-form": "pnpm --filter @mapomodule/example-custom-form dev",
     "dev:example-e2e": "pnpm --filter @mapomodule/example-e2e dev",
+    "dev:example-ai": "pnpm --filter @mapomodule/example-ai dev",
     "dev:core": "pnpm --filter @mapomodule/core dev",
     "dev:store": "pnpm --filter @mapomodule/store dev",
     "dev:uikit": "pnpm --filter @mapomodule/uikit dev",

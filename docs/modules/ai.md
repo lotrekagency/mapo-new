@@ -922,7 +922,7 @@ The token is sealed in the user's own space of the storage, so it follows them o
 
 ## AI settings
 
-The module adds a page, **AI settings**, at `/ai-settings`, in the sidebar's footer, for every signed-in user; a user the app keeps out of the AI is told so there. It adds it only when the app has no page on that path, as Mapo does with `/login`.
+The module adds a page, **AI settings**, at `/ai-settings`, in the sidebar's footer, for every signed-in user; a user the app keeps out of the AI is told so there. It adds it only when the app has no page on that path, as Mapo does with `/login`. The demo app `apps/example-ai` shows it in a project that enables only the AI, beside a page of the app's own that reads `status`.
 
 - **Each user** picks the provider and model they prefer, among those they are given ([Which key a call uses](#which-key-a-call-uses)): it becomes their default for `run`, while the app and the admins give it to them and a key reaches the provider; when it does not apply, the page says so. They see which key their calls use, save or remove their own token where an admin's assignment allows one ([Personal tokens](#personal-tokens)), and check the connection.
 - **The AI's admins** also see the keys: the assignments to everyone, a group or a user, which they add, change and remove; the order of the groups; and the tokens the users saved, which they can remove ([Assign keys](#assign-keys)). Assigning a key to one user with every model, while a group of theirs narrows the models, shows a warning and offers the group's models.
