@@ -78,6 +78,8 @@ describe("matchRecipes", () => {
       "let the admins add an OpenAI model without a deploy",
       "ai-admin-settings",
     ],
+    ["how much does the AI cost per user this month", "ai-usage"],
+    ["show the tokens used by each model", "ai-usage"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

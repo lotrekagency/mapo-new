@@ -794,6 +794,24 @@ export const RECIPES: Recipe[] = [
       "Experimental: on the AI settings page the AI's admins change how the AI works in the whole app (GET/PUT /_mapo/ai/settings, POST /_mapo/ai/settings/preview): their instructions (layer 3 of the prompt, after Mapo's and the app's), the rules of verification over mapo.ai.verification, words that keep a field from the AI besides Mapo's and mapo.ai.secretWords, the prompt cache of openai and anthropic, Anthropic's fallbacks (off; on only where the app's anthropic.fallbacks leaves them on), and models they add where the app sets providers.<id>.adminModels: true, saved once the provider's server lists them. The app's options stay the defaults; changes are audited, and an unreadable record closes the AI with 503.",
   },
   {
+    id: "ai-usage",
+    task: "See how much the AI is used and what it costs, by user, model and day",
+    keywords: [
+      "usage",
+      "tokens",
+      "cost",
+      "prices",
+      "mapo.ai.prices",
+      "audit",
+      "changes",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Usage",
+    summary:
+      "Experimental: the AI settings page shows the usage summed from the audit when it is read: the AI's admins see every user's calls of a period (GET /_mapo/ai/usage?days=, 1 to 3650, 30 unless set; the page offers 7, 30 and 90) by user, model and day, the latest 50 calls and the changes of keys and settings (GET /_mapo/ai/actions); each user their own (GET /_mapo/ai/usage/mine). Tokens always; a cost only for the models the app prices in mapo.ai.prices ({ currency, providers: { [provider]: { [model]: { input, output, cacheRead?, cacheWrite? } } } }, per million tokens): Mapo keeps no price list. Never what was sent.",
+  },
+  {
     id: "ai-cloud-models",
     task: "Use OpenAI or Anthropic (Claude) models for the AI",
     keywords: [
