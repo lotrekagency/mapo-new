@@ -195,7 +195,11 @@ const KEY_ACTION_RECORD = z.strictObject({
     .discriminatedUnion("kind", [
       z.strictObject({ kind: z.literal("all") }),
       z.strictObject({ kind: z.literal("group"), group: TEXT }),
-      z.strictObject({ kind: z.literal("user"), user: TEXT }),
+      z.strictObject({
+        kind: z.literal("user"),
+        user: TEXT,
+        label: TEXT.optional(),
+      }),
     ])
     .optional(),
   user: TEXT.optional(),

@@ -44,12 +44,14 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/module.ts`                   | The Nuxt module: routes, plugins, server and app imports, private runtime config, hook types                                 |
 | `src/storage.ts`                  | At build time, the storage's default mount                                                                                   |
 | `src/access.ts`                   | At build time, the `admin` and `users` options                                                                               |
+| `src/settings.ts`                 | At build time, the `settings` option: the settings page's path and label, the users' and groups' endpoints                   |
 | `src/runtime/server/routes/`      | The gateway's Nitro handlers, one file per route                                                                             |
 | `src/runtime/server/auth/`        | Who calls the gateway: the session, the rules, the hook                                                                      |
 | `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation                                             |
 | `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models                                  |
 | `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
 | `src/runtime/server/keys/`        | The chain of keys, the admins' assignments in one sealed record, the users' own tokens, the key routes' wiring               |
+| `src/runtime/server/settings/`    | The settings page's server: the user's preference in the storage, the check of a connection                                  |
 | `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read` and the routes of the keys                                            |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
@@ -64,7 +66,10 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/gateway.ts`   | The gateway's response types and the contract version                                                                        |
 | `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form                                           |
 | `src/runtime/shared/read.ts`      | The browser's half of `read`: the file sent as a form, the answer read                                                       |
+| `src/runtime/shared/settings.ts`  | The settings page's reading of the backend's users and groups, as DRF lists them                                             |
 | `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors; `useMapoAiRead()`: a file sent to `read` |
+| `src/runtime/components/`         | `MapoAiSettings` and its parts, with Nuxt UI; `settingsClient.ts` in `composables/` is their client                          |
+| `src/runtime/pages/`              | `ai-settings.vue`, the page the module adds when the app has none on its path                                                |
 
 The rules for the code are in `packages/@mapomodule/ai/AGENTS.md`: `runtime/shared` stays free of Nuxt, Nitro, Vue and Node imports, secrets stay on the server, outside data is `unknown` until a validator reads it, nothing that keeps the AI out may be lost, one schema serves every provider, the state is sealed and fails closed, no pattern runs unbounded, `run` builds what it asks and spends last, and the page writes only what the answer verifies on an empty field.
 
@@ -619,6 +624,46 @@ The record is read at each request of `status`, `run` and the token's route. One
 - **The admin names a user by the backend's id**, which the settings page will have to offer by name.
 - **The nearest assignment decides the models alone**: a user's assignment that sets only a key opens every model to them; the settings page should repeat the group's models as a default.
 
+## The AI settings page
+
+The module adds a page at `/ai-settings` (`src/settings.ts` reads the option; `module.ts` adds it with `extendPages` only when the app has no page on that path, as uikit does with `/login`), and registers its interface as a public component, `MapoAiSettings`, for an app that sets the path to `false` and mounts it in a page of its own. The page's meta carries the layout, the `auth` middleware and the sidebar's label, icon and footer: a page loaded from `node_modules` gets no `definePageMeta()` auto-import.
+
+| File                                                  | Role                                                                                          |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `src/runtime/components/MapoAiSettings.vue`           | Asks `status`; shows the user's part, and the admins' part to the AI's admins                 |
+| `src/runtime/components/MapoAiSettingsPersonal.vue`   | The preference, the key in use, the user's own token, the check of the connection             |
+| `src/runtime/components/MapoAiSettingsKeys.vue`       | The assignments, the order of the groups, the users' tokens                                   |
+| `src/runtime/components/MapoAiSettingsAssignment.vue` | The dialog that saves an assignment; the warning when one user's assignment widens the models |
+| `src/runtime/components/MapoAiSettingsPrincipal.vue`  | Picks a user or a group: searched in the app's endpoint, or written by hand                   |
+| `src/runtime/composables/settingsClient.ts`           | `$mapoFetch`, the translations and the endpoints, shared by the parts; not public             |
+| `src/runtime/server/settings/preferences.ts`          | The user's preference, sealed in their space of the `settings` purpose                        |
+| `src/runtime/server/settings/connection.ts`           | `checkConnection()`: the provider's models listed with the user's key; pure                   |
+
+### The preference
+
+A user's provider and model are a record of their own space, `preferences` in the `settings` purpose. `mapoAiUserPolicy()` reads it with the keys and the tokens, and `policyForUser()` makes it the defaults of both tasks only while the provider offers the user that model and can be called; otherwise the app's defaults apply, and the record stays, so a model an admin opens again comes back. `status` answers the record as `preference` and what applies as `default`, so the page can say both. Saving one the user is not given is a 403: the check runs on the user's own policy, keys and assignments included.
+
+### The check of a connection
+
+`POST /_mapo/ai/test` builds the user's policy, as `run` does, and calls the provider's `listModels(signal, apiKey)` with the key the chain chose: Mapo's providers are built again with it, an app's gets it as the second argument. Listing the models costs no tokens, and tells the four things the page needs: the server answers, the key is taken, the model is there, and how long it took. A provider that needs a key and has none is `no-key` without a call; one without `listModels` is `unverifiable`. A failure is answered by its kind (`MapoAiProviderFailure`), and its message goes to the log only. Ten checks a minute per user, counted in the memory of the process, apart from the calls of `run`.
+
+### Users and groups by name
+
+The backend has no endpoint Mapo knows for its users, so the app names its own (`settings.usersApi`, `settings.groupsApi`, public runtime config), and the page searches it with `?search=` through `$mapoFetch`, with the admin's session: the backend decides who may list its users. `principalsOf()` reads the answer as DRF writes it, plain or paginated, a user by `id` and the first of `username`, `email` or name, a group by `name`. A user's assignment keeps that name as `scope.label`, to show it; the chain matches the id alone. Without an endpoint, the admin writes the id or the name.
+
+### Styling
+
+The components use Nuxt UI and Tailwind utilities. Tailwind generates only the classes it finds in the sources it scans, so uikit's `main.css`, the stylesheet with `@import "tailwindcss"`, has a `@source` for `ai/src/runtime/components`, as it has for form's components; an app without the package has no such folder, and Tailwind skips a missing source.
+
+### Strengths and weaknesses
+
+- **One page for every app, and a component for the others**: the page works with no code; an app that wants it elsewhere sets `path: false`.
+- **The check is free and fast**, and proves the key and the model; it does not prove that a call with a large schema goes through, which only a call would.
+- **The preference never widens anything**: it applies only within what the user is given.
+- **Labels in two languages**, from `mapo.ai.settings.*`; the sidebar's label is a plain text, `settings.label`, since the sidebar does not translate route labels.
+- **Lint**: the components carry the Vue template formatting warnings that Prettier and ESLint disagree on, as form and uikit do.
+- **No component tests**: the logic the components rely on is tested in the server and in `shared/settings.ts`; the page itself is checked live, in `apps/example-e2e`.
+
 ## Filling a form
 
 `useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
@@ -682,6 +727,7 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `markdown.test.ts`  | The closed list of tags: everything else is text                                                                                                   |
 | `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |
 | `keys.test.ts`      | The chain of keys, the assignments, the bodies of the routes; `keys-routes.test.ts` runs the routes: who, keys, tokens, audit                      |
+| `settings.test.ts`  | The users and groups of the backend, the check of a connection, the preference in the policy                                                       |
 | `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep                                         |
 | `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                                                                  |
 | `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                                                                   |
@@ -809,6 +855,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
+| AI settings                                      | The settings page: preferences, keys, the check of a connection  |
 | The prompt, Verification, Limits, The audit      | The `run` route                                                  |
 | The secret and the storage                       | The encrypted storage                                            |
 | Options                                          | Every option, in the change that makes it work (written to date) |
@@ -817,7 +864,7 @@ Still to write, each with the work that fills it:
 
 | Section                       | Filled by                                                |
 | ----------------------------- | -------------------------------------------------------- |
-| AI settings                   | The settings page                                        |
+| AI settings                   | The rest of the AI settings: rules, usage                |
 | Read a file (PDFs, images)    | The readers for PDFs and images                          |
 | Fill a form with Magic Fill   | Magic Fill                                               |
 | Verified and to check         | Magic Fill, from the verification described on this page |
@@ -833,7 +880,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **The AI settings page**, on the routes of the keys: the admins assign keys and models by name, order the groups, list and remove the tokens, check a key (`POST test`), set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists; each user sees their key and saves their own token.
+1. **The rest of the AI settings**, in the page that exists: the admins' instructions for the whole app, with a preview of the rules of the prompt; the verification rules; the extra words that name a secret; the prompt cache; models added to those the app lists; Anthropic's fallbacks; then the usage read from the audit and the log of the changes of the keys. Those for one entity come with the catalog.
 2. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
 3. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
 4. **Import AI**, with a check for duplicates between new items and existing records.

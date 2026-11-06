@@ -10,13 +10,14 @@
 
 import type { H3Event } from "h3";
 import { useNitroApp, useRuntimeConfig } from "nitropack/runtime";
-import type { MapoAiKeyProvider } from "../../shared/gateway";
+import type { MapoAiKeyProvider, MapoAiPreference } from "../../shared/gateway";
 import type { MapoAiSession } from "../auth/nitro";
 import { emptyKeysRecord } from "../keys/assignments";
 import type { AssignableProvider, KeysRecord } from "../keys/assignments";
 import { keyStatusOf, providerAccess } from "../keys/chain";
 import type { KeyChainUser } from "../keys/chain";
 import { readKeys, readUserTokens } from "../keys/store";
+import { readPreference } from "../settings/preferences";
 import { mapoAiProvider } from "../providers/registry";
 import type { MapoAiServerSettings } from "../providers/registry";
 import { mapoAiStorageState, useMapoAiStorage } from "../storage/nitro";
@@ -76,36 +77,40 @@ export async function mapoAiUserPolicy(
   const policy = policyOf(options, (id) =>
     mapoAiProvider(id, serverSettingsOf(config, options, id)),
   ).policy;
-  const { record, tokens } = await keysOf(event, user, policy);
-  return policyForUser(policy, (usable) => {
-    const assignable = assignableOf(usable);
-    const token = tokens.get(assignable.id);
-    const access = providerAccess({
-      provider: assignable,
-      user,
-      record,
-      ...(token ? { token } : {}),
-      ...withProjectKey(providerKeyOf(config, assignable.id)),
-    });
-    const key = keyStatusOf(assignable, access, token);
-    if (!key) return { provider: usable.provider, models: access.models };
-    const apiKey = access.key?.value;
-    const settings = serverSettingsOf(config, options, assignable.id, false);
-    const inClear = plainKeyWarning(assignable.id, settings.baseURL, apiKey);
-    if (inClear) noticeOnce(inClear);
-    return {
-      // Mapo's providers hold their key from when they are built: built
-      // again with the user's. An app's provider gets it with each call.
-      provider:
-        mapoAiProvider(assignable.id, {
-          ...settings,
-          ...(apiKey ? { apiKey } : {}),
-        }) ?? usable.provider,
-      models: access.models,
-      ...(apiKey ? { apiKey } : {}),
-      key,
-    };
-  });
+  const { record, tokens, preference } = await keysOf(event, user, policy);
+  return policyForUser(
+    policy,
+    (usable) => {
+      const assignable = assignableOf(usable);
+      const token = tokens.get(assignable.id);
+      const access = providerAccess({
+        provider: assignable,
+        user,
+        record,
+        ...(token ? { token } : {}),
+        ...withProjectKey(providerKeyOf(config, assignable.id)),
+      });
+      const key = keyStatusOf(assignable, access, token);
+      if (!key) return { provider: usable.provider, models: access.models };
+      const apiKey = access.key?.value;
+      const settings = serverSettingsOf(config, options, assignable.id, false);
+      const inClear = plainKeyWarning(assignable.id, settings.baseURL, apiKey);
+      if (inClear) noticeOnce(inClear);
+      return {
+        // Mapo's providers hold their key from when they are built: built
+        // again with the user's. An app's provider gets it with each call.
+        provider:
+          mapoAiProvider(assignable.id, {
+            ...settings,
+            ...(apiKey ? { apiKey } : {}),
+          }) ?? usable.provider,
+        models: access.models,
+        ...(apiKey ? { apiKey } : {}),
+        key,
+      };
+    },
+    preference,
+  );
 }
 
 /** The providers the options enable that cannot be used, for the server's log. */
@@ -114,14 +119,18 @@ export function unusableMapoAiProviders(event?: H3Event): UnusableProvider[] {
 }
 
 /**
- * The admins' keys, and the user's own tokens for the providers that take
- * one; nothing when the storage is closed.
+ * The admins' keys, the user's own tokens for the providers that take one,
+ * and the user's preference; nothing when the storage is closed.
  */
 async function keysOf(
   event: H3Event,
   user: KeyChainUser,
   policy: MapoAiPolicy,
-): Promise<{ record: KeysRecord; tokens: Map<string, string> }> {
+): Promise<{
+  record: KeysRecord;
+  tokens: Map<string, string>;
+  preference?: MapoAiPreference;
+}> {
   if (!mapoAiStorageState(event).open) {
     return { record: emptyKeysRecord(), tokens: new Map() };
   }
@@ -131,7 +140,17 @@ async function keysOf(
     .filter((usable) => usable.provider.key !== undefined)
     .map((usable) => usable.provider.id);
   const tokens = await readUserTokens(storage.store("tokens"), user.id, keyed);
-  return { record, tokens };
+  const preference = await readPreference(storage.store("settings"), user.id);
+  return { record, tokens, ...(preference ? { preference } : {}) };
+}
+
+/** The user's saved preference, for `status`; nothing when the storage is closed. */
+export async function mapoAiPreference(
+  event: H3Event,
+  userId: string,
+): Promise<MapoAiPreference | undefined> {
+  if (!mapoAiStorageState(event).open) return undefined;
+  return readPreference(useMapoAiStorage(event).store("settings"), userId);
 }
 
 function assignableOf(usable: UsableProvider): AssignableProvider {

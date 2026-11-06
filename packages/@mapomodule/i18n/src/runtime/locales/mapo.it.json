@@ -318,6 +318,122 @@
         "network": "Il server non si raggiunge.",
         "badAnswer": "La risposta del server non si è potuta leggere.",
         "failed": "L'AI non è riuscita a compilare il form."
+      },
+      "settings": {
+        "title": "Impostazioni AI",
+        "intro": "Scegli il provider e il modello delle tue chiamate, vedi quale chiave usano e verifica la connessione.",
+        "loading": "Carico le impostazioni AI…",
+        "notAllowed": "L'AI non è disponibile per il tuo account.",
+        "failed": "La richiesta non è riuscita.",
+        "failedWith": "La richiesta non è riuscita ({status}).",
+        "personal": {
+          "title": "Le tue preferenze",
+          "provider": "Provider",
+          "model": "Modello",
+          "noProvider": "Nessun provider AI è disponibile per te."
+        },
+        "preference": {
+          "save": "Usa come mio predefinito",
+          "remove": "Usa il predefinito dell'app",
+          "appDefault": "Usi il predefinito dell'app.",
+          "notApplied": "La tua scelta ora non vale: il modello non ti spetta più, o nessuna chiave raggiunge il provider. Vale quella dell'app.",
+          "saved": "Il tuo predefinito è salvato.",
+          "removed": "Usi di nuovo il predefinito dell'app."
+        },
+        "key": {
+          "inUse": "Chiave in uso:",
+          "personal": "il tuo token",
+          "user": "assegnata a te da un admin",
+          "group": "assegnata da un admin al gruppo {group}",
+          "all": "assegnata da un admin a tutti",
+          "project": "la chiave dell'app",
+          "none": "nessuna: questo provider non si può usare",
+          "noneOptional": "nessuna: il server accetta chiamate senza chiave",
+          "ending": "che finisce con {last4}"
+        },
+        "token": {
+          "placeholder": "Il tuo token per questo provider",
+          "save": "Salva il token",
+          "replace": "Sostituisci il token",
+          "remove": "Rimuovi",
+          "saved": "Il tuo token che finisce con {last4} è salvato.",
+          "unused": "Hai salvato un token, ma ora un admin non lo consente: non si usa.",
+          "help": "Conservato cifrato sul server: il browser non lo rilegge più.",
+          "savedNotice": "Il tuo token è salvato.",
+          "removedNotice": "Il tuo token è rimosso."
+        },
+        "check": {
+          "button": "Verifica connessione",
+          "connected": "Connesso · {ms} ms",
+          "modelMissing": "Il server ha risposto, ma non elenca {model}.",
+          "noKey": "Nessuna chiave: questo provider non si può usare.",
+          "unverifiable": "Questo provider non si può verificare.",
+          "failed": "Il server non ha risposto ({failure})."
+        },
+        "admin": {
+          "title": "Chiavi",
+          "intro": "Visibile agli admin dell'AI: chi usa quale chiave e quali modelli.",
+          "empty": "Nessuna assegnazione: tutti usano ogni modello che l'app abilita, con la chiave dell'app, e nessun token personale."
+        },
+        "scope": {
+          "all": "Tutti",
+          "anyGroup": "Un gruppo",
+          "anyUser": "Un utente",
+          "group": "Gruppo {group}",
+          "user": "Utente {user}"
+        },
+        "assignment": {
+          "add": "Aggiungi una chiave",
+          "edit": "Modifica l'assegnazione",
+          "remove": "Rimuovi l'assegnazione",
+          "for": "Per",
+          "group": "Gruppo",
+          "user": "Utente",
+          "provider": "Provider",
+          "models": "Modelli",
+          "everyModel": "Tutti i modelli",
+          "closed": "Nessuno spuntato: il provider è chiuso per loro.",
+          "closedShort": "nessuno: chiuso",
+          "widens": "L'assegnazione di un utente decide da sola: con tutti i modelli, questo utente li avrà tutti, anche se un suo gruppo li limita.",
+          "useModelsOf": "Usa i modelli di {group}",
+          "key": "Chiave",
+          "keyKept": "Lascia vuoto per tenere la chiave salvata.",
+          "keyNext": "Lascia vuoto per usare la chiave del livello sopra.",
+          "removeKey": "Rimuovi la chiave: vale quella del livello sopra",
+          "noKey": "quella del livello sopra",
+          "shortKey": "una chiave corta",
+          "tokens": "Token personali",
+          "tokensAllowed": "consentiti",
+          "tokensNo": "no",
+          "personalTokens": "I suoi utenti possono usare un token proprio",
+          "personalTokensHelp": "Le loro chiamate passano allora dal loro account presso il provider.",
+          "savedNotice": "L'assegnazione è salvata.",
+          "removedNotice": "L'assegnazione è rimossa."
+        },
+        "groups": {
+          "title": "Ordine dei gruppi",
+          "help": "Un utente in più gruppi riceve l'assegnazione del gruppo più in alto in questo elenco.",
+          "up": "Sposta {group} su",
+          "down": "Sposta {group} giù",
+          "save": "Salva l'ordine",
+          "savedNotice": "L'ordine dei gruppi è salvato."
+        },
+        "tokens": {
+          "title": "Token personali degli utenti",
+          "none": "Nessun utente ha salvato un token.",
+          "remove": "Rimuovi",
+          "removedNotice": "Il token è rimosso."
+        },
+        "principal": {
+          "search": {
+            "user": "Cerca un utente",
+            "group": "Cerca un gruppo"
+          },
+          "write": {
+            "user": "L'id dell'utente nel backend",
+            "group": "Il nome del gruppo"
+          }
+        }
       }
     }
   }

@@ -120,9 +120,12 @@ export interface MapoAiProvider {
    * The models its server has, for a server that can list them, such as
    * a local one. The server calls it when it starts, and warns about each
    * model `mapo.ai.providers` allows that the list does not have; the
-   * models a request may use stay those `mapo.ai.providers` allows.
+   * models a request may use stay those `mapo.ai.providers` allows. "Check
+   * the connection" in the AI settings calls it too, for one user. For a
+   * provider that declares `key`, `apiKey` is the key the chain chose for
+   * that user, or the project's when the server starts.
    */
-  listModels?(signal: AbortSignal): Promise<MapoAiModelInfo[]>;
+  listModels?(signal: AbortSignal, apiKey?: string): Promise<MapoAiModelInfo[]>;
   /**
    * Calls the model. Throw a {@link MapoAiProviderError} for a failure the
    * gateway should tell apart (a timeout, a rate limit); anything else it

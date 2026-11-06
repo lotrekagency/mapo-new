@@ -13,6 +13,7 @@ import { createError } from "h3";
 import type {
   MapoAiDefaults,
   MapoAiKeyStatus,
+  MapoAiPreference,
   MapoAiProviderStatus,
   MapoAiRunRequest,
 } from "../../shared/gateway";
@@ -93,11 +94,13 @@ export function policyOf(
 /**
  * The policy for one user: each usable provider as `offer` gives it to
  * them, with their models and their key. A provider that offers them no
- * model is left out, and the defaults are chosen again among the rest.
+ * model is left out, and the defaults are chosen again among the rest:
+ * the user's `preference` first, while they may call it.
  */
 export function policyForUser(
   policy: MapoAiPolicy,
   offer: (usable: UsableProvider) => UserOffer,
+  preference?: MapoAiPreference,
 ): MapoAiPolicy {
   const providers = policy.providers.flatMap((usable): UsableProvider[] => {
     const offered = offer(usable);
@@ -112,11 +115,33 @@ export function policyForUser(
       },
     ];
   });
-  const defaults = defaultsOf(policy.options, providers);
+  const defaults =
+    preferredOf(providers, preference) ?? defaultsOf(policy.options, providers);
   return {
     providers,
     options: policy.options,
     ...(defaults ? { defaults } : {}),
+  };
+}
+
+/**
+ * The user's preference as defaults, for every task, while the provider
+ * offers them the model and can be called; `undefined` otherwise.
+ */
+function preferredOf(
+  providers: readonly UsableProvider[],
+  preference: MapoAiPreference | undefined,
+): MapoAiDefaults | undefined {
+  if (!preference) return undefined;
+  const usable = providers.find(
+    (one) => one.provider.id === preference.provider,
+  );
+  const isOffered = usable?.models.includes(preference.model) === true;
+  if (!usable || !isOffered || !canCall(usable)) return undefined;
+  const { model } = preference;
+  return {
+    provider: usable.provider.id,
+    models: { fill: model, extract: model },
   };
 }
 

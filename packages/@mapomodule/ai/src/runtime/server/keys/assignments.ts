@@ -101,7 +101,11 @@ const MODEL = z.string().min(1).max(MAX_MODEL_ID);
 const SCOPE = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("all") }),
   z.strictObject({ kind: z.literal("group"), group: NAME }),
-  z.strictObject({ kind: z.literal("user"), user: NAME }),
+  z.strictObject({
+    kind: z.literal("user"),
+    user: NAME,
+    label: z.string().max(MAX_NAME).optional(),
+  }),
 ]);
 
 const ACTOR = z.strictObject({

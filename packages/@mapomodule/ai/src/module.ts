@@ -1,4 +1,5 @@
 import {
+  addComponent,
   addImports,
   addServerHandler,
   addServerImports,
@@ -6,6 +7,7 @@ import {
   addTypeTemplate,
   createResolver,
   defineNuxtModule,
+  extendPages,
   useLogger,
   useNitro,
 } from "@nuxt/kit";
@@ -20,6 +22,7 @@ import {
 } from "./runtime/server/run/options";
 import { MAPO_AI_GATEWAY_PATH } from "./runtime/shared/gateway";
 import { isRecord } from "./runtime/shared/guards";
+import { settingsOption } from "./settings";
 import { addDefaultStorageMount } from "./storage";
 
 export type { MapoAiOptions, MapoAiStatus } from "./index";
@@ -116,6 +119,47 @@ export default defineNuxtModule<MapoAiOptions>({
       readers,
     };
 
+    // The AI settings page: where it is, and which endpoints of the backend
+    // the admins search users and groups with. The endpoints go in the
+    // public runtime config, where the page reads them and the environment
+    // can change them (`NUXT_PUBLIC_MAPO_AI_SETTINGS_USERS_API`).
+    const settings = settingsOption(options.settings, warn);
+    const publicConfig = nuxt.options.runtimeConfig.public;
+    const publicAi = isRecord(publicConfig.mapoAi) ? publicConfig.mapoAi : {};
+    publicConfig.mapoAi = {
+      ...publicAi,
+      settings: {
+        usersApi: settings.usersApi ?? "",
+        groupsApi: settings.groupsApi ?? "",
+      },
+    };
+    addComponent({
+      name: "MapoAiSettings",
+      filePath: resolver.resolve("./runtime/components/MapoAiSettings.vue"),
+    });
+    const { path: settingsPath, label: settingsLabel } = settings;
+    if (settingsPath !== false) {
+      // Added only when the app has no page on that path, as uikit does
+      // with /login. The layout and the middleware live in `meta`: the
+      // page is loaded from node_modules, where definePageMeta() is no
+      // auto-import.
+      extendPages((pages) => {
+        if (pages.some((page) => page.path === settingsPath)) return;
+        pages.push({
+          name: "mapo-ai-settings",
+          path: settingsPath,
+          file: resolver.resolve("./runtime/pages/ai-settings.vue"),
+          meta: {
+            layout: "mapo-default",
+            middleware: ["auth"],
+            label: settingsLabel,
+            icon: "i-lucide-sparkles",
+            sidebarFooter: true,
+          },
+        });
+      });
+    }
+
     // The hooks, `mapo-ai:user`, `mapo-ai:prompt` and `mapo-ai:read`, typed
     // in the app's server code.
     addTypeTemplate(
@@ -186,7 +230,8 @@ export default defineNuxtModule<MapoAiOptions>({
       handler: resolver.resolve("./runtime/server/routes/run.post"),
     });
     // The keys: the admins assign them, each user saves their own token
-    // where an assignment allows one.
+    // where an assignment allows one; the AI settings: the user's
+    // preference and the check of a provider's connection.
     const keyRoutes = [
       ["keys", "get", "keys.get"],
       ["keys", "put", "keys.put"],
@@ -194,6 +239,9 @@ export default defineNuxtModule<MapoAiOptions>({
       ["keys/:id", "delete", "keys-id.delete"],
       ["token", "put", "token.put"],
       ["token", "delete", "token.delete"],
+      ["preferences", "put", "preferences.put"],
+      ["preferences", "delete", "preferences.delete"],
+      ["test", "post", "test.post"],
     ] as const;
     for (const [path, method, file] of keyRoutes) {
       addServerHandler({

@@ -13,6 +13,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - `GET /_mapo/ai/status` tells a signed-in user the version of the gateway's contract, whether the app lets them use the AI and whether they administer it, and the providers, models, limits and readers they get; an admin also gets the state of the storage.
 - Two options say who administers the AI and who may use it, `admin` and `users`, and a Nitro plugin can narrow it further with the `mapo-ai:user` hook.
 - `POST /_mapo/ai/run` fills one record (`fill`) or extracts every record a source describes (`extract`). The page sends the record's two descriptions, its backend schema and its form's fields, and the source; the gateway builds what the AI may fill, composes the prompt, calls the provider and reads its answer: each field comes back empty, filled (verified by a quote of the source, or to check) or discarded with a reason. The gateway never writes to the backend.
+- The module adds an **AI settings** page (`/ai-settings`), also a component, `MapoAiSettings`: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins assign keys to everyone, a group or a user.
 - The keys come from three levels, nearest to the user first: the user's own token, where an admin allows one; the key the AI's admins assign to the user, to one of their groups or to everyone, with the models it opens; the project's key, in the server's environment. The browser never sees a key: `status` says which level gives it.
 - The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command; `openai`, OpenAI's models through its Responses API; `anthropic`, Claude through Anthropic's Messages API; `ollama`, a model served by Ollama; `openai-compatible`, a model served by LM Studio, vLLM, llama.cpp or another server that speaks OpenAI's Chat Completions API; and the ones an app registers with `registerMapoAiProvider()`.
 - `POST /_mapo/ai/read` reads a file into the text `run` takes, with the reader of its format: text, Markdown, JSON, HTML, CSV and XLSX. An app puts its own reader in place of any of Mapo's or adds one (`registerMapoAiReader()`), touches up what any reader read (the `mapo-ai:read` hook), and turns a format off without code (`readers`). In the browser, `useMapoAiRead()` sends a file.
@@ -21,7 +22,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model answered, the tokens (those of the provider's prompt cache among them) and the outcome, never the contents, for 90 days by default (`audit`).
 - `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
-- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys (`MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -68,6 +69,7 @@ The gateway is a set of routes on your app's own Nitro server, under `/_mapo/ai/
 | `POST /_mapo/ai/run`   | What the AI proposes for a record, or for the records of a source, read field by field ([Ask the AI](#ask-the-ai))                                                                                                                                       |
 | `/_mapo/ai/keys`       | For the AI's admins: the keys they assign to everyone, a group or a user, the models they open, and the order of the groups ([Keys](#keys))                                                                                                              |
 | `/_mapo/ai/token`      | The user's own token for a provider, where an admin's assignment allows one ([Personal tokens](#personal-tokens))                                                                                                                                        |
+| `/_mapo/ai/test`       | Checks a provider's connection with the user's key, at no cost; `PUT` and `DELETE /_mapo/ai/preferences` save and remove the user's provider and model ([AI settings](#ai-settings))                                                                     |
 
 The contract version goes up when a route or a response changes in a way an older client cannot read. The answers are the user's own, so they carry `Cache-Control: no-store`.
 
@@ -79,7 +81,7 @@ import type { MapoAiStatus } from "mapomodule/types";
 const status = await $fetch<MapoAiStatus>("/_mapo/ai/status");
 ```
 
-To a user the app lets in, `providers` lists what `run` may call for them, with the models they may ask for and, for a provider that calls with a key, where their key comes from (`key`, [Keys](#keys)), `default` what it calls when a request names nothing, `limits` the limits of `run` and `read` ([Limits](#limits)), and `readers` the formats `read` takes, the app's readers first ([Read a file](#read-a-file)). An empty `providers`, and no `default`, means `run` has no provider to call. To an admin, `storage` says whether the gateway can read and write its state, and why not, never the secret itself:
+To a user the app lets in, `providers` lists what `run` may call for them, with the models they may ask for and, for a provider that calls with a key, where their key comes from (`key`, [Keys](#keys)), `default` what it calls when a request names nothing (the user's `preference` when they may still call it, [AI settings](#ai-settings)), `limits` the limits of `run` and `read` ([Limits](#limits)), and `readers` the formats `read` takes, the app's readers first ([Read a file](#read-a-file)). An empty `providers`, and no `default`, means `run` has no provider to call. To an admin, `storage` says whether the gateway can read and write its state, and why not, never the secret itself:
 
 ```json
 {
@@ -170,7 +172,7 @@ export default defineNuxtConfig({
 });
 ```
 
-An admin assigns keys and models to everyone, a group or a user, and allows personal tokens ([Keys](#keys)); `status` tells an admin the state of the storage.
+An admin assigns keys and models to everyone, a group or a user, and allows personal tokens ([Keys](#keys)), in the [AI settings](#ai-settings) page or through its routes; `status` tells an admin the state of the storage.
 
 ### Restrict who uses the AI
 
@@ -822,7 +824,7 @@ export default defineNuxtConfig({
 - It returns `{ status: "answered", output, usage }`, where `output` is the answer parsed from JSON (or the model's text, when it is not JSON: the answer then comes back with `readable: false`), or `{ status: "refused", refusal, usage }`. `usage` may add `cacheReadTokens` and `cacheWriteTokens`, the prompt's tokens read from and written to the provider's cache, and the answer may add `model`, the model that answered when it is not the one asked: the gateway's answer and its audit name it. The gateway reads what it returns as outside data: `output` as plain JSON, so one it cannot copy as JSON is unreadable, token counts as whole numbers from zero, a `model` only as a name of up to 200 characters, and anything else is a 502.
 - `key`, optional, says that the provider calls its server with a key: `"required"`, or `"optional"` for a server that also takes calls without one. Each call then gets the key the chain chose for the user as `request.apiKey` ([Keys](#keys)): the user's own token where allowed, an admin's key, or the project's, from `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY` (`NUXT_MAPO_AI_PROVIDERS_ACME_API_KEY`). A `"required"` provider without a key is refused before the call. Without `key`, the provider gets no key from the gateway and keeps its own, and the admins assign it models only. Never log `apiKey`.
 - `capabilities` say what the provider can do. The gateway reads none of them: it sends text only, waits for the whole answer and calls no tools.
-- `listModels(signal)`, optional, returns the models its server has (`MapoAiModelInfo[]`). The server calls it when it starts, and warns about each model `providers` allows that the list does not have, or that the list could not be read; a request may still ask only for the models `providers` lists.
+- `listModels(signal, apiKey)`, optional, returns the models its server has (`MapoAiModelInfo[]`). The server calls it when it starts, with the project's key, and warns about each model `providers` allows that the list does not have, or that the list could not be read; a request may still ask only for the models `providers` lists. The connection check of the [AI settings](#ai-settings) calls it too, with the key the chain chose for the user.
 - A `MapoAiProviderError` tells the gateway what failed: `timeout` (504), `rate-limit` (503, with `Retry-After` when `retryAfter` is a count of seconds, at most an hour), `too-long` for a prompt the model cannot read whole (413), `unavailable`, `invalid-response`, `refused-request` or `truncated` for an answer cut at its cap (502). Any other error, or a failure the gateway does not know, is a 502 too. The message goes to the server's log, never to the browser.
 - An id is lowercase letters, digits and `-`, starting with a letter. `mock`, `openai`, `anthropic`, `openai-compatible` and `ollama` are kept for Mapo's own providers: registering one of them is an error.
 - A registered provider that `providers` does not enable is never called, and the server says so when it starts; so it does for one `providers` enables that does not exist or has no model.
@@ -898,7 +900,7 @@ const assignment = await $fetch<MapoAiKeyAssignment>("/_mapo/ai/keys", {
 // assignment.key is { last4: "…" }: the key never comes back.
 ```
 
-- `scope` is `{ "kind": "all" }`, `{ "kind": "group", "group": "editors" }`, with the group's name as `userInfoApi` sends it, or `{ "kind": "user", "user": "42" }`, with the backend's `id` as text.
+- `scope` is `{ "kind": "all" }`, `{ "kind": "group", "group": "editors" }`, with the group's name as `userInfoApi` sends it, or `{ "kind": "user", "user": "42", "label": "ada" }`, with the backend's `id` as text and an optional `label` (up to 150 characters) that only shows the user by name in the [AI settings](#ai-settings): the `id` alone decides.
 - `models` names models `providers` enables for the provider, kept in the app's order; `[]` closes the provider to the scope, and `null` opens every model again. A new assignment without `models` opens every model, and it is nearer to its users than their groups' assignments: to give a user a key of their own and keep their group's models, repeat the models.
 - `key` is printable characters without spaces, up to 4096; `null` removes it, and the next level's key applies. An assignment without a key narrows the models and keeps the key of the next level.
 - `personalTokens` lets the users of the scope use their own token; a new assignment has it `false`.
@@ -917,6 +919,60 @@ A user brings their own token where an admin's assignment allows it. They are of
 | `DELETE /_mapo/ai/token?provider=openai` | Removes the user's token: 204, whether there was one or not. An AI admin removes another user's with `&user=<id>`            |
 
 The token is sealed in the user's own space of the storage, so it follows them on every device. It is used only while the nearest assignment allows it: when an admin turns personal tokens off, the next call uses the next level's key, and the token stays until its user or an admin removes it. `GET /_mapo/ai/keys` lists the saved tokens to the admins, with whose and the last four characters.
+
+## AI settings
+
+The module adds a page, **AI settings**, at `/ai-settings`, in the sidebar's footer, for every signed-in user; a user the app keeps out of the AI is told so there. It adds it only when the app has no page on that path, as Mapo does with `/login`.
+
+- **Each user** picks the provider and model they prefer, among those they are given ([Which key a call uses](#which-key-a-call-uses)): it becomes their default for `run`, while the app and the admins give it to them and a key reaches the provider; when it does not apply, the page says so. They see which key their calls use, save or remove their own token where an admin's assignment allows one ([Personal tokens](#personal-tokens)), and check the connection.
+- **The AI's admins** also see the keys: the assignments to everyone, a group or a user, which they add, change and remove; the order of the groups; and the tokens the users saved, which they can remove ([Assign keys](#assign-keys)). Assigning a key to one user with every model, while a group of theirs narrows the models, shows a warning and offers the group's models.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      settings: {
+        label: "Impostazioni AI",
+        usersApi: "/api/users/",
+        groupsApi: "/api/groups/",
+      },
+    },
+  },
+});
+```
+
+- `path` moves the page, and `false` leaves it out: then the app puts the component in a page of its own, with its own `definePageMeta`:
+
+  ```vue
+  <!-- app/pages/settings/ai.vue -->
+  <template>
+    <MapoAiSettings />
+  </template>
+  ```
+
+- `label` is the page's entry in the sidebar, "AI settings" unless set. The sidebar shows it as written, since it translates no route's label: an app in another language sets it (`label: "Impostazioni AI"`). The page's own texts come from the `mapo.ai.settings.*` messages, in English and Italian.
+- `usersApi` and `groupsApi` are the backend's endpoints that list users and groups as Django REST Framework does, plain or paginated (`results`). An admin assigning a key searches them with `?search=`, with their own session: a user is saved by their `id`, shown by `username`, `email` or name; a group by its `name`, as `userInfoApi` lists a user's groups. Without them, the admin writes a user's id or a group's name. The environment can change them (`NUXT_PUBLIC_MAPO_AI_SETTINGS_USERS_API`).
+
+The page calls these routes besides `status`, `keys` and `token`:
+
+| Route                          | What it does                                                                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /_mapo/ai/preferences`    | `{ "provider": "openai", "model": "gpt-6-luna" }` saves the user's preference, sealed in their space of the storage: 204, or 403 for a provider or model they are not given |
+| `DELETE /_mapo/ai/preferences` | Removes it: the app's default applies again. 204                                                                                                                            |
+| `POST /_mapo/ai/test`          | `{ "provider": "openai", "model": "gpt-6-luna" }` checks the connection, as below                                                                                           |
+
+`status` answers the saved preference as `preference`, even when it no longer applies, as when an admin closed the model to the user; `default` says what applies.
+
+**Check the connection** (`POST /_mapo/ai/test`) asks the provider's server for its list of models, with the key the user's calls use, which costs no tokens. The answer, `MapoAiTestResponse`, has an `outcome`:
+
+- `connected`: the server answered and lists the model, with the time it took (`latencyMs`);
+- `model-missing`: the server answered without the model;
+- `no-key`: the provider needs a key and no level gives the user one;
+- `unverifiable`: the provider cannot list its models, as the mock;
+- `failed`: the server did not answer, or refused the key; `failure` says how (`timeout`, `rate-limit`, `unavailable`, `refused-request`, `invalid-response`), and the server's log why.
+
+Without a model, the check looks for the user's default model of the provider. A user may check ten times a minute (429 past that); a body that is not a check is a 400, and a provider or a model they are not given a 403. An app's provider is checked through its `listModels(signal, apiKey)`, which gets the key the chain chose for the user ([Your own provider](#your-own-provider)).
 
 ## The prompt
 
@@ -1114,6 +1170,7 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | `readers`      | `Record<string, boolean>`                                                                                      | `{}`: every reader on                  | The readers of `read` turned off, or on, by id ([Turn a format off](#turn-a-format-off)) |
 | `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number; maxFileBytes?: number }` | `20`, `100000`, `2000`, `10485760`     | The limits of `run` and `read` ([Limits](#limits))                                       |
 | `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |
+| `settings`     | `{ path?: string \| false; label?: string; usersApi?: string; groupsApi?: string }`                            | `/ai-settings`, "AI settings"          | The AI settings page ([AI settings](#ai-settings))                                       |
 
 An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
 

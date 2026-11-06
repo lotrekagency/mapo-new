@@ -57,10 +57,17 @@ export interface MapoAiStatus {
    */
   providers?: MapoAiProviderStatus[];
   /**
-   * What `run` calls when the request names no provider or no model. For a
-   * user the app lets in, when a provider is enabled.
+   * What `run` calls when the request names no provider or no model: the
+   * user's preference when they may still call it, else the app's
+   * default. For a user the app lets in, when a provider is enabled.
    */
   default?: MapoAiDefaults;
+  /**
+   * The provider and model the user saved as theirs
+   * (`PUT /_mapo/ai/preferences`), even when it no longer applies, as when
+   * an admin closed the model to them: `default` says what applies.
+   */
+  preference?: MapoAiPreference;
   /** The limits of `run` and `read`. For a user the app lets in. */
   limits?: MapoAiLimits;
   /**
@@ -145,12 +152,13 @@ export interface MapoAiKeyStatus {
 /**
  * Who an admin's assignment of a key is for: everyone, the users of a
  * group (by its name, as `userInfoApi` sends it), or one user (by the
- * backend's `id`, as text).
+ * backend's `id`, as text, with the name the admin saw when picking them,
+ * `label`, only to show it: the id alone decides).
  */
 export type MapoAiKeyScope =
   | { kind: "all" }
   | { kind: "group"; group: string }
-  | { kind: "user"; user: string };
+  | { kind: "user"; user: string; label?: string };
 
 /**
  * An admin's assignment, as `GET /_mapo/ai/keys` answers it: never the
@@ -230,6 +238,42 @@ export interface MapoAiKeysAnswer {
   groups: string[];
   /** The tokens the users saved. */
   tokens: MapoAiSavedToken[];
+}
+
+/**
+ * The provider and model a user prefers: their default for `run`, while
+ * they may call it. Body of `PUT /_mapo/ai/preferences`.
+ */
+export interface MapoAiPreference {
+  provider: string;
+  model: string;
+}
+
+/** Body of `POST /_mapo/ai/test`: the provider to check, and the model. */
+export interface MapoAiTestInput {
+  provider: string;
+  /** The model to look for; without it, the user's default for the provider. */
+  model?: string;
+}
+
+/**
+ * What "check the connection" found, `POST /_mapo/ai/test`. The gateway
+ * asks the provider's server for its models with the key the user's calls
+ * use, which costs no tokens:
+ * - `connected`: the server answered, and lists the model;
+ * - `model-missing`: the server answered, without the model;
+ * - `no-key`: the provider needs a key, and no level gives the user one;
+ * - `unverifiable`: the provider cannot list its models;
+ * - `failed`: the server did not answer, or refused the key: `failure` says how.
+ */
+export interface MapoAiTestResponse {
+  provider: string;
+  model: string;
+  outcome: "connected" | "model-missing" | "no-key" | "unverifiable" | "failed";
+  /** Milliseconds the server took to answer, when it did. */
+  latencyMs?: number;
+  /** For `failed`: `timeout`, `rate-limit`, `unavailable`, `refused-request`, `invalid-response`. */
+  failure?: string;
 }
 
 /** Body of `PUT /_mapo/ai/token`: the user's own token for a provider. */

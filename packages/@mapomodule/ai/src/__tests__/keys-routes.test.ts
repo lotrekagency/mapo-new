@@ -89,6 +89,10 @@ function fakeBackend(init?: RequestInit): Response {
 
 /** The keys each call of the app's provider `acme` got. */
 let seen: (string | undefined)[] = [];
+/** The models each call of `acme` asked for. */
+let models: string[] = [];
+/** The keys each listing of `acme`'s models got. */
+let listed: (string | undefined)[] = [];
 
 /**
  * The gateway's routes on a bare h3 app, as Nitro mounts them, with the
@@ -109,7 +113,12 @@ async function gateway(): Promise<(request: Request) => Promise<Response>> {
     models: ["acme-1", "acme-2"],
     run: (request: MapoAiProviderRequest) => {
       seen.push(request.apiKey);
+      models.push(request.model);
       return mockProvider.run(request);
+    },
+    listModels: async (_signal: AbortSignal, apiKey?: string) => {
+      listed.push(apiKey);
+      return [{ id: "acme-1" }, { id: "acme-2" }];
     },
   });
   const router = createRouter()
@@ -120,7 +129,10 @@ async function gateway(): Promise<(request: Request) => Promise<Response>> {
     .put(`${PATH}/keys/groups`, await route("keys-groups.put"))
     .delete(`${PATH}/keys/:id`, await route("keys-id.delete"))
     .put(`${PATH}/token`, await route("token.put"))
-    .delete(`${PATH}/token`, await route("token.delete"));
+    .delete(`${PATH}/token`, await route("token.delete"))
+    .put(`${PATH}/preferences`, await route("preferences.put"))
+    .delete(`${PATH}/preferences`, await route("preferences.delete"))
+    .post(`${PATH}/test`, await route("test.post"));
   return toWebHandler(createApp().use(router));
 }
 
@@ -237,6 +249,8 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
   seen = [];
+  models = [];
+  listed = [];
   const root = createStorage();
   root.mount("mapo-ai", memoryDriver());
   runtime.root = root;
@@ -866,5 +880,195 @@ describe("the audit of the keys", () => {
       },
     ]);
     expect(JSON.stringify(actions)).not.toMatch(/acme-(all|token)/);
+  });
+});
+
+describe("the AI settings' routes", () => {
+  it("saves the user's preference, which becomes their default, and removes it", async () => {
+    const handle = await gateway();
+
+    const saved = await handle(
+      request("PUT", "/preferences", "editor", {
+        provider: "acme",
+        model: "acme-2",
+      }),
+    );
+    const status = await statusOf(handle, "editor");
+    const run = await handle(
+      request("POST", "/run", "editor", {
+        ...fillBody(),
+        provider: undefined,
+      }),
+    );
+    const removed = await handle(request("DELETE", "/preferences", "editor"));
+    const after = await statusOf(handle, "editor");
+
+    expect(saved.status).toBe(204);
+    expect(status.preference).toEqual({ provider: "acme", model: "acme-2" });
+    expect(status.default).toEqual({
+      provider: "acme",
+      models: { fill: "acme-2", extract: "acme-2" },
+    });
+    expect(run.status).toBe(200);
+    expect(models).toEqual(["acme-2"]);
+    expect(removed.status).toBe(204);
+    expect(after.preference).toBeUndefined();
+    expect(after.default?.provider).toBe("acme");
+    expect(after.default?.models.fill).toBe("acme-1");
+  });
+
+  it("refuses a preference the user is not given, and keeps one an admin closed without applying it", async () => {
+    const handle = await gateway();
+    await assign(handle, {
+      scope: { kind: "group", group: "editors" },
+      provider: "acme",
+      models: ["acme-1"],
+    });
+
+    const refused = await handle(
+      request("PUT", "/preferences", "editor", {
+        provider: "acme",
+        model: "acme-2",
+      }),
+    );
+    expect(refused.status).toBe(403);
+
+    expect(
+      (
+        await handle(
+          request("PUT", "/preferences", "writer", {
+            provider: "acme",
+            model: "acme-2",
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    await handle(
+      request("PUT", "/preferences", "admin", {
+        provider: "acme",
+        model: "acme-2",
+      }),
+    );
+    await assign(handle, {
+      scope: { kind: "all" },
+      provider: "acme",
+      models: ["acme-1"],
+    });
+    const status = await statusOf(handle, "admin");
+
+    expect(status.preference).toEqual({ provider: "acme", model: "acme-2" });
+    expect(status.default?.models.fill).toBe("acme-1");
+  });
+
+  it("checks the connection with the key the user's calls use", async () => {
+    const handle = await gateway();
+    await assign(handle, {
+      scope: { kind: "group", group: "editors" },
+      provider: "acme",
+      key: EDITORS_KEY,
+    });
+
+    const response = await handle(
+      request("POST", "/test", "editor", { provider: "acme", model: "acme-2" }),
+    );
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(text)).toMatchObject({
+      provider: "acme",
+      model: "acme-2",
+      outcome: "connected",
+    });
+    expect(listed).toEqual([EDITORS_KEY]);
+    for (const secret of SECRETS) expect(text).not.toContain(secret);
+    expect(seen).toEqual([]);
+  });
+
+  it("checks no provider without a key, nor one or a model the user is not given", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: { timeout: 5 }, mock: { timeout: 5 } },
+    };
+    const handle = await gateway();
+
+    const noKey = await handle(
+      request("POST", "/test", "editor", { provider: "acme" }),
+    );
+    const unknown = await handle(
+      request("POST", "/test", "editor", { provider: "openai" }),
+    );
+    const notGiven = await handle(
+      request("POST", "/test", "editor", { provider: "acme", model: "x" }),
+    );
+    const mock = await handle(
+      request("POST", "/test", "editor", { provider: "mock" }),
+    );
+
+    expect(await noKey.json()).toMatchObject({ outcome: "no-key" });
+    expect(unknown.status).toBe(403);
+    expect(notGiven.status).toBe(403);
+    expect(await mock.json()).toMatchObject({
+      provider: "mock",
+      outcome: "unverifiable",
+    });
+    expect(listed).toEqual([]);
+  });
+
+  it("allows ten checks a minute", async () => {
+    const handle = await gateway();
+    const statuses: number[] = [];
+
+    for (let index = 0; index < 11; index += 1) {
+      const response = await handle(
+        request("POST", "/test", "editor", { provider: "acme" }),
+      );
+      statuses.push(response.status);
+    }
+
+    expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+
+  it("refuses a preference or a check sent from another site", async () => {
+    const handle = await gateway();
+    const crossSite = { "sec-fetch-site": "cross-site" };
+
+    const saved = await handle(
+      request(
+        "PUT",
+        "/preferences",
+        "editor",
+        { provider: "acme", model: "acme-1" },
+        crossSite,
+      ),
+    );
+    const removed = await handle(
+      request("DELETE", "/preferences", "editor", undefined, crossSite),
+    );
+    const checked = await handle(
+      request("POST", "/test", "editor", { provider: "acme" }, crossSite),
+    );
+
+    expect([saved.status, removed.status, checked.status]).toEqual([
+      403, 403, 403,
+    ]);
+    expect(listed).toEqual([]);
+  });
+
+  it("answers 503 to a preference without a storage", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      secret: "",
+    };
+    const handle = await gateway();
+
+    const response = await handle(
+      request("PUT", "/preferences", "editor", {
+        provider: "acme",
+        model: "acme-1",
+      }),
+    );
+
+    expect(response.status).toBe(503);
   });
 });

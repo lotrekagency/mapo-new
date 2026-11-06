@@ -318,6 +318,122 @@
         "network": "The server could not be reached.",
         "badAnswer": "The server's answer could not be read.",
         "failed": "The AI could not fill the form."
+      },
+      "settings": {
+        "title": "AI settings",
+        "intro": "Choose the provider and model of your calls, see which key they use, and check the connection.",
+        "loading": "Loading the AI settings…",
+        "notAllowed": "The AI is not available to your account.",
+        "failed": "The request failed.",
+        "failedWith": "The request failed ({status}).",
+        "personal": {
+          "title": "Your preferences",
+          "provider": "Provider",
+          "model": "Model",
+          "noProvider": "No AI provider is available to you."
+        },
+        "preference": {
+          "save": "Use as my default",
+          "remove": "Use the app's default",
+          "appDefault": "You use the app's default.",
+          "notApplied": "Your default does not apply now: its model is closed to you, or no key reaches its provider. The app's default applies.",
+          "saved": "Your default is saved.",
+          "removed": "You use the app's default again."
+        },
+        "key": {
+          "inUse": "Key in use:",
+          "personal": "your own token",
+          "user": "assigned to you by an admin",
+          "group": "assigned by an admin to the group {group}",
+          "all": "assigned by an admin to everyone",
+          "project": "the app's key",
+          "none": "none: this provider cannot be used",
+          "noneOptional": "none: the server takes calls without a key",
+          "ending": "ending in {last4}"
+        },
+        "token": {
+          "placeholder": "Your own token for this provider",
+          "save": "Save the token",
+          "replace": "Replace the token",
+          "remove": "Remove",
+          "saved": "Your token ending in {last4} is saved.",
+          "unused": "You saved a token, but an admin does not allow it now: it is not used.",
+          "help": "Kept encrypted on the server: the browser never reads it again.",
+          "savedNotice": "Your token is saved.",
+          "removedNotice": "Your token is removed."
+        },
+        "check": {
+          "button": "Check the connection",
+          "connected": "Connected · {ms} ms",
+          "modelMissing": "The server answered, but does not list {model}.",
+          "noKey": "No key: this provider cannot be used.",
+          "unverifiable": "This provider cannot be checked.",
+          "failed": "The server did not answer ({failure})."
+        },
+        "admin": {
+          "title": "Keys",
+          "intro": "Visible to the AI's admins: who uses which key and which models.",
+          "empty": "No assignment: everyone uses every model the app enables, with the app's key, and no own token."
+        },
+        "scope": {
+          "all": "Everyone",
+          "anyGroup": "A group",
+          "anyUser": "A user",
+          "group": "Group {group}",
+          "user": "User {user}"
+        },
+        "assignment": {
+          "add": "Add a key",
+          "edit": "Change the assignment",
+          "remove": "Remove the assignment",
+          "for": "For",
+          "group": "Group",
+          "user": "User",
+          "provider": "Provider",
+          "models": "Models",
+          "everyModel": "Every model",
+          "closed": "None ticked: the provider is closed to them.",
+          "closedShort": "none: closed",
+          "widens": "One user's assignment decides alone: with every model, this user gets them all, though a group of theirs limits them.",
+          "useModelsOf": "Use the models of {group}",
+          "key": "Key",
+          "keyKept": "Leave it empty to keep the key saved.",
+          "keyNext": "Leave it empty to use the next level's key.",
+          "removeKey": "Remove the key: the next level's applies",
+          "noKey": "the next level's",
+          "shortKey": "a short key",
+          "tokens": "Own tokens",
+          "tokensAllowed": "allowed",
+          "tokensNo": "no",
+          "personalTokens": "Its users may use their own token",
+          "personalTokensHelp": "Their calls then go through their own account with the provider.",
+          "savedNotice": "The assignment is saved.",
+          "removedNotice": "The assignment is removed."
+        },
+        "groups": {
+          "title": "Order of the groups",
+          "help": "A user in several groups gets the assignment of the group highest in this list.",
+          "up": "Move {group} up",
+          "down": "Move {group} down",
+          "save": "Save the order",
+          "savedNotice": "The order of the groups is saved."
+        },
+        "tokens": {
+          "title": "Users' own tokens",
+          "none": "No user saved a token.",
+          "remove": "Remove",
+          "removedNotice": "The token is removed."
+        },
+        "principal": {
+          "search": {
+            "user": "Search a user",
+            "group": "Search a group"
+          },
+          "write": {
+            "user": "The user's id in the backend",
+            "group": "The group's name"
+          }
+        }
       }
     }
   }

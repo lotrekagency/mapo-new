@@ -77,8 +77,8 @@ async function checkModels(event?: H3Event): Promise<void> {
   await Promise.all(
     providers.map(async ({ provider, models }) => {
       if (typeof provider.listModels !== "function") return;
-      const hasProjectKey = providerKeyOf(config, provider.id) !== undefined;
-      if (provider.key === "required" && !hasProjectKey) {
+      const projectKey = providerKeyOf(config, provider.id);
+      if (provider.key === "required" && !projectKey) {
         console.warn(
           `[mapo-ai] The provider "${provider.id}" has no project's key (${providerKeyVariable(provider.id)}), so its models are not checked: it is called with the key an admin assigns, or a user's own where allowed, and refused to a user who has none.`,
         );
@@ -88,6 +88,7 @@ async function checkModels(event?: H3Event): Promise<void> {
       try {
         listed = await provider.listModels(
           AbortSignal.timeout(LIST_TIMEOUT_MS),
+          ...(projectKey && provider.key ? [projectKey] : []),
         );
       } catch (error) {
         console.warn(

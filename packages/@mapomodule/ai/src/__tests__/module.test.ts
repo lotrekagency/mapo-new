@@ -38,6 +38,8 @@ const kit = vi.hoisted(() => {
     warnings: unknown[];
     templates: Array<{ template: unknown; context: unknown }>;
     nitro: { options: unknown };
+    components: unknown[];
+    pages: Array<(pages: Array<Record<string, unknown>>) => void>;
   } = {
     handlers: [],
     plugins: [],
@@ -46,6 +48,8 @@ const kit = vi.hoisted(() => {
     warnings: [],
     templates: [],
     nitro: { options: {} },
+    components: [],
+    pages: [],
   };
   return state;
 });
@@ -61,7 +65,17 @@ vi.mock("@nuxt/kit", () => ({
     kit.templates.push({ template, context }),
   useLogger: () => ({ warn: (message: unknown) => kit.warnings.push(message) }),
   useNitro: () => kit.nitro,
+  addComponent: (component: unknown) => kit.components.push(component),
+  extendPages: (extend: (pages: Array<Record<string, unknown>>) => void) =>
+    kit.pages.push(extend),
 }));
+
+/** The pages the module adds to an app that has `existing`. */
+function pagesAdded(existing: Array<Record<string, unknown>> = []) {
+  const pages = [...existing];
+  for (const extend of kit.pages) extend(pages);
+  return pages.slice(existing.length);
+}
 
 /** Runs the module's setup on a fake Nuxt; the hooks it registers, by name. */
 async function setup(
@@ -89,6 +103,98 @@ beforeEach(() => {
   kit.appImports = [];
   kit.warnings = [];
   kit.templates = [];
+  kit.components = [];
+  kit.pages = [];
+});
+
+describe("the AI settings page", () => {
+  it("adds the page at /ai-settings, in the sidebar's footer, behind the login, with its component", async () => {
+    await setup({ public: {} });
+
+    expect(pagesAdded()).toEqual([
+      {
+        name: "mapo-ai-settings",
+        path: "/ai-settings",
+        file: "resolved:./runtime/pages/ai-settings.vue",
+        meta: {
+          layout: "mapo-default",
+          middleware: ["auth"],
+          label: "AI settings",
+          icon: "i-lucide-sparkles",
+          sidebarFooter: true,
+        },
+      },
+    ]);
+    expect(kit.components).toEqual([
+      {
+        name: "MapoAiSettings",
+        filePath: "resolved:./runtime/components/MapoAiSettings.vue",
+      },
+    ]);
+  });
+
+  it("leaves the path to a page of the app", async () => {
+    await setup({ public: {} });
+
+    expect(pagesAdded([{ path: "/ai-settings", file: "app.vue" }])).toEqual([]);
+  });
+
+  it("takes another path and label, or no page, and the endpoints of users and groups", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      settings: {
+        path: "/settings/ai",
+        label: "Impostazioni AI",
+        usersApi: "/api/users/",
+        groupsApi: "https://backend.example.org/api/groups/",
+      },
+    });
+
+    expect(pagesAdded()).toMatchObject([
+      { path: "/settings/ai", meta: { label: "Impostazioni AI" } },
+    ]);
+    expect(runtimeConfig.public).toEqual({
+      mapoAi: {
+        settings: {
+          usersApi: "/api/users/",
+          groupsApi: "https://backend.example.org/api/groups/",
+        },
+      },
+    });
+    expect(kit.warnings).toEqual([]);
+
+    kit.pages = [];
+    await setup({ public: {} }, { settings: { path: false } });
+    expect(pagesAdded()).toEqual([]);
+    expect(kit.components).toHaveLength(2);
+  });
+
+  it("keeps the defaults of what it cannot read, and says so", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      settings: {
+        path: "ai settings",
+        label: "",
+        usersApi: "users",
+        color: "red",
+      },
+    });
+
+    expect(pagesAdded()).toMatchObject([
+      { path: "/ai-settings", meta: { label: "AI settings" } },
+    ]);
+    expect(runtimeConfig.public).toEqual({
+      mapoAi: { settings: { usersApi: "", groupsApi: "" } },
+    });
+    expect(kit.warnings.map(String)).toEqual([
+      'mapo.ai.settings has no "color": ignored.',
+      'mapo.ai.settings.path is not a path such as "/ai-settings", or false, so the page is at /ai-settings.',
+      'mapo.ai.settings.label is not a text of up to 80 characters, so the page is "AI settings" in the sidebar.',
+      'mapo.ai.settings.usersApi is not a path of the backend such as "/api/users/", so the admins write a user\'s id instead.',
+    ]);
+  });
 });
 
 describe("the module", () => {
@@ -102,7 +208,10 @@ describe("the module", () => {
       admin: {},
       ...RUN_DEFAULTS,
     });
-    expect(runtimeConfig.public).toEqual({});
+    // The public runtime config holds the settings page's endpoints only.
+    expect(runtimeConfig.public).toEqual({
+      mapoAi: { settings: { usersApi: "", groupsApi: "" } },
+    });
     expect(kit.warnings).toEqual([]);
   });
 
@@ -198,6 +307,21 @@ describe("the module", () => {
         method: "delete",
         handler: "resolved:./runtime/server/routes/token.delete",
       },
+      {
+        route: "/_mapo/ai/preferences",
+        method: "put",
+        handler: "resolved:./runtime/server/routes/preferences.put",
+      },
+      {
+        route: "/_mapo/ai/preferences",
+        method: "delete",
+        handler: "resolved:./runtime/server/routes/preferences.delete",
+      },
+      {
+        route: "/_mapo/ai/test",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/test.post",
+      },
     ]);
     expect(kit.imports).toEqual([
       {
@@ -267,7 +391,9 @@ describe("the access options", () => {
       users: { groups: ["editors"], permissions: ["change_article"] },
       ...RUN_DEFAULTS,
     });
-    expect(runtimeConfig.public).toEqual({});
+    expect(runtimeConfig.public).toEqual({
+      mapoAi: { settings: { usersApi: "", groupsApi: "" } },
+    });
     expect(kit.warnings).toEqual([]);
   });
 
@@ -360,7 +486,9 @@ describe("the options of run", () => {
       },
       audit: { retentionDays: 30 },
     });
-    expect(runtimeConfig.public).toEqual({});
+    expect(runtimeConfig.public).toEqual({
+      mapoAi: { settings: { usersApi: "", groupsApi: "" } },
+    });
     expect(kit.warnings).toEqual([]);
   });
 

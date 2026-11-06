@@ -3,7 +3,7 @@ import { MAPO_AI_CONTRACT_VERSION } from "../../shared/gateway";
 import type { MapoAiStatus } from "../../shared/gateway";
 import { readMapoAiCaller } from "../auth/nitro";
 import { mapoAiReaderStatuses } from "../readers/nitro";
-import { mapoAiUserPolicy } from "../run/nitro";
+import { mapoAiPreference, mapoAiUserPolicy } from "../run/nitro";
 import { providerStatuses } from "../run/policy";
 import { mapoAiStorageState } from "../storage/nitro";
 
@@ -37,6 +37,8 @@ export default defineEventHandler(async (event): Promise<MapoAiStatus> => {
   const policy = await mapoAiUserPolicy(event, caller.user);
   status.providers = providerStatuses(policy);
   if (policy.defaults) status.default = policy.defaults;
+  const preference = await mapoAiPreference(event, caller.user.id);
+  if (preference) status.preference = preference;
   status.limits = { ...policy.options.limits };
   status.readers = mapoAiReaderStatuses(event);
   return status;

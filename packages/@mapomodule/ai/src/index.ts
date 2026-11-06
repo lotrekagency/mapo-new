@@ -20,6 +20,7 @@ export type {
   MapoAiKeysAnswer,
   MapoAiKeyStatus,
   MapoAiLimits,
+  MapoAiPreference,
   MapoAiProviderStatus,
   MapoAiReaderStatus,
   MapoAiReadResponse,
@@ -31,6 +32,8 @@ export type {
   MapoAiSourcePart,
   MapoAiStatus,
   MapoAiStorageState,
+  MapoAiTestInput,
+  MapoAiTestResponse,
   MapoAiTextPart,
   MapoAiTokenInput,
   MapoAiUsage,
@@ -194,4 +197,23 @@ export interface MapoAiOptions {
    * @default { retentionDays: 90 }
    */
   audit?: { retentionDays?: number };
+  /**
+   * The AI settings page, which the module adds when the app has no page on
+   * its path: each user picks their provider and model, sees the key in
+   * use, saves their own token where allowed and checks the connection;
+   * the AI's admins assign keys. `path`, `false` for no page (the app puts
+   * `<MapoAiSettings />` in a page of its own); `label`, its entry in the
+   * sidebar; `usersApi` and `groupsApi`, the backend's endpoints that list
+   * users and groups as Django REST Framework does, which the admins search
+   * with `?search=`: without them, they write a user's id and a group's
+   * name.
+   * @default { path: "/ai-settings", label: "AI settings" }
+   * @example { label: "Impostazioni AI", usersApi: "/api/users/", groupsApi: "/api/groups/" }
+   */
+  settings?: {
+    path?: string | false;
+    label?: string;
+    usersApi?: string;
+    groupsApi?: string;
+  };
 }
