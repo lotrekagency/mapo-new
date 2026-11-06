@@ -131,8 +131,8 @@ const FAILURES: Record<
  * Runs a request of `run` for the user of `session`.
  * @throws H3Error 403 (provider, model or permission), 413 (a prompt the
  *   model cannot read whole), 422 (nothing to ask), 429 (the user's limit,
- *   with `data.retryAfter`), 503 (no provider; the provider busy, with
- *   `data.retryAfter` when it says), 502, 504. A failure of the provider
+ *   with `data.retryAfter`), 503 (no provider; no key for the provider;
+ *   the provider busy, with `data.retryAfter` when it says), 502, 504. A failure of the provider
  *   names itself in `data.failure`.
  */
 export async function runMapoAi(
@@ -178,6 +178,13 @@ export async function runMapoAi(
     ...(request.instructions ? { operator: request.instructions } : {}),
   });
   const provider = { id: usable.provider.id, model };
+  // Where the key comes from, for the audit: the level, never the key.
+  const keyLevel = usable.key
+    ? {
+        level: usable.key.level,
+        ...(usable.key.group !== undefined ? { group: usable.key.group } : {}),
+      }
+    : undefined;
   const started = now();
   const audit = (
     outcome: MapoAiAuditOutcome,
@@ -198,6 +205,7 @@ export async function runMapoAi(
         task: request.task,
         entities: described.map((entity) => ({ ...entity })),
         provider: by,
+        ...(keyLevel ? { key: keyLevel } : {}),
         prompt: prompt.version,
         usage,
         outcome,
@@ -221,6 +229,7 @@ export async function runMapoAi(
       parts: structuredClone(request.parts),
       schema: asked.schema,
       contract: asked,
+      ...(usable.apiKey !== undefined ? { apiKey: usable.apiKey } : {}),
     });
   } catch (error) {
     const failure = failureOf(error);

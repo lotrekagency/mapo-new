@@ -21,7 +21,7 @@ import { runMapoAi } from "../run/run";
 export default defineEventHandler(async (event): Promise<MapoAiRunResponse> => {
   setResponseHeader(event, "cache-control", "no-store");
   const session = await requireMapoAiSession(event);
-  const deps = mapoAiRunDependencies(event);
+  const deps = await mapoAiRunDependencies(event, session);
   const request = await readRunRequest(event, deps.policy.options.limits);
   try {
     return await runMapoAi(session, request, deps);

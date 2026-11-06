@@ -152,6 +152,8 @@ export function createAnthropicProvider(
   return {
     id: "anthropic",
     label: "Anthropic",
+    // Anthropic's own API needs one; a proxy at another address may not.
+    key: needsKey(server.url, "anthropic.com") ? "required" : "optional",
     capabilities: {
       structuredOutput: "strict",
       pdf: false,

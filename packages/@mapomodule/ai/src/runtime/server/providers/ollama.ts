@@ -98,6 +98,8 @@ export function createOllamaProvider(settings: OllamaSettings): MapoAiProvider {
   return {
     id: "ollama",
     label: "Ollama",
+    // Ollama takes no key; a proxy in front of it may ask one.
+    key: "optional",
     capabilities: {
       structuredOutput: "strict",
       pdf: false,

@@ -802,6 +802,8 @@ Registers a provider the app implements, from a Nitro plugin. `run` calls it onl
 
 **Returns:** `void`. It throws a `TypeError` when the id is not a provider's id or `run` is missing, and an `Error` when the id is one Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`) or is registered already.
 
+With `key` (`"required"` or `"optional"`), each call gets the key the gateway's chain chose for the user as `request.apiKey`: their own token where an admin allows it, an admin's key, or the project's, from `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY`. See [Keys](/modules/ai#keys).
+
 ---
 
 ### `registerMapoAiMockFixtures(list)`

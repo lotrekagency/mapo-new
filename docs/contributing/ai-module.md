@@ -47,7 +47,8 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation                                             |
 | `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models                                  |
 | `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
-| `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run` and `read`                                                                    |
+| `src/runtime/server/keys/`        | The chain of keys, the admins' assignments in one sealed record, the users' own tokens, the key routes' wiring               |
+| `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read` and the routes of the keys                                            |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
 | `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call                                   |
@@ -368,7 +369,7 @@ A provider implements `MapoAiProvider`: an id, its capabilities, optionally its 
 
 The registry holds Mapo's providers and the app's. Registering makes a provider available; only `mapo.ai.providers` makes it usable, so one place says what may spend, and at start the server's log names the providers that will not be called. An app cannot register an id Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`), so an update of Mapo never takes over an app's provider.
 
-The interface holds what the providers that call a server need: no key (each is built with its own), the models a server lists (`listModels()`, called when the server starts), the context and the images of each model (`MapoAiModelInfo`), a time limit, and in an answer the model that answered, when it is not the one asked, and the counts of the provider's prompt cache. The capabilities are declared, not read yet: the gateway sends text only, waits for the whole answer and calls no tool.
+The interface holds what the providers that call a server need: whether they call with a key (`key`, `"required"` or `"optional"`) and, for a call, the key the chain chose (`apiKey`, [Keys](#keys)), the models a server lists (`listModels()`, called when the server starts), the context and the images of each model (`MapoAiModelInfo`), a time limit, and in an answer the model that answered, when it is not the one asked, and the counts of the provider's prompt cache. The capabilities are declared, not read yet: the gateway sends text only, waits for the whole answer and calls no tool.
 
 The mock (`mock.ts`) is a provider like the others, enabled the same way. It answers with a failure on command, then from a fixture, then by simple rules, and its answers go through the sanitizer like a model's, so tests and demos run the whole chain but the model. The app registers fixtures with `registerMapoAiMockFixtures()`.
 
@@ -568,6 +569,52 @@ The app's readers come before Mapo's, in the order the app registers them, and a
 - **The hook is no boundary**: a text the page sends to `run` itself never goes through it, so an app that must keep something away from every provider needs a check where `run` reads its source.
 - **No limit of calls on `read`**: it calls no AI, but a large workbook costs the server memory and time.
 
+## Keys
+
+A provider that calls its server with a key gets, for each call, the key nearest the user: their own token, where an admin's assignment allows one; a key the AI's admins assigned to the user, to one of their groups or to everyone; the project's, from the environment. The admins' assignments also narrow the models. The browser never gets a key: `status` says the level and the last four characters.
+
+| File                                     | Role                                                                                                      |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `src/runtime/server/keys/assignments.ts` | The record of the assignments and its changes, the routes' bodies read with zod, `last4()`; pure          |
+| `src/runtime/server/keys/chain.ts`       | `providerAccess()`: the models, the personal tokens and the key of one provider for one user; pure        |
+| `src/runtime/server/keys/store.ts`       | The record and the tokens in the sealed storage; the changes one at a time; 503 for a record unreadable   |
+| `src/runtime/server/keys/nitro.ts`       | The routes' storage, who acts, the audit of each change                                                   |
+| `src/runtime/server/run/policy.ts`       | `policyForUser()`: the app's policy narrowed for one user, the defaults chosen again, the 503 without key |
+| `src/runtime/server/run/nitro.ts`        | `mapoAiUserPolicy()`: the record and the tokens read, Mapo's providers built again with the user's key    |
+
+### The chain
+
+For each provider, `applyingAssignments()` lists the assignments that apply to the user, nearest first: theirs (by the backend's `id`), their groups' (by name, in the admins' order, then the others by name), everyone's. The nearest decides two things, the models, within those `mapo.ai.providers` enables and in its order, and whether personal tokens are allowed; without an assignment, every model and no personal token. The key is decided apart, climbing: the user's token where allowed, the first assignment that holds a key, the project's. So an assignment can narrow the models without a key of its own, and a group's key serves a user whose own assignment only narrows the models. The other way round is a trap: an assignment that only gives a user a key, with no `models`, opens every model to them, though their group's limits them; the docs tell admins to repeat the models.
+
+The developer admits and the admin assigns: an assignment never opens a provider or a model the options do not enable. An assignment of a model the app no longer enables stays in the record, and the chain drops the model; one that allows no model closes the provider to its scope, and `status` no longer lists it for those users.
+
+`policyForUser()` applies the chain to the app's policy, which `mapoAiPolicy()` still builds for everyone, as the server's start and the admins' routes need it. Mapo's providers hold their key from when they are built, so `mapoAiUserPolicy()` builds them again, at each request, with the user's key; an app's provider is the same object, and gets the key with each call as `request.apiKey`. A provider that needs a key and has none at any level is refused before the call, with a 503 (`canCall()`), and the defaults prefer a provider that can be called.
+
+### Where the keys are kept
+
+The assignments and the order of the groups are one record, `assignments` in the `keys` purpose: a change is one write, a reader never sees half of one, and an assignment is unique by scope and provider by construction. The routes change it one at a time in a process (`changeKeys()`), and a read waits for a change in progress (`readKeys()`), since a driver such as the file system's writes in place and a read in the middle would find half a record. Across processes the last write wins, as for any record of the storage, and a record that does not open is read once more after 50 ms, for a write of another process, before it closes the AI. Five hundred assignments and five hundred groups bound it.
+
+A user's token is a record of their own space in the `tokens` purpose, under the provider's id, with who saved it: the admins list the tokens through the purpose's own store, which reads every user's space, and the hash of the space never needs reversing.
+
+The record is read at each request of `status`, `run` and the token's route. One that is there and does not open, sealed with another secret or by a newer version, closes the AI with a 503: an assignment can close a model or a provider, and going on without it would give users more than the admins decided. Without an open storage there is no record to miss: `status` shows the project's keys, and `run` refuses every call anyway, since it could not audit one.
+
+### What goes out, and what never does
+
+- **No key in an answer.** `status` and `GET keys` answer `last4`, and only for a key of 16 characters or more. The routes' errors name the field, never its value: zod's message is replaced for `key` and `token`.
+- **No key in a log or an audit record.** The audit keeps the level of a call's key, and each change of the keys under `actions:` (who, what, for whom, whether the key changed).
+- **A key is printable ASCII without spaces**: it goes into a header, where a line break would end it.
+- **A key over plain `http:`** to another machine is said in the log, whatever level gave it.
+
+### Strengths and weaknesses
+
+- **One rule decides the models, another the key**, both easy to test: the nearest assignment, and the first key up.
+- **Personal tokens are off until an admin allows them**, since a call with one sends the company's data through an account it does not control.
+- **The AI fails closed** when the admins' keys cannot be read; recovering means the old secret or removing the record.
+- **The last write wins across processes**: two admins saving on two processes at the same moment can lose one change.
+- **A token's provider must call with a key**: a provider that uses none takes no key and no token in an assignment.
+- **The admin names a user by the backend's id**, which the settings page will have to offer by name.
+- **The nearest assignment decides the models alone**: a user's assignment that sets only a key opens every model to them; the settings page should repeat the group's models as a default.
+
 ## Filling a form
 
 `useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
@@ -721,8 +768,9 @@ Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. 
 1. Write it in `src/runtime/server/providers/`, implementing `MapoAiProvider`, built from its settings (`MapoAiServerSettings`) with the `fetch` passed in, so its tests serve recorded answers through `servers.ts`: success, refusal, truncation, invalid JSON, 429, 5xx.
 2. Call its server through `http.ts`: `callServer()` and `serverJson()` tell the failures apart, `readJsonLines()` and `readEvents()` read a stream within a bound.
 3. Add it to `MAPO_PROVIDERS` in `registry.ts`; its id is in `MAPO_AI_RESERVED_PROVIDER_IDS` already, or goes there in the same change.
-4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and a place for its key, and, with `isCloud`, `effort` and `promptCache`; document them. A cloud's provider builds on `cloud.ts`.
-5. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
+4. Read its options in `run/options.ts`, which warns about the keys it does not know: for one that calls a server, add it to `SERVER_PROVIDERS`, which gives it `baseURL` and, with `isCloud`, `effort` and `promptCache`; document them. Every provider but the mock has a place for its project's key. A cloud's provider builds on `cloud.ts`.
+5. Declare `key`, `"required"` or `"optional"`, when it calls with a key: the chain of keys applies to it, and it is built again at each request with the user's key ([Keys](#keys)).
+6. Throw a `MapoAiProviderError` for each failure the gateway tells apart, and read what the provider's API returns as outside data.
 
 ### Add a reader of Mapo
 
@@ -773,10 +821,10 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Readers for PDFs and images**: a PDF's text, and images and scans, as text through a reader of their own or as the file for the providers that read it; then the `where` of a quote, the part it names, can narrow its search.
-2. **Keys on three levels**: the project's, those an admin assigns, and the operator's own, sealed in the storage.
-3. **The AI settings page**, where admins also set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists.
-4. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has; then **Import AI**, with a check for duplicates between new items and existing records.
+1. **The AI settings page**, on the routes of the keys: the admins assign keys and models by name, order the groups, list and remove the tokens, check a key (`POST test`), set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists; each user sees their key and saves their own token.
+2. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
+3. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
+4. **Import AI**, with a check for duplicates between new items and existing records.
 
 ### Nice to have
 

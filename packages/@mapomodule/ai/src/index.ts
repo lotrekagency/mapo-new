@@ -12,6 +12,13 @@ export type {
   MapoAiDefaults,
   MapoAiExtractRequest,
   MapoAiFillRequest,
+  MapoAiKeyAssignment,
+  MapoAiKeyAssignmentInput,
+  MapoAiKeyLevel,
+  MapoAiKeyProvider,
+  MapoAiKeyScope,
+  MapoAiKeysAnswer,
+  MapoAiKeyStatus,
   MapoAiLimits,
   MapoAiProviderStatus,
   MapoAiReaderStatus,
@@ -19,11 +26,13 @@ export type {
   MapoAiRunEntity,
   MapoAiRunRequest,
   MapoAiRunResponse,
+  MapoAiSavedToken,
   MapoAiSecretState,
   MapoAiSourcePart,
   MapoAiStatus,
   MapoAiStorageState,
   MapoAiTextPart,
+  MapoAiTokenInput,
   MapoAiUsage,
 } from "./runtime/shared/gateway";
 export type {
@@ -100,8 +109,9 @@ export interface MapoAiOptions {
   /**
    * Who administers the AI. Superusers always do; so does a user in one of
    * `groups`, or with one of `permissions` (codenames, as `userInfoApi`
-   * sends them). Today an admin is told the state of the gateway's storage
-   * in `status`.
+   * sends them). An admin assigns keys, providers and models to everyone,
+   * a group or a user (`/_mapo/ai/keys`), allows personal tokens, and is
+   * told the state of the gateway's storage in `status`.
    * @default {} (superusers only)
    * @example { groups: ["ai-admin"] }
    */
@@ -123,11 +133,14 @@ export interface MapoAiOptions {
    * optional `promptCache`; `ollama` and `openai-compatible` for models on
    * the app's own servers, with their `baseURL`) and those the app registers
    * with `registerMapoAiProvider()`. `false` turns off one a layer enables.
-   * A provider's key goes in the server's environment, not here:
+   * A provider's project key goes in the server's environment, not here:
    * `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`,
    * `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`,
    * `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`,
-   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`.
+   * `NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`, and
+   * `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY` for an app's provider that
+   * declares `key`. The AI's admins assign their own keys over it, and
+   * narrow the models, for everyone, a group or a user.
    * @default {} (no provider: `run` answers 503)
    * @example { mock: { models: ["mock"], timeout: 120 } }
    */

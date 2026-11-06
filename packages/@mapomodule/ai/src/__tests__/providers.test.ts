@@ -133,7 +133,7 @@ describe("the providers plugin", () => {
     ]);
   }
 
-  it("says that a cloud provider has no key, without calling its API", async () => {
+  it("says that a cloud provider has no project's key, without calling its API", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     runtime.config = {
@@ -145,7 +145,7 @@ describe("the providers plugin", () => {
     await vi.waitFor(() => expect(logged(warnings)).toHaveLength(1));
 
     expect(logged(warnings)[0]).toContain(
-      'The models of the provider "openai" could not be read: The provider "openai" has no key: set NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY',
+      'The provider "openai" has no project\'s key (NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY), so its models are not checked: it is called with the key an admin assigns',
     );
     expect(fetch).not.toHaveBeenCalled();
   });

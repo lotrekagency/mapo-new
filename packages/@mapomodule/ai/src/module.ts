@@ -14,7 +14,6 @@ import { accessRuleOption } from "./access";
 import type { MapoAiOptions } from "./index";
 import { MAPO_AI_READER_IDS } from "./runtime/server/readers/registry";
 import {
-  MAPO_AI_SERVER_PROVIDERS,
   providerKeyOf,
   providerKeyVariable,
   readRunOptions,
@@ -30,8 +29,9 @@ export type { MapoAiOptions, MapoAiStatus } from "./index";
  *
  * Registers the AI gateway on the app's own Nitro server, under
  * `/_mapo/ai/*`: `status`; `read`, which reads a file into text with
- * Mapo's readers or the app's; and `run`, which calls the providers the
- * app enables. Its state goes to a sealed storage: the Nitro mount `mapo-ai`,
+ * Mapo's readers or the app's; `run`, which calls the providers the app
+ * enables; `keys`, where the AI's admins assign keys to everyone, a group
+ * or a user, and `token`, where a user saves their own where allowed. Its state goes to a sealed storage: the Nitro mount `mapo-ai`,
  * encrypted with `NUXT_MAPO_AI_SECRET`. The app's pages get
  * `useMapoAiFill()`, which fills a detail form through `run`, and
  * `useMapoAiRead()`, which reads a file through `read`. Opt-in: the
@@ -78,13 +78,14 @@ export default defineNuxtModule<MapoAiOptions>({
         `mapo.ai.default.provider is "${run.default.provider}", which mapo.ai.providers does not enable: the first provider it enables is the default.`,
       );
     }
-    // The key of a provider that calls a server comes from the environment
+    // The project's key of a provider comes from the environment
     // (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`), which fills only a place the
-    // runtime config has: each such provider gets one. A key written in the
-    // config is used, but the build copies it into the server bundle.
+    // runtime config has: every provider but the mock gets one, an app's
+    // too. A key written in the config is used, but the build copies it into
+    // the server bundle.
     const providers = Object.fromEntries(
       Object.entries(run.providers).map(([id, enabled]) => {
-        if (!MAPO_AI_SERVER_PROVIDERS.includes(id)) return [id, enabled];
+        if (id === "mock") return [id, enabled];
         const inOptions = providerKeyOf(options, id, warn);
         const inRuntimeConfig = providerKeyOf(configured, id, warn);
         const where = inOptions
@@ -184,5 +185,22 @@ export default defineNuxtModule<MapoAiOptions>({
       method: "post",
       handler: resolver.resolve("./runtime/server/routes/run.post"),
     });
+    // The keys: the admins assign them, each user saves their own token
+    // where an assignment allows one.
+    const keyRoutes = [
+      ["keys", "get", "keys.get"],
+      ["keys", "put", "keys.put"],
+      ["keys/groups", "put", "keys-groups.put"],
+      ["keys/:id", "delete", "keys-id.delete"],
+      ["token", "put", "token.put"],
+      ["token", "delete", "token.delete"],
+    ] as const;
+    for (const [path, method, file] of keyRoutes) {
+      addServerHandler({
+        route: `${MAPO_AI_GATEWAY_PATH}/${path}`,
+        method,
+        handler: resolver.resolve(`./runtime/server/routes/${file}`),
+      });
+    }
   },
 }) satisfies NuxtModule<MapoAiOptions>;

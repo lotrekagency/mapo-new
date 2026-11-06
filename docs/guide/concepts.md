@@ -29,7 +29,7 @@ export default defineNuxtConfig({
 | `@mapomodule/i18n`  | A wrapper around `@nuxtjs/i18n` with Mapo's English and Italian catalogs and `useMapoT()`.                                                                 |
 | `@mapomodule/utils` | Plain TypeScript helpers (`deepMerge`, `objectDiff`, `slugify`, …). Not a Nuxt module, not auto-imported.                                                  |
 | `@mapomodule/mcp`   | A development-only MCP server that gives AI assistants Mapo's docs, real component APIs and your app's configuration.                                      |
-| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry. Today: the AI gateway (`/_mapo/ai/*`) with providers, readers of files, `useMapoAiFill()`, `useMapoAiRead()`. |
+| `@mapomodule/ai`    | Experimental, opt-in AI-assisted data entry: the gateway (`/_mapo/ai/*`) with its providers, keys, readers of files, `useMapoAiFill()`, `useMapoAiRead()`. |
 
 Backend integrations ship as separate packages. The Camomilla CMS one is [`@mapomodule/mapo-integrations-camomilla`](/modules/camomilla); any other backend gets [its own small integration](/modules/integrations-howto).
 
@@ -128,7 +128,7 @@ Pick the lightest layer that does the job:
 
 With the meta-module, everything lives under the `mapo` key. Core options sit at the top level (`authLoginUrl`, `userInfoApi`, `logoutUrl`, `loginUrl`, …), and each sub-module has its own block: `mapo.uikit`, `mapo.form`, `mapo.i18n`, `mapo.mcp` and `mapo.ai` (which also opts in to `@mapomodule/ai`). A package installed on its own reads its own key instead: `mapoCore`, `mapoStore`, `mapoUikit`, `mapoForm`, `mapoI18n`, `mapoMcp` or `mapoAi`.
 
-Every option has a default, listed in [Core options](/modules/core#options). Secrets are not options: `@mapomodule/ai` reads its own, `NUXT_MAPO_AI_SECRET`, and the keys of the providers it calls, such as `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, from the server's environment at runtime ([the secret](/modules/ai#set-the-secret), [the keys](/modules/ai#openai)).
+Every option has a default, listed in [Core options](/modules/core#options). Secrets are not options: `@mapomodule/ai` reads its own, `NUXT_MAPO_AI_SECRET`, and the project's keys of the providers it calls, such as `NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, from the server's environment at runtime ([the secret](/modules/ai#set-the-secret), [the keys](/modules/ai#keys)).
 
 ## Imports
 

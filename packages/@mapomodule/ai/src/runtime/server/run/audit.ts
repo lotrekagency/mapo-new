@@ -1,14 +1,22 @@
 /**
- * The audit log of `run`: one record per call that reached a provider,
- * sealed in the storage's `audit` purpose, in the space of the user who
- * made it, and kept for `mapo.ai.audit.retentionDays`. Metadata only: who,
- * when, the task, the entities, the provider and model, the version of the
- * prompt, the tokens, the outcome and how long it took. Never the source,
- * the instructions, the values or the refusal's text.
+ * The audit log, sealed in the storage's `audit` purpose and kept for
+ * `mapo.ai.audit.retentionDays`:
+ * - one record per call of `run` that reached a provider, in the space of
+ *   the user who made it. Metadata only: who, when, the task, the
+ *   entities, the provider and model, the level of the key, the version of
+ *   the prompt, the tokens, the outcome and how long it took. Never the
+ *   source, the instructions, the values or the refusal's text;
+ * - one record per change of the keys (an admin's assignment, the order of
+ *   the groups, a user's own token), under `actions:`: who, what, for whom.
+ *   Never a key.
  */
 
 import { z } from "zod";
-import type { MapoAiUsage } from "../../shared/gateway";
+import type {
+  MapoAiKeyLevel,
+  MapoAiKeyScope,
+  MapoAiUsage,
+} from "../../shared/gateway";
 import type { MapoAiProviderFailure } from "../providers/types";
 import type { PurposeStore } from "../storage/sealed";
 
@@ -38,6 +46,11 @@ export interface MapoAiAuditRecord {
    * when the provider retried the call on it.
    */
   provider: { id: string; model: string };
+  /**
+   * For a provider that calls with a key: the level that gave it, and the
+   * group for `group`. Never the key.
+   */
+  key?: { level: MapoAiKeyLevel; group?: string };
   /** The version of Mapo's base rules the prompt had. */
   prompt: number;
   usage: MapoAiUsage;
@@ -68,6 +81,12 @@ const AUDIT_RECORD = z.strictObject({
     )
     .max(100),
   provider: z.strictObject({ id: TEXT, model: TEXT }),
+  key: z
+    .strictObject({
+      level: z.enum(["personal", "user", "group", "all", "project", "none"]),
+      group: TEXT.optional(),
+    })
+    .optional(),
   prompt: COUNT,
   usage: z.strictObject({
     inputTokens: COUNT,
@@ -132,4 +151,91 @@ export async function writeAudit(
   await space.set(auditKey(options.at), record, {
     expiresAt: options.now + options.retentionDays * 24 * 60 * 60 * 1000,
   });
+}
+
+/** A change of the keys, as the audit keeps it. */
+export type MapoAiKeyAction =
+  | "assignment-saved"
+  | "assignment-removed"
+  | "groups-ordered"
+  | "token-saved"
+  | "token-removed";
+
+/** One change of the keys, as the audit keeps it: never a key. */
+export interface MapoAiKeyActionRecord {
+  v: typeof AUDIT_RECORD_VERSION;
+  /** When, as an ISO date and time. */
+  at: string;
+  /** Who made it: an admin, or a user saving or removing their own token. */
+  by: { id: string; username?: string };
+  action: MapoAiKeyAction;
+  /** The provider of an assignment or a token. */
+  provider?: string;
+  /** Who an assignment is for. */
+  scope?: MapoAiKeyScope;
+  /** Whose token was saved or removed. */
+  user?: string;
+  /** For a saved assignment: whether its key was set, replaced or removed. */
+  keyChanged?: boolean;
+}
+
+const KEY_ACTION_RECORD = z.strictObject({
+  v: z.literal(AUDIT_RECORD_VERSION),
+  at: z.string().max(40),
+  by: z.strictObject({ id: TEXT, username: TEXT.optional() }),
+  action: z.enum([
+    "assignment-saved",
+    "assignment-removed",
+    "groups-ordered",
+    "token-saved",
+    "token-removed",
+  ]),
+  provider: TEXT.optional(),
+  scope: z
+    .discriminatedUnion("kind", [
+      z.strictObject({ kind: z.literal("all") }),
+      z.strictObject({ kind: z.literal("group"), group: TEXT }),
+      z.strictObject({ kind: z.literal("user"), user: TEXT }),
+    ])
+    .optional(),
+  user: TEXT.optional(),
+  keyChanged: z.boolean().optional(),
+}) satisfies z.ZodType<MapoAiKeyActionRecord>;
+
+/** Where the changes of the keys go, in the purpose's own space. */
+export const KEY_ACTIONS_PREFIX = "actions";
+
+/**
+ * A change of the keys read back from the storage, or `undefined` when it
+ * is not one this version writes.
+ * @param value the stored value: outside data
+ */
+export function readKeyActionRecord(
+  value: unknown,
+): MapoAiKeyActionRecord | undefined {
+  const parsed = KEY_ACTION_RECORD.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+/**
+ * Seals a change of the keys under `actions:`, to expire after
+ * `retentionDays`. A failure to write is logged, not thrown: the change is
+ * made, and an admin should not see it fail for its record.
+ * @param store the storage's `audit` purpose
+ */
+export async function writeKeyAction(
+  store: PurposeStore,
+  record: MapoAiKeyActionRecord,
+  options: { retentionDays: number; now: number },
+): Promise<void> {
+  try {
+    await store.set(`${KEY_ACTIONS_PREFIX}:${auditKey(options.now)}`, record, {
+      expiresAt: options.now + options.retentionDays * 24 * 60 * 60 * 1000,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[mapo-ai] The audit record of a change of the keys could not be written: ${reason}`,
+    );
+  }
 }

@@ -168,6 +168,36 @@ describe("the module", () => {
         method: "post",
         handler: "resolved:./runtime/server/routes/run.post",
       },
+      {
+        route: "/_mapo/ai/keys",
+        method: "get",
+        handler: "resolved:./runtime/server/routes/keys.get",
+      },
+      {
+        route: "/_mapo/ai/keys",
+        method: "put",
+        handler: "resolved:./runtime/server/routes/keys.put",
+      },
+      {
+        route: "/_mapo/ai/keys/groups",
+        method: "put",
+        handler: "resolved:./runtime/server/routes/keys-groups.put",
+      },
+      {
+        route: "/_mapo/ai/keys/:id",
+        method: "delete",
+        handler: "resolved:./runtime/server/routes/keys-id.delete",
+      },
+      {
+        route: "/_mapo/ai/token",
+        method: "put",
+        handler: "resolved:./runtime/server/routes/token.put",
+      },
+      {
+        route: "/_mapo/ai/token",
+        method: "delete",
+        handler: "resolved:./runtime/server/routes/token.delete",
+      },
     ]);
     expect(kit.imports).toEqual([
       {
@@ -592,6 +622,40 @@ describe("the options of run", () => {
     expect(unreadable.mapoAi).toMatchObject({ providers: {} });
     expect(kit.warnings.map(String)).toEqual([
       "mapo.ai.providers.openai-compatible.contextTokens is not a whole number of tokens from 1024 to 10000000, so the provider is not enabled.",
+    ]);
+  });
+
+  it("gives an app's provider a place for its project's key, which the environment fills", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+
+    await setup(runtimeConfig, {
+      providers: { acme: { models: ["acme-1"], baseURL: "http://x" } },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { acme: { models: ["acme-1"], timeout: 120, apiKey: "" } },
+    });
+    expect(
+      (runtimeConfig.mapoAi as { providers: { acme: object } }).providers.acme,
+    ).not.toHaveProperty("baseURL");
+    expect(kit.warnings.map(String)).toEqual([
+      'mapo.ai.providers.acme has no "baseURL": ignored.',
+    ]);
+  });
+
+  it("warns about the key of an app's provider written in the config", async () => {
+    const runtimeConfig: Record<string, unknown> = { public: {} };
+    const written = "acme-key-written-in-the-config";
+
+    await setup(runtimeConfig, {
+      providers: { acme: { models: ["acme-1"], apiKey: written } },
+    });
+
+    expect(runtimeConfig.mapoAi).toMatchObject({
+      providers: { acme: { apiKey: written } },
+    });
+    expect(kit.warnings.map(String)).toEqual([
+      "mapo.ai.providers.acme.apiKey is set in the Nuxt config, so the build copies it into the server bundle. Set NUXT_MAPO_AI_PROVIDERS_ACME_API_KEY in the server's environment instead.",
     ]);
   });
 

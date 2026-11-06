@@ -1,4 +1,4 @@
-import { defineNitroPlugin } from "nitropack/runtime";
+import { defineNitroPlugin, useRuntimeConfig } from "nitropack/runtime";
 import type { H3Event } from "h3";
 import { isRecord } from "../../shared/guards";
 import {
@@ -10,6 +10,7 @@ import {
   mapoAiRunOptions,
   unusableMapoAiProviders,
 } from "../run/nitro";
+import { providerKeyOf, providerKeyVariable } from "../run/options";
 
 /** How long the server waits for a provider's list of models when it starts. */
 const LIST_TIMEOUT_MS = 10_000;
@@ -22,8 +23,9 @@ const LIST_TIMEOUT_MS = 10_000;
  * it usable. For a provider whose server lists its models, as Mapo's do,
  * it also says which models the options allow that the server does not
  * have (or the key may not use), or that the list cannot be read: a server
- * out of reach, a key missing or refused. None stops the server from
- * starting.
+ * out of reach, a key refused. A provider that needs a key and has no
+ * project's key is not asked: its calls use the keys the admins assign.
+ * None stops the server from starting.
  *
  * It runs once the app's own plugins have run (Nitro runs the plugins of
  * modules first), because those register the app's providers. Where the
@@ -71,9 +73,17 @@ function check(event?: H3Event): void {
  */
 async function checkModels(event?: H3Event): Promise<void> {
   const { providers } = mapoAiPolicy(event);
+  const config: unknown = useRuntimeConfig(event).mapoAi;
   await Promise.all(
     providers.map(async ({ provider, models }) => {
       if (typeof provider.listModels !== "function") return;
+      const hasProjectKey = providerKeyOf(config, provider.id) !== undefined;
+      if (provider.key === "required" && !hasProjectKey) {
+        console.warn(
+          `[mapo-ai] The provider "${provider.id}" has no project's key (${providerKeyVariable(provider.id)}), so its models are not checked: it is called with the key an admin assigns, or a user's own where allowed, and refused to a user who has none.`,
+        );
+        return;
+      }
       let listed: unknown;
       try {
         listed = await provider.listModels(

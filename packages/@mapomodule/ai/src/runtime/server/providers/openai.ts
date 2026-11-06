@@ -127,6 +127,8 @@ export function createOpenAiProvider(settings: OpenAiSettings): MapoAiProvider {
   return {
     id: "openai",
     label: "OpenAI",
+    // OpenAI's own API needs one; a proxy at another address may not.
+    key: needsKey(server.url, "openai.com") ? "required" : "optional",
     capabilities: {
       structuredOutput: "strict",
       pdf: false,

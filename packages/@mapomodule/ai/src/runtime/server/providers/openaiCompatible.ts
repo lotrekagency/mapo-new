@@ -112,6 +112,7 @@ export function createOpenAiCompatibleProvider(
   return {
     id: "openai-compatible",
     label: "OpenAI-compatible server",
+    key: "optional",
     capabilities: {
       // The servers differ in how they hold the answer to its schema: the
       // sanitizer is the check that holds on every one.

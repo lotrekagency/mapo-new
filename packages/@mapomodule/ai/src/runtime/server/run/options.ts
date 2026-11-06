@@ -134,8 +134,7 @@ export const DEFAULT_CLOUD_PROVIDER_TIMEOUT = 300;
  * Mapo's providers that call a server, with the server's address when the
  * app sets none, whether the app may say the models' context, and whether
  * they are a cloud's, with an effort and a prompt cache. Their entry of
- * `mapo.ai.providers` takes `baseURL`, and the runtime config holds their
- * key, `apiKey`, which the environment fills.
+ * `mapo.ai.providers` takes `baseURL`.
  */
 const SERVER_PROVIDERS: ReadonlyMap<
   string,
@@ -150,10 +149,6 @@ const SERVER_PROVIDERS: ReadonlyMap<
 const MIN_CONTEXT_TOKENS = 1024;
 /** The most context a server's models may be said to read. */
 const MAX_CONTEXT_TOKENS = 10_000_000;
-/** The ids of Mapo's providers that call a server, whose key the runtime config holds. */
-export const MAPO_AI_SERVER_PROVIDERS: readonly string[] = [
-  ...SERVER_PROVIDERS.keys(),
-];
 /** The limits of `run`, unless `mapo.ai.limits` says otherwise. */
 export const DEFAULT_LIMITS: Readonly<MapoAiLimits> = Object.freeze({
   perUserPerMinute: 20,
@@ -223,11 +218,14 @@ function providersOf(
       continue;
     }
     const server = SERVER_PROVIDERS.get(id);
-    // The key is read apart, by `providerKeyOf()`: it never joins the options.
+    // The key is read apart, by `providerKeyOf()`: it never joins the
+    // options. Every provider but the mock has a place for it, an app's
+    // too, which gets it with each call when it declares `key`.
     const known = [
       "models",
       "timeout",
-      ...(server ? ["baseURL", "apiKey"] : []),
+      ...(id !== "mock" ? ["apiKey"] : []),
+      ...(server ? ["baseURL"] : []),
       ...(server?.takesContext ? ["contextTokens"] : []),
       ...(server?.isCloud ? ["effort", "promptCache"] : []),
     ];
@@ -350,9 +348,9 @@ function baseURLOf(
 }
 
 /**
- * The key of one of Mapo's providers that call a server, from the runtime
- * config, where the environment puts it
- * (`NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`). It is read apart
+ * The project's key of a provider, from the runtime config, where the
+ * environment puts it (`NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY`,
+ * `NUXT_MAPO_AI_PROVIDERS_ACME_API_KEY` for an app's provider `acme`). It is read apart
  * from the options, so a key never travels with them. Only text is a key:
  * Nuxt reads a value of digits only as a number, and `true` as a boolean,
  * so such a key is left out, and `warn` says so without the value.
@@ -404,8 +402,8 @@ export function plainKeyWarning(
 }
 
 /**
- * The environment's variable for the key of one of Mapo's providers that
- * call a server, as Nuxt names it: `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`.
+ * The environment's variable for the project's key of a provider, as Nuxt
+ * names it: `NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`.
  */
 export function providerKeyVariable(id: string): string {
   return `NUXT_MAPO_AI_PROVIDERS_${id.replace(/-/g, "_").toUpperCase()}_API_KEY`;

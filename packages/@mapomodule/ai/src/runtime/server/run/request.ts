@@ -7,7 +7,7 @@
  */
 
 import type { JSONSchema } from "@mapomodule/utils";
-import { createError, getRequestHeader } from "h3";
+import { createError } from "h3";
 import type { H3Event } from "h3";
 import { z } from "zod";
 import type {
@@ -16,7 +16,7 @@ import type {
   MapoAiRunRequest,
 } from "../../shared/gateway";
 import { isRecord } from "../../shared/guards";
-import { readLimitedBytes } from "../body";
+import { readJsonBody } from "../body";
 
 /** Bytes a body may have besides its source and instructions: the entities' schemas. */
 export const RUN_BODY_BASE_BYTES = 2 * 1024 * 1024;
@@ -113,25 +113,7 @@ export async function readRunRequest(
   event: H3Event,
   limits: MapoAiLimits,
 ): Promise<MapoAiRunRequest> {
-  const type = getRequestHeader(event, "content-type") ?? "";
-  const isJson = /^application\/json\s*(?:;|$)/i.test(type.trim());
-  if (!isJson) {
-    throw createError({
-      statusCode: 415,
-      statusMessage: "The body must be JSON (application/json)",
-    });
-  }
-
-  const text = await readLimitedText(event, maxBodyBytes(limits));
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw createError({
-      statusCode: 400,
-      statusMessage: "The body is not JSON",
-    });
-  }
+  const body = await readJsonBody(event, maxBodyBytes(limits));
   const parsed = RUN_REQUEST.safeParse(body);
   if (!parsed.success) {
     const [issue] = parsed.error.issues;
@@ -196,34 +178,6 @@ function checkEntities(request: MapoAiRunRequest): void {
       statusCode: 400,
       statusMessage: "Not a request of run",
       data: { problem: "each entity of an extraction needs a type of its own" },
-    });
-  }
-}
-
-/**
- * The body as text, read until `maxBytes`: a longer one is refused as soon
- * as it is, before it is all in memory.
- * @throws H3Error 413, or 400 when it is not UTF-8
- */
-async function readLimitedText(
-  event: H3Event,
-  maxBytes: number,
-): Promise<string> {
-  const tooLarge = () =>
-    createError({
-      statusCode: 413,
-      statusMessage: `The body is larger than ${maxBytes} bytes`,
-    });
-  const declared = Number(getRequestHeader(event, "content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes) throw tooLarge();
-
-  const bytes = await readLimitedBytes(event, maxBytes, tooLarge);
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw createError({
-      statusCode: 400,
-      statusMessage: "The body is not UTF-8",
     });
   }
 }

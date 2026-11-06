@@ -1,12 +1,59 @@
 /**
  * A request's body, read up to a bound: the routes that take one (`run`,
- * `read`) refuse a body past their bound as soon as it is, before it is all
- * in memory.
+ * `read`, the keys and the tokens) refuse a body past their bound as soon
+ * as it is, before it is all in memory.
  */
 
 import type { IncomingMessage } from "node:http";
-import { readRawBody } from "h3";
+import { createError, getRequestHeader, readRawBody } from "h3";
 import type { H3Event } from "h3";
+
+/**
+ * The body, a JSON value, read until `maxBytes`: a longer one is refused as
+ * soon as it is, before it is all in memory. Outside data: the caller
+ * checks its shape.
+ * @throws H3Error 415 when it is not sent as JSON, 413 when it is too
+ *   large, 400 when it is not UTF-8 or not JSON
+ */
+export async function readJsonBody(
+  event: H3Event,
+  maxBytes: number,
+): Promise<unknown> {
+  const type = getRequestHeader(event, "content-type") ?? "";
+  const isJson = /^application\/json\s*(?:;|$)/i.test(type.trim());
+  if (!isJson) {
+    throw createError({
+      statusCode: 415,
+      statusMessage: "The body must be JSON (application/json)",
+    });
+  }
+  const tooLarge = () =>
+    createError({
+      statusCode: 413,
+      statusMessage: `The body is larger than ${maxBytes} bytes`,
+    });
+  const declared = Number(getRequestHeader(event, "content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) throw tooLarge();
+
+  const bytes = await readLimitedBytes(event, maxBytes, tooLarge);
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "The body is not UTF-8",
+    });
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "The body is not JSON",
+    });
+  }
+}
 
 /**
  * The body's bytes, by the way the runtime hands them over: a web stream; a

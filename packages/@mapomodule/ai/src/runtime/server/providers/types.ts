@@ -69,6 +69,12 @@ export interface MapoAiProviderRequest {
    * gateway stops waiting then, whatever the provider does.
    */
   signal: AbortSignal;
+  /**
+   * For a provider that declares `key`: the key the gateway's chain chose
+   * for the user (their own token, an admin's key, the project's). Absent
+   * when no level has one. Never log it.
+   */
+  apiKey?: string;
 }
 
 /**
@@ -92,6 +98,18 @@ export interface MapoAiProvider {
   readonly id: string;
   /** Its name for people, shown by `status`. */
   readonly label?: string;
+  /**
+   * Whether it calls its server with a key from the gateway's chain: the
+   * user's own token, where an admin allows one; the key an admin assigned
+   * to the user, a group of theirs or everyone; the project's, from the
+   * environment (`NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY`). Each call gets it
+   * as `apiKey`.
+   * - `required`: a call without a key is refused before it is made;
+   * - `optional`: it is made without one too, as a server on the app's own
+   *   network takes it.
+   * Absent: the provider uses no key of the gateway, as the mock.
+   */
+  readonly key?: "required" | "optional";
   readonly capabilities: MapoAiProviderCapabilities;
   /**
    * The models it offers when `mapo.ai.providers` lists none for it, its

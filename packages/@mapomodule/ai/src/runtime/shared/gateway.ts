@@ -90,6 +90,152 @@ export interface MapoAiProviderStatus {
   label?: string;
   /** The models a request may ask for, the provider's default first. */
   models: string[];
+  /**
+   * The key its calls use, for a provider that calls with one: which
+   * level gives it, never the key. Absent for a provider that uses no key
+   * of the gateway, such as the mock.
+   */
+  key?: MapoAiKeyStatus;
+}
+
+/**
+ * Where the key of a call comes from, nearest to the user first:
+ * - `personal`: the user's own token, where an admin's assignment allows
+ *   one;
+ * - `user`, `group`, `all`: the key an admin assigned to the user, to one
+ *   of their groups, or to everyone;
+ * - `project`: the app's own, from the server's environment;
+ * - `none`: no level has one.
+ */
+export type MapoAiKeyLevel =
+  | "personal"
+  | "user"
+  | "group"
+  | "all"
+  | "project"
+  | "none";
+
+/** The key a provider's calls use for the user, as `status` tells it. */
+export interface MapoAiKeyStatus {
+  /** Which level gives the key. */
+  level: MapoAiKeyLevel;
+  /** For `group`: the group's name. */
+  group?: string;
+  /**
+   * The key's last four characters, to tell keys apart: for a key of 16
+   * characters or more, never with `none`.
+   */
+  last4?: string;
+  /**
+   * Whether the provider needs a key: with `none`, `run` refuses it before
+   * calling. A server on the app's own network may take calls without one.
+   */
+  required: boolean;
+  /** The user's own token for the provider. */
+  personal: {
+    /** Whether an admin's assignment lets the user use one. */
+    allowed: boolean;
+    /** Whether the user saved one; it is used only while allowed. */
+    saved: boolean;
+    /** Its last four characters, as for the key. */
+    last4?: string;
+  };
+}
+
+/**
+ * Who an admin's assignment of a key is for: everyone, the users of a
+ * group (by its name, as `userInfoApi` sends it), or one user (by the
+ * backend's `id`, as text).
+ */
+export type MapoAiKeyScope =
+  | { kind: "all" }
+  | { kind: "group"; group: string }
+  | { kind: "user"; user: string };
+
+/**
+ * An admin's assignment, as `GET /_mapo/ai/keys` answers it: never the
+ * key, only its last four characters.
+ */
+export interface MapoAiKeyAssignment {
+  /** Its id, as `DELETE /_mapo/ai/keys/:id` names it. */
+  id: string;
+  scope: MapoAiKeyScope;
+  /** The provider's id. */
+  provider: string;
+  /**
+   * The models the scope may use, among those the app enables, in the
+   * app's order; absent: every model the app enables. Empty: the provider
+   * is closed to the scope.
+   */
+  models?: string[];
+  /** The key, when the assignment has one: absent, the next level's applies. */
+  key?: { last4?: string };
+  /** Whether the users of the scope may use their own token instead. */
+  personalTokens: boolean;
+  /** When it last changed, and by whom. */
+  updated: { at: string; by: { id: string; username?: string } };
+}
+
+/**
+ * Body of `PUT /_mapo/ai/keys`: one assignment, which replaces the one of
+ * the same scope and provider. On a replacement, what the body leaves out
+ * stays as it was.
+ */
+export interface MapoAiKeyAssignmentInput {
+  scope: MapoAiKeyScope;
+  provider: string;
+  /** The models the scope may use; `null`: every model the app enables. */
+  models?: string[] | null;
+  /** The key; `null`: none, the next level's applies. */
+  key?: string | null;
+  /** Whether the users of the scope may use their own token. New: `false`. */
+  personalTokens?: boolean;
+}
+
+/** A provider the app enables, as an admin assigns it. */
+export interface MapoAiKeyProvider {
+  id: string;
+  label?: string;
+  /** The models the app enables, its default first. */
+  models: string[];
+  /**
+   * Whether its calls take a key, and whether they need one; absent for a
+   * provider that uses no key of the gateway, which takes no key and no
+   * personal token in an assignment.
+   */
+  key?: "required" | "optional";
+}
+
+/** A user's own token, as an admin sees it: never the token. */
+export interface MapoAiSavedToken {
+  user: { id: string; username?: string };
+  provider: string;
+  /** Its last four characters, as for a key. */
+  last4?: string;
+  /** When the user saved it. */
+  savedAt: string;
+}
+
+/** Response of `GET /_mapo/ai/keys`, for the AI's admins. */
+export interface MapoAiKeysAnswer {
+  /** The providers the app enables. */
+  providers: MapoAiKeyProvider[];
+  /** The assignments, in the order they were made. */
+  assignments: MapoAiKeyAssignment[];
+  /**
+   * The order of the groups, highest priority first: a user in several
+   * groups gets the assignment of the highest. The groups it leaves out
+   * come after, by name.
+   */
+  groups: string[];
+  /** The tokens the users saved. */
+  tokens: MapoAiSavedToken[];
+}
+
+/** Body of `PUT /_mapo/ai/token`: the user's own token for a provider. */
+export interface MapoAiTokenInput {
+  provider: string;
+  token: string;
 }
 
 /** The provider and the model of each task that `run` calls when the request names none. */
