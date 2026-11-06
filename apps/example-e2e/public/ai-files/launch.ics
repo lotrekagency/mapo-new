@@ -1,0 +1,13 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//City Magazine//Events//EN
+BEGIN:VEVENT
+UID:open-data-2026@example.com
+DTSTART:20261120T180000
+DTEND:20261120T200000
+SUMMARY:Ten years of open data: the party
+DESCRIPTION:The city celebrates ten years of open data\, with the people
+  who use it every day.
+LOCATION:Palazzo Marino\, Milan
+END:VEVENT
+END:VCALENDAR

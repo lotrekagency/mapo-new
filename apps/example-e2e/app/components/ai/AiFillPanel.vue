@@ -9,8 +9,10 @@
 import type {
   MapoAiFillAction,
   MapoAiFillField,
+  MapoAiSourcePart,
   MapoAiStatus,
 } from "mapomodule/types";
+import AiSourceFile from "~/components/ai/AiSourceFile.vue";
 import { AI_ARTICLE_SAMPLES } from "#shared/aiArticleSamples";
 
 const detail = useMapoDetail();
@@ -38,6 +40,16 @@ onMounted(async () => {
 
 const source = ref(AI_ARTICLE_SAMPLES[0]?.text ?? "");
 const instructions = ref("");
+
+// A file read into the box: its parts go to the AI, named after the file,
+// as long as the box holds the text read; once edited, the box's text goes.
+const fromFile = shallowRef<{ text: string; parts: MapoAiSourcePart[] }>();
+function useFile(read: { text: string; parts: MapoAiSourcePart[] }) {
+  source.value = read.text;
+  fromFile.value = read;
+}
+const sourceToSend = () =>
+  fromFile.value?.text === source.value ? fromFile.value.parts : source.value;
 
 const isAllowed = computed(() => status.value?.allowed !== false);
 const canFill = computed(
@@ -97,7 +109,7 @@ function note(field: MapoAiFillField): string {
 }
 
 function fill() {
-  void ai?.fill(source.value, { instructions: instructions.value });
+  void ai?.fill(sourceToSend(), { instructions: instructions.value });
 }
 </script>
 
@@ -140,6 +152,7 @@ function fill() {
         {{ sample.label }}
       </UButton>
     </div>
+    <AiSourceFile :readers="status?.readers" @read="useFile" />
     <UTextarea
       v-model="source"
       :rows="8"

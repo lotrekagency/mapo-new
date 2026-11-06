@@ -13,9 +13,11 @@
 import type {
   MapoAiFillEntity,
   MapoAiFillField,
+  MapoAiSourcePart,
   MapoAiStatus,
 } from "mapomodule/types";
 import AiLabOutcomes from "~/components/ai/AiLabOutcomes.vue";
+import AiSourceFile from "~/components/ai/AiSourceFile.vue";
 import type { AiSample } from "#shared/aiArticleSamples";
 
 const props = defineProps<{
@@ -94,6 +96,16 @@ const providerItems = computed(() =>
 
 const source = ref(props.samples[0]?.text ?? "");
 const instructions = ref("");
+
+// A file read into the box: its parts go to the AI, named after the file,
+// as long as the box holds the text read; once edited, the box's text goes.
+const fromFile = shallowRef<{ text: string; parts: MapoAiSourcePart[] }>();
+function useFile(read: { text: string; parts: MapoAiSourcePart[] }) {
+  source.value = read.text;
+  fromFile.value = read;
+}
+const sourceToSend = () =>
+  fromFile.value?.text === source.value ? fromFile.value.parts : source.value;
 
 const isAllowed = computed(() => status.value?.allowed !== false);
 const canFill = computed(
@@ -201,7 +213,7 @@ async function fill() {
     `useMapoAiFill() reads the backend's schema (OPTIONS of ${detail?.endpoint.value}/) and the form's fields, and posts them with the source (${source.value.length} characters) to /_mapo/ai/run: provider ${providerId.value}, model ${model.value}`,
   );
   startWatching();
-  await ai.fill(source.value, {
+  await ai.fill(sourceToSend(), {
     instructions: instructions.value,
     provider: { id: providerId.value, model: model.value },
   });
@@ -329,6 +341,7 @@ const waited = computed(() =>
         {{ sample.label }}
       </UButton>
     </div>
+    <AiSourceFile :readers="status?.readers" @read="useFile" />
     <p v-if="providerId === 'ollama'" class="text-xs text-muted">
       Mapo's own provider writes nothing to the lab's trace: the log shows the
       browser and the gateway. Choose example-ollama, the app's provider, to

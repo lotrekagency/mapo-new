@@ -12,9 +12,11 @@
 import type {
   MapoAiFillEntity,
   MapoAiFillField,
+  MapoAiSourcePart,
   MapoAiStatus,
 } from "mapomodule/types";
 import AiLabOutcomes from "~/components/ai/AiLabOutcomes.vue";
+import AiSourceFile from "~/components/ai/AiSourceFile.vue";
 import type { AiSample } from "#shared/aiArticleSamples";
 import { AI_CLOUD_PRICES_DATE, estimateAiCost } from "#shared/aiCloudPrices";
 
@@ -73,6 +75,16 @@ const providerItems = computed(() =>
 const source = ref(props.samples[0]?.text ?? "");
 const instructions = ref("");
 
+// A file read into the box: its parts go to the AI, named after the file,
+// as long as the box holds the text read; once edited, the box's text goes.
+const fromFile = shallowRef<{ text: string; parts: MapoAiSourcePart[] }>();
+function useFile(read: { text: string; parts: MapoAiSourcePart[] }) {
+  source.value = read.text;
+  fromFile.value = read;
+}
+const sourceToSend = () =>
+  fromFile.value?.text === source.value ? fromFile.value.parts : source.value;
+
 const isAllowed = computed(() => status.value?.allowed !== false);
 const canFill = computed(
   () =>
@@ -127,7 +139,7 @@ async function fill() {
   timer = setInterval(() => {
     now.value = Date.now();
   }, TICK_MS);
-  await ai.fill(source.value, {
+  await ai.fill(sourceToSend(), {
     instructions: instructions.value,
     provider: { id: providerId.value, model: model.value },
   });
@@ -295,6 +307,7 @@ const waited = computed(() =>
         {{ sample.label }}
       </UButton>
     </div>
+    <AiSourceFile :readers="status?.readers" @read="useFile" />
     <UTextarea
       v-model="source"
       :rows="7"
