@@ -4,7 +4,12 @@
  * proxy. It speaks the API's version 2026-10-21, which takes no sampling
  * parameter. Each call:
  * - holds the answer to its schema (`output_config.format`). Claude reads
- *   the schema, so the prompt does not repeat it;
+ *   the schema, so the prompt does not repeat it. A schema Anthropic cannot
+ *   compile, as a large form's ("Schema is too complex for compilation"),
+ *   is asked again without it: the schema goes in the prompt, as for a
+ *   local model, the model writes the JSON, and the gateway's sanitizer
+ *   checks it as it checks every answer. The refusal costs no tokens, and
+ *   the calls with that schema skip it for a day;
  * - asks the reasoning of the provider's `effort`, `low` unless set: the
  *   current models think before they answer, and Opus 5.5 always does. The
  *   answer's cap counts the thinking too, and grows with the schema and
@@ -43,7 +48,7 @@ import {
 import type { MapoAiEffort, OptionalParameter } from "./cloud";
 import { providerServer, readEvents, serverJson } from "./http";
 import type { ProviderServer, ServerFetch } from "./http";
-import { answerOutput, tokenCount } from "./local";
+import { answerOutput, instructionsWithSchema, tokenCount } from "./local";
 import { MapoAiProviderError } from "./types";
 import type {
   MapoAiModelInfo,
@@ -103,8 +108,20 @@ const OPTIONAL: readonly OptionalParameter[] = [
       "a request Anthropic's safety filters decline comes back as a refusal",
   },
 ];
-/** Anthropic's refusal of a schema its structured outputs cannot compile. */
-const TOO_COMPLEX = /too complex/i;
+/**
+ * Anthropic's refusal of a schema its structured outputs cannot compile:
+ * "Schema is too complex for compilation" today, and any wording that
+ * names the schema or its grammar with its size or its compilation.
+ */
+const TOO_COMPLEX =
+  /\b(?:schema|grammar)\b[^.]*\b(?:too (?:complex|large|big)|too many|compil)|\b(?:too (?:complex|large|big)|compil\w*)\b[^.]*\b(?:schema|grammar)\b/i;
+/**
+ * How long a schema Anthropic could not compile is asked without its
+ * grammar: a day, as Anthropic keeps a grammar it compiled.
+ */
+const UNCOMPILED_MS = 24 * 60 * 60 * 1000;
+/** The schemas remembered as not compiling, at most. */
+const MAX_UNCOMPILED = 500;
 
 /** The counts of a message's usage, each read on its own. */
 const COUNTS = [
@@ -116,6 +133,22 @@ const COUNTS = [
 
 /** The parameters Anthropic's models refused, in this process. */
 const dropped = createDroppedParameters();
+
+/**
+ * The schemas Anthropic could not compile, in this process, by server,
+ * model and schema, with when to try their grammar again.
+ */
+const uncompiled = new Map<string, number>();
+
+/** Anthropic's refusal of the answer's schema, which a call without it can avoid. */
+class SchemaTooComplex extends MapoAiProviderError {
+  constructor(message: string) {
+    super("refused-request", message);
+  }
+}
+
+/** How a call holds the answer to its schema: the grammar, or the prompt alone. */
+type AnswerMode = "grammar" | "prompt";
 
 /** What a call needs besides the request. */
 interface CallSettings {
@@ -201,11 +234,35 @@ async function runAnthropic(
   call: CallSettings,
 ): Promise<MapoAiProviderAnswer> {
   requireKey(server, call);
-  const cap = cloudAnswerTokens(
-    request.task,
-    JSON.stringify(request.schema).length,
-    call.effort,
-  );
+  const schema = JSON.stringify(request.schema);
+  const cap = cloudAnswerTokens(request.task, schema.length, call.effort);
+  const known = await uncompiledKey(server, request.model, schema);
+  if (!isUncompiled(known)) {
+    try {
+      return await callAnthropic(server, request, call, cap, "grammar");
+    } catch (error) {
+      if (!(error instanceof SchemaTooComplex)) throw error;
+      // Two calls with a new schema at once both meet the refusal: the
+      // log says it once.
+      const isNew = !isUncompiled(known);
+      rememberUncompiled(known);
+      if (isNew)
+        console.warn(
+          `[mapo-ai] ${error.message.replace(/\.+$/, "")}. The call is made again without structured outputs, with the schema in the prompt, and so are the calls with this schema for a day; the gateway's sanitizer checks the answer.`,
+        );
+    }
+  }
+  return callAnthropic(server, request, call, cap, "prompt");
+}
+
+/** One call to `/messages`, holding the answer to its schema as `mode` says. */
+async function callAnthropic(
+  server: ProviderServer,
+  request: MapoAiProviderRequest,
+  call: CallSettings,
+  cap: number,
+  mode: AnswerMode,
+): Promise<MapoAiProviderAnswer> {
   const response = await callCloud({
     server,
     request,
@@ -213,7 +270,7 @@ async function runAnthropic(
     optional: OPTIONAL,
     dropped,
     build: (left) => ({
-      body: requestBody(request, call, cap, left),
+      body: requestBody(request, call, cap, left, mode),
       // The beta goes with the parameter: a server that refuses one may
       // not know the other.
       ...(left.has("fallbacks")
@@ -221,14 +278,53 @@ async function runAnthropic(
         : { headers: { "anthropic-beta": FALLBACK_BETA } }),
     }),
     ownRefusal: ({ message }) =>
-      TOO_COMPLEX.test(message)
-        ? new MapoAiProviderError(
-            "refused-request",
+      mode === "grammar" && TOO_COMPLEX.test(message)
+        ? new SchemaTooComplex(
             `${server.name} could not compile the answer's schema for ${request.model}, too large or too nested for its structured outputs: ${message}`,
           )
         : undefined,
   });
-  return answerOf(server, request, await readAnswer(server, response, request));
+  const streamed = await readAnswer(server, response, request);
+  return answerOf(server, request, streamed, mode);
+}
+
+/**
+ * The name a schema Anthropic could not compile is remembered by: the
+ * server, the model and a hash of the schema, which a request may make
+ * as large as its limits allow.
+ */
+async function uncompiledKey(
+  server: ProviderServer,
+  model: string,
+  schema: string,
+): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(schema),
+  );
+  const hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${server.url} ${model} ${hash}`;
+}
+
+/** Whether a schema could not be compiled within the last day. */
+function isUncompiled(key: string): boolean {
+  const until = uncompiled.get(key);
+  if (until === undefined) return false;
+  if (until > Date.now()) return true;
+  uncompiled.delete(key);
+  return false;
+}
+
+/** Remembers a schema that could not be compiled, the oldest going first past the bound. */
+function rememberUncompiled(key: string): void {
+  uncompiled.delete(key);
+  if (uncompiled.size >= MAX_UNCOMPILED) {
+    const [oldest] = uncompiled.keys();
+    if (oldest !== undefined) uncompiled.delete(oldest);
+  }
+  uncompiled.set(key, Date.now() + UNCOMPILED_MS);
 }
 
 /** A call without the key its server needs fails before it is made. */
@@ -238,25 +334,39 @@ function requireKey(server: ProviderServer, call: CallSettings): void {
   }
 }
 
-/** The body of a call to `/messages`, without the parameters the model refused. */
+/**
+ * The body of a call to `/messages`, without the parameters the model
+ * refused. With `mode` `prompt`, the schema goes at the end of the stable
+ * part of the prompt instead of in `output_config`.
+ */
 function requestBody(
   request: MapoAiProviderRequest,
   call: CallSettings,
   cap: number,
   left: ReadonlySet<string>,
+  mode: AnswerMode,
 ): Record<string, unknown> {
   // The mark ends the stable part: Anthropic caches what comes before it.
   const mark = call.promptCache ? { cache_control: { type: "ephemeral" } } : {};
+  const isGrammar = mode === "grammar";
+  const instructions = isGrammar
+    ? request.prompt.instructions
+    : instructionsWithSchema(request.prompt, request.schema);
+  const outputConfig = {
+    ...(isGrammar
+      ? { format: { type: "json_schema", schema: request.schema } }
+      : {}),
+    ...(left.has("effort") ? {} : { effort: call.effort }),
+  };
   return {
     model: request.model,
     max_tokens: cap,
     stream: true,
-    system: [{ type: "text", text: request.prompt.instructions, ...mark }],
+    system: [{ type: "text", text: instructions, ...mark }],
     messages: [{ role: "user", content: request.prompt.input }],
-    output_config: {
-      format: { type: "json_schema", schema: request.schema },
-      ...(left.has("effort") ? {} : { effort: call.effort }),
-    },
+    ...(Object.keys(outputConfig).length
+      ? { output_config: outputConfig }
+      : {}),
     ...(left.has("fallbacks") ? {} : { fallbacks: "default" }),
   };
 }
@@ -404,6 +514,7 @@ function answerOf(
   server: ProviderServer,
   request: MapoAiProviderRequest,
   streamed: Streamed,
+  mode: AnswerMode,
 ): MapoAiProviderAnswer {
   const { usage, fellBackOn } = streamed;
   const served = fellBackOn ? { model: fellBackOn } : {};
@@ -434,10 +545,16 @@ function answerOf(
       ...served,
     };
   }
-  // Claude may write a listed value with another case than its schema's.
+  // Without the grammar, Claude may put the JSON in a block of code, or
+  // write a word around it; and a listed value with another case than its
+  // schema's in either mode.
+  const output =
+    mode === "grammar"
+      ? answerOutput(streamed.text)
+      : jsonInText(streamed.text);
   return {
     status: "answered",
-    output: withEnumCase(answerOutput(streamed.text), request.schema),
+    output: withEnumCase(output, request.schema),
     usage,
     ...served,
   };
@@ -461,4 +578,30 @@ function refusalText(streamed: Streamed): string {
   if (isWords) return said.slice(0, 1000);
   const kind = streamed.category ? ` (${streamed.category})` : "";
   return `Anthropic's safety filters declined the request${kind}`;
+}
+
+/**
+ * The JSON a model wrote without a grammar: the whole text, else the inside
+ * of a block of code, the last that is JSON (a model may show an example
+ * before its answer), else what goes from the first `{` to the last `}`;
+ * the text itself when none is JSON, which the sanitizer reads as
+ * unreadable.
+ */
+function jsonInText(text: string): unknown {
+  const fenced = Array.from(
+    text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi),
+    (match) => match[1] ?? "",
+  ).reverse();
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  const braced = first >= 0 && last > first ? text.slice(first, last + 1) : "";
+  for (const candidate of [text, ...fenced, braced]) {
+    if (!candidate.trim()) continue;
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // the next way
+    }
+  }
+  return text;
 }

@@ -68,6 +68,32 @@ function events(...values: Record<string, unknown>[]): Response {
   );
 }
 
+/** A stream whose answer is `text`, in one piece. */
+function textStream(text: string): Response {
+  return events(
+    {
+      type: "message_start",
+      message: { model: OPUS, usage: { input_tokens: 900, output_tokens: 1 } },
+    },
+    {
+      type: "content_block_start",
+      index: 0,
+      content_block: { type: "text", text: "" },
+    },
+    {
+      type: "content_block_delta",
+      index: 0,
+      delta: { type: "text_delta", text },
+    },
+    {
+      type: "message_delta",
+      delta: { stop_reason: "end_turn" },
+      usage: { output_tokens: 120 },
+    },
+    { type: "message_stop" },
+  );
+}
+
 /** Anthropic's error, as its API answers one. */
 function error(status: number, type: string, message: string): Response {
   return json({ type: "error", error: { type, message } }, status);
@@ -577,20 +603,330 @@ describe("the anthropic provider", () => {
     });
   });
 
-  it("says when the answer's schema is too complex for Anthropic's structured outputs", async () => {
+  it("asks again with the schema in the prompt when Anthropic cannot compile it, and remembers the schema", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        stream("anthropic-answered.sse"),
+        stream("anthropic-answered.sse"),
+      ],
+    });
+    const request = providerRequest({ model: OPUS });
+
+    const first = await provider.run(request);
+    const again = await provider.run(providerRequest({ model: OPUS }));
+
+    expect(first).toMatchObject({ status: "answered", output: ANSWER });
+    expect(again).toMatchObject({ status: "answered", output: ANSWER });
+    const [grammar, prompted, remembered] = calls.map(bodyOf);
+    expect(grammar?.output_config).toEqual({
+      format: { type: "json_schema", schema: request.schema },
+      effort: "low",
+    });
+    for (const body of [prompted, remembered]) {
+      expect(body?.output_config).toEqual({ effort: "low" });
+      expect(body?.system).toEqual([
+        {
+          type: "text",
+          text: `${request.prompt.instructions}\n\n# The answer's JSON schema\n${JSON.stringify(request.schema)}`,
+        },
+      ]);
+      expect(body?.messages).toEqual(grammar?.messages);
+    }
+    expect(calls).toHaveLength(3);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(String(warn.mock.calls[0]?.[0])).toContain(
+      "could not compile the answer's schema for claude-opus-5-5, too large or too nested",
+    );
+  });
+
+  it("asks a schema it did not remember with the grammar again", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        stream("anthropic-answered.sse"),
+        stream("anthropic-answered.sse"),
+      ],
+    });
+
+    await provider.run(providerRequest({ model: OPUS }));
+    const other = providerRequest({ model: OPUS });
+    await provider.run({
+      ...other,
+      schema: { ...other.schema, description: "Another form" },
+    });
+
+    expect(bodyOf(calls[2]).output_config).toMatchObject({
+      format: { type: "json_schema" },
+    });
+  });
+
+  it("reads the JSON Claude writes in a block of code without the grammar", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const text = `Here is the answer:\n\n\`\`\`json\n${JSON.stringify(ANSWER, null, 2)}\n\`\`\`\n`;
     const { provider } = anthropic({
-      [MESSAGES]: [json(documented("anthropic-too-complex.json"), 400)],
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        events(
+          {
+            type: "message_start",
+            message: {
+              model: OPUS,
+              usage: { input_tokens: 900, output_tokens: 1 },
+            },
+          },
+          {
+            type: "content_block_start",
+            index: 0,
+            content_block: { type: "text", text: "" },
+          },
+          {
+            type: "content_block_delta",
+            index: 0,
+            delta: { type: "text_delta", text },
+          },
+          {
+            type: "message_delta",
+            delta: { stop_reason: "end_turn" },
+            usage: { output_tokens: 120 },
+          },
+          { type: "message_stop" },
+        ),
+      ],
+    });
+
+    const answer = await provider.run(providerRequest({ model: OPUS }));
+
+    expect(answer).toMatchObject({ status: "answered", output: ANSWER });
+  });
+
+  it("asks again for another wording of a schema Anthropic cannot compile, with the usage of the call that answered", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [
+        error(
+          400,
+          "invalid_request_error",
+          "The compiled grammar of this schema is too large.",
+        ),
+        stream("anthropic-answered.sse"),
+      ],
+    });
+
+    const answer = await provider.run(providerRequest({ model: OPUS }));
+
+    expect(answer).toEqual({
+      status: "answered",
+      output: ANSWER,
+      usage: { inputTokens: 2210, outputTokens: 398 },
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("warns once when two calls meet the refusal of the same schema", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    // Anthropic refuses every call with the grammar, once both have
+    // arrived, and answers the others.
+    let arrived = 0;
+    let bothArrived!: () => void;
+    const both = new Promise<void>((resolve) => (bothArrived = resolve));
+    const { provider } = anthropic(
+      {},
+      {
+        fetch: async (_url, init) => {
+          const body = JSON.parse(String(init.body)) as {
+            output_config?: { format?: unknown };
+          };
+          if (!body.output_config?.format) {
+            return stream("anthropic-answered.sse");
+          }
+          arrived += 1;
+          if (arrived === 2) bothArrived();
+          await both;
+          return json(documented("anthropic-too-complex.json"), 400);
+        },
+      },
+    );
+
+    const answers = await Promise.all([
+      provider.run(providerRequest({ model: OPUS })),
+      provider.run(providerRequest({ model: OPUS })),
+    ]);
+
+    expect(answers.map((answer) => answer.status)).toEqual([
+      "answered",
+      "answered",
+    ]);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("reads the last block of code that is JSON, after an example", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const text = [
+      "An empty answer looks like this:",
+      "```json",
+      JSON.stringify({ values: {}, evidence: [] }),
+      "```",
+      "Here is the answer:",
+      "```json",
+      JSON.stringify(ANSWER),
+      "```",
+    ].join("\n");
+    const { provider } = anthropic({
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        textStream(text),
+      ],
+    });
+
+    const answer = await provider.run(providerRequest({ model: OPUS }));
+
+    expect(answer).toMatchObject({ output: ANSWER });
+  });
+
+  it("reads text that holds no JSON as the text itself, for the sanitizer", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider } = anthropic({
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        textStream("I cannot fill this form."),
+      ],
+    });
+
+    const answer = await provider.run(providerRequest({ model: OPUS }));
+
+    expect(answer).toMatchObject({
+      status: "answered",
+      output: "I cannot fill this form.",
+    });
+  });
+
+  it("fails as the call without the grammar fails, with no third call", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [
+        json(documented("anthropic-too-complex.json"), 400),
+        error(500, "api_error", "Internal server error"),
+      ],
     });
 
     const failure = await failureOf(
       provider.run(providerRequest({ model: OPUS })),
     );
 
-    expect(failure).toEqual({
-      failure: "refused-request",
-      message: expect.stringContaining(
-        "could not compile the answer's schema for claude-opus-5-5, too large or too nested",
-      ),
+    expect(failure.failure).toBe("unavailable");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("does not ask again, nor remember, for a refusal that is not of the schema's size", async () => {
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [
+        error(
+          400,
+          "invalid_request_error",
+          "messages.0.content: Field required",
+        ),
+        stream("anthropic-answered.sse"),
+      ],
+    });
+
+    const failure = await failureOf(
+      provider.run(providerRequest({ model: OPUS })),
+    );
+    await provider.run(providerRequest({ model: OPUS }));
+
+    expect(failure.failure).toBe("refused-request");
+    expect(bodyOf(calls[1]).output_config).toMatchObject({
+      format: { type: "json_schema" },
+    });
+  });
+
+  it("keeps the cache mark, the beta and no output_config without its effort, when the call goes without the grammar", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { provider, calls } = anthropic(
+      {
+        [MESSAGES]: [
+          json(documented("anthropic-too-complex.json"), 400),
+          error(
+            400,
+            "invalid_request_error",
+            "output_config.effort: Extra inputs are not permitted",
+          ),
+          stream("anthropic-answered.sse"),
+        ],
+      },
+      { promptCache: true },
+    );
+    const request = providerRequest({ model: OPUS });
+
+    await provider.run(request);
+
+    const prompted = bodyOf(calls[2]);
+    expect(prompted).not.toHaveProperty("output_config");
+    expect(prompted.system).toEqual([
+      {
+        type: "text",
+        text: `${request.prompt.instructions}\n\n# The answer's JSON schema\n${JSON.stringify(request.schema)}`,
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+    expect(calls[2]?.headers).toMatchObject({
+      "anthropic-beta": "server-side-fallback-2026-07-01",
+    });
+  });
+
+  it("tries the grammar of a schema again after a day", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { provider, calls } = anthropic({
+        [MESSAGES]: [
+          json(documented("anthropic-too-complex.json"), 400),
+          stream("anthropic-answered.sse"),
+          stream("anthropic-answered.sse"),
+          stream("anthropic-answered.sse"),
+        ],
+      });
+
+      await provider.run(providerRequest({ model: OPUS }));
+      vi.setSystemTime(Date.now() + 23 * 60 * 60 * 1000);
+      await provider.run(providerRequest({ model: OPUS }));
+      vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
+      await provider.run(providerRequest({ model: OPUS }));
+
+      expect(bodyOf(calls[2]).output_config).not.toHaveProperty("format");
+      expect(bodyOf(calls[3]).output_config).toMatchObject({
+        format: { type: "json_schema" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("remembers 500 schemas, forgetting the oldest first", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const refusals = Array.from({ length: 501 }, () => [
+      json(documented("anthropic-too-complex.json"), 400),
+      stream("anthropic-answered.sse"),
+    ]).flat();
+    const { provider, calls } = anthropic({
+      [MESSAGES]: [...refusals, stream("anthropic-answered.sse")],
+    });
+    const base = providerRequest({ model: OPUS });
+    const nth = (index: number) => ({
+      ...base,
+      schema: { ...base.schema, description: `Form ${index}` },
+    });
+
+    for (let index = 0; index <= 500; index += 1) {
+      await provider.run(nth(index));
+    }
+    await provider.run(nth(0));
+
+    expect(bodyOf(calls.at(-1)).output_config).toMatchObject({
+      format: { type: "json_schema" },
     });
   });
 
