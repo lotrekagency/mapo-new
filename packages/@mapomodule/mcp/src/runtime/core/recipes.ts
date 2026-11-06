@@ -679,6 +679,46 @@ export const RECIPES: Recipe[] = [
       "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore; undo() puts back what it wrote.",
   },
   {
+    id: "ai-read-files",
+    task: "Give the AI a file, a web page, a CSV or an Excel sheet, instead of a pasted text",
+    keywords: [
+      "useMapoAiRead",
+      "_mapo/ai/read",
+      "upload a file",
+      "file input",
+      "excel",
+      "xlsx",
+      "csv",
+      "spreadsheet",
+      "html page",
+      "markdown",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Read a file",
+    summary:
+      "Experimental: useMapoAiRead().read(file) posts one file to POST /_mapo/ai/read, which reads text, Markdown, JSON, HTML (into Markdown) and CSV or XLSX (each sheet whole, as a Markdown table) into the text parts run takes, without calling any AI; pass answer.parts to useMapoAiFill().fill(). The answer's status says when there are none: unsupported, empty, too-long (more than limits.maxSourceChars) or failed; files up to limits.maxFileBytes, 10 MB by default.",
+  },
+  {
+    id: "ai-readers",
+    task: "Replace how the AI gateway reads a file format, add a format, or turn one off",
+    keywords: [
+      "registerMapoAiReader",
+      "mapo-ai:read",
+      "mapo.ai.readers",
+      "custom reader",
+      "reader",
+      "file format",
+      "turn off",
+      "redact",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Replace or add a reader",
+    summary:
+      "Experimental: in a Nitro plugin, registerMapoAiReader({ id, extensions, types?, read(file) }) puts the app's reader in place of Mapo's with the same id (text, markdown, json, html, csv, xlsx) or adds a format; the mapo-ai:read hook touches up the parts any reader read (context.parts), files only, never pasted text; mapo.ai.readers turns a reader off by id ({ xlsx: false }, or NUXT_MAPO_AI_READERS_XLSX=false).",
+  },
+  {
     id: "ai-providers",
     task: "Add an AI provider, or answer with the mock",
     keywords: [

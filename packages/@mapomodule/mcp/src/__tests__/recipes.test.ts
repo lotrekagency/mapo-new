@@ -62,6 +62,10 @@ describe("matchRecipes", () => {
     ["turn on the prompt cache of the AI provider", "ai-cloud-models"],
     ["raise the reasoning effort of the AI provider", "ai-cloud-models"],
     ["set the api key of the ollama server", "ai-local-models"],
+    ["let the operator upload an excel file for the AI", "ai-read-files"],
+    ["give the AI a csv spreadsheet instead of pasted text", "ai-read-files"],
+    ["replace the reader of html files in the AI gateway", "ai-readers"],
+    ["turn off xlsx files for the AI", "ai-readers"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
