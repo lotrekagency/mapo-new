@@ -40,6 +40,49 @@ export default defineNuxtConfig({
         anthropic: { adminModels: true },
         ...(ollamaModels.length ? { ollama: { models: ollamaModels } } : {}),
       },
+      // The prices of the models the app enables, for the costs of the
+      // usage on the settings page: list prices in dollars per million
+      // tokens, read on 2026-11-05, as the AI lab of example-e2e has them.
+      // A real project writes those of its own contract; Mapo keeps none.
+      prices: {
+        currency: "USD",
+        providers: {
+          openai: {
+            "gpt-6.1-sol": {
+              input: 2,
+              output: 10,
+              cacheRead: 0.1,
+              cacheWrite: 2.5,
+            },
+            "gpt-6-luna": {
+              input: 0.1,
+              output: 0.5,
+              cacheRead: 0.01,
+              cacheWrite: 0.125,
+            },
+          },
+          anthropic: {
+            "claude-opus-5-5": {
+              input: 4,
+              output: 20,
+              cacheRead: 0.2,
+              cacheWrite: 5,
+            },
+            "claude-sonnet-5-5": {
+              input: 2,
+              output: 10,
+              cacheRead: 0.2,
+              cacheWrite: 2.5,
+            },
+            "claude-haiku-5-5": {
+              input: 0.1,
+              output: 0.5,
+              cacheRead: 0.01,
+              cacheWrite: 0.125,
+            },
+          },
+        },
+      },
       // The backend's users and groups, which the settings page searches
       // when an admin assigns a key (server/api/users, server/api/groups).
       settings: { usersApi: "/api/users/", groupsApi: "/api/groups/" },
