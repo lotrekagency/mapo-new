@@ -446,6 +446,18 @@ describe("createSealedStorage — bound to its place", () => {
     ).toBe(1);
   });
 
+  it("says a record is there without opening it, one sealed with another secret too", async () => {
+    const storage = memoryMount();
+    await sealedOn(storage, { secret: OTHER_SECRET })
+      .sealed.store("keys")
+      .set("team-a", 1);
+    const { sealed, problems } = sealedOn(storage);
+
+    expect(await sealed.store("keys").has("team-a")).toBe(true);
+    expect(await sealed.store("keys").has("team-b")).toBe(false);
+    expect(problems).toEqual([]);
+  });
+
   it.each([
     [
       "a byte of the sealed value",

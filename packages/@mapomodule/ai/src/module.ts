@@ -231,7 +231,8 @@ export default defineNuxtModule<MapoAiOptions>({
     });
     // The keys: the admins assign them, each user saves their own token
     // where an assignment allows one; the AI settings: the user's
-    // preference and the check of a provider's connection.
+    // preference, the check of a provider's connection, and how the AI
+    // works in the whole app, which its admins change.
     const keyRoutes = [
       ["keys", "get", "keys.get"],
       ["keys", "put", "keys.put"],
@@ -242,6 +243,9 @@ export default defineNuxtModule<MapoAiOptions>({
       ["preferences", "put", "preferences.put"],
       ["preferences", "delete", "preferences.delete"],
       ["test", "post", "test.post"],
+      ["settings", "get", "settings.get"],
+      ["settings", "put", "settings.put"],
+      ["settings/preview", "post", "settings-preview.post"],
     ] as const;
     for (const [path, method, file] of keyRoutes) {
       addServerHandler({

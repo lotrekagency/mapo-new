@@ -77,7 +77,12 @@ export function policyOf(
       unusable.push({ id, reason: "unknown" });
       continue;
     }
-    const models = enabled.models ?? [...(provider.models ?? [])];
+    const own = enabled.models ?? [...(provider.models ?? [])];
+    // The admins' models come after the app's, once each.
+    const added = [...new Set(enabled.addedModels ?? [])].filter(
+      (model) => !own.includes(model),
+    );
+    const models = [...own, ...added];
     if (!models.length) {
       unusable.push({ id, reason: "no-model" });
       continue;

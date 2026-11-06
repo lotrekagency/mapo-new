@@ -3,12 +3,15 @@
  * The AI settings: each user picks the provider and model they prefer,
  * sees the key their calls use, saves their own token where an admin
  * allows it and checks the connection; the AI's admins also assign keys,
- * order the groups and remove the users' tokens. It asks the gateway's
+ * order the groups and remove the users' tokens, and change how the AI
+ * works in the whole app: instructions, rules of verification, words of
+ * secrets, the providers' cache, fallbacks and added models. It asks the gateway's
  * `status`, so a user the app keeps out of the AI is told so.
  */
 import { onMounted, shallowRef } from "vue";
 import { useSettingsClient } from "../composables/settingsClient";
 import type { MapoAiStatus } from "../shared/gateway";
+import MapoAiSettingsBehaviour from "./MapoAiSettingsBehaviour.vue";
 import MapoAiSettingsKeys from "./MapoAiSettingsKeys.vue";
 import MapoAiSettingsPersonal from "./MapoAiSettingsPersonal.vue";
 
@@ -59,6 +62,7 @@ onMounted(load);
     <template v-else-if="status">
       <MapoAiSettingsPersonal :status="status" @changed="load" />
       <MapoAiSettingsKeys v-if="status.admin" @changed="load" />
+      <MapoAiSettingsBehaviour v-if="status.admin" @changed="load" />
     </template>
     <p v-else-if="loading" class="text-sm text-muted">
       {{ t("mapo.ai.settings.loading") }}

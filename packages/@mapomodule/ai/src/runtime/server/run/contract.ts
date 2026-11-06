@@ -25,15 +25,19 @@ import { capped } from "./request";
  *   be compiled: entities that share an endpoint, a schema too large for
  *   the providers
  */
-export function contractOf(request: MapoAiRunRequest): AiContract {
+export function contractOf(
+  request: MapoAiRunRequest,
+  options: { secretWords?: readonly string[] } = {},
+): AiContract {
+  const words = options.secretWords ?? [];
   try {
     if (request.task === "fill") {
-      const source = sourceOf(request.entity);
+      const source = sourceOf(request.entity, words);
       if (!source.entity.fields.length) throw nothingToFill();
       return compileFillContract(source, languageOf(request));
     }
     const sources = request.entities
-      .map(sourceOf)
+      .map((entity) => sourceOf(entity, words))
       .filter((source) => source.entity.fields.length > 0);
     if (!sources.length) throw nothingToFill();
     return compileExtractContract(sources, languageOf(request));
@@ -54,13 +58,24 @@ export function contractOf(request: MapoAiRunRequest): AiContract {
   }
 }
 
-function sourceOf(entity: MapoAiRunEntity): AiContractSource {
+/**
+ * One entity's source of the contract, built from its two descriptions,
+ * with the words that name a secret besides Mapo's: the app's and the
+ * admins'.
+ */
+function sourceOf(
+  entity: MapoAiRunEntity,
+  secretWords: readonly string[],
+): AiContractSource {
   const model = buildAiEntity(
     {
       ...(entity.schema ? { schema: entity.schema } : {}),
       ...(entity.fields ? { fields: entity.fields } : {}),
     },
-    entity.exclude ? { exclude: entity.exclude } : {},
+    {
+      ...(entity.exclude ? { exclude: entity.exclude } : {}),
+      ...(secretWords.length ? { secretWords } : {}),
+    },
   );
   return {
     entity: model,

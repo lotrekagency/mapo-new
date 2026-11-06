@@ -1,12 +1,15 @@
 /**
  * The AI settings page's reading of the backend's users and groups, as
  * outside data: a list as Django REST Framework answers it, plain or
- * paginated (`results`); and of the user's preference in `status`. Pure,
- * shared by the page and its tests.
+ * paginated (`results`); of the user's preference in `status`; and of the
+ * rules of verification an admin makes less prudent. Pure, shared by the
+ * page, the gateway and their tests.
  */
 
 import type { MapoAiStatus } from "./gateway";
 import { isRecord } from "./guards";
+import { DEFAULT_VERIFICATION_RULES } from "./sanitize";
+import type { AiVerificationRules } from "./sanitize";
 
 /** A user or a group to pick in an assignment: the value saved, and its name for people. */
 export interface MapoAiPrincipal {
@@ -79,4 +82,60 @@ export function preferenceApplies(
   const sameProvider = preference.provider === defaults.provider;
   const sameModel = preference.model === defaults.models.fill;
   return sameProvider && sameModel;
+}
+
+/** The rules of verification, in the order the page shows them. */
+const RULE_NAMES: readonly (keyof AiVerificationRules)[] = [
+  "dateYear",
+  "bareHours",
+  "timeZones",
+  "oneWordQuotes",
+  "richTextLinks",
+  "soleNumber",
+];
+
+/**
+ * The value of each rule that asks less of a quote: `soleNumber: false`
+ * verifies a number its quote writes beside another. For `oneWordQuotes`,
+ * `"unique"` asks less than `"never"`.
+ */
+const LOOSER_VALUES: Readonly<AiVerificationRules> = Object.freeze({
+  dateYear: false,
+  bareHours: true,
+  timeZones: false,
+  oneWordQuotes: "unique",
+  richTextLinks: false,
+  soleNumber: false,
+});
+
+/** How prudent a rule's value is: `0` for the value that asks less of a quote, `1` for the other. */
+function prudenceOf(
+  name: keyof AiVerificationRules,
+  value: AiVerificationRules[keyof AiVerificationRules],
+): number {
+  return value === LOOSER_VALUES[name] ? 0 : 1;
+}
+
+/**
+ * The rules `rules` sets less prudent than any of `baselines`: by default
+ * Mapo's defaults; the gateway and the page pass the app's rules too, so a
+ * rule the app made stricter than Mapo's and an admin sets back counts.
+ * The page warns about them, and the audit of a change names them.
+ */
+export function looserRules(
+  rules: Partial<AiVerificationRules>,
+  baselines: readonly Partial<AiVerificationRules>[] = [
+    DEFAULT_VERIFICATION_RULES,
+  ],
+): (keyof AiVerificationRules)[] {
+  return RULE_NAMES.filter((name) => {
+    const value = rules[name];
+    if (value === undefined) return false;
+    return baselines.some((baseline) => {
+      const base = baseline[name];
+      return (
+        base !== undefined && prudenceOf(name, value) < prudenceOf(name, base)
+      );
+    });
+  });
 }

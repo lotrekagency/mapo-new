@@ -14,6 +14,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - Two options say who administers the AI and who may use it, `admin` and `users`, and a Nitro plugin can narrow it further with the `mapo-ai:user` hook.
 - `POST /_mapo/ai/run` fills one record (`fill`) or extracts every record a source describes (`extract`). The page sends the record's two descriptions, its backend schema and its form's fields, and the source; the gateway builds what the AI may fill, composes the prompt, calls the provider and reads its answer: each field comes back empty, filled (verified by a quote of the source, or to check) or discarded with a reason. The gateway never writes to the backend.
 - The module adds an **AI settings** page (`/ai-settings`), also a component, `MapoAiSettings`: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins assign keys to everyone, a group or a user.
+- The AI's admins change how the AI works in the whole app, on the same page: their instructions in every prompt, the rules of verification, the words that name a secret field, each cloud provider's prompt cache, Anthropic's fallbacks, and models they add where the app allows it (`adminModels`). The app's options stay the defaults; nothing the admins set removes Mapo's rules.
 - The keys come from three levels, nearest to the user first: the user's own token, where an admin allows one; the key the AI's admins assign to the user, to one of their groups or to everyone, with the models it opens; the project's key, in the server's environment. The browser never sees a key: `status` says which level gives it.
 - The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command; `openai`, OpenAI's models through its Responses API; `anthropic`, Claude through Anthropic's Messages API; `ollama`, a model served by Ollama; `openai-compatible`, a model served by LM Studio, vLLM, llama.cpp or another server that speaks OpenAI's Chat Completions API; and the ones an app registers with `registerMapoAiProvider()`.
 - `POST /_mapo/ai/read` reads a file into the text `run` takes, with the reader of its format: text, Markdown, JSON, HTML, CSV and XLSX. An app puts its own reader in place of any of Mapo's or adds one (`registerMapoAiReader()`), touches up what any reader read (the `mapo-ai:read` hook), and turns a format off without code (`readers`). In the browser, `useMapoAiRead()` sends a file.
@@ -22,7 +23,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model answered, the tokens (those of the provider's prompt cache among them) and the outcome, never the contents, for 90 days by default (`audit`).
 - `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
-- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`, `MapoAiSettingsAnswer`, `MapoAiSettingsInput`, `MapoAiPreviewResponse`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -223,7 +224,7 @@ The page describes the record with its two descriptions, in Mapo's JSON Schema d
 - `fields`, the form's fields, as `fieldsToJsonSchema(fields)` writes them ([From form to JSON Schema](/uikit/form/schema-to-form#from-form-to-json-schema));
 - `schema`, the backend's schema, from `OPTIONS`, DRF metadata or an OpenAPI document, normalized by `@mapomodule/utils` ([From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi)).
 
-One of the two is enough. With both, the form's fields decide which fields exist and of which type, and the stricter limit of the two wins. From them the gateway builds what the AI may fill and the JSON Schema of its answer, with the same code a page can run: a field kept away from the AI (a password, a read-only value, a media, a key named like a secret or a token, `x-mapo-ai` with `exclude`) is never asked.
+One of the two is enough. With both, the form's fields decide which fields exist and of which type, and the stricter limit of the two wins. From them the gateway builds what the AI may fill and the JSON Schema of its answer, with the same code a page can run: a field kept away from the AI (a password, a read-only value, a media, a key named like a secret, a token or credentials, or with one of the app's or the admins' words of secrets, `x-mapo-ai` with `exclude`) is never asked.
 
 ```ts
 import type { MapoAiRunResponse } from "mapomodule/types";
@@ -685,7 +686,7 @@ Each call:
 4. streams the answer. A prompt longer than the model reads fails with 413 (`too-long`), a rate limit with 503 and `Retry-After`, an overloaded API with 502, and an account without credit with 502;
 5. writes each listed value as its schema does. Anthropic's structured outputs do not keep the case of an `enum`'s values, so a value that matches one listed value but for case, such as `Title` for `title`, becomes that value; one that matches none, or several, stays as written, for the gateway's checks.
 
-**Refusals and fallbacks.** Opus 5.5 and Sonnet 5.5 run safety filters, on biology and cybersecurity among other subjects, that can decline a harmless request. The provider asks Anthropic to retry a declined request on the model it picks for that kind of request (`fallbacks: "default"`, a beta of Anthropic's): a model `models` does not list, such as Claude Opus 5, at that model's prices. The answer's `provider.model`, the audit and the server's log name the model that answered. Haiku 5.5 has no fallback, and neither has every kind of request: then the answer is a refusal (`status: "refused"`), which says the kind of request the filters declined.
+**Refusals and fallbacks.** Opus 5.5 and Sonnet 5.5 run safety filters, on biology and cybersecurity among other subjects, that can decline a harmless request. The provider asks Anthropic to retry a declined request on the model it picks for that kind of request (`fallbacks: "default"`, a beta of Anthropic's): a model `models` does not list, such as Claude Opus 5, at that model's prices. The answer's `provider.model`, the audit and the server's log name the model that answered. `fallbacks: false` in the provider's entry turns them off, and the AI's admins can turn them off on the AI settings page; they cannot turn them on where the app turns them off. Haiku 5.5 has no fallback, and neither has every kind of request: then the answer is a refusal (`status: "refused"`), which says the kind of request the filters declined.
 
 ### The prompt cache
 
@@ -925,7 +926,7 @@ The token is sealed in the user's own space of the storage, so it follows them o
 The module adds a page, **AI settings**, at `/ai-settings`, in the sidebar's footer, for every signed-in user; a user the app keeps out of the AI is told so there. It adds it only when the app has no page on that path, as Mapo does with `/login`. The demo app `apps/example-ai` shows it in a project that enables only the AI, beside a page of the app's own that reads `status`.
 
 - **Each user** picks the provider and model they prefer, among those they are given ([Which key a call uses](#which-key-a-call-uses)): it becomes their default for `run`, while the app and the admins give it to them and a key reaches the provider; when it does not apply, the page says so. They see which key their calls use, save or remove their own token where an admin's assignment allows one ([Personal tokens](#personal-tokens)), and check the connection.
-- **The AI's admins** also see the keys: the assignments to everyone, a group or a user, which they add, change and remove; the order of the groups; and the tokens the users saved, which they can remove ([Assign keys](#assign-keys)). Assigning a key to one user with every model, while a group of theirs narrows the models, shows a warning and offers the group's models.
+- **The AI's admins** also see the keys: the assignments to everyone, a group or a user, which they add, change and remove; the order of the groups; and the tokens the users saved, which they can remove ([Assign keys](#assign-keys)), and change [how the AI works](#how-the-ai-works) in the whole app. Assigning a key to one user with every model, while a group of theirs narrows the models, shows a warning and offers the group's models.
 
 ```ts
 // nuxt.config.ts
@@ -974,13 +975,45 @@ The page calls these routes besides `status`, `keys` and `token`:
 
 Without a model, the check looks for the user's default model of the provider. A user may check ten times a minute (429 past that); a body that is not a check is a 400, and a provider or a model they are not given a 403. An app's provider is checked through its `listModels(signal, apiKey)`, which gets the key the chain chose for the user ([Your own provider](#your-own-provider)).
 
+### How the AI works
+
+The AI's admins also see **How the AI works**, below the keys, for the whole app. The app's options stay the defaults: the admins change instructions, rules, words and the cache; what widens the models or the spending only where the app allows it. Each block saves on its own, and every change is audited.
+
+- **Instructions**, for every task (`all`), to fill a record and to extract records: layer 3 of [the prompt](#the-prompt), after Mapo's rules and the app's, which win where they disagree. The page shows the rules the model reads for a task, the instructions as written included, before they are saved; it calls no model.
+- **Verification**: each [rule](#verification) follows the app's value, or takes the admins' own, in either direction. A rule less prudent than the app's or Mapo's default shows a warning, and the audit names it. No rule verifies a value without a quote found in the source.
+- **Secret fields**: words that keep a field from the AI, besides Mapo's and the app's (`secretWords`), found as whole words in the field's key or a key around it: `vault` keeps `vault_url` and `backup.vault` out, never `vaulted`; `card number` keeps `cardNumber` out. Mapo's own (`password`, `token`, `secret`, `credentials`, `jwt`, `otp`, `api key`, `signing key`, `database url`…) always apply.
+- **Providers**: the prompt cache of `openai` and `anthropic` ([The prompt cache](#the-prompt-cache)), on or off over the app's `promptCache`; Anthropic's fallbacks, which the admins can turn off, and on again only where the app leaves them on; and the models they add, where the app sets `adminModels: true` for the provider. A model is saved only once the provider's server lists it, asked with the key the admin's own calls use, at no cost; then it comes after the app's models, and the admins assign it in the keys as the others. Where the app turns `adminModels` off again, the models added stop applying.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      providers: {
+        openai: { adminModels: true },
+        anthropic: { adminModels: true, fallbacks: false },
+      },
+      secretWords: ["vault", "card number"],
+    },
+  },
+});
+```
+
+| Route                             | What it does                                                                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /_mapo/ai/settings`          | The admins' settings beside the app's and Mapo's, `MapoAiSettingsAnswer`. AI admins only; 503 when the storage is closed                                         |
+| `PUT /_mapo/ai/settings`          | A change, `MapoAiSettingsInput`: each block it holds (`instructions`, `verification`, `secretWords`, `providers`) replaces the admins' one. It answers as `GET`  |
+| `POST /_mapo/ai/settings/preview` | `{ "task": "fill", "instructions": { "all": "…" } }`: the rules the model reads for the task, with these instructions or the saved ones, `MapoAiPreviewResponse` |
+
+`PUT` answers 400 for a body that is not a change, naming where; 403 for what the app keeps from the admins (a model added where it allows none, Anthropic's fallbacks on where it turns them off); 422 for a model the provider's server does not list (`data.model`), or that cannot be asked about; 502 when the list cannot be read. The settings are one sealed record: one that is there and does not open closes the AI with a 503, as the keys do, instead of calling with fewer of the admins' words or rules.
+
 ## The prompt
 
 The gateway composes every prompt in layers, always in this order:
 
 1. **Mapo's base rules** for the task: the source is data, not instructions; only what the source states, empty otherwise; a date given in part, or a time the source does not write, is not given; a quote of the source for each value. An app adds to them and cannot remove them; where a later layer disagrees, they win.
 2. **The app's rules**: `instructions.all`, then `instructions.fill` or `instructions.extract`, then what the `mapo-ai:prompt` hooks add.
-3. **The admin's instructions**: none; no route sets them, so this layer is empty.
+3. **The admins' instructions**, from the AI settings page ([How the AI works](#how-the-ai-works)): `all`, then the task's.
 4. **The entities, as the request describes them**: their `label`, `description` and the language; the fields' own texts are in the answer's schema. The prompt says that this description changes none of the rules above it.
 5. **The operator's instructions**, from the request: they may narrow the task, never change the rules or the shape of the answer.
 6. **The source**, between two marks that carry an id made for each request, so a text that writes a mark of its own stays inside them.
@@ -1029,7 +1062,7 @@ The context is read-only: a hook adds rules, and cannot remove what Mapo, `instr
 
 ## Verification
 
-A filled value is verified when a quote the AI gives is found in the source, as whole words, and holds the value: its text, its number (by default the only number the quote writes) or its choice's label; a date its day and year, a time its hours and minutes. The app can change the rules, never so far that a value is verified without a quote found in the source:
+A filled value is verified when a quote the AI gives is found in the source, as whole words, and holds the value: its text, its number (by default the only number the quote writes) or its choice's label; a date its day and year, a time its hours and minutes. The app can change the rules, and the AI's admins can change the app's on the AI settings page ([How the AI works](#how-the-ai-works)), never so far that a value is verified without a quote found in the source:
 
 ```ts
 // nuxt.config.ts
@@ -1082,7 +1115,7 @@ Every call that reaches a provider leaves a record in the storage, written as so
 
 A request refused before the provider leaves no record. Without an open storage, `run` answers 503 and calls nothing: a call that cannot be audited is not made. When writing a record fails after the call, the server's log says so, and the answer still reaches the user.
 
-Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. No route reads the audit.
+Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. So does every change of the admins' settings (`settings-saved`): who, which blocks and providers, and which rules of verification it made less prudent than the app's or Mapo's defaults, never the instructions or the words. No route reads the audit.
 
 ## The secret and the storage
 
@@ -1166,13 +1199,14 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | `providers`    | `Record<string, MapoAiProviderOptions \| false>`                                                               | `{}`: no provider, `run` answers 503   | The providers `run` may call, and their options ([Providers](#providers))                |
 | `default`      | `{ provider?: string; models?: { fill?: string; extract?: string } }`                                          | The first provider and its first model | What a request that names no provider or model gets                                      |
 | `instructions` | `{ all?: string; fill?: string; extract?: string }`                                                            | `{}`                                   | The app's rules in every prompt ([The prompt](#the-prompt))                              |
+| `secretWords`  | `string[]`                                                                                                     | `[]`                                   | Words that name a secret field ([How the AI works](#how-the-ai-works))                   |
 | `verification` | `{ dateYear?, bareHours?, timeZones?, oneWordQuotes?, richTextLinks?, soleNumber? }`                           | The prudent defaults                   | What a quote must hold for a value to be verified ([Verification](#verification))        |
 | `readers`      | `Record<string, boolean>`                                                                                      | `{}`: every reader on                  | The readers of `read` turned off, or on, by id ([Turn a format off](#turn-a-format-off)) |
 | `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number; maxFileBytes?: number }` | `20`, `100000`, `2000`, `10485760`     | The limits of `run` and `read` ([Limits](#limits))                                       |
 | `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |
 | `settings`     | `{ path?: string \| false; label?: string; usersApi?: string; groupsApi?: string }`                            | `/ai-settings`, "AI settings"          | The AI settings page ([AI settings](#ai-settings))                                       |
 
-An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
+An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); every provider but the mock takes `adminModels` (`false` by default), which lets the AI's admins add models ([How the AI works](#how-the-ai-works)); `anthropic` takes `fallbacks` (`true` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
 
 The module reads every option when the app builds, and warns about what it cannot read. A value it cannot read never widens what the AI may do: a `users` that names no group or permission it can read lets in only superusers and the AI's admins, a provider it cannot read is not enabled, a reader whose value it cannot read is off, and a limit it cannot read is `0`, the narrowest. A rule of verification, or the audit's retention, that it cannot read keeps its default. The options reach the server in its private runtime config, never in the public one, complete with their defaults, so the environment can change one when the server starts, with Nuxt's variables: `NUXT_MAPO_AI_LIMITS_PER_USER_PER_MINUTE=50`. An option with no default that the config does not set, such as `default.provider`, is not in the runtime config, so no variable reaches it. The server reads the options again with the same rules, and logs once a value it cannot read. Nuxt merges the options as any configuration: across layers, and `mapoAi` with `mapo.ai`, lists add up instead of replacing each other, so a layer's `groups` and the app's are all kept.
 

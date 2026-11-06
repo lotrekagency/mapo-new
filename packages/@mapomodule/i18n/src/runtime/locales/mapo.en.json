@@ -433,6 +433,87 @@
             "user": "The user's id in the backend",
             "group": "The group's name"
           }
+        },
+        "behaviour": {
+          "title": "How the AI works",
+          "intro": "For everyone in the app. The admins change what the app sets, within what it allows; Mapo's rules stay above all.",
+          "updated": "Last changed by {by}, {at}.",
+          "save": "Save",
+          "saved": "Saved.",
+          "appDefault": "As the app: {value}",
+          "on": "On",
+          "off": "Off",
+          "instructions": {
+            "title": "Instructions",
+            "help": "Added to every prompt after Mapo's rules and the app's, which win where they disagree.",
+            "all": "For every task",
+            "fill": "To fill a record",
+            "extract": "To extract records",
+            "app": "The app's rules: {text}",
+            "appNone": "The app adds no rule here.",
+            "preview": "Show the rules the model reads",
+            "previewTask": "The task to show",
+            "previewNote": "Mapo's rules, the app's and yours as written, not saved yet. Without the record, the source and the rules the app adds for a request."
+          },
+          "rules": {
+            "title": "Verification",
+            "help": "What a quote of the source must hold for a value to be verified, and go into an empty field by itself. No rule verifies a value without a quote found in the source.",
+            "looser": "Less prudent than the app's rules or Mapo's defaults: {rules}. More values go into the form by themselves, with less of a quote to prove them.",
+            "dateYear": {
+              "label": "A date needs its year",
+              "help": "“14 October” verifies no date."
+            },
+            "bareHours": {
+              "label": "An hour alone is a time",
+              "help": "“at 9 pm” written as “at 21” counts, from 13 to 23."
+            },
+            "timeZones": {
+              "label": "A time needs its time zone",
+              "help": "A date and time verifies only with the time zone its quote writes."
+            },
+            "oneWordQuotes": {
+              "label": "Quotes of one word",
+              "help": "When a quote of a single word counts.",
+              "unique": "When the source writes it once",
+              "never": "Never"
+            },
+            "richTextLinks": {
+              "label": "Rich text needs its links",
+              "help": "Rich text verifies only when its quote writes the address of each of its links."
+            },
+            "soleNumber": {
+              "label": "A number needs a quote of its own",
+              "help": "“6 stars out of 5” verifies neither number."
+            }
+          },
+          "secrets": {
+            "title": "Secret fields",
+            "help": "A field whose name, or a name around it, holds one of these words, whole, is never filled by the AI.",
+            "mapo": "Mapo's, which always apply:",
+            "app": "The app's:",
+            "admin": "The admins':",
+            "none": "None",
+            "add": "Add",
+            "placeholder": "A word of a field's name, such as vault",
+            "remove": "Remove {word}",
+            "invalid": "Letters, digits, spaces, _, - and ., up to 64 characters."
+          },
+          "providers": {
+            "title": "Providers",
+            "help": "Settings of each provider the app enables.",
+            "cache": "Prompt cache",
+            "cacheHelp": "Keeps the rules and the schema in the provider's cache for a few minutes, never the source: the calls that follow cost less.",
+            "fallbacks": "Anthropic's fallbacks",
+            "fallbacksHelp": "A request the model declines for its safety filters goes to a model Anthropic picks, at that model's prices.",
+            "fallbacksOff": "The app keeps them off.",
+            "appModels": "The app's models:",
+            "notApplied": "The app no longer lets admins add models: the ones added do not apply.",
+            "modelPlaceholder": "A model's id, as the provider lists it",
+            "addModel": "Add a model",
+            "removeModel": "Remove {model}",
+            "modelNote": "Saved only if the provider's server lists it, asked with the key your own calls use. Then assign it in the keys.",
+            "cannotAdd": "The app lets no admin add models to this provider."
+          }
         }
       }
     }

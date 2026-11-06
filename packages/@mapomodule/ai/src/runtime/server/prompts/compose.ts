@@ -42,7 +42,7 @@ export interface ComposePromptOptions {
   parts: readonly MapoAiSourcePart[];
   /** The app's rules, in order: `mapo.ai.instructions`, then the hooks'. */
   app?: readonly string[];
-  /** The admin's instructions, in order. None yet: no route passes them. */
+  /** The AI's admins' instructions, in order, from the AI settings. */
   admin?: readonly string[];
   /** The operator's own instructions for this request. */
   operator?: string;
@@ -66,27 +66,10 @@ export function composeMapoAiPrompt(
   options: ComposePromptOptions,
 ): MapoAiPrompt {
   const { contract } = options;
-  const instructions: string[] = [
-    `# Rules (Mapo, version ${MAPO_AI_PROMPT_VERSION})`,
-    baseRules(contract.task),
+  const instructions = [
+    ...ruleLayers(contract.task, options.app, options.admin),
+    ...entityContext(contract),
   ];
-  const app = paragraphs(options.app);
-  if (app.length) {
-    instructions.push(
-      "# The app's rules",
-      "They add to the rules above; where they disagree, the rules above win.",
-      ...app,
-    );
-  }
-  const admin = paragraphs(options.admin);
-  if (admin.length) {
-    instructions.push(
-      "# The administrator's instructions",
-      "They add to the rules above; where they disagree, the rules above win.",
-      ...admin,
-    );
-  }
-  instructions.push(...entityContext(contract));
 
   const mark = options.mark ?? randomMark();
   const input: string[] = [];
@@ -109,6 +92,52 @@ export function composeMapoAiPrompt(
     instructions: instructions.join("\n\n"),
     input: input.join("\n\n"),
   };
+}
+
+/**
+ * Layers 1–3 of a task's prompt, as the model reads them: Mapo's base
+ * rules, the app's and the admins'. What the AI settings page shows an
+ * admin before they save their instructions; the rules a `mapo-ai:prompt`
+ * hook adds depend on the request, and are not in it.
+ */
+export function previewMapoAiRules(
+  task: AiContract["task"],
+  app: readonly string[],
+  admin: readonly string[],
+): { version: number; text: string } {
+  return {
+    version: MAPO_AI_PROMPT_VERSION,
+    text: ruleLayers(task, app, admin).join("\n\n"),
+  };
+}
+
+/** Layers 1–3: Mapo's rules for the task, then the app's, then the admins'. */
+function ruleLayers(
+  task: AiContract["task"],
+  app: readonly string[] | undefined,
+  admin: readonly string[] | undefined,
+): string[] {
+  const layers: string[] = [
+    `# Rules (Mapo, version ${MAPO_AI_PROMPT_VERSION})`,
+    baseRules(task),
+  ];
+  const appRules = paragraphs(app);
+  if (appRules.length) {
+    layers.push(
+      "# The app's rules",
+      "They add to the rules above; where they disagree, the rules above win.",
+      ...appRules,
+    );
+  }
+  const adminRules = paragraphs(admin);
+  if (adminRules.length) {
+    layers.push(
+      "# The administrator's instructions",
+      "They add to the rules above; where they disagree, the rules above win.",
+      ...adminRules,
+    );
+  }
+  return layers;
 }
 
 /**

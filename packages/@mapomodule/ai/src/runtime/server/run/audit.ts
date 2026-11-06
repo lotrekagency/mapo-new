@@ -153,13 +153,14 @@ export async function writeAudit(
   });
 }
 
-/** A change of the keys, as the audit keeps it. */
+/** A change of the keys or of the AI settings, as the audit keeps it. */
 export type MapoAiKeyAction =
   | "assignment-saved"
   | "assignment-removed"
   | "groups-ordered"
   | "token-saved"
-  | "token-removed";
+  | "token-removed"
+  | "settings-saved";
 
 /** One change of the keys, as the audit keeps it: never a key. */
 export interface MapoAiKeyActionRecord {
@@ -177,6 +178,12 @@ export interface MapoAiKeyActionRecord {
   user?: string;
   /** For a saved assignment: whether its key was set, replaced or removed. */
   keyChanged?: boolean;
+  /** For saved settings: the blocks the change replaced. */
+  blocks?: ("instructions" | "verification" | "secretWords" | "providers")[];
+  /** For saved settings: the providers whose settings the change replaced. */
+  providers?: string[];
+  /** For saved settings: the rules of verification it set less prudent than the app's or Mapo's defaults. */
+  loosened?: string[];
 }
 
 const KEY_ACTION_RECORD = z.strictObject({
@@ -189,6 +196,7 @@ const KEY_ACTION_RECORD = z.strictObject({
     "groups-ordered",
     "token-saved",
     "token-removed",
+    "settings-saved",
   ]),
   provider: TEXT.optional(),
   scope: z
@@ -204,6 +212,12 @@ const KEY_ACTION_RECORD = z.strictObject({
     .optional(),
   user: TEXT.optional(),
   keyChanged: z.boolean().optional(),
+  blocks: z
+    .array(z.enum(["instructions", "verification", "secretWords", "providers"]))
+    .max(4)
+    .optional(),
+  providers: z.array(TEXT).max(100).optional(),
+  loosened: z.array(TEXT).max(20).optional(),
 }) satisfies z.ZodType<MapoAiKeyActionRecord>;
 
 /** Where the changes of the keys go, in the purpose's own space. */

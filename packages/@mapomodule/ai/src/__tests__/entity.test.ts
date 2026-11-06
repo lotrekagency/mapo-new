@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fieldsToJsonSchema } from "@mapomodule/form/runtime/utils/fieldsToJsonSchema";
 import { drfMetadataToJsonSchema } from "@mapomodule/utils/jsonSchema";
 import type { JSONSchema } from "@mapomodule/utils";
-import { buildAiEntity } from "../runtime/shared/entity";
+import { buildAiEntity, readSecretWord } from "../runtime/shared/entity";
 import type { AiEntity, AiField } from "../runtime/shared/entity";
 import { AI_KEYWORD } from "../runtime/shared/dialect";
 
@@ -772,6 +772,21 @@ describe("buildAiEntity — what keeps the AI out counts wherever it is written"
       "accesskey",
       "db_pwd",
       "passphrase",
+      // The names a review found that once got through.
+      "smtp_pass",
+      "credentials",
+      "awsCredentials",
+      "signing_key",
+      "encryptionKey",
+      "master_key",
+      "hmac_key",
+      "session_key",
+      "jwt",
+      "otp",
+      "totp_seed",
+      "recovery_codes",
+      "connection_string",
+      "database_url",
     ];
     // The same words at the start of another word, or another word beside "key".
     const kept = [
@@ -780,6 +795,10 @@ describe("buildAiEntity — what keeps the AI out counts wherever it is written"
       "keynote",
       "api_version",
       "passport",
+      "passenger_count",
+      "compass",
+      "session_title",
+      "database_name",
     ];
 
     it("keeps it out of a form alone", () => {
@@ -2153,4 +2172,82 @@ describe("buildAiEntity — choices the AI can answer with", () => {
       expect(entity.warnings).toEqual([]);
     },
   );
+});
+
+describe("the words of secrets the app and the admins add", () => {
+  it("keeps out a field whose key holds them as whole words, in order", () => {
+    const entity = buildAiEntity(
+      {
+        fields: objectSchema({
+          title: { type: "string" },
+          vault_url: { type: "string" },
+          vaulted: { type: "string" },
+          cardNumber: { type: "string" },
+          number_card: { type: "string" },
+        }),
+      },
+      { secretWords: ["vault", "Card Number"] },
+    );
+
+    expect(entity.fields.map((field) => field.key)).toEqual([
+      "title",
+      "vaulted",
+      "number_card",
+    ]);
+    expect(entity.skipped.map((field) => [field.key, field.reason])).toEqual([
+      ["vault_url", "secret"],
+      ["cardNumber", "secret"],
+    ]);
+  });
+
+  it("finds them in a key around, inside an object and in a list's items", () => {
+    const entity = buildAiEntity(
+      {
+        fields: objectSchema({
+          vault: objectSchema({ url: { type: "string" } }),
+          backup: objectSchema({
+            vault_url: { type: "string" },
+            note: { type: "string" },
+          }),
+          speakers: {
+            type: "array",
+            items: objectSchema({
+              name: { type: "string" },
+              vault_pin: { type: "string" },
+            }),
+          },
+        }),
+      },
+      { secretWords: ["vault"] },
+    );
+
+    const skipped = entity.skipped.map((field) => field.key);
+    expect(skipped).toEqual(
+      expect.arrayContaining(["vault", "backup.vault_url"]),
+    );
+    expect(entity.fields.map((field) => field.key)).toContain("backup.note");
+    const speakers = entity.fields.find((field) => field.key === "speakers");
+    expect(speakers?.items?.fields.map((field) => field.key)).toEqual(["name"]);
+    expect(
+      speakers?.items?.skipped.map((field) => [field.key, field.reason]),
+    ).toEqual([["vault_pin", "secret"]]);
+  });
+
+  it("adds to Mapo's, which stay without them", () => {
+    const entity = buildAiEntity(
+      { fields: objectSchema({ api_key: { type: "string" } }) },
+      { secretWords: [] },
+    );
+
+    expect(entity.skipped.map((field) => field.reason)).toEqual(["secret"]);
+  });
+
+  it("reads a word as the app or an admin writes it", () => {
+    expect(readSecretWord("  Vault ")).toBe("vault");
+    expect(readSecretWord("signing_key")).toBe("signing_key");
+    expect(readSecretWord("")).toBeUndefined();
+    expect(readSecretWord("vault!")).toBeUndefined();
+    expect(readSecretWord("x".repeat(65))).toBeUndefined();
+    expect(readSecretWord(42)).toBeUndefined();
+  });
 });

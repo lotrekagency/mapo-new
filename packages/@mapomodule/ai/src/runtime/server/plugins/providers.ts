@@ -69,7 +69,8 @@ function check(event?: H3Event): void {
 /**
  * Compares the models `mapo.ai.providers` allows with those each provider's
  * server lists, when it lists them. A model's name is compared as the
- * provider lists it.
+ * provider lists it. The app's options only: a model the AI's admins add
+ * was listed by its server when they saved it.
  */
 async function checkModels(event?: H3Event): Promise<void> {
   const { providers } = mapoAiPolicy(event);

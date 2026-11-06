@@ -17,6 +17,7 @@ const RUN_DEFAULTS = {
   providers: {},
   default: { models: {} },
   instructions: { all: "", fill: "", extract: "" },
+  secretWords: [],
   verification: { ...DEFAULT_VERIFICATION_RULES },
   readers: READERS_ON,
   limits: {
@@ -321,6 +322,21 @@ describe("the module", () => {
         route: "/_mapo/ai/test",
         method: "post",
         handler: "resolved:./runtime/server/routes/test.post",
+      },
+      {
+        route: "/_mapo/ai/settings",
+        method: "get",
+        handler: "resolved:./runtime/server/routes/settings.get",
+      },
+      {
+        route: "/_mapo/ai/settings",
+        method: "put",
+        handler: "resolved:./runtime/server/routes/settings.put",
+      },
+      {
+        route: "/_mapo/ai/settings/preview",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/settings-preview.post",
       },
     ]);
     expect(kit.imports).toEqual([

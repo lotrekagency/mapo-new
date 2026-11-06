@@ -15,7 +15,7 @@ import {
   keyStores,
 } from "../keys/nitro";
 import { changeKeys } from "../keys/store";
-import { assignableProviders, mapoAiPolicy } from "../run/nitro";
+import { assignableProviders, mapoAiAppPolicy } from "../run/nitro";
 
 /**
  * `PUT /_mapo/ai/keys`, for the AI's admins: saves an assignment, which
@@ -32,7 +32,7 @@ export default defineEventHandler(
     const input = readAssignmentInput(
       await readJsonBody(event, KEYS_BODY_BYTES),
     );
-    const providers = assignableProviders(mapoAiPolicy(event));
+    const providers = assignableProviders(await mapoAiAppPolicy(event));
     const by = actorOf(session.user);
     const saved = await changeKeys(stores.keys, (record) => {
       const result = withAssignment(record, input, {

@@ -21,6 +21,10 @@ export type {
   MapoAiKeyStatus,
   MapoAiLimits,
   MapoAiPreference,
+  MapoAiPreviewInput,
+  MapoAiPreviewResponse,
+  MapoAiProviderSettings,
+  MapoAiProviderSettingsInput,
   MapoAiProviderStatus,
   MapoAiReaderStatus,
   MapoAiReadResponse,
@@ -29,9 +33,12 @@ export type {
   MapoAiRunResponse,
   MapoAiSavedToken,
   MapoAiSecretState,
+  MapoAiSettingsAnswer,
+  MapoAiSettingsInput,
   MapoAiSourcePart,
   MapoAiStatus,
   MapoAiStorageState,
+  MapoAiTaskInstructions,
   MapoAiTestInput,
   MapoAiTestResponse,
   MapoAiTextPart,
@@ -160,15 +167,28 @@ export interface MapoAiOptions {
    * The app's rules for the AI, added to every prompt after Mapo's base
    * rules, which win where they disagree: `all` for every task, `fill` and
    * `extract` for one. A Nitro plugin adds rules per request with the
-   * `mapo-ai:prompt` hook.
+   * `mapo-ai:prompt` hook. The AI's admins add theirs on the AI settings
+   * page, after these: where the two disagree, Mapo's rules and these win.
    * @default {}
    * @example { all: "Prices are in euros." }
    */
   instructions?: { all?: string; fill?: string; extract?: string };
   /**
+   * Words that name a secret besides Mapo's (`password`, `token`, `api key`,
+   * `credentials`…): a field whose key, or a key around it, holds one as
+   * whole words in that order is never filled by the AI. `vault` keeps
+   * `vault_url` out, never `vaulted`. The AI's admins add theirs on the AI
+   * settings page; nothing removes Mapo's.
+   * @default []
+   * @example ["vault", "card number", "iban"]
+   */
+  secretWords?: string[];
+  /**
    * What a quote must hold for a value to be verified, rule by rule; the
    * rules left out keep their prudent default. No rule verifies a value
-   * without a quote found in the source.
+   * without a quote found in the source. The AI's admins change them on
+   * the AI settings page, where a rule less prudent than these or the
+   * default shows a warning.
    * @default { dateYear: true, bareHours: false, timeZones: true, oneWordQuotes: "unique", richTextLinks: true, soleNumber: true }
    */
   verification?: Partial<AiVerificationRules>;

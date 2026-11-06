@@ -204,7 +204,12 @@ describe("the providers that call a server", () => {
     );
 
     expect(read.providers).toEqual({
-      ollama: { models: ["m"], timeout: 600, baseURL: "http://ollama:11434" },
+      ollama: {
+        models: ["m"],
+        timeout: 600,
+        baseURL: "http://ollama:11434",
+        adminModels: false,
+      },
     });
     expect(JSON.stringify(read)).not.toContain("secret-key");
     expect(warnings).toEqual([]);
@@ -260,5 +265,62 @@ describe("the providers that call a server", () => {
     expect(providerKeyVariable("openai-compatible")).toBe(
       "NUXT_MAPO_AI_PROVIDERS_OPENAI_COMPATIBLE_API_KEY",
     );
+  });
+});
+
+describe("the options the AI's admins work within", () => {
+  it("adds the admins' models after the app's, once each", () => {
+    const read = readRunOptions({ providers: { acme: {} } }, () => undefined);
+    const acme = read.providers.acme;
+    if (!acme) throw new Error("acme is not enabled");
+    acme.addedModels = ["acme-9", "acme-1", "acme-9"];
+
+    const { policy: built } = policyOf(read, (id) => PROVIDERS.get(id));
+
+    expect(built.providers[0]?.models).toEqual(["acme-1", "acme-2", "acme-9"]);
+  });
+
+  it("reads the app's words of secrets, lowercase and once each, and warns about the others", () => {
+    const warnings: string[] = [];
+    const read = readRunOptions(
+      { secretWords: ["Vault", "vault", "card number", "no!", 7] },
+      (message) => warnings.push(message),
+    );
+
+    expect(read.secretWords).toEqual(["vault", "card number"]);
+    expect(warnings).toHaveLength(2);
+    expect(
+      readRunOptions({ secretWords: "vault" }, () => undefined).secretWords,
+    ).toEqual([]);
+  });
+
+  it("keeps the admins' models off and Anthropic's fallbacks on unless the app says otherwise", () => {
+    const warnings: string[] = [];
+    const read = readRunOptions(
+      {
+        providers: {
+          acme: {},
+          mock: {},
+          anthropic: {},
+          openai: { adminModels: true, fallbacks: false },
+          ollama: { models: ["m"], adminModels: "yes" },
+        },
+      },
+      (message) => warnings.push(message),
+    );
+
+    expect(read.providers.acme?.adminModels).toBe(false);
+    expect(read.providers.mock).not.toHaveProperty("adminModels");
+    expect(read.providers.anthropic).toMatchObject({
+      adminModels: false,
+      fallbacks: true,
+    });
+    expect(read.providers.openai?.adminModels).toBe(true);
+    expect(read.providers.openai).not.toHaveProperty("fallbacks");
+    expect(read.providers.ollama?.adminModels).toBe(false);
+    expect(warnings).toEqual([
+      'mapo.ai.providers.openai has no "fallbacks": ignored.',
+      "mapo.ai.providers.ollama.adminModels is not true or false, so it is false.",
+    ]);
   });
 });

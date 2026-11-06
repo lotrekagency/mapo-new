@@ -22,6 +22,7 @@ import {
 } from "../providers/cloud";
 import type { MapoAiEffort } from "../providers/cloud";
 import { DEFAULT_OLLAMA_URL, serverURL } from "../providers/local";
+import { readSecretWord } from "../../shared/entity";
 import { DEFAULT_VERIFICATION_RULES } from "../../shared/sanitize";
 import type { AiVerificationRules } from "../../shared/sanitize";
 
@@ -85,6 +86,25 @@ export interface MapoAiProviderOptions {
    * says each model's context, and refuses a prompt that does not fit.
    */
   contextTokens?: number;
+  /**
+   * Whether the AI's admins may add models to this provider's own, on the
+   * AI settings page: each one the provider's server lists, with the key
+   * their own calls use, after the app's, to assign as the others. A model
+   * added widens what may spend, so only the app allows it. Not for the
+   * mock.
+   * @default false
+   */
+  adminModels?: boolean;
+  /**
+   * For `anthropic`: whether a request its model declines for its safety
+   * filters is asked again of the model Anthropic picks for that kind of
+   * request (its fallbacks), which may be one `models` does not list, at
+   * its own prices; the answer, the audit and the log name it. The AI's
+   * admins can turn them off on the AI settings page, and on again only
+   * where the app leaves them on.
+   * @default true
+   */
+  fallbacks?: boolean;
 }
 
 /** The options of `run`, read and complete: every value has its default. */
@@ -101,12 +121,31 @@ export interface MapoAiRunOptions {
       effort?: MapoAiEffort;
       /** For a cloud provider, always: `false`, unless the app turned it on. */
       promptCache?: boolean;
+      /** Whether the AI's admins may add models: always, `false` unless the app allows it; never for the mock. */
+      adminModels?: boolean;
+      /** For `anthropic`, always: `true`, unless the app or an admin turned them off. */
+      fallbacks?: boolean;
+      /**
+       * The models the AI's admins added, after the app's: never from the
+       * config; a request reads them from the AI settings.
+       */
+      addedModels?: string[];
     }
   >;
   /** What a request that names no provider or model gets, as the app wrote it. */
   default: { provider?: string; models: { fill?: string; extract?: string } };
   /** The app's rules, for every task and for each. */
   instructions: { all: string; fill: string; extract: string };
+  /**
+   * The AI's admins' instructions, for every task and for each: never in
+   * the config; a request reads them from the AI settings.
+   */
+  adminInstructions?: { all: string; fill: string; extract: string };
+  /**
+   * The words that name a secret besides Mapo's, the app's
+   * (`mapo.ai.secretWords`); a request adds the admins'.
+   */
+  secretWords: string[];
   verification: AiVerificationRules;
   /**
    * The readers the app turns on or off, by id, as it wrote them: a reader
@@ -183,6 +222,7 @@ export function readRunOptions(
     providers: providersOf(options.providers, warn),
     default: defaultsOf(options.default, warn),
     instructions: instructionsOf(options.instructions, warn),
+    secretWords: secretWordsOf(options.secretWords, warn),
     verification: verificationOf(options.verification, warn),
     readers: readersOf(options.readers, warn),
     limits: limitsOf(options.limits, warn),
@@ -228,6 +268,8 @@ function providersOf(
       ...(server ? ["baseURL"] : []),
       ...(server?.takesContext ? ["contextTokens"] : []),
       ...(server?.isCloud ? ["effort", "promptCache"] : []),
+      ...(id !== "mock" ? ["adminModels"] : []),
+      ...(id === "anthropic" ? ["fallbacks"] : []),
     ];
     unknownKeys(entry, known, option, warn);
     const baseURL = server
@@ -253,6 +295,28 @@ function providersOf(
         ? {
             effort: effortOf(entry.effort, option, warn),
             promptCache: promptCacheOf(entry.promptCache, option, warn),
+          }
+        : {}),
+      ...(id !== "mock"
+        ? {
+            adminModels: switchOf(
+              entry.adminModels,
+              false,
+              option,
+              "adminModels",
+              warn,
+            ),
+          }
+        : {}),
+      ...(id === "anthropic"
+        ? {
+            fallbacks: switchOf(
+              entry.fallbacks,
+              true,
+              option,
+              "fallbacks",
+              warn,
+            ),
           }
         : {}),
     };
@@ -294,6 +358,24 @@ function promptCacheOf(
   if (typeof value === "boolean") return value;
   warn(`${option}.promptCache is not true or false, so it is false.`);
   return false;
+}
+
+/**
+ * A switch of a provider: its default when unset, and when it cannot be
+ * read, with a warning. `adminModels` and `fallbacks` widen what may spend
+ * only as their defaults say.
+ */
+function switchOf(
+  value: unknown,
+  fallback: boolean,
+  option: string,
+  name: string,
+  warn: (message: string) => void,
+): boolean {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  warn(`${option}.${name} is not true or false, so it is ${fallback}.`);
+  return fallback;
 }
 
 /**
@@ -515,6 +597,40 @@ function instructionsOf(
     }
   }
   return instructions;
+}
+
+/** Words that name a secret, at most, as the app or the admins write them. */
+export const MAX_SECRET_WORDS = 100;
+
+/** `mapo.ai.secretWords`: the words that can be read, lowercase, once each. */
+function secretWordsOf(
+  value: unknown,
+  warn: (message: string) => void,
+): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    warn(
+      "mapo.ai.secretWords is not a list of words, so Mapo's names of secrets apply alone.",
+    );
+    return [];
+  }
+  const words: string[] = [];
+  for (const entry of value) {
+    const word = readSecretWord(entry);
+    if (word === undefined) {
+      warn(
+        "mapo.ai.secretWords has an entry that is not a word of a key (letters, digits, spaces, _, - and ., up to 64 characters): ignored.",
+      );
+      continue;
+    }
+    if (!words.includes(word)) words.push(word);
+  }
+  if (words.length > MAX_SECRET_WORDS) {
+    warn(
+      `mapo.ai.secretWords has more than ${MAX_SECRET_WORDS} words: the first ${MAX_SECRET_WORDS} apply.`,
+    );
+  }
+  return words.slice(0, MAX_SECRET_WORDS);
 }
 
 function verificationOf(

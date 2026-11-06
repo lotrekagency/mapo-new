@@ -433,6 +433,87 @@
             "user": "L'id dell'utente nel backend",
             "group": "Il nome del gruppo"
           }
+        },
+        "behaviour": {
+          "title": "Come lavora l'AI",
+          "intro": "Per tutti nell'app. Gli admin cambiano quello che l'app imposta, nei limiti che consente; le regole di Mapo restano sopra tutte.",
+          "updated": "Ultima modifica di {by}, {at}.",
+          "save": "Salva",
+          "saved": "Salvato.",
+          "appDefault": "Come l'app: {value}",
+          "on": "Attivo",
+          "off": "Spento",
+          "instructions": {
+            "title": "Istruzioni",
+            "help": "Si aggiungono a ogni prompt dopo le regole di Mapo e quelle dell'app, che vincono dove non sono d'accordo.",
+            "all": "Per ogni compito",
+            "fill": "Per compilare un record",
+            "extract": "Per estrarre record",
+            "app": "Le regole dell'app: {text}",
+            "appNone": "Qui l'app non aggiunge regole.",
+            "preview": "Mostra le regole che legge il modello",
+            "previewTask": "Il compito da mostrare",
+            "previewNote": "Le regole di Mapo, quelle dell'app e le tue come sono scritte, non ancora salvate. Senza il record, la sorgente e le regole che l'app aggiunge per una richiesta."
+          },
+          "rules": {
+            "title": "Verifica",
+            "help": "Cosa deve contenere una citazione della sorgente perché un valore sia verificato, ed entri da solo in un campo vuoto. Nessuna regola verifica un valore senza una citazione trovata nella sorgente.",
+            "looser": "Meno prudente delle regole dell'app o dei default di Mapo: {rules}. Più valori entrano da soli nel form, con meno citazione a provarli.",
+            "dateYear": {
+              "label": "Una data vuole l'anno",
+              "help": "“14 ottobre” non verifica nessuna data."
+            },
+            "bareHours": {
+              "label": "Un'ora da sola è un orario",
+              "help": "“alle 21” conta come orario, dalle 13 alle 23."
+            },
+            "timeZones": {
+              "label": "Un orario vuole il fuso",
+              "help": "Data e ora si verificano solo con il fuso che la citazione scrive."
+            },
+            "oneWordQuotes": {
+              "label": "Citazioni di una parola",
+              "help": "Quando conta una citazione di una sola parola.",
+              "unique": "Quando la sorgente la scrive una volta",
+              "never": "Mai"
+            },
+            "richTextLinks": {
+              "label": "Il testo formattato vuole i suoi link",
+              "help": "Il testo formattato si verifica solo se la citazione scrive l'indirizzo di ogni suo link."
+            },
+            "soleNumber": {
+              "label": "Un numero vuole una citazione tutta sua",
+              "help": "“6 stelle su 5” non verifica nessuno dei due numeri."
+            }
+          },
+          "secrets": {
+            "title": "Campi segreti",
+            "help": "Un campo il cui nome, o un nome intorno, contiene una di queste parole intere non viene mai compilato dall'AI.",
+            "mapo": "Quelle di Mapo, che valgono sempre:",
+            "app": "Quelle dell'app:",
+            "admin": "Quelle degli admin:",
+            "none": "Nessuna",
+            "add": "Aggiungi",
+            "placeholder": "Una parola del nome di un campo, per esempio vault",
+            "remove": "Togli {word}",
+            "invalid": "Lettere, cifre, spazi, _, - e ., fino a 64 caratteri."
+          },
+          "providers": {
+            "title": "Provider",
+            "help": "Le impostazioni di ogni provider che l'app attiva.",
+            "cache": "Cache del prompt",
+            "cacheHelp": "Tiene regole e schema nella cache del provider per qualche minuto, mai la sorgente: le chiamate che seguono costano meno.",
+            "fallbacks": "Ripiego di Anthropic",
+            "fallbacksHelp": "Una richiesta che il modello rifiuta per i suoi filtri di sicurezza passa a un modello scelto da Anthropic, ai prezzi di quel modello.",
+            "fallbacksOff": "L'app lo tiene spento.",
+            "appModels": "I modelli dell'app:",
+            "notApplied": "L'app non consente più agli admin di aggiungere modelli: quelli aggiunti non valgono.",
+            "modelPlaceholder": "L'id di un modello, come lo elenca il provider",
+            "addModel": "Aggiungi un modello",
+            "removeModel": "Togli {model}",
+            "modelNote": "Si salva solo se il server del provider lo elenca, chiesto con la chiave delle tue chiamate. Poi assegnalo nelle chiavi.",
+            "cannotAdd": "L'app non consente agli admin di aggiungere modelli a questo provider."
+          }
         }
       }
     }

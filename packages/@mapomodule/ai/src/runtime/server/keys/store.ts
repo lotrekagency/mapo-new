@@ -101,10 +101,11 @@ async function readRecord(
   store: PurposeStore,
   again = true,
 ): Promise<KeysRecord> {
+  // Asked at every request: one read when no admin assigned a key, never
+  // a listing of the purpose.
+  if (!(await store.has(KEYS_RECORD))) return emptyKeysRecord();
   const record = await store.get(KEYS_RECORD, readKeysRecord);
   if (record) return record;
-  const names = await store.keys();
-  if (!names.includes(KEYS_RECORD)) return emptyKeysRecord();
   if (again) {
     await new Promise((resolve) => setTimeout(resolve, REREAD_MS));
     return readRecord(store, false);

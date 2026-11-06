@@ -240,6 +240,15 @@ export interface BuildAiEntityOptions {
    * the `speakers` list.
    */
   exclude?: readonly string[];
+  /**
+   * Words that name a secret besides Mapo's ({@link MAPO_SECRET_NAMES}), as
+   * the app (`mapo.ai.secretWords`) and the AI's admins add them: each one
+   * or more words of a key (`vault`, `signing_key`, `card number`), found
+   * as whole words in that order, in the key and the keys around it.
+   * `vault` keeps `vault_url` and `backup.vault` out, never `vaulted`. They
+   * add to Mapo's, which nothing removes.
+   */
+  secretWords?: readonly string[];
 }
 
 // ─── Looking through a property ──────────────────────────────────────────────
@@ -1267,8 +1276,9 @@ const PASSWORD_KEY = /pass(?:word|wd|phrase)/i;
 
 /**
  * Endings of a word of a key that name a secret: `token`, `authtoken`,
- * `client_secret`, `clientsecret`, `apikey`, `privatekey`, `smtppwd`. A word
- * that only begins so, such as `tokenizer` or `secretary`, names none.
+ * `client_secret`, `clientsecret`, `apikey`, `privatekey`, `credentials`,
+ * `awscredentials`. A word that only begins so, such as `tokenizer` or
+ * `secretary`, names none.
  */
 const SECRET_ENDINGS = [
   "token",
@@ -1277,15 +1287,89 @@ const SECRET_ENDINGS = [
   "privatekey",
   "accesskey",
   "secretkey",
+  "credential",
 ].flatMap((ending) => [ending, `${ending}s`]);
 
-/** Two words of a key that name a secret together: `api_key`, `privateKey`. */
-const SECRET_PAIRS = new Set(
-  ["api", "private", "access"].flatMap((kind) => [
-    `${kind} key`,
-    `${kind} keys`,
+/**
+ * Whole words of a key that name a secret on their own: `smtp_pwd`,
+ * `smtp_pass`, `jwt`, `otp`, `totp_seed`. A word that only holds one, such
+ * as `passenger` or `jwtish`, names none.
+ */
+const SECRET_WORDS = new Set(["pwd", "pass", "jwt", "otp", "totp"]);
+
+/**
+ * Two words of a key that name a secret together: `api_key`, `privateKey`,
+ * `signing_key`, `hmacKey`, `recovery_codes`, `connection_string`,
+ * `database_url`.
+ */
+const SECRET_PAIRS = new Set([
+  ...[
+    "api",
+    "private",
+    "access",
+    "signing",
+    "encryption",
+    "master",
+    "hmac",
+    "session",
+  ].flatMap((kind) => [`${kind} key`, `${kind} keys`]),
+  ...["recovery code", "connection string", "database url"].flatMap((pair) => [
+    pair,
+    `${pair}s`,
   ]),
-);
+]);
+
+/**
+ * What Mapo reads as the name of a secret, for people: a field whose key,
+ * or a key around it, says one of these is never filled by the AI. Words
+ * are found whole (`pass`, not `passenger`), endings at the end of a word
+ * (`authtoken`), and `password` anywhere (`newpassword`).
+ */
+export const MAPO_SECRET_NAMES: readonly string[] = Object.freeze([
+  "password",
+  "passwd",
+  "passphrase",
+  "pwd",
+  "pass",
+  "token",
+  "secret",
+  "credentials",
+  "jwt",
+  "otp",
+  "totp",
+  "api key",
+  "private key",
+  "access key",
+  "secret key",
+  "signing key",
+  "encryption key",
+  "master key",
+  "hmac key",
+  "session key",
+  "recovery code",
+  "connection string",
+  "database url",
+]);
+
+/** Characters of a word that names a secret, as the app or an admin writes it. */
+export const MAX_SECRET_WORD = 64;
+
+/**
+ * A word that names a secret as the app or an admin writes it, read as
+ * outside data: letters, digits, spaces, `_`, `-` and `.`, at most
+ * {@link MAX_SECRET_WORD} characters, with one word of a key at least.
+ * Lowercase and trimmed; `undefined` for one that cannot be read.
+ */
+export function readSecretWord(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const word = value.trim();
+  const isWritten =
+    word.length > 0 &&
+    word.length <= MAX_SECRET_WORD &&
+    /^[\p{L}\p{N} _.-]+$/u.test(word);
+  if (!isWritten || !keyWords(word).length) return undefined;
+  return word.toLowerCase();
+}
 
 /**
  * The words of a key, in lower case, split at `_`, `-`, `.`, camel case and
@@ -1304,22 +1388,48 @@ function keyWords(key: string): string[] {
 }
 
 /**
- * A key that names a secret: a password anywhere in it (`pwd` as a word),
- * or a word that ends in a token, a secret, an API, private, access or
- * secret key, or an API, private or access key in two words. `secretary`,
- * `tokenizer` and `keynote` name none.
+ * A key that names a secret: a password anywhere in it, a word of
+ * {@link SECRET_WORDS}, a word that ends in a token, a secret, credentials,
+ * an API, private, access or secret key, a pair of {@link SECRET_PAIRS}, or
+ * one of the app's and the admins' words (`extra`, as sequences of words).
+ * `secretary`, `tokenizer`, `passenger` and `keynote` name none.
  */
-function namesSecret(key: string): boolean {
+function namesSecret(
+  key: string,
+  extra: readonly (readonly string[])[] = [],
+): boolean {
   if (PASSWORD_KEY.test(key)) return true;
   const words = keyWords(key);
   const hasSecretWord = words.some(
     (word) =>
-      word === "pwd" || SECRET_ENDINGS.some((ending) => word.endsWith(ending)),
+      SECRET_WORDS.has(word) ||
+      SECRET_ENDINGS.some((ending) => word.endsWith(ending)),
   );
   const hasSecretPair = words.some((word, index) =>
     SECRET_PAIRS.has(`${word} ${words[index + 1] ?? ""}`),
   );
-  return hasSecretWord || hasSecretPair;
+  const hasExtraWords = extra.some((sequence) => holdsInOrder(words, sequence));
+  return hasSecretWord || hasSecretPair || hasExtraWords;
+}
+
+/** Whether `words` hold `sequence`, word after word: `vault url` in `backup vault url`. */
+function holdsInOrder(
+  words: readonly string[],
+  sequence: readonly string[],
+): boolean {
+  if (!sequence.length) return false;
+  return words.some((_, start) =>
+    sequence.every((word, offset) => words[start + offset] === word),
+  );
+}
+
+/** The app's and the admins' words of secrets, each as the words of a key it holds. */
+function secretSequences(
+  words: readonly string[] | undefined,
+): (readonly string[])[] {
+  return (words ?? [])
+    .map((word) => keyWords(word))
+    .filter((sequence) => sequence.length > 0);
 }
 
 /** What the schemas around a nested value say about one of its keys, source by source. */
@@ -1344,6 +1454,8 @@ interface Nesting {
   names: string;
   /** A value around is translatable: one per language, and so is everything inside. */
   translatable: boolean;
+  /** The app's and the admins' words of secrets, as sequences of words: the same at every depth. */
+  secretWords?: readonly (readonly string[])[];
   /**
    * What the schemas around this entity say about one of its keys: every
    * declaration on the way, in `allOf` parts, union branches and conditions.
@@ -1429,7 +1541,7 @@ function keepOutReason(input: FieldInput): AiSkipReason | undefined {
     field.secret ||
     backend?.secret === true ||
     inherited.secret ||
-    namesSecret(name);
+    namesSecret(name, nesting.secretWords);
   if (isSecret) return "secret";
   // The form decides what is read-only; the backend only warns.
   if (field.readonly) return "readonly";
@@ -1685,6 +1797,7 @@ function innerNesting(
     names: nesting.names ? `${nesting.names}.${names}` : names,
     translatable: nesting.translatable || field.translatable,
     around,
+    ...(nesting.secretWords ? { secretWords: nesting.secretWords } : {}),
   };
 }
 
@@ -1920,7 +2033,9 @@ export function buildAiEntity(
   sources: AiEntitySources,
   options: BuildAiEntityOptions = {},
 ): AiEntity {
-  return buildEntity(sources, options, TOP);
+  const secretWords = secretSequences(options.secretWords);
+  const top: Nesting = secretWords.length ? { ...TOP, secretWords } : TOP;
+  return buildEntity(sources, options, top);
 }
 
 /** {@link buildAiEntity}, at some depth inside objects and lists. */

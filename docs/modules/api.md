@@ -794,7 +794,7 @@ Reads the operator's files into text through the gateway's `read`, as `run` take
 
 ### `<MapoAiSettings />`
 
-The AI settings, as the page the module adds at `/ai-settings` shows them: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins also assign keys, order the groups and remove the users' tokens. It has no props, events or slots. For a page of the app's own, set `mapo.ai.settings.path` to `false` and put the component in it. See [AI settings](/modules/ai#ai-settings).
+The AI settings, as the page the module adds at `/ai-settings` shows them: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins also assign keys, order the groups and remove the users' tokens, and change how the AI works in the whole app: instructions, rules of verification, words of secret fields, the providers' prompt cache, Anthropic's fallbacks and the models they add. It has no props, events or slots. For a page of the app's own, set `mapo.ai.settings.path` to `false` and put the component in it. See [AI settings](/modules/ai#ai-settings).
 
 ---
 
@@ -808,7 +808,7 @@ Registers a provider the app implements, from a Nitro plugin. `run` calls it onl
 
 **Returns:** `void`. It throws a `TypeError` when the id is not a provider's id or `run` is missing, and an `Error` when the id is one Mapo keeps (`mock`, `openai`, `anthropic`, `openai-compatible`, `ollama`) or is registered already.
 
-With `key` (`"required"` or `"optional"`), each call gets the key the gateway's chain chose for the user as `request.apiKey`: their own token where an admin allows it, an admin's key, or the project's, from `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY`. See [Keys](/modules/ai#keys). `listModels(signal, apiKey)` gets the project's key when the server starts, and the user's when the [AI settings](/modules/ai#ai-settings) check the connection.
+With `key` (`"required"` or `"optional"`), each call gets the key the gateway's chain chose for the user as `request.apiKey`: their own token where an admin allows it, an admin's key, or the project's, from `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY`. See [Keys](/modules/ai#keys). `listModels(signal, apiKey)` gets the project's key when the server starts, and the user's when the [AI settings](/modules/ai#ai-settings) check the connection, or the admin's when they add a model ([How the AI works](/modules/ai#how-the-ai-works)).
 
 ---
 

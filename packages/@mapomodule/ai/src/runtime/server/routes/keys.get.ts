@@ -4,7 +4,7 @@ import { requireMapoAiAdmin } from "../auth/nitro";
 import { assignmentView } from "../keys/assignments";
 import { keyStores } from "../keys/nitro";
 import { listTokens, readKeys } from "../keys/store";
-import { assignableProviders, mapoAiPolicy } from "../run/nitro";
+import { assignableProviders, mapoAiAppPolicy } from "../run/nitro";
 
 /**
  * `GET /_mapo/ai/keys`, for the AI's admins: the providers the app enables,
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event): Promise<MapoAiKeysAnswer> => {
   const stores = keyStores(event);
   const record = await readKeys(stores.keys);
   return {
-    providers: assignableProviders(mapoAiPolicy(event)),
+    providers: assignableProviders(await mapoAiAppPolicy(event)),
     assignments: record.assignments.map(assignmentView),
     groups: [...record.groups],
     tokens: await listTokens(stores.tokens),

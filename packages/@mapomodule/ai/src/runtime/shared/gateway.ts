@@ -7,7 +7,11 @@
 
 import type { JSONSchema } from "@mapomodule/utils";
 import type { AiChoice } from "./entity";
-import type { AiExtractResult, AiFillResult } from "./sanitize";
+import type {
+  AiExtractResult,
+  AiFillResult,
+  AiVerificationRules,
+} from "./sanitize";
 
 /**
  * Path prefix of the gateway routes on the app's Nitro server. It stays
@@ -280,6 +284,121 @@ export interface MapoAiTestResponse {
 export interface MapoAiTokenInput {
   provider: string;
   token: string;
+}
+
+// ─── settings ────────────────────────────────────────────────────────────────
+
+/** Instructions by task: for every task, for filling a record, for extracting records; `""` for none. */
+export interface MapoAiTaskInstructions {
+  all: string;
+  fill: string;
+  extract: string;
+}
+
+/**
+ * How the AI works in the whole app, as `GET /_mapo/ai/settings` answers
+ * the AI's admins: what they changed, beside what the app sets and what
+ * Mapo keeps whatever happens. Never a key.
+ */
+export interface MapoAiSettingsAnswer {
+  instructions: {
+    /** The admins': layer 3 of the prompt. */
+    admin: MapoAiTaskInstructions;
+    /** The app's (`mapo.ai.instructions`): layer 2, which wins over the admins'. */
+    app: MapoAiTaskInstructions;
+  };
+  verification: {
+    /** The rules that apply: the admins' where they set one, else the app's. */
+    rules: AiVerificationRules;
+    /** The app's (`mapo.ai.verification`). */
+    app: AiVerificationRules;
+    /** Mapo's prudent defaults. */
+    mapo: AiVerificationRules;
+    /** The rules the admins set. */
+    admin: Partial<AiVerificationRules>;
+  };
+  /** The words that name a secret, a field the AI never fills. */
+  secretWords: {
+    /** Mapo's: nothing removes them. */
+    mapo: string[];
+    /** The app's (`mapo.ai.secretWords`). */
+    app: string[];
+    /** The admins'. */
+    admin: string[];
+  };
+  /** The providers the app enables, in its order. */
+  providers: MapoAiProviderSettings[];
+  /** The last change of the admins, when they made one. */
+  updated?: { at: string; by: { id: string; username?: string } };
+}
+
+/** A provider's settings, as the AI's admins see and change them. */
+export interface MapoAiProviderSettings {
+  id: string;
+  label?: string;
+  /** For `openai` and `anthropic`: the prompt cache as the app sets it, the admins' choice, and what applies. */
+  promptCache?: { app: boolean; admin?: boolean; value: boolean };
+  /**
+   * For `anthropic`: its fallbacks as the app sets them, the admins'
+   * choice, and what applies. With `app: false` they stay off.
+   */
+  fallbacks?: { app: boolean; admin?: boolean; value: boolean };
+  models: {
+    /** The app's, or the provider's own. */
+    app: string[];
+    /** Those the admins added, after the app's. */
+    added: string[];
+    /** Whether the app lets the admins add models (`adminModels`). */
+    canAdd: boolean;
+  };
+}
+
+/**
+ * Body of `PUT /_mapo/ai/settings`: each block it holds replaces the
+ * admins' one; the blocks it leaves out stay as they are.
+ */
+export interface MapoAiSettingsInput {
+  /** The admins' instructions; a task left out has none. */
+  instructions?: Partial<MapoAiTaskInstructions>;
+  /** The rules the admins set; a rule left out follows the app's, and `{}` all of them. */
+  verification?: Partial<AiVerificationRules>;
+  /** Words that name a secret besides Mapo's and the app's. */
+  secretWords?: string[];
+  /** By provider id: each one given replaces the admins' settings of that provider. */
+  providers?: Record<string, MapoAiProviderSettingsInput>;
+}
+
+/** The admins' settings of one provider, in {@link MapoAiSettingsInput}. */
+export interface MapoAiProviderSettingsInput {
+  /** For `openai` and `anthropic`; left out, the app's applies. */
+  promptCache?: boolean;
+  /** For `anthropic`; left out, the app's applies; `true` only where the app leaves them on. */
+  fallbacks?: boolean;
+  /**
+   * Models to add after the app's, where the app allows it: each one the
+   * provider's server lists, with the key the admin's own calls use.
+   * Left out, none.
+   */
+  models?: string[];
+}
+
+/** Body of `POST /_mapo/ai/settings/preview`. */
+export interface MapoAiPreviewInput {
+  task: "fill" | "extract";
+  /** Instructions not saved yet, to see them in place; left out, the saved ones. */
+  instructions?: Partial<MapoAiTaskInstructions>;
+}
+
+/** What `POST /_mapo/ai/settings/preview` answers. */
+export interface MapoAiPreviewResponse {
+  /** The version of Mapo's base rules. */
+  version: number;
+  /**
+   * Layers 1–3 of the task's prompt, as the model reads them: Mapo's rules,
+   * the app's, the admins'. Without the record, the source and the rules
+   * the app's `mapo-ai:prompt` hooks add for a request.
+   */
+  text: string;
 }
 
 /** The provider and the model of each task that `run` calls when the request names none. */

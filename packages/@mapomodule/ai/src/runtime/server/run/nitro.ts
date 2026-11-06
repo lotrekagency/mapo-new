@@ -1,10 +1,10 @@
 /**
  * `run` wired to the app's Nitro server: the options from the private
- * runtime config, the providers from the registry (Mapo's that call a
- * server built with its address and the key the chain chose for the user),
- * the admins' keys and the users' tokens and the audit in the sealed
- * storage, the counts of this process, and the app's `mapo-ai:prompt`
- * hooks. The logic lives in `run.ts`, `policy.ts`, `options.ts` and
+ * runtime config, with the AI's admins' settings over them, the providers
+ * from the registry (Mapo's that call a server built with its address and
+ * the key the chain chose for the user), the admins' keys and the users'
+ * tokens and the audit in the sealed storage, the counts of this process,
+ * and the app's `mapo-ai:prompt` hooks. The logic lives in `run.ts`, `policy.ts`, `options.ts` and
  * `keys/`, which the tests run without Nitro.
  */
 
@@ -17,7 +17,10 @@ import type { AssignableProvider, KeysRecord } from "../keys/assignments";
 import { keyStatusOf, providerAccess } from "../keys/chain";
 import type { KeyChainUser } from "../keys/chain";
 import { readKeys, readUserTokens } from "../keys/store";
+import { emptyAdminSettings, withAdminSettings } from "../settings/admin";
+import type { AdminSettingsRecord } from "../settings/admin";
 import { readPreference } from "../settings/preferences";
+import { readAdminSettings } from "../settings/store";
 import { mapoAiProvider } from "../providers/registry";
 import type { MapoAiServerSettings } from "../providers/registry";
 import { mapoAiStorageState, useMapoAiStorage } from "../storage/nitro";
@@ -50,6 +53,20 @@ export function mapoAiPolicy(event?: H3Event): MapoAiPolicy {
   return currentPolicy(event).policy;
 }
 
+/**
+ * The providers the app enables, with their own models, without the
+ * admins' settings: what the AI settings show the admins, who add to them.
+ */
+export function mapoAiAppProviders(
+  event: H3Event,
+): { id: string; label?: string; models: string[] }[] {
+  return mapoAiPolicy(event).providers.map(({ provider, models }) => ({
+    id: provider.id,
+    ...(provider.label ? { label: provider.label } : {}),
+    models: [...models],
+  }));
+}
+
 /** The providers the app enables, as the admins assign them. */
 export function assignableProviders(policy: MapoAiPolicy): MapoAiKeyProvider[] {
   return policy.providers.map(({ provider, models }) => ({
@@ -61,19 +78,51 @@ export function assignableProviders(policy: MapoAiPolicy): MapoAiKeyProvider[] {
 }
 
 /**
- * What `run` may call for one user, and its defaults: the app's providers
- * as the admins' assignments narrow them, each with the key the chain
- * chose. Without a storage that opens, as in production without
- * `NUXT_MAPO_AI_SECRET`, there are no assignments nor tokens: the project's
- * keys only.
- * @throws H3Error 503 when the admins' keys are stored and cannot be read
+ * The AI's admins' settings; none when the storage is closed, as in
+ * production without `NUXT_MAPO_AI_SECRET`.
+ * @throws H3Error 503 when they are stored and cannot be read
+ */
+export async function mapoAiAdminSettings(
+  event: H3Event,
+): Promise<AdminSettingsRecord> {
+  if (!mapoAiStorageState(event).open) return emptyAdminSettings();
+  return readAdminSettings(useMapoAiStorage(event).store("settings"));
+}
+
+/**
+ * What the app enables, with the admins' settings: the models they added,
+ * for the routes of the keys, which assign them.
+ * @throws H3Error 503 as {@link mapoAiAdminSettings}
+ */
+export async function mapoAiAppPolicy(event: H3Event): Promise<MapoAiPolicy> {
+  const config: unknown = useRuntimeConfig(event).mapoAi;
+  const options = withAdminSettings(
+    readRunOptions(config, warnOnce),
+    await mapoAiAdminSettings(event),
+  );
+  return policyOf(options, (id) =>
+    mapoAiProvider(id, serverSettingsOf(config, options, id)),
+  ).policy;
+}
+
+/**
+ * What `run` may call for one user, and its defaults: the app's providers,
+ * with the AI's admins' settings, as the admins' assignments narrow them,
+ * each with the key the chain chose. Without a storage that opens, as in
+ * production without `NUXT_MAPO_AI_SECRET`, there are no settings,
+ * assignments nor tokens: the app's options and the project's keys only.
+ * @throws H3Error 503 when the admins' keys or settings are stored and
+ *   cannot be read
  */
 export async function mapoAiUserPolicy(
   event: H3Event,
   user: KeyChainUser,
 ): Promise<MapoAiPolicy> {
   const config: unknown = useRuntimeConfig(event).mapoAi;
-  const options = readRunOptions(config, warnOnce);
+  const options = withAdminSettings(
+    readRunOptions(config, warnOnce),
+    await mapoAiAdminSettings(event),
+  );
   const policy = policyOf(options, (id) =>
     mapoAiProvider(id, serverSettingsOf(config, options, id)),
   ).policy;
@@ -176,8 +225,8 @@ function currentPolicy(event?: H3Event): ReturnType<typeof policyOf> {
 
 /**
  * The address, the project's key and the settings (the context, a cloud's
- * effort and prompt cache) a provider that calls a server is built with;
- * without the key when `withKey` is `false`.
+ * effort and prompt cache, Anthropic's fallbacks) a provider that calls a
+ * server is built with; without the key when `withKey` is `false`.
  */
 function serverSettingsOf(
   config: unknown,
@@ -197,6 +246,7 @@ function serverSettingsOf(
     ...(enabled?.contextTokens ? { contextTokens: enabled.contextTokens } : {}),
     ...(enabled?.effort ? { effort: enabled.effort } : {}),
     ...(enabled?.promptCache ? { promptCache: true } : {}),
+    ...(enabled?.fallbacks === false ? { fallbacks: false } : {}),
   };
 }
 

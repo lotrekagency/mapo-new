@@ -30,11 +30,13 @@ export interface MapoAiServerSettings {
   effort?: MapoAiEffort;
   /** Whether a cloud provider keeps the stable part of the prompt in its cache. */
   promptCache?: boolean;
+  /** For `anthropic`: `false` when the app or the admins turn its fallbacks off. */
+  fallbacks?: boolean;
 }
 
 /** What Mapo's cloud providers take of their settings. */
 function cloudSettings(
-  { baseURL, apiKey, effort, promptCache }: MapoAiServerSettings,
+  { baseURL, apiKey, effort, promptCache, fallbacks }: MapoAiServerSettings,
   fallback: string,
 ) {
   return {
@@ -42,6 +44,7 @@ function cloudSettings(
     ...(apiKey ? { apiKey } : {}),
     ...(effort ? { effort } : {}),
     ...(promptCache ? { promptCache } : {}),
+    ...(fallbacks === false ? { fallbacks } : {}),
   };
 }
 

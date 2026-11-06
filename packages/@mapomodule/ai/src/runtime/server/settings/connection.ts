@@ -10,6 +10,7 @@
 import type { MapoAiTestResponse } from "../../shared/gateway";
 import { maskKeys } from "../providers/http";
 import { MapoAiProviderError } from "../providers/types";
+import type { MapoAiProviderFailure } from "../providers/types";
 import { canCall } from "../run/policy";
 import type { UsableProvider } from "../run/policy";
 
@@ -33,13 +34,40 @@ export async function checkConnection(
   model: string,
   options: CheckOptions = {},
 ): Promise<MapoAiTestResponse> {
-  const now = options.now ?? Date.now;
   const { provider } = usable;
   const asked = { provider: provider.id, model };
   if (!canCall(usable)) return { ...asked, outcome: "no-key" };
-  if (typeof provider.listModels !== "function") {
-    return { ...asked, outcome: "unverifiable" };
+  const listed = await listedModels(usable, "connection check", options);
+  if (listed === undefined) return { ...asked, outcome: "unverifiable" };
+  if ("failure" in listed) {
+    return { ...asked, outcome: "failed", failure: listed.failure };
   }
+  return {
+    ...asked,
+    outcome: listed.ids.includes(model) ? "connected" : "model-missing",
+    latencyMs: listed.latencyMs,
+  };
+}
+
+/**
+ * The ids of the models `usable`'s server lists, asked with the key the
+ * user's calls use, at no cost: for the check of a connection, and before
+ * a model an admin adds is saved. `undefined` for a provider that cannot
+ * list its models; how the list failed, with the reason in the log
+ * (`what` names the step there), never the key.
+ */
+export async function listedModels(
+  usable: UsableProvider,
+  what: string,
+  options: CheckOptions = {},
+): Promise<
+  | { ids: string[]; latencyMs: number }
+  | { failure: MapoAiProviderFailure }
+  | undefined
+> {
+  const now = options.now ?? Date.now;
+  const { provider } = usable;
+  if (typeof provider.listModels !== "function") return undefined;
   const started = now();
   try {
     const listed: unknown = await provider.listModels(
@@ -48,19 +76,18 @@ export async function checkConnection(
     );
     const latencyMs = Math.max(0, now() - started);
     // An app's provider may list anything: only ids count.
-    const ids = (Array.isArray(listed) ? listed : []).map((info: unknown) =>
-      typeof info === "object" && info !== null
-        ? Reflect.get(info, "id")
-        : undefined,
+    const ids = (Array.isArray(listed) ? listed : []).flatMap(
+      (info: unknown) => {
+        const id =
+          typeof info === "object" && info !== null
+            ? Reflect.get(info, "id")
+            : undefined;
+        return typeof id === "string" ? [id] : [];
+      },
     );
-    const isListed = ids.includes(model);
-    return {
-      ...asked,
-      outcome: isListed ? "connected" : "model-missing",
-      latencyMs,
-    };
+    return { ids, latencyMs };
   } catch (error) {
-    const failure =
+    const failure: MapoAiProviderFailure =
       error instanceof MapoAiProviderError
         ? error.failure
         : isTimeout(error)
@@ -69,9 +96,9 @@ export async function checkConnection(
     const message = error instanceof Error ? error.message : String(error);
     const reason = withoutKey(message, usable.apiKey);
     options.log?.(
-      `[mapo-ai] The connection check of the provider "${provider.id}" failed: ${reason.slice(0, 500)}`,
+      `[mapo-ai] The ${what} of the provider "${provider.id}" failed: ${reason.slice(0, 500)}`,
     );
-    return { ...asked, outcome: "failed", failure };
+    return { failure };
   }
 }
 

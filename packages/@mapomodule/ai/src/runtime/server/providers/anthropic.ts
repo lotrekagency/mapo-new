@@ -67,6 +67,11 @@ export interface AnthropicSettings {
   effort?: MapoAiEffort;
   /** Marks the stable part of the prompt for Anthropic's cache. */
   promptCache?: boolean;
+  /**
+   * Asks for Anthropic's fallbacks: a request the model declines for its
+   * safety filters goes to the model Anthropic picks. On unless `false`.
+   */
+  fallbacks?: boolean;
   /** How it calls the API: the global `fetch`, or a test's. */
   fetch?: ServerFetch;
 }
@@ -155,6 +160,8 @@ interface CallSettings {
   effort: MapoAiEffort;
   promptCache: boolean;
   hasKey: boolean;
+  /** Whether the call asks for Anthropic's fallbacks. */
+  fallbacks: boolean;
 }
 
 /** What the stream of an answer brought. */
@@ -181,6 +188,7 @@ export function createAnthropicProvider(
     effort: settings.effort ?? DEFAULT_EFFORT,
     promptCache: settings.promptCache === true,
     hasKey: Boolean(settings.apiKey),
+    fallbacks: settings.fallbacks !== false,
   };
   return {
     id: "anthropic",
@@ -255,6 +263,14 @@ async function runAnthropic(
   return callAnthropic(server, request, call, cap, "prompt");
 }
 
+/**
+ * Whether a call asks for Anthropic's fallbacks: when the app and the
+ * admins leave them on, and the model has not refused the parameter.
+ */
+function asksFallbacks(call: CallSettings, left: ReadonlySet<string>): boolean {
+  return call.fallbacks && !left.has("fallbacks");
+}
+
 /** One call to `/messages`, holding the answer to its schema as `mode` says. */
 async function callAnthropic(
   server: ProviderServer,
@@ -273,9 +289,9 @@ async function callAnthropic(
       body: requestBody(request, call, cap, left, mode),
       // The beta goes with the parameter: a server that refuses one may
       // not know the other.
-      ...(left.has("fallbacks")
-        ? {}
-        : { headers: { "anthropic-beta": FALLBACK_BETA } }),
+      ...(asksFallbacks(call, left)
+        ? { headers: { "anthropic-beta": FALLBACK_BETA } }
+        : {}),
     }),
     ownRefusal: ({ message }) =>
       mode === "grammar" && TOO_COMPLEX.test(message)
@@ -367,7 +383,7 @@ function requestBody(
     ...(Object.keys(outputConfig).length
       ? { output_config: outputConfig }
       : {}),
-    ...(left.has("fallbacks") ? {} : { fallbacks: "default" }),
+    ...(asksFallbacks(call, left) ? { fallbacks: "default" } : {}),
   };
 }
 

@@ -975,6 +975,19 @@ describe("the anthropic provider", () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it("asks for no fallbacks, nor their beta, when the app or the admins turn them off", async () => {
+    const { provider, calls } = anthropic(
+      { [MESSAGES]: [stream("anthropic-answered.sse")] },
+      { fallbacks: false },
+    );
+
+    await provider.run(providerRequest({ model: OPUS }));
+
+    expect(calls).toHaveLength(1);
+    expect(bodyOf(calls[0])).not.toHaveProperty("fallbacks");
+    expect(calls[0]?.headers).not.toHaveProperty("anthropic-beta");
+  });
+
   it("asks again without the fallbacks and their beta when the server does not take them", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const { provider, calls } = anthropic({

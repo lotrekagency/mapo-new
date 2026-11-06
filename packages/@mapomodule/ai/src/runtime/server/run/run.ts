@@ -154,7 +154,7 @@ export async function runMapoAi(
   // cost anything; the call counts only once they have passed.
   const perMinute = options.limits.perUserPerMinute;
   refuseOverLimit(deps.limiter.peek(session.user.id, perMinute));
-  const contract = contractOf(request);
+  const contract = contractOf(request, { secretWords: options.secretWords });
   const entities =
     request.task === "fill" ? [request.entity] : request.entities;
   const described = entities.map(describedEntity);
@@ -174,6 +174,10 @@ export async function runMapoAi(
       options.instructions.all,
       options.instructions[request.task],
       ...hookRules,
+    ],
+    admin: [
+      options.adminInstructions?.all ?? "",
+      options.adminInstructions?.[request.task] ?? "",
     ],
     ...(request.instructions ? { operator: request.instructions } : {}),
   });

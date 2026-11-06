@@ -112,6 +112,13 @@ export interface SealedStore {
   /** Removes the record at `key`, if there is one. */
   remove(key: string): Promise<void>;
   /**
+   * Whether a record is stored at `key`, without opening it: one that is
+   * there and does not open, or has expired, counts. One read of the key,
+   * never a listing: what tells a record no admin saved from one that does
+   * not open, at every request.
+   */
+  has(key: string): Promise<boolean>;
+  /**
    * The keys of this store's records, under `prefix` when given (`b1` lists
    * `b1:…`, not `b1` itself or `b10`). They may include records that have
    * expired since the last sweep: `get` never returns those.
@@ -301,6 +308,11 @@ export function createSealedStorage(
 
       async remove(key) {
         await storage.removeItem(recordAt(pathOf(key)));
+      },
+
+      async has(key) {
+        const stored = await storage.getItem(recordAt(pathOf(key)));
+        return stored !== null && stored !== undefined;
       },
 
       async keys(prefix) {

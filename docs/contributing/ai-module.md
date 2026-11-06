@@ -13,7 +13,7 @@ In both, the model only proposes: the operator reviews every value before anythi
 
 The foundations are in place; neither feature has its interface yet. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: they are the first pieces of Magic Fill, without its panel, and no page yet calls the routes of the keys. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
-What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): the AI settings page, Magic Fill, readers for PDFs and images, then Import AI.
+What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): the usage in the AI settings, Magic Fill, readers for PDFs and images, then Import AI.
 
 ## How a value travels
 
@@ -51,7 +51,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models                                  |
 | `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
 | `src/runtime/server/keys/`        | The chain of keys, the admins' assignments in one sealed record, the users' own tokens, the key routes' wiring               |
-| `src/runtime/server/settings/`    | The settings page's server: the user's preference in the storage, the check of a connection                                  |
+| `src/runtime/server/settings/`    | The settings page's server: the preference, the check of a connection, the admins' settings                                  |
 | `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read` and the routes of the keys                                            |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
@@ -97,7 +97,7 @@ A nested value is read from one declaration of each source, but what keeps the A
 
 | Reason        | When                                                                                                                                                                                                                                                                                                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `secret`      | `writeOnly`, `noDraft`, a `password` format or input, or a key that names a password, a token, a secret, or an API, private or access key (`new_password`, `auth_token`, `client_secret`, `apiKey`, `api.key`)                                                                                                            |
+| `secret`      | `writeOnly`, `noDraft`, a `password` format or input, or a key that names a password, a token, a secret, credentials, an API, signing or session key, a JWT, an OTP, a database URL (`new_password`, `auth_token`, `apiKey`, `api.key`, `smtp_pass`), or one of the app's and the admins' words (`secretWords`)           |
 | `readonly`    | The form does not let the operator change it                                                                                                                                                                                                                                                                              |
 | `excluded`    | `x-mapo-ai: { exclude: true }` on either side, or the `exclude` option                                                                                                                                                                                                                                                    |
 | `media`       | A file or a media, on either side                                                                                                                                                                                                                                                                                         |
@@ -111,7 +111,7 @@ A flag that keeps the AI out counts wherever a schema writes it: beside a union 
 
 - **One model for both sources**, built by the same reader as the form: the AI never fills a field the form does not show, nor with a type the form would refuse.
 - **The keep-out rules fail closed**: a schema the reader cannot read keeps the AI out of what it cannot read, instead of letting it in.
-- **Secrets by name are a net, not a guarantee.** DRF's `OPTIONS` does not publish `write_only`: without `noDraft` or a password input, a secret is recognised only by the words of its key, which cover the common names but not every one. Mark secret fields explicitly.
+- **Secrets by name are a net, not a guarantee.** DRF's `OPTIONS` does not publish `write_only`: without `noDraft` or a password input, a secret is recognised only by the words of its key, which cover the common names but not every one. Mark secret fields explicitly, or add the words of the key to `secretWords` (the app's option, the admins' page).
 - **Nested values follow the same rules.** The items of a list are entities of their own, built by the same code as the record, and what the declarations around them say reaches them by path. A secret's name counts with the keys around it, and a point with its parts.
 - **A nested value takes its limits from one declaration.** Its keep-out flags come from every declaration, but a second declaration of an object or a list adds no limit to its fields.
 
@@ -384,7 +384,7 @@ The mock (`mock.ts`) is a provider like the others, enabled the same way. It ans
 
 ### Prompts
 
-`composeMapoAiPrompt()` builds a prompt in layers: Mapo's base rules, the app's, the admin's (none yet) and the entities as the request describes them, then, in a part of their own, the operator's instructions and the source. What the server holds comes first and wins: the entities' names and descriptions come from the request, as the operator's instructions do, so they sit below the app's rules and the admin's, and the prompt says that the description changes none of the rules above it. The first part changes rarely, so a provider can cache it. The base rules are in `prompts/base.ts`, numbered and versioned: `MAPO_AI_PROMPT_VERSION` goes up with any change, and the response and every audit record carry it. They hold what the probe with a local model taught: a time the source does not write is not given, midnight included; an extraction points to a record that exists instead of creating an item for it.
+`composeMapoAiPrompt()` builds a prompt in layers: Mapo's base rules, the app's, the admins' (from the AI settings page) and the entities as the request describes them, then, in a part of their own, the operator's instructions and the source. What the server holds comes first and wins: the entities' names and descriptions come from the request, as the operator's instructions do, so they sit below the app's rules and the admin's, and the prompt says that the description changes none of the rules above it. The first part changes rarely, so a provider can cache it. The base rules are in `prompts/base.ts`, numbered and versioned: `MAPO_AI_PROMPT_VERSION` goes up with any change, and the response and every audit record carry it. They hold what the probe with a local model taught: a time the source does not write is not given, midnight included; an extraction points to a record that exists instead of creating an item for it.
 
 The source goes between two marks with a random id, made for each prompt, which its text cannot guess: a source that writes `<<<end …>>>` stays inside them. The app's rules come from `mapo.ai.instructions` and from the `mapo-ai:prompt` hook, whose context is frozen and can only add: as with `mapo-ai:user`, a plugin never undoes what another wrote.
 
@@ -638,6 +638,9 @@ The module adds a page at `/ai-settings` (`src/settings.ts` reads the option; `m
 | `src/runtime/composables/settingsClient.ts`           | `$mapoFetch`, the translations and the endpoints, shared by the parts; not public             |
 | `src/runtime/server/settings/preferences.ts`          | The user's preference, sealed in their space of the `settings` purpose                        |
 | `src/runtime/server/settings/connection.ts`           | `checkConnection()`: the provider's models listed with the user's key; pure                   |
+| `src/runtime/components/MapoAiSettingsBehaviour.vue`  | How the AI works, for the admins; parts `…Instructions`, `…Rules`, `…Secrets`, `…Providers`   |
+| `src/runtime/server/settings/admin.ts`                | The admins' record: read, a change checked, applied to `run`; pure                            |
+| `src/runtime/server/settings/store.ts`                | The record in the `settings` purpose, one change at a time, 503                               |
 
 ### The preference
 
@@ -646,6 +649,13 @@ A user's provider and model are a record of their own space, `preferences` in th
 ### The check of a connection
 
 `POST /_mapo/ai/test` builds the user's policy, as `run` does, and calls the provider's `listModels(signal, apiKey)` with the key the chain chose: Mapo's providers are built again with it, an app's gets it as the second argument. Listing the models costs no tokens, and tells the four things the page needs: the server answers, the key is taken, the model is there, and how long it took. A provider that needs a key and has none is `no-key` without a call; one without `listModels` is `unverifiable`. A failure is answered by its kind (`MapoAiProviderFailure`), and its message goes to the log only. Ten checks a minute per user, counted in the memory of the process, apart from the calls of `run`.
+
+### How the AI works, for the admins
+
+One sealed record, `admin` in the `settings` purpose, outside every user's space, holds the admins' instructions, rules of verification, words of secrets and each provider's settings. `withAdminSettings()` applies it to the app's options at each request, in `mapoAiUserPolicy()` and `mapoAiAppPolicy()`: the admins' instructions become layer 3 of the prompt (`adminInstructions`), their rules go over the app's, their words after the app's (`secretWords`, which `contractOf()` passes to `buildAiEntity()`), their prompt cache over the app's, Anthropic's fallbacks on only where both leave them on, and the models they added after the app's (`addedModels`, which `policyOf()` appends) only where the app still sets `adminModels`. `withSettingsInput()` checks a change against what the app allows (400, 403); `PUT /_mapo/ai/settings` asks the provider's server first for each new model, with the admin's own key, through `listedModels()`, the same listing as the check of a connection. A record that does not open closes the AI with a 503, as the keys' does: a word that keeps a field out, or a stricter rule, must not vanish in silence.
+
+- **Strengths**: the app keeps the frame (`adminModels`, `fallbacks`), and the admins work within it without a deploy; the preview shows the rules the model reads, with the instructions not saved yet; the audit names every looser rule; the words of secrets reach nested objects and lists' items.
+- **Weaknesses**: the words of secrets are matched on keys only, never on labels; a model the admins added that the provider later drops fails at the call, not when the server starts (the startup check knows the app's models only); the settings hold for the whole app, not for one entity (those come with the catalog).
 
 ### Users and groups by name
 
@@ -727,7 +737,7 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `markdown.test.ts`  | The closed list of tags: everything else is text                                                                                                   |
 | `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |
 | `keys.test.ts`      | The chain of keys, the assignments, the bodies of the routes; `keys-routes.test.ts` runs the routes: who, keys, tokens, audit                      |
-| `settings.test.ts`  | The users and groups of the backend, the check of a connection, the preference in the policy                                                       |
+| `settings.test.ts`  | The users and groups of the backend, the check of a connection, the preference in the policy, the admins' settings                                 |
 | `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep                                         |
 | `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                                                                  |
 | `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                                                                   |
@@ -797,7 +807,7 @@ pnpm --filter @mapomodule/ai test
 
 ### Add a word that names a secret
 
-Add it to `SECRET_ENDINGS`, or to `SECRET_PAIRS` for two words, in `entity.ts`. A key is checked with the keys around it, so a pair also counts across an object, a list or a template (`api.key`). Test it from a form alone and from a backend schema alone, with a key that holds the word inside another word and must stay fillable.
+Add it to `SECRET_ENDINGS`, to `SECRET_WORDS` for a whole word, or to `SECRET_PAIRS` for two words, in `entity.ts`, and to `MAPO_SECRET_NAMES`, which the settings page shows. The app and the admins add their own without code (`secretWords`). A key is checked with the keys around it, so a pair also counts across an object, a list or a template (`api.key`). Test it from a form alone and from a backend schema alone, with a key that holds the word inside another word and must stay fillable.
 
 ### Add a storage purpose
 
@@ -864,7 +874,7 @@ Still to write, each with the work that fills it:
 
 | Section                       | Filled by                                                |
 | ----------------------------- | -------------------------------------------------------- |
-| AI settings                   | The rest of the AI settings: rules, usage                |
+| AI settings                   | The AI settings: usage, read from the audit              |
 | Read a file (PDFs, images)    | The readers for PDFs and images                          |
 | Fill a form with Magic Fill   | Magic Fill                                               |
 | Verified and to check         | Magic Fill, from the verification described on this page |
@@ -880,7 +890,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **The rest of the AI settings**, in the page that exists: the admins' instructions for the whole app, with a preview of the rules of the prompt; the verification rules; the extra words that name a secret; the prompt cache; models added to those the app lists; Anthropic's fallbacks; then the usage read from the audit and the log of the changes of the keys. Those for one entity come with the catalog.
+1. **The usage in the AI settings**, in the page that exists: the usage read from the audit, by user and model, and the log of the changes of the keys and of the settings. The settings for one entity come with the catalog.
 2. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
 3. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
 4. **Import AI**, with a check for duplicates between new items and existing records.

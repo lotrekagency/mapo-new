@@ -18,8 +18,11 @@ import type {
   MapoAiKeyAssignment,
   MapoAiKeyAssignmentInput,
   MapoAiKeysAnswer,
+  MapoAiPreviewResponse,
   MapoAiProviderStatus,
   MapoAiRunRequest,
+  MapoAiSettingsAnswer,
+  MapoAiSettingsInput,
   MapoAiStatus,
 } from "../runtime/shared/gateway";
 
@@ -93,6 +96,10 @@ let seen: (string | undefined)[] = [];
 let models: string[] = [];
 /** The keys each listing of `acme`'s models got. */
 let listed: (string | undefined)[] = [];
+/** The rules each call of `acme` got: layers 1–4 of its prompt. */
+let prompts: string[] = [];
+/** The schema of each call of `acme`, as text. */
+let schemas: string[] = [];
 
 /**
  * The gateway's routes on a bare h3 app, as Nitro mounts them, with the
@@ -114,11 +121,14 @@ async function gateway(): Promise<(request: Request) => Promise<Response>> {
     run: (request: MapoAiProviderRequest) => {
       seen.push(request.apiKey);
       models.push(request.model);
+      prompts.push(request.prompt.instructions);
+      schemas.push(JSON.stringify(request.schema));
       return mockProvider.run(request);
     },
+    // The server has one model more than the app lists, for the admins to add.
     listModels: async (_signal: AbortSignal, apiKey?: string) => {
       listed.push(apiKey);
-      return [{ id: "acme-1" }, { id: "acme-2" }];
+      return [{ id: "acme-1" }, { id: "acme-2" }, { id: "acme-large" }];
     },
   });
   const router = createRouter()
@@ -132,7 +142,10 @@ async function gateway(): Promise<(request: Request) => Promise<Response>> {
     .delete(`${PATH}/token`, await route("token.delete"))
     .put(`${PATH}/preferences`, await route("preferences.put"))
     .delete(`${PATH}/preferences`, await route("preferences.delete"))
-    .post(`${PATH}/test`, await route("test.post"));
+    .post(`${PATH}/test`, await route("test.post"))
+    .get(`${PATH}/settings`, await route("settings.get"))
+    .put(`${PATH}/settings`, await route("settings.put"))
+    .post(`${PATH}/settings/preview`, await route("settings-preview.post"));
   return toWebHandler(createApp().use(router));
 }
 
@@ -251,6 +264,8 @@ beforeEach(() => {
   seen = [];
   models = [];
   listed = [];
+  prompts = [];
+  schemas = [];
   const root = createStorage();
   root.mount("mapo-ai", memoryDriver());
   runtime.root = root;
@@ -1068,6 +1083,304 @@ describe("the AI settings' routes", () => {
         model: "acme-1",
       }),
     );
+
+    expect(response.status).toBe(503);
+  });
+});
+
+describe("the routes of the AI settings — how the AI works", () => {
+  /** Saves a change of the settings as the admin; the answer, or the refusal's status. */
+  async function change(
+    handle: Handle,
+    input: MapoAiSettingsInput | Record<string, unknown>,
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const response = await handle(request("PUT", "/settings", "admin", input));
+    return {
+      status: response.status,
+      body: (await response.json()) as Record<string, unknown>,
+    };
+  }
+
+  /** Enables more providers, and options of acme, before the gateway is built. */
+  function withProviders(providers: Record<string, unknown>) {
+    const config = runtime.config.mapoAi as Record<string, unknown>;
+    config.providers = {
+      ...(config.providers as Record<string, unknown>),
+      ...providers,
+    };
+  }
+
+  it("answers the AI's admins only", async () => {
+    const handle = await gateway();
+
+    const statuses = await Promise.all([
+      handle(request("GET", "/settings", undefined)),
+      handle(request("GET", "/settings", "editor")),
+      handle(request("PUT", "/settings", "editor", { secretWords: [] })),
+      handle(request("POST", "/settings/preview", "editor", { task: "fill" })),
+    ]);
+
+    expect(statuses.map((response) => response.status)).toEqual([
+      401, 403, 403, 403,
+    ]);
+  });
+
+  it("refuses a change sent from another site", async () => {
+    const handle = await gateway();
+
+    const response = await handle(
+      request(
+        "PUT",
+        "/settings",
+        "admin",
+        { secretWords: ["vault"] },
+        { "sec-fetch-site": "cross-site" },
+      ),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("answers the app's settings before any admin changed them", async () => {
+    const handle = await gateway();
+
+    const response = await handle(request("GET", "/settings", "admin"));
+    const answer = (await response.json()) as MapoAiSettingsAnswer;
+
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(answer.instructions.admin).toEqual({
+      all: "",
+      fill: "",
+      extract: "",
+    });
+    expect(answer.verification.admin).toEqual({});
+    expect(answer.secretWords.mapo).toContain("credentials");
+    expect(answer.secretWords.admin).toEqual([]);
+    expect(answer.providers.find((one) => one.id === "acme")).toEqual({
+      id: "acme",
+      label: "Acme",
+      models: { app: ["acme-1", "acme-2"], added: [], canAdd: false },
+    });
+    expect(answer).not.toHaveProperty("updated");
+  });
+
+  it("saves block by block, and audits who changed which blocks, never the instructions", async () => {
+    const handle = await gateway();
+
+    const first = await change(handle, {
+      instructions: { all: "Write titles without the date." },
+    });
+    const second = await change(handle, {
+      verification: { soleNumber: false, oneWordQuotes: "never" },
+    });
+
+    expect([first.status, second.status]).toEqual([200, 200]);
+    const answer = second.body as unknown as MapoAiSettingsAnswer;
+    expect(answer.instructions.admin.all).toBe(
+      "Write titles without the date.",
+    );
+    expect(answer.verification.admin).toEqual({
+      soleNumber: false,
+      oneWordQuotes: "never",
+    });
+    expect(answer.updated?.by).toEqual({ id: "1", username: "admin" });
+    const { actions } = await auditOf();
+    expect(
+      actions.map(({ action, blocks, loosened }) => ({
+        action,
+        blocks,
+        loosened,
+      })),
+    ).toEqual([
+      {
+        action: "settings-saved",
+        blocks: ["instructions"],
+        loosened: undefined,
+      },
+      {
+        action: "settings-saved",
+        blocks: ["verification"],
+        loosened: ["soleNumber"],
+      },
+    ]);
+    const raw = await rawStorage();
+    expect(raw).not.toContain("Write titles without the date.");
+  });
+
+  it("puts the admins' instructions after the app's, and keeps their words of secrets out of the contract", async () => {
+    (runtime.config.mapoAi as Record<string, unknown>).instructions = {
+      all: "Prices are in euros.",
+    };
+    const handle = await gateway();
+    await change(handle, {
+      instructions: { fill: "Write titles without the date." },
+      secretWords: ["vault"],
+    });
+
+    const response = await handle(
+      request("POST", "/run", "editor", {
+        ...fillBody(),
+        entity: {
+          fields: {
+            type: "object",
+            properties: {
+              title: { type: "string", title: "Title" },
+              vault_url: { type: "string", title: "Vault" },
+            },
+          },
+          label: "Article",
+          model: "article",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const [prompt = ""] = prompts;
+    const app = prompt.indexOf("Prices are in euros.");
+    const admin = prompt.indexOf("Write titles without the date.");
+    expect(app).toBeGreaterThan(0);
+    expect(admin).toBeGreaterThan(app);
+    expect(schemas[0]).toContain("title");
+    expect(schemas[0]).not.toContain("vault_url");
+  });
+
+  it("adds a model the provider's server lists, asked with the admin's key, where the app allows it", async () => {
+    withProviders({
+      acme: { timeout: 5, apiKey: PROJECT_KEY, adminModels: true },
+    });
+    const handle = await gateway();
+
+    const saved = await change(handle, {
+      providers: { acme: { models: ["acme-large"] } },
+    });
+
+    expect(saved.status).toBe(200);
+    expect(listed).toEqual([PROJECT_KEY]);
+    const keys = (await (
+      await handle(request("GET", "/keys", "admin"))
+    ).json()) as MapoAiKeysAnswer;
+    expect(keys.providers.find((one) => one.id === "acme")?.models).toEqual([
+      "acme-1",
+      "acme-2",
+      "acme-large",
+    ]);
+    expect((await acmeOf(handle, "editor"))?.models).toEqual([
+      "acme-1",
+      "acme-2",
+      "acme-large",
+    ]);
+    // Saved once: the next change asks the server nothing about it.
+    await change(handle, { providers: { acme: { models: ["acme-large"] } } });
+    expect(listed).toEqual([PROJECT_KEY]);
+  });
+
+  it("refuses a model the server does not list, or where the app allows none, before saving it", async () => {
+    const handle = await gateway();
+
+    const notAllowed = await change(handle, {
+      providers: { acme: { models: ["acme-large"] } },
+    });
+    expect(notAllowed.status).toBe(403);
+    expect(listed).toEqual([]);
+
+    withProviders({
+      acme: { timeout: 5, apiKey: PROJECT_KEY, adminModels: true },
+    });
+    // A gateway built again, with fresh modules, reads the new options.
+    vi.resetModules();
+    const allowed = await gateway();
+    const unknown = await change(allowed, {
+      providers: { acme: { models: ["acme-ghost"] } },
+    });
+    expect(unknown.status).toBe(422);
+    expect(unknown.body.data).toEqual({ model: "acme-ghost" });
+    expect((await acmeOf(allowed, "editor"))?.models).toEqual([
+      "acme-1",
+      "acme-2",
+    ]);
+  });
+
+  it("keeps Anthropic's fallbacks off where the app turns them off, and lets the admins turn them off", async () => {
+    withProviders({ anthropic: { fallbacks: false } });
+    const off = await gateway();
+
+    expect(
+      (await change(off, { providers: { anthropic: { fallbacks: true } } }))
+        .status,
+    ).toBe(403);
+
+    withProviders({ anthropic: {} });
+    vi.resetModules();
+    const on = await gateway();
+    const saved = await change(on, {
+      providers: { anthropic: { fallbacks: false } },
+    });
+    const answer = saved.body as unknown as MapoAiSettingsAnswer;
+    expect(
+      answer.providers.find((one) => one.id === "anthropic")?.fallbacks,
+    ).toEqual({ app: true, admin: false, value: false });
+  });
+
+  it("refuses a body that is not a change, naming where", async () => {
+    const handle = await gateway();
+
+    const refused = await Promise.all([
+      change(handle, { secretWords: ["vault", "no!"] }),
+      change(handle, { providers: { nowhere: {} } }),
+      change(handle, { providers: { acme: { promptCache: true } } }),
+      change(handle, { verification: { years: true } }),
+    ]);
+
+    expect(refused.map((one) => one.status)).toEqual([400, 400, 400, 400]);
+    expect(refused[0]?.body.data).toEqual({
+      path: "secretWords.1",
+      problem:
+        "a word of a key: letters, digits, spaces, _, - and ., up to 64 characters",
+    });
+  });
+
+  it("shows the rules the model reads, with instructions not saved yet or the saved ones", async () => {
+    (runtime.config.mapoAi as Record<string, unknown>).instructions = {
+      all: "Prices are in euros.",
+    };
+    const handle = await gateway();
+    await change(handle, { instructions: { all: "Saved rule." } });
+
+    const preview = async (body: Record<string, unknown>) =>
+      (await (
+        await handle(request("POST", "/settings/preview", "admin", body))
+      ).json()) as MapoAiPreviewResponse;
+    const draft = await preview({
+      task: "fill",
+      instructions: { all: "Draft rule." },
+    });
+    const saved = await preview({ task: "extract" });
+
+    expect(draft.text).toContain("Prices are in euros.");
+    expect(draft.text).toContain("Draft rule.");
+    expect(draft.text).not.toContain("Saved rule.");
+    expect(saved.text).toContain("Saved rule.");
+    expect(prompts).toEqual([]);
+  });
+
+  it("closes the AI while the settings cannot be read", async () => {
+    await sealed("another-secret-0123456789-abcdefghijklmnop")
+      .store("settings")
+      .set("admin", { v: 1 });
+    const handle = await gateway();
+
+    const status = await handle(request("GET", "/status", "editor"));
+    const run = await runAs(handle, "editor");
+
+    expect([status.status, run.status]).toEqual([503, 503]);
+    expect(seen).toEqual([]);
+  });
+
+  it("answers 503 without a storage", async () => {
+    (runtime.config.mapoAi as Record<string, unknown>).secret = "";
+    const handle = await gateway();
+
+    const response = await handle(request("GET", "/settings", "admin"));
 
     expect(response.status).toBe(503);
   });
