@@ -4,14 +4,16 @@ How `@mapomodule/ai` is built, why it is built this way, what it does well and w
 
 ## Where the module is going
 
-The module will help an operator enter data with a language model, in two ways:
+The module is meant to help an operator enter data with a language model, in two ways:
 
-- **Magic Fill** will fill the form of one record from a text or a file;
-- **Import AI** will extract several related records from a long source.
+- **Magic Fill**, to fill the form of one record from a text or a file;
+- **Import AI**, to extract several related records from a long source.
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Neither feature exists yet. Today the package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; and `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server. In the browser, `useMapoAiFill()` fills a detail form through `run`: it is the first piece of Magic Fill, without its panel. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+The foundations are in place; neither feature has its interface yet. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: they are the first pieces of Magic Fill, without its panel, and no page yet calls the routes of the keys. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+
+What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): the AI settings page, Magic Fill, readers for PDFs and images, then Import AI.
 
 ## How a value travels
 
@@ -29,7 +31,7 @@ Before them, a file the operator gives becomes text: `POST /_mapo/ai/read` reads
 
 1. **The entity model** says which fields the AI may fill, with their kind of value, limits and choices, and which fields it must leave alone, with the reason.
 2. **The contract** is the strict JSON Schema the model's answer must follow, the same for every provider, with the fields behind it.
-3. **The provider** gets the prompt the gateway composed, in layers, with the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, two providers for models in a cloud, `openai` and `anthropic`, and two for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
+3. **The provider** gets the prompt the gateway composed in layers, the source and the contract's schema, and returns the model's answer. Mapo ships the `mock`, which answers without a model, two providers for models in a cloud, `openai` and `anthropic`, and two for models on the app's own servers, `ollama` and `openai-compatible`; an app can register its own.
 4. **The sanitizer** reads the answer as outside data, turns each value into the form's type, discards what breaks a rule, and checks each value against the quotes the model gives from the source.
 5. **The page** applies the outcomes: `useMapoAiFill()` writes a verified value into an empty field, and marks every other one for the operator.
 
@@ -59,6 +61,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/markdown.ts`  | Restricted Markdown, the rich text the model writes                                                                          |
 | `src/runtime/shared/dialect.ts`   | The `x-mapo-ai` keyword: a hint for the model, or `exclude`                                                                  |
 | `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                                                  |
+| `src/runtime/shared/gateway.ts`   | The gateway's response types and the contract version                                                                        |
 | `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form                                           |
 | `src/runtime/shared/read.ts`      | The browser's half of `read`: the file sent as a form, the answer read                                                       |
 | `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors; `useMapoAiRead()`: a file sent to `read` |
@@ -210,7 +213,7 @@ The app changes them with the `verification` option, which `run` applies to ever
 
 ## The storage
 
-The gateway's state lives on the app's server, in the Nitro mount `mapo-ai`, and every record is sealed before it reaches the driver. `run` writes its audit there. The gateway's routes reach it through `useMapoAiStorage(event)`, which reads the secret through the request's event (on Cloudflare Workers the environment arrives with the request) and throws a 503 while the storage is closed.
+The gateway's state lives on the app's server, in the Nitro mount `mapo-ai`, and every record is sealed before it reaches the driver. The audit of `run`, the admins' assignments of keys and the users' own tokens are written there. The gateway's routes reach it through `useMapoAiStorage(event)`, which reads the secret through the request's event (on Cloudflare Workers the environment arrives with the request) and throws a 503 while the storage is closed.
 
 | File                                    | Role                                                                                                                    |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -244,7 +247,7 @@ Everything is WebCrypto, with no Node import, so the same code runs on every ser
 
 ### Purposes and users
 
-`createSealedStorage({ storage, secret }).store(purpose)` holds the records of one purpose, and `forUser(id)` resolves to those of one user within it, filed under `u:` and a keyed hash (HMAC) of the id: neither file names nor keys say who the users are. The purpose's own store lists, reads and removes every user's records too, as an admin will; it never writes in a user's space, which only `forUser()` does.
+`createSealedStorage({ storage, secret }).store(purpose)` holds the records of one purpose, and `forUser(id)` resolves to those of one user within it, filed under `u:` and a keyed hash (HMAC) of the id: neither file names nor keys say who the users are. The purpose's own store lists, reads and removes every user's records too, as the admins' list of saved tokens does; it never writes in a user's space, which only `forUser()` does.
 
 A key is up to 8 segments of lowercase letters, digits, `_` and `-`, each up to 64 characters, joined by `:`, and none is a name Windows keeps for a device (`con`, `nul`, `com1`…). Lowercase because a case-insensitive file system would merge `B1` and `b1`; a route checks an id from a request before it makes a key of it.
 
@@ -383,7 +386,7 @@ The source goes between two marks with a random id, made for each prompt, which 
 
 The limit per user counts the calls of the last sixty seconds in the memory of the process, as the sessions are remembered: nothing is written per call, a restart forgets, and a server with several processes allows the limit in each. `0` is a limit too: no call, no source, no instructions, no file; and a limit that cannot be read, in the Nuxt config or in the environment, is `0` rather than its default, so a mistake never lets more through. A shared count in the sealed storage would not be exact either, since the storage has no atomic increment, and calls made together would get through; caps by day or by cost can be read from the audit.
 
-The audit has one record per call that reached the provider, in the `audit` purpose and in the space of the user. The day and time in the record's name (`2026:11:04:t101530123-<random>`) list a day's records together, and tell nothing the expiry, which is in clear, does not tell already. A record holds no contents, and is read back with a zod validator, since it may come from an older version.
+The audit has one record per call that reached the provider, in the `audit` purpose and in the space of the user. The day and time in the record's name (`2026:11:04:t101530123-<random>`) list a day's records together, and tell nothing the expiry, which is in clear, does not tell already. Each change of the keys leaves a record too, under `actions:` in the same space ([Keys](#keys)). A record holds no contents, and is read back with a zod validator, since it may come from an older version.
 
 ### Strengths and weaknesses
 
@@ -414,7 +417,7 @@ The providers call their servers with `fetch`: one or two endpoints each, a body
 
 ### Where the server is, and its key
 
-Only the app says where a server is: `baseURL` in `mapo.ai.providers`, `http://localhost:11434` for Ollama unless set, or the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_BASE_URL`). A request never names a server, and the admin will not either: an address written from outside would let the gateway call any server of its network. An address is read as outside data (`serverURL()`): `http:` or `https:`, without credentials, query or fragment; one that cannot be read leaves the provider off. A key, for a server behind a proxy, comes from the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`): the module puts an empty `apiKey` in the private runtime config of each such provider, so Nuxt has a place to fill, and `providerKeyOf()` reads it apart from the options, so it never travels with them; a key of digits only, which Nuxt reads as a number, and a key sent over plain `http:` to another machine are said in the log, never the key. `mapoAiProvider(id, settings)` builds Mapo's providers from these settings at each request; what a server says about its models is kept ten minutes, by address. A provider never follows a redirect, which would send the prompt elsewhere, and of an error's JSON body it logs only the message: a validation error can repeat the request, source included.
+Only the app says where a server is: `baseURL` in `mapo.ai.providers`, `http://localhost:11434` for Ollama unless set, or the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_BASE_URL`). A request never names a server, and no admin sets one either: an address written from outside would let the gateway call any server of its network. An address is read as outside data (`serverURL()`): `http:` or `https:`, without credentials, query or fragment; one that cannot be read leaves the provider off. A key, for a server behind a proxy, comes from the environment (`NUXT_MAPO_AI_PROVIDERS_OLLAMA_API_KEY`): the module puts an empty `apiKey` in the private runtime config of each such provider, so Nuxt has a place to fill, and `providerKeyOf()` reads it apart from the options, so it never travels with them; a key of digits only, which Nuxt reads as a number, and a key sent over plain `http:` to another machine are said in the log, never the key. `mapoAiProvider(id, settings)` builds Mapo's providers from these settings at each request; what a server says about its models is kept ten minutes, by address. A provider never follows a redirect, which would send the prompt elsewhere, and of an error's JSON body it logs only the message: a validation error can repeat the request, source included.
 
 ### What a call to Ollama does
 
@@ -466,7 +469,7 @@ Two of Mapo's providers call a model in a provider's cloud: `openai`, through Op
 
 ### What they share with the local ones, and what not
 
-They call their APIs through `http.ts`, like the local providers: the same failures, no redirect followed, a stream read within a bound, and an error's message only, with what looks like a key masked (`maskKeys()`), since OpenAI repeats the key it refuses, masked but for its last characters. Their options are read by the same reader (`SERVER_PROVIDERS` in `run/options.ts`, where `isCloud` gives them `effort` and `promptCache`), and their keys come from the environment in the same way (`NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`).
+They call their APIs through `http.ts`, like the local providers: the same failures, no redirect followed, a stream read within a bound, and an error's message only, with what looks like a key masked (`maskKeys()`), since OpenAI repeats the key it refuses, masked but for its last characters. Their options are read by the same reader (`SERVER_PROVIDERS` in `run/options.ts`, where `isCloud` gives them `effort` and `promptCache`), and their project's keys, the last level of the chain of keys ([Keys](#keys)), come from the environment in the same way (`NUXT_MAPO_AI_PROVIDERS_OPENAI_API_KEY`, `NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY`).
 
 They differ where the APIs do:
 
@@ -677,6 +680,7 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `citations.test.ts` | Finding quotes, numbers read one way, points of a map, dates, times, time zones and links                                                          |
 | `markdown.test.ts`  | The closed list of tags: everything else is text                                                                                                   |
 | `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |
+| `keys.test.ts`      | The chain of keys, the assignments, the bodies of the routes; `keys-routes.test.ts` runs the routes: who, keys, tokens, audit                      |
 | `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep                                         |
 | `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                                                                  |
 | `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                                                                   |
@@ -793,27 +797,34 @@ Add it to `markdown.ts` and to the closed list in its tests, and make sure `Mapo
 
 ## Documentation plan
 
-The module's documentation is written with the code, on this plan. [AI-assisted entry](/modules/ai) is for app developers and says only what works, because the MCP server serves it to assistants as fact. Its sections, and what fills each:
+The module's documentation is written with the code, on this plan. [AI-assisted entry](/modules/ai) is for app developers and says only what works, because the MCP server serves it to assistants as fact. These sections exist now, and the work that filled each:
 
 | Section                                          | Filled by                                                        |
 | ------------------------------------------------ | ---------------------------------------------------------------- |
-| What works today, Enable the module, The gateway | The gateway's first route (written)                              |
-| Who may use the gateway                          | The gateway's authentication (written)                           |
-| Ask the AI                                       | The `run` route (written)                                        |
-| The prompt, Verification, Limits, The audit      | The `run` route (written)                                        |
-| The secret and the storage                       | The encrypted storage (written)                                  |
+| What works today, Enable the module, The gateway | The gateway's first route                                        |
+| Who may use the gateway                          | The gateway's authentication                                     |
+| Ask the AI                                       | The `run` route                                                  |
+| Fill a detail form                               | `useMapoAiFill()`                                                |
+| Read a file                                      | The readers of files, `useMapoAiRead()`                          |
+| Providers                                        | The mock, an app's own, local models, the cloud                  |
+| Keys                                             | The three levels, the routes of the keys and of the tokens       |
+| The prompt, Verification, Limits, The audit      | The `run` route                                                  |
+| The secret and the storage                       | The encrypted storage                                            |
 | Options                                          | Every option, in the change that makes it work (written to date) |
-| Fill a detail form                               | `useMapoAiFill()` (written)                                      |
-| Read a file                                      | The readers of text and sheets (written); PDFs and images        |
-| Fill a form with Magic Fill                      | Magic Fill                                                       |
-| Verified and to check                            | Magic Fill, from the verification described on this page         |
-| Keep a field away from the AI                    | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets         |
-| Providers and keys                               | The mock, an app's own, local models, the cloud (written); keys  |
-| AI settings                                      | The settings page                                                |
-| Import several records                           | Import AI                                                        |
-| Guarantees and limits                            | Every change                                                     |
 
-This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text.
+Still to write, each with the work that fills it:
+
+| Section                       | Filled by                                                |
+| ----------------------------- | -------------------------------------------------------- |
+| AI settings                   | The settings page                                        |
+| Read a file (PDFs, images)    | The readers for PDFs and images                          |
+| Fill a form with Magic Fill   | Magic Fill                                               |
+| Verified and to check         | Magic Fill, from the verification described on this page |
+| Keep a field away from the AI | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets |
+| Import several records        | Import AI                                                |
+| Guarantees and limits         | Every change                                             |
+
+This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text; the last reread closed the foundations.
 
 ## Next and nice to have
 
@@ -822,7 +833,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 In this order:
 
 1. **The AI settings page**, on the routes of the keys: the admins assign keys and models by name, order the groups, list and remove the tokens, check a key (`POST test`), set the verification rules, the extra words that name a secret and the prompt cache, and add models to those the app lists; each user sees their key and saves their own token.
-2. **Magic Fill**, on `useMapoAiFill()`: its panel, files, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
+2. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
 3. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
 4. **Import AI**, with a check for duplicates between new items and existing records.
 

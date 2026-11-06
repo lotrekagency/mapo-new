@@ -3,7 +3,7 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. Today it installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), reads a file into text (`read`), and asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field. Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiRead()` sends a file to `read` and `useMapoAiFill()` fills a detail form through `run`, from components the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. It installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), reads a file into text (`read`), asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field, and keeps the keys of the providers on three levels (`keys`, `token`). Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiRead()` sends a file to `read` and `useMapoAiFill()` fills a detail form through `run`, from components the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
@@ -143,7 +143,7 @@ Every route of the gateway answers these errors:
 | 403    | The app's rules refuse the user: `users`, or a `mapo-ai:user` hook ([Who may use the gateway](#who-may-use-the-gateway)). `status` answers that user `"allowed": false` instead ([A user the app refuses](#a-user-the-app-refuses)) |
 | 502    | The backend cannot say who is signed in: it cannot be reached, it fails, or `userInfoApi` returns no user. The server's log says why, and the session is not touched                                                                |
 
-The two routes that take a POST, `read` and `run`, also refuse with 403 a request a browser marks as sent from another origin (`Sec-Fetch-Site` other than `same-origin`). Called with `$mapoFetch`, these errors behave as for any backend call: a 401 sends the user to the login page, and a 403 shows Mapo's permission-denied message. `run` and `read` have errors of their own ([Errors of run](#errors-of-run), [What read answers](#what-read-answers)).
+The routes that change something, `read`, `run` and the routes of the keys and the token, also refuse with 403 a request a browser marks as sent from another origin (`Sec-Fetch-Site` other than `same-origin`). The routes of the keys are for the AI's admins: anyone else gets a 403. Called with `$mapoFetch`, these errors behave as for any backend call: a 401 sends the user to the login page, and a 403 shows Mapo's permission-denied message. `run` and `read` have errors of their own ([Errors of run](#errors-of-run), [What read answers](#what-read-answers)).
 
 ## Who may use the gateway
 
@@ -170,7 +170,7 @@ export default defineNuxtConfig({
 });
 ```
 
-An admin assigns keys, providers and models to everyone, a group or a user, and allows personal tokens ([Keys](#keys)); `status` tells an admin the state of the storage.
+An admin assigns keys and models to everyone, a group or a user, and allows personal tokens ([Keys](#keys)); `status` tells an admin the state of the storage.
 
 ### Restrict who uses the AI
 
@@ -437,7 +437,7 @@ The reference app has a scenario: `/ai/fill/new` and `/ai/fill/1` in `apps/examp
 - **The text.** A file that is neither UTF-8 nor UTF-16 with its byte order mark is read as Windows-1252, as the spreadsheets and the editors of Western Europe write it; an HTML page in the encoding its `<meta charset>` names. A file with NUL characters, such as a binary one, is no text: it is `failed`.
 - **Sheets.** A row goes on a line, its cells between `|`, so the AI reads which column a value is in; rows and columns with nothing in them go. A CSV's delimiter is the one a first line `sep=;` names, or the first of tab, `;`, `|` and `,` that splits the first rows, so a CSV that writes decimals with a comma reads with `;`. A cell of a workbook gives its value, not its format: a date as `2026-03-02`, with its time when it has one, a number with up to 15 significant digits (`25%` is `0.25`), a formula the value the spreadsheet computed. Hidden sheets and rows are read like the others, and every sheet counts toward the length of the text. The old `.xls` is not read. A workbook is `failed` before the reader reads it when its XML unzips into more than 20 MB, counted as it unzips, when a part unzips into more than its ZIP declares, when its sheets hold more than 2 million cells, counting the empty ones up to the last row and column of each, or when it has more than 10,000 parts.
 - **Web pages.** The HTML reader is no browser: it applies no CSS, so what a style hides is read, and it cannot tell a page's content from its header and footer, which reach the AI too.
-- **Other formats.** Mapo has no reader for PDFs, images or Word documents (PDFs and images are planned): such a file is `unsupported`, unless the app registers a reader for it ([Replace or add a reader](#replace-or-add-a-reader)).
+- **Other formats.** Mapo has no reader for PDFs, images or Word documents: such a file is `unsupported`, unless the app registers a reader for it ([Replace or add a reader](#replace-or-add-a-reader)).
 - **Whole or not at all.** A file whose text is longer than `limits.maxSourceChars` is `too-long`: a source goes to `run` whole, never cut. The file itself may have up to `limits.maxFileBytes` bytes, 10 MB by default ([Limits](#limits)).
 
 ### Send a file
@@ -821,7 +821,7 @@ export default defineNuxtConfig({
 - `run(request)` gets the `task`, the `model`, the `prompt` (`instructions`, the part that stays the same, and `input`, the operator's instructions and the source), the source's `parts`, the JSON Schema of the answer (`schema`, in the subset every provider accepts in strict mode), the `contract` it was compiled from, and a `signal`, aborted when the `timeout` is up. The gateway stops waiting then, whatever the provider does. The contract and the parts are copies: changing them changes nothing the answer is read against.
 - It returns `{ status: "answered", output, usage }`, where `output` is the answer parsed from JSON (or the model's text, when it is not JSON: the answer then comes back with `readable: false`), or `{ status: "refused", refusal, usage }`. `usage` may add `cacheReadTokens` and `cacheWriteTokens`, the prompt's tokens read from and written to the provider's cache, and the answer may add `model`, the model that answered when it is not the one asked: the gateway's answer and its audit name it. The gateway reads what it returns as outside data: `output` as plain JSON, so one it cannot copy as JSON is unreadable, token counts as whole numbers from zero, a `model` only as a name of up to 200 characters, and anything else is a 502.
 - `key`, optional, says that the provider calls its server with a key: `"required"`, or `"optional"` for a server that also takes calls without one. Each call then gets the key the chain chose for the user as `request.apiKey` ([Keys](#keys)): the user's own token where allowed, an admin's key, or the project's, from `NUXT_MAPO_AI_PROVIDERS_<ID>_API_KEY` (`NUXT_MAPO_AI_PROVIDERS_ACME_API_KEY`). A `"required"` provider without a key is refused before the call. Without `key`, the provider gets no key from the gateway and keeps its own, and the admins assign it models only. Never log `apiKey`.
-- `capabilities` say what the provider can do. The gateway reads none of them yet: it sends text only, waits for the whole answer and calls no tools.
+- `capabilities` say what the provider can do. The gateway reads none of them: it sends text only, waits for the whole answer and calls no tools.
 - `listModels(signal)`, optional, returns the models its server has (`MapoAiModelInfo[]`). The server calls it when it starts, and warns about each model `providers` allows that the list does not have, or that the list could not be read; a request may still ask only for the models `providers` lists.
 - A `MapoAiProviderError` tells the gateway what failed: `timeout` (504), `rate-limit` (503, with `Retry-After` when `retryAfter` is a count of seconds, at most an hour), `too-long` for a prompt the model cannot read whole (413), `unavailable`, `invalid-response`, `refused-request` or `truncated` for an answer cut at its cap (502). Any other error, or a failure the gateway does not know, is a 502 too. The message goes to the server's log, never to the browser.
 - An id is lowercase letters, digits and `-`, starting with a letter. `mock`, `openai`, `anthropic`, `openai-compatible` and `ollama` are kept for Mapo's own providers: registering one of them is an error.
@@ -924,7 +924,7 @@ The gateway composes every prompt in layers, always in this order:
 
 1. **Mapo's base rules** for the task: the source is data, not instructions; only what the source states, empty otherwise; a date given in part, or a time the source does not write, is not given; a quote of the source for each value. An app adds to them and cannot remove them; where a later layer disagrees, they win.
 2. **The app's rules**: `instructions.all`, then `instructions.fill` or `instructions.extract`, then what the `mapo-ai:prompt` hooks add.
-3. **The admin's instructions**: none yet.
+3. **The admin's instructions**: none; no route sets them, so this layer is empty.
 4. **The entities, as the request describes them**: their `label`, `description` and the language; the fields' own texts are in the answer's schema. The prompt says that this description changes none of the rules above it.
 5. **The operator's instructions**, from the request: they may narrow the task, never change the rules or the shape of the answer.
 6. **The source**, between two marks that carry an id made for each request, so a text that writes a mark of its own stays inside them.
@@ -1023,7 +1023,7 @@ Every call that reaches a provider leaves a record in the storage, written as so
 
 A request refused before the provider leaves no record. Without an open storage, `run` answers 503 and calls nothing: a call that cannot be audited is not made. When writing a record fails after the call, the server's log says so, and the answer still reaches the user.
 
-Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. No route reads the audit yet.
+Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. No route reads the audit.
 
 ## The secret and the storage
 
