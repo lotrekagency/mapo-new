@@ -401,6 +401,138 @@ export interface MapoAiPreviewResponse {
   text: string;
 }
 
+// ─── usage ───────────────────────────────────────────────────────────────────
+
+/**
+ * The calls of a group and their tokens, as the usage sums them from the
+ * audit, and their cost where the app prices their models.
+ */
+export interface MapoAiUsageTotals {
+  calls: number;
+  answered: number;
+  refused: number;
+  failed: number;
+  /** Tokens of the prompts, those read from or written to a cache included. */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /**
+   * In the answer's `currency`, for the calls of the models the app prices
+   * (`mapo.ai.prices`); absent when it prices none of them.
+   */
+  cost?: number;
+  /** Calls of models the app gives no price: not in `cost`. */
+  unpricedCalls: number;
+}
+
+/** A user's calls, as the AI's admins see them. */
+export interface MapoAiUsageByUser extends MapoAiUsageTotals {
+  user: { id: string; username?: string };
+}
+
+/** The calls of one model of one provider: the model that answered. */
+export interface MapoAiUsageByModel extends MapoAiUsageTotals {
+  provider: string;
+  model: string;
+}
+
+/** The calls of one day, in UTC. */
+export interface MapoAiUsageByDay extends MapoAiUsageTotals {
+  /** `YYYY-MM-DD`, in UTC. */
+  day: string;
+}
+
+/** One call, as the usage lists the latest: never its source, instructions or values. */
+export interface MapoAiUsageCall {
+  /** When it started, as an ISO date and time. */
+  at: string;
+  user: { id: string; username?: string };
+  task: "fill" | "extract";
+  /** The entities, by label, else type, model or endpoint. */
+  entities: string[];
+  /** The provider and the model that answered. */
+  provider: string;
+  model: string;
+  /** Where the key came from, never the key. */
+  key?: { level: MapoAiKeyLevel; group?: string };
+  outcome: "answered" | "refused" | "failed";
+  failure?: string;
+  usage: MapoAiUsage;
+  durationMs: number;
+  /** In the answer's `currency`, when the app prices the model. */
+  cost?: number;
+}
+
+/**
+ * `GET /_mapo/ai/usage` for the AI's admins, every user's calls;
+ * `GET /_mapo/ai/usage/mine` for a user, their own.
+ */
+export interface MapoAiUsageAnswer {
+  /** The period: the last `days` days, from `from` to `to`, in UTC (`YYYY-MM-DD`). */
+  days: number;
+  from: string;
+  to: string;
+  /** The currency of the costs, as `mapo.ai.prices` names it: `USD` unless set. */
+  currency: string;
+  totals: MapoAiUsageTotals;
+  /** For the AI's admins: each user's calls, most first. */
+  byUser?: MapoAiUsageByUser[];
+  /** Each model's calls, most first. */
+  byModel: MapoAiUsageByModel[];
+  /** Each day's calls, the latest first. */
+  byDay: MapoAiUsageByDay[];
+  /** The latest calls, newest first. */
+  recent: MapoAiUsageCall[];
+  /**
+   * Whether the period had more calls than the gateway reads at once: then
+   * the totals are of the newest ones.
+   */
+  truncated: boolean;
+}
+
+/** What a change of the audit's `actions:` did. */
+export type MapoAiActionKind =
+  | "assignment-saved"
+  | "assignment-removed"
+  | "groups-ordered"
+  | "token-saved"
+  | "token-removed"
+  | "settings-saved";
+
+/** A change of the keys or of the AI settings, as `GET /_mapo/ai/actions` lists it: never a key or a text. */
+export interface MapoAiAction {
+  /** When, as an ISO date and time. */
+  at: string;
+  /** Who made it. */
+  by: { id: string; username?: string };
+  action: MapoAiActionKind;
+  /** The provider of an assignment or a token. */
+  provider?: string;
+  /** Who an assignment is for. */
+  scope?: MapoAiKeyScope;
+  /** Whose token was saved or removed: their id. */
+  user?: string;
+  /** For a saved assignment: whether its key was set, replaced or removed. */
+  keyChanged?: boolean;
+  /** For saved settings: the blocks replaced. */
+  blocks?: ("instructions" | "verification" | "secretWords" | "providers")[];
+  /** For saved settings: the providers whose settings were replaced. */
+  providers?: string[];
+  /** For saved settings: the rules of verification made less prudent. */
+  loosened?: string[];
+}
+
+/** `GET /_mapo/ai/actions`, for the AI's admins: the changes of the period, newest first. */
+export interface MapoAiActionsAnswer {
+  days: number;
+  from: string;
+  to: string;
+  actions: MapoAiAction[];
+  /** Whether the period had more changes than the gateway lists at once. */
+  truncated: boolean;
+}
+
 /** The provider and the model of each task that `run` calls when the request names none. */
 export interface MapoAiDefaults {
   /** The provider's id. */

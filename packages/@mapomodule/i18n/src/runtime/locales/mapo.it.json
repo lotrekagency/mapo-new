@@ -514,6 +514,68 @@
             "modelNote": "Si salva solo se il server del provider lo elenca, chiesto con la chiave delle tue chiamate. Poi assegnalo nelle chiavi.",
             "cannotAdd": "L'app non consente agli admin di aggiungere modelli a questo provider."
           }
+        },
+        "usage": {
+          "title": "Consumi",
+          "titleMine": "I tuoi consumi",
+          "intro": "Le chiamate del periodo, lette dal registro: cosa è stato chiesto non c'è mai.",
+          "period": "Periodo",
+          "days": "Ultimi {n} giorni",
+          "calls": "Chiamate",
+          "outcomesLine": "{answered} con risposta, {refused} rifiutate, {failed} fallite",
+          "inputTokens": "Token del prompt",
+          "outputTokens": "Token della risposta",
+          "tokens": "Token (prompt / risposta)",
+          "cached": "{n} dalla cache o verso la cache",
+          "cost": "Costo",
+          "unpriced": "{n} chiamate di modelli senza prezzo dell'app non sono nel costo.",
+          "truncated": "Il periodo ha più chiamate di quante se ne leggono in una volta: i numeri sono delle più recenti.",
+          "empty": "Nessuna chiamata nel periodo.",
+          "byUser": "Per utente",
+          "byModel": "Per modello",
+          "byDay": "Per giorno (UTC)",
+          "recent": "Ultime chiamate",
+          "user": "Utente",
+          "model": "Modello",
+          "day": "Giorno",
+          "when": "Quando",
+          "task": "Compito",
+          "outcome": "Esito",
+          "tasks": {
+            "fill": "Compilare",
+            "extract": "Estrarre"
+          },
+          "outcomes": {
+            "answered": "Con risposta",
+            "refused": "Rifiutata",
+            "failed": "Fallita"
+          }
+        },
+        "actions": {
+          "title": "Cambi",
+          "intro": "Chi ha cambiato le chiavi e le impostazioni dell'AI, e quando. Mai una chiave, un'istruzione o una parola.",
+          "empty": "Nessun cambio nel periodo.",
+          "who": "Chi",
+          "what": "Cosa",
+          "details": "Dettagli",
+          "ofUser": "token dell'utente {user}",
+          "keyChanged": "chiave cambiata",
+          "loosened": "meno prudente: {rules}",
+          "truncated": "Sono elencati solo i 500 cambi più recenti del periodo.",
+          "kinds": {
+            "assignmentSaved": "Assegnazione salvata",
+            "assignmentRemoved": "Assegnazione tolta",
+            "groupsOrdered": "Ordine dei gruppi",
+            "tokenSaved": "Token personale salvato",
+            "tokenRemoved": "Token personale tolto",
+            "settingsSaved": "Come lavora l'AI cambiato"
+          },
+          "blocks": {
+            "instructions": "istruzioni",
+            "verification": "verifica",
+            "secretWords": "campi segreti",
+            "providers": "provider"
+          }
         }
       }
     }

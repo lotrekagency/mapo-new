@@ -107,6 +107,19 @@ export interface MapoAiProviderOptions {
   fallbacks?: boolean;
 }
 
+/**
+ * The price of a million tokens of a model, in the currency of
+ * `mapo.ai.prices`: the prompt's (`input`), the answer's with its
+ * reasoning (`output`), and the prompt's tokens read from or written to
+ * the provider's prompt cache, which cost as `input` unless set.
+ */
+export interface MapoAiModelPrice {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
 /** The options of `run`, read and complete: every value has its default. */
 export interface MapoAiRunOptions {
   /** The providers enabled, by id, in the order the app lists them. */
@@ -154,6 +167,15 @@ export interface MapoAiRunOptions {
   readers: Record<string, boolean>;
   limits: MapoAiLimits;
   audit: { retentionDays: number };
+  /**
+   * The app's prices of its models, for the costs the usage shows: by
+   * provider id, then model id. A model without a price shows its tokens
+   * only.
+   */
+  prices: {
+    currency: string;
+    providers: Record<string, Record<string, MapoAiModelPrice>>;
+  };
 }
 
 /** Seconds a call to a provider may take, unless `timeout` says otherwise. */
@@ -227,6 +249,7 @@ export function readRunOptions(
     readers: readersOf(options.readers, warn),
     limits: limitsOf(options.limits, warn),
     audit: auditOf(options.audit, warn),
+    prices: pricesOf(options.prices, warn),
   };
 }
 
@@ -754,6 +777,105 @@ function auditOf(
     );
   }
   return audit;
+}
+
+/** The currency of the costs when the app names none. */
+export const DEFAULT_CURRENCY = "USD";
+/** The most a price of a million tokens may be: a typo of zeros stays out. */
+const MAX_PRICE = 100_000;
+
+/**
+ * `mapo.ai.prices`: `{ currency?, providers: { [provider]: { [model]: price } } }`.
+ * A price that cannot be read is left out, with a warning: its model shows
+ * tokens only, never a wrong cost.
+ */
+function pricesOf(
+  value: unknown,
+  warn: (message: string) => void,
+): MapoAiRunOptions["prices"] {
+  const prices: MapoAiRunOptions["prices"] = {
+    currency: DEFAULT_CURRENCY,
+    providers: {},
+  };
+  if (value === undefined || value === null) return prices;
+  if (!isRecord(value)) {
+    warn(
+      "mapo.ai.prices is not { currency?, providers }, so the usage shows tokens only.",
+    );
+    return prices;
+  }
+  unknownKeys(value, ["currency", "providers"], "mapo.ai.prices", warn);
+  const { currency, providers } = value;
+  if (typeof currency === "string" && /^[A-Z]{3}$/.test(currency)) {
+    prices.currency = currency;
+  } else if (currency !== undefined) {
+    warn(
+      `mapo.ai.prices.currency is not a code of three capital letters, such as "EUR", so it is "${DEFAULT_CURRENCY}".`,
+    );
+  }
+  if (providers === undefined) return prices;
+  if (!isRecord(providers)) {
+    warn(
+      "mapo.ai.prices.providers is not an object of providers by id, so the usage shows tokens only.",
+    );
+    return prices;
+  }
+  for (const [id, models] of Object.entries(providers)) {
+    const option = `mapo.ai.prices.providers.${id}`;
+    if (!PROVIDER_ID.test(id) || !isRecord(models)) {
+      warn(`${option} is not an object of models by id: ignored.`);
+      continue;
+    }
+    const priced: Record<string, MapoAiModelPrice> = {};
+    for (const [model, price] of Object.entries(models)) {
+      const read = priceOf(price);
+      const isModelId = model.length > 0 && model.length <= MAX_MODEL_ID;
+      if (read && isModelId) priced[model] = read;
+      else {
+        warn(
+          `${option}.${model} is not { input, output, cacheRead?, cacheWrite? }, prices of a million tokens from 0 to ${MAX_PRICE}: ignored.`,
+        );
+      }
+    }
+    if (Object.keys(priced).length) prices.providers[id] = priced;
+  }
+  return prices;
+}
+
+/** A model's price, or `undefined` when it cannot be read. */
+function priceOf(value: unknown): MapoAiModelPrice | undefined {
+  if (!isRecord(value)) return undefined;
+  const names = ["input", "output", "cacheRead", "cacheWrite"] as const;
+  const hasOnlyPrices = Object.keys(value).every((key) =>
+    (names as readonly string[]).includes(key),
+  );
+  if (!hasOnlyPrices) return undefined;
+  const amount = (
+    raw: unknown,
+    isRequired: boolean,
+  ): number | null | undefined => {
+    if (raw === undefined && !isRequired) return undefined;
+    const isAmount =
+      typeof raw === "number" &&
+      Number.isFinite(raw) &&
+      raw >= 0 &&
+      raw <= MAX_PRICE;
+    return isAmount ? raw : null;
+  };
+  const input = amount(value.input, true);
+  const output = amount(value.output, true);
+  const cacheRead = amount(value.cacheRead, false);
+  const cacheWrite = amount(value.cacheWrite, false);
+  const values = [input, output, cacheRead, cacheWrite];
+  if (values.includes(null) || input == null || output == null) {
+    return undefined;
+  }
+  return {
+    input,
+    output,
+    ...(cacheRead !== undefined && cacheRead !== null ? { cacheRead } : {}),
+    ...(cacheWrite !== undefined && cacheWrite !== null ? { cacheWrite } : {}),
+  };
 }
 
 /** Warns about the keys of `value` the option does not have. */

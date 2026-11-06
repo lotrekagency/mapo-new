@@ -15,6 +15,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - `POST /_mapo/ai/run` fills one record (`fill`) or extracts every record a source describes (`extract`). The page sends the record's two descriptions, its backend schema and its form's fields, and the source; the gateway builds what the AI may fill, composes the prompt, calls the provider and reads its answer: each field comes back empty, filled (verified by a quote of the source, or to check) or discarded with a reason. The gateway never writes to the backend.
 - The module adds an **AI settings** page (`/ai-settings`), also a component, `MapoAiSettings`: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins assign keys to everyone, a group or a user.
 - The AI's admins change how the AI works in the whole app, on the same page: their instructions in every prompt, the rules of verification, the words that name a secret field, each cloud provider's prompt cache, Anthropic's fallbacks, and models they add where the app allows it (`adminModels`). The app's options stay the defaults; nothing the admins set removes Mapo's rules.
+- The same page shows the usage, read from the audit: the AI's admins see every user's calls of a period (7, 30 or 90 days) by user, model and day, the latest calls and the changes of the keys and the settings; each user sees their own. Tokens always, and a cost where the app gives the prices of its models (`prices`).
 - The keys come from three levels, nearest to the user first: the user's own token, where an admin allows one; the key the AI's admins assign to the user, to one of their groups or to everyone, with the models it opens; the project's key, in the server's environment. The browser never sees a key: `status` says which level gives it.
 - The providers `run` may call are the ones `providers` enables: Mapo's `mock`, which answers from fixtures, from lines such as `Title: About us`, or with a failure on command; `openai`, OpenAI's models through its Responses API; `anthropic`, Claude through Anthropic's Messages API; `ollama`, a model served by Ollama; `openai-compatible`, a model served by LM Studio, vLLM, llama.cpp or another server that speaks OpenAI's Chat Completions API; and the ones an app registers with `registerMapoAiProvider()`.
 - `POST /_mapo/ai/read` reads a file into the text `run` takes, with the reader of its format: text, Markdown, JSON, HTML, CSV and XLSX. An app puts its own reader in place of any of Mapo's or adds one (`registerMapoAiReader()`), touches up what any reader read (the `mapo-ai:read` hook), and turns a format off without code (`readers`). In the browser, `useMapoAiRead()` sends a file.
@@ -23,7 +24,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model answered, the tokens (those of the provider's prompt cache among them) and the outcome, never the contents, for 90 days by default (`audit`).
 - `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
-- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`, `MapoAiSettingsAnswer`, `MapoAiSettingsInput`, `MapoAiPreviewResponse`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
+- `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiModelPrice`, `MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`, `MapoAiSettingsAnswer`, `MapoAiSettingsInput`, `MapoAiPreviewResponse`, `MapoAiUsageAnswer`, `MapoAiActionsAnswer`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
 
 How the module is built, what its shared core already does and what comes next are described, for people who work on Mapo, in [Working on the AI module](/contributing/ai-module).
 
@@ -1007,6 +1008,48 @@ export default defineNuxtConfig({
 
 `PUT` answers 400 for a body that is not a change, naming where; 403 for what the app keeps from the admins (a model added where it allows none, Anthropic's fallbacks on where it turns them off); 422 for a model the provider's server does not list (`data.model`), or that cannot be asked about; 502 when the list cannot be read. The settings are one sealed record: one that is there and does not open closes the AI with a 503, as the keys do, instead of calling with fewer of the admins' words or rules.
 
+### Usage
+
+The page shows the usage of the AI, summed from [the audit](#the-audit) when it is read: nothing is written for it at each call. The AI's admins see every user's calls (`GET /_mapo/ai/usage`) and the changes of the keys and the settings (`GET /_mapo/ai/actions`); each user sees their own calls (`GET /_mapo/ai/usage/mine`). Never what was sent: the audit holds no source, instruction or value.
+
+- **A period**: the last 7, 30 or 90 days (`?days=`, 30 unless set, up to 3650), in UTC days. Only the records of the period are opened, since a record's key holds its day; at most 20,000, the newest, with `truncated` when there were more.
+- **Totals**, **by user** (admins only), **by model** (the model that answered) and **by day**: calls, how many were answered, refused or failed, and the tokens of the prompts and the answers, with those read from or written to a cache.
+- **The latest 50 calls**: when, who, the task and the entities' names, the provider and model, the outcome, the tokens and the time.
+- **A cost** only for the models the app prices: Mapo keeps no price list, since prices change and depend on the contract. A model without a price shows its tokens, and `unpricedCalls` counts its calls, which the cost leaves out.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  mapo: {
+    ai: {
+      prices: {
+        currency: "EUR",
+        providers: {
+          openai: {
+            "gpt-6.1-sol": {
+              input: 1.8,
+              output: 9,
+              cacheRead: 0.09,
+              cacheWrite: 2.25,
+            },
+          },
+        },
+      },
+    },
+  },
+});
+```
+
+A price is that of a million tokens, in `currency` (a code of three capital letters, `USD` unless set): the prompt's (`input`), the answer's with its reasoning (`output`), and the prompt's tokens read from or written to the provider's cache (`cacheRead`, `cacheWrite`), as `input` unless set. A call costs its fresh prompt tokens at `input`, its cached ones at their price, and its answer at `output`. A price that cannot be read is left out with a warning, never shown wrong.
+
+| Route                      | What it answers                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GET /_mapo/ai/usage`      | `MapoAiUsageAnswer`, every user's calls of the period, with `byUser`. AI admins only                  |
+| `GET /_mapo/ai/usage/mine` | `MapoAiUsageAnswer`, the user's own calls, without `byUser`. Every user the app lets use the AI       |
+| `GET /_mapo/ai/actions`    | `MapoAiActionsAnswer`, the changes of the keys and the settings of the period, the newest 500. Admins |
+
+Each answers 400 for `days` that is not a whole number from 1 to 3650, and 503 when the storage is closed.
+
 ## The prompt
 
 The gateway composes every prompt in layers, always in this order:
@@ -1115,7 +1158,7 @@ Every call that reaches a provider leaves a record in the storage, written as so
 
 A request refused before the provider leaves no record. Without an open storage, `run` answers 503 and calls nothing: a call that cannot be audited is not made. When writing a record fails after the call, the server's log says so, and the answer still reaches the user.
 
-Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. So does every change of the admins' settings (`settings-saved`): who, which blocks and providers, and which rules of verification it made less prudent than the app's or Mapo's defaults, never the instructions or the words. No route reads the audit.
+Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. So does every change of the admins' settings (`settings-saved`): who, which blocks and providers, and which rules of verification it made less prudent than the app's or Mapo's defaults, never the instructions or the words. The AI settings page reads both, for [the usage](#usage) and the changes; nothing else does.
 
 ## The secret and the storage
 
@@ -1204,6 +1247,7 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | `readers`      | `Record<string, boolean>`                                                                                      | `{}`: every reader on                  | The readers of `read` turned off, or on, by id ([Turn a format off](#turn-a-format-off)) |
 | `limits`       | `{ perUserPerMinute?: number; maxSourceChars?: number; maxInstructionsChars?: number; maxFileBytes?: number }` | `20`, `100000`, `2000`, `10485760`     | The limits of `run` and `read` ([Limits](#limits))                                       |
 | `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |
+| `prices`       | `{ currency?: string; providers: Record<string, Record<string, MapoAiModelPrice>> }`                           | None: tokens only                      | The prices of the app's models, for the usage's costs ([Usage](#usage))                  |
 | `settings`     | `{ path?: string \| false; label?: string; usersApi?: string; groupsApi?: string }`                            | `/ai-settings`, "AI settings"          | The AI settings page ([AI settings](#ai-settings))                                       |
 
 An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); every provider but the mock takes `adminModels` (`false` by default), which lets the AI's admins add models ([How the AI works](#how-the-ai-works)); `anthropic` takes `fallbacks` (`true` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).

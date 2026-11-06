@@ -5,15 +5,18 @@
  * allows it and checks the connection; the AI's admins also assign keys,
  * order the groups and remove the users' tokens, and change how the AI
  * works in the whole app: instructions, rules of verification, words of
- * secrets, the providers' cache, fallbacks and added models. It asks the gateway's
+ * secrets, the providers' cache, fallbacks and added models. Each user
+ * sees their own usage, the admins everyone's and the log of the changes. It asks the gateway's
  * `status`, so a user the app keeps out of the AI is told so.
  */
 import { onMounted, shallowRef } from "vue";
 import { useSettingsClient } from "../composables/settingsClient";
 import type { MapoAiStatus } from "../shared/gateway";
+import MapoAiSettingsActions from "./MapoAiSettingsActions.vue";
 import MapoAiSettingsBehaviour from "./MapoAiSettingsBehaviour.vue";
 import MapoAiSettingsKeys from "./MapoAiSettingsKeys.vue";
 import MapoAiSettingsPersonal from "./MapoAiSettingsPersonal.vue";
+import MapoAiSettingsUsage from "./MapoAiSettingsUsage.vue";
 
 const client = useSettingsClient();
 const { t } = client;
@@ -61,8 +64,13 @@ onMounted(load);
     />
     <template v-else-if="status">
       <MapoAiSettingsPersonal :status="status" @changed="load" />
-      <MapoAiSettingsKeys v-if="status.admin" @changed="load" />
-      <MapoAiSettingsBehaviour v-if="status.admin" @changed="load" />
+      <MapoAiSettingsUsage v-if="!status.admin" scope="mine" />
+      <template v-if="status.admin">
+        <MapoAiSettingsKeys @changed="load" />
+        <MapoAiSettingsBehaviour @changed="load" />
+        <MapoAiSettingsUsage scope="all" />
+        <MapoAiSettingsActions />
+      </template>
     </template>
     <p v-else-if="loading" class="text-sm text-muted">
       {{ t("mapo.ai.settings.loading") }}

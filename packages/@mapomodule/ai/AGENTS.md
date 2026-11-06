@@ -51,7 +51,8 @@ src/
   runtime/components/        the settings page's parts: MapoAiSettings (the page's content), ...Personal (preference,
                              token, check), ...Keys (assignments, order of the groups, tokens), ...Assignment (the
                              editor of one), ...Principal (a user or a group, searched on the backend), ...Behaviour
-                             (how the AI works, for the admins) with ...Instructions, ...Rules, ...Secrets, ...Providers
+                             (how the AI works, for the admins) with ...Instructions, ...Rules, ...Secrets, ...Providers,
+                             ...Usage (everyone's for the admins, the user's own), ...Actions (the changes)
   runtime/pages/             ai-settings.vue, the page the module adds
   runtime/server/auth/       who calls the gateway:
                                user.ts     the user read from `userInfoApi`'s answer (zod); the rules: admin, users,
@@ -92,6 +93,8 @@ src/
                              check of a connection: the provider's list of models with the user's key), admin.ts (the
                              admins' settings: the record, a change checked against the app, applied to a request;
                              pure), store.ts (the record in the storage, one change at a time, 503 when unreadable)
+  runtime/server/usage/      report.ts (the period, a call's cost, the sums by user, model and day, the changes; pure),
+                             read.ts (the audit's records of a period: only those its days file)
   runtime/server/body.ts     a request's body read up to a bound, for `run`, `read` and the keys
   runtime/server/prompts/    base.ts (Mapo's base rules, MAPO_AI_PROMPT_VERSION), compose.ts (the prompt in layers)
   runtime/server/storage/    the sealed storage of the gateway's state:
@@ -131,6 +134,7 @@ src/
 19. **The key nearest the user, never more than the admins decided.** For each provider the nearest assignment (the user's, their groups' by the admins' order, everyone's) decides the models, within those `mapo.ai.providers` enables, and whether personal tokens are allowed; the key is the user's token where allowed, else the first key up the assignments, else the project's (`keys/chain.ts`). Personal tokens are off unless an assignment allows them. A provider that needs a key and has none is refused before the call. The admins' record is one sealed record; one that is there and does not open closes the AI with a 503 instead of giving users more than the admins decided. No answer, log, error or audit record holds a key: `last4()` only, for a key of 16 characters or more, and zod's message is replaced for a key or a token. Mapo's providers are built again with the user's key at each request; an app's provider that declares `key` gets it as `request.apiKey`.
 20. **The settings page is a client, and checks nothing for the server.** Its components call the gateway's routes and the app's users and groups endpoints through `settingsClient.ts`, and every choice they offer (a preference, a token, an assignment) is checked again by the route. The preference applies only within what the user is given (`policyForUser()`). The check of a connection only lists a provider's models with the user's key, at no cost, within a timeout and 10 checks a minute per user, and names how it failed, never the key. The page is added only when the app has no route at its path, and `settings.path: false` leaves it out; labels come from `mapo.ai.settings.*` in both catalogs; the components' Tailwind classes reach the app through the `@source` of uikit's `main.css`.
 21. **The admins work within the app's frame, and their settings fail closed.** The app's options are the defaults: the admins change the instructions (layer 3 of the prompt), the rules of verification, the words of secrets and the prompt cache, and widen the models or the spending only where the app allows it (`adminModels`, `fallbacks`). `withAdminSettings()` applies their record to the options of each request; a record that does not open closes the AI with a 503, as the keys' does. A model they add is saved only once the provider's server lists it, asked with the admin's own key. The audit names the blocks changed and every rule made less prudent than the app's or Mapo's default, never the instructions or the words. Nothing removes Mapo's names of secrets (rule 8).
+22. **The usage is read, never counted.** It is summed from the audit when the page asks for it (`usage/`): `run` writes one record per call and nothing else. A reading opens only the records of its period, by the day their keys write, and a bounded number of them. The admins read every user's usage and the changes; a user only their own space. A cost exists only where the app prices the model (`mapo.ai.prices`): Mapo keeps no price list. The usage never shows what was sent, since the audit never holds it.
 
 ## Change together
 
@@ -152,6 +156,7 @@ src/
 | A part of the settings page      | `mapo.ai.settings.*` in both catalogs; uikit `main.css` if the folder moves; the check in `apps/example-ai`     |
 | A setting of the admins          | `settings/admin.ts`, `shared/gateway.ts`, its block of the page, `mapo.ai.settings.behaviour.*`, the docs       |
 | A name of a secret               | `SECRET_WORDS`, `SECRET_ENDINGS`, `SECRET_PAIRS` and `MAPO_SECRET_NAMES` in `entity.ts`; `entity.test.ts`       |
+| The audit record's format        | `AUDIT_RECORD_VERSION` (from the first release on), `usage/report.ts`, `usage.test.ts`, the docs' Usage         |
 | An option of `run`               | `run/options.ts` and its warnings, `MapoAiOptions` in `index.ts`, `module.test.ts`, the docs' options           |
 | The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), the reader in `shared/fill.ts`, `run.test.ts`, the docs    |
 | A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                               |

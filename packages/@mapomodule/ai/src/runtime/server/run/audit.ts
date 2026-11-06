@@ -7,12 +7,16 @@
  *   the prompt, the tokens, the outcome and how long it took. Never the
  *   source, the instructions, the values or the refusal's text;
  * - one record per change of the keys (an admin's assignment, the order of
- *   the groups, a user's own token), under `actions:`: who, what, for whom.
- *   Never a key.
+ *   the groups, a user's own token) or of the AI settings, under
+ *   `actions:`: who, what, for whom. Never a key, an instruction or a word.
+ *
+ * The usage (`usage/`) reads the calls' records, and the AI settings page
+ * the changes.
  */
 
 import { z } from "zod";
 import type {
+  MapoAiActionKind,
   MapoAiKeyLevel,
   MapoAiKeyScope,
   MapoAiUsage,
@@ -20,7 +24,13 @@ import type {
 import type { MapoAiProviderFailure } from "../providers/types";
 import type { PurposeStore } from "../storage/sealed";
 
-/** The format of an audit record: it goes up when the record changes shape. */
+/**
+ * The format of an audit record: it goes up when the record changes shape.
+ * Version 1 is the format of the first release, its optional fields
+ * included (the cache's tokens, the model that answered, the changes of
+ * the settings): no release wrote an older one. From the first change
+ * after it, a new version keeps the older one readable.
+ */
 export const AUDIT_RECORD_VERSION = 1;
 
 /** What became of a call: answered, refused by the model, or failed. */
@@ -154,13 +164,7 @@ export async function writeAudit(
 }
 
 /** A change of the keys or of the AI settings, as the audit keeps it. */
-export type MapoAiKeyAction =
-  | "assignment-saved"
-  | "assignment-removed"
-  | "groups-ordered"
-  | "token-saved"
-  | "token-removed"
-  | "settings-saved";
+export type MapoAiKeyAction = MapoAiActionKind;
 
 /** One change of the keys, as the audit keeps it: never a key. */
 export interface MapoAiKeyActionRecord {

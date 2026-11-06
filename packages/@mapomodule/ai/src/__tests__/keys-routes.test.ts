@@ -24,6 +24,8 @@ import type {
   MapoAiSettingsAnswer,
   MapoAiSettingsInput,
   MapoAiStatus,
+  MapoAiActionsAnswer,
+  MapoAiUsageAnswer,
 } from "../runtime/shared/gateway";
 
 const SECRET = "keys-test-secret-0123456789-abcdefghijklm";
@@ -145,7 +147,10 @@ async function gateway(): Promise<(request: Request) => Promise<Response>> {
     .post(`${PATH}/test`, await route("test.post"))
     .get(`${PATH}/settings`, await route("settings.get"))
     .put(`${PATH}/settings`, await route("settings.put"))
-    .post(`${PATH}/settings/preview`, await route("settings-preview.post"));
+    .post(`${PATH}/settings/preview`, await route("settings-preview.post"))
+    .get(`${PATH}/usage`, await route("usage.get"))
+    .get(`${PATH}/usage/mine`, await route("usage-mine.get"))
+    .get(`${PATH}/actions`, await route("actions.get"));
   return toWebHandler(createApp().use(router));
 }
 
@@ -1383,5 +1388,112 @@ describe("the routes of the AI settings — how the AI works", () => {
     const response = await handle(request("GET", "/settings", "admin"));
 
     expect(response.status).toBe(503);
+  });
+});
+
+describe("the routes of the usage and of the changes", () => {
+  async function usageOf(
+    handle: Handle,
+    path: string,
+    session: string,
+  ): Promise<MapoAiUsageAnswer> {
+    const response = await handle(request("GET", path, session));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const text = await response.text();
+    for (const secret of SECRETS) expect(text).not.toContain(secret);
+    return JSON.parse(text) as MapoAiUsageAnswer;
+  }
+
+  it("keeps everyone's usage and the changes to the AI's admins, and a user's own to them", async () => {
+    const handle = await gateway();
+
+    const statuses = await Promise.all([
+      handle(request("GET", "/usage", undefined)),
+      handle(request("GET", "/usage", "editor")),
+      handle(request("GET", "/actions", "editor")),
+      handle(request("GET", "/usage/mine", undefined)),
+      handle(request("GET", "/usage/mine", "editor")),
+    ]);
+
+    expect(statuses.map((response) => response.status)).toEqual([
+      401, 403, 403, 401, 200,
+    ]);
+  });
+
+  it("sums every user's calls for the admins, and only the user's own for them, never what was sent", async () => {
+    (runtime.config.mapoAi as Record<string, unknown>).prices = {
+      currency: "EUR",
+      providers: { acme: { "acme-1": { input: 1, output: 2 } } },
+    };
+    const handle = await gateway();
+    await runAs(handle, "editor");
+    await runAs(handle, "editor", "acme-2");
+    await runAs(handle, "writer");
+
+    const all = await usageOf(handle, "/usage?days=7", "admin");
+    const mine = await usageOf(handle, "/usage/mine", "editor");
+
+    expect(all.days).toBe(7);
+    expect(all.currency).toBe("EUR");
+    expect(all.totals.calls).toBe(3);
+    expect(all.byUser?.map((row) => [row.user.username, row.calls])).toEqual([
+      ["editor", 2],
+      ["writer", 1],
+    ]);
+    expect(all.byModel.map((row) => row.model).sort()).toEqual([
+      "acme-1",
+      "acme-2",
+    ]);
+    // acme-1 is priced, acme-2 is not.
+    expect(all.totals.cost).toBeGreaterThan(0);
+    expect(all.totals.unpricedCalls).toBe(1);
+    expect(mine.totals.calls).toBe(2);
+    expect(mine).not.toHaveProperty("byUser");
+    expect(mine.recent.every((one) => one.user.id === "2")).toBe(true);
+    expect(JSON.stringify(all)).not.toContain("About us");
+  });
+
+  it("lists the changes of the keys and of the settings, newest first, never a key", async () => {
+    const handle = await gateway();
+    await assign(handle, {
+      scope: { kind: "all" },
+      provider: "acme",
+      key: ALL_KEY,
+    });
+    await handle(
+      request("PUT", "/settings", "admin", {
+        verification: { soleNumber: false },
+      }),
+    );
+
+    const response = await handle(request("GET", "/actions?days=1", "admin"));
+    const text = await response.text();
+    const answer = JSON.parse(text) as MapoAiActionsAnswer;
+
+    expect(answer.actions.map((one) => one.action)).toEqual([
+      "settings-saved",
+      "assignment-saved",
+    ]);
+    expect(answer.actions[0]?.loosened).toEqual(["soleNumber"]);
+    expect(answer.actions[1]).toMatchObject({
+      by: { id: "1", username: "admin" },
+      provider: "acme",
+      scope: { kind: "all" },
+      keyChanged: true,
+    });
+    for (const secret of SECRETS) expect(text).not.toContain(secret);
+  });
+
+  it("refuses days it cannot read, and answers 503 without a storage", async () => {
+    const handle = await gateway();
+
+    const refused = await handle(request("GET", "/usage?days=0", "admin"));
+    (runtime.config.mapoAi as Record<string, unknown>).secret = "";
+    vi.resetModules();
+    const closed = await gateway();
+    const noStorage = await closed(request("GET", "/usage/mine", "editor"));
+
+    expect([refused.status, noStorage.status]).toEqual([400, 503]);
   });
 });

@@ -794,7 +794,7 @@ Reads the operator's files into text through the gateway's `read`, as `run` take
 
 ### `<MapoAiSettings />`
 
-The AI settings, as the page the module adds at `/ai-settings` shows them: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins also assign keys, order the groups and remove the users' tokens, and change how the AI works in the whole app: instructions, rules of verification, words of secret fields, the providers' prompt cache, Anthropic's fallbacks and the models they add. It has no props, events or slots. For a page of the app's own, set `mapo.ai.settings.path` to `false` and put the component in it. See [AI settings](/modules/ai#ai-settings).
+The AI settings, as the page the module adds at `/ai-settings` shows them: each user picks their provider and model, sees their key, saves their own token where allowed and checks the connection; the AI's admins also assign keys, order the groups and remove the users' tokens, and change how the AI works in the whole app: instructions, rules of verification, words of secret fields, the providers' prompt cache, Anthropic's fallbacks and the models they add; each user sees their own usage, the admins everyone's and the log of the changes. It has no props, events or slots. For a page of the app's own, set `mapo.ai.settings.path` to `false` and put the component in it. See [AI settings](/modules/ai#ai-settings).
 
 ---
 

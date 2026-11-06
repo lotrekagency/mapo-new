@@ -27,6 +27,7 @@ const RUN_DEFAULTS = {
     maxFileBytes: 10 * 1024 * 1024,
   },
   audit: { retentionDays: 90 },
+  prices: { currency: "USD", providers: {} },
 };
 
 /** What the mocked `@nuxt/kit` collects from the module's setup. */
@@ -337,6 +338,21 @@ describe("the module", () => {
         route: "/_mapo/ai/settings/preview",
         method: "post",
         handler: "resolved:./runtime/server/routes/settings-preview.post",
+      },
+      {
+        route: "/_mapo/ai/usage",
+        method: "get",
+        handler: "resolved:./runtime/server/routes/usage.get",
+      },
+      {
+        route: "/_mapo/ai/usage/mine",
+        method: "get",
+        handler: "resolved:./runtime/server/routes/usage-mine.get",
+      },
+      {
+        route: "/_mapo/ai/actions",
+        method: "get",
+        handler: "resolved:./runtime/server/routes/actions.get",
       },
     ]);
     expect(kit.imports).toEqual([

@@ -514,6 +514,68 @@
             "modelNote": "Saved only if the provider's server lists it, asked with the key your own calls use. Then assign it in the keys.",
             "cannotAdd": "The app lets no admin add models to this provider."
           }
+        },
+        "usage": {
+          "title": "Usage",
+          "titleMine": "Your usage",
+          "intro": "The calls of the period, read from the audit: what was asked never is.",
+          "period": "Period",
+          "days": "Last {n} days",
+          "calls": "Calls",
+          "outcomesLine": "{answered} answered, {refused} refused, {failed} failed",
+          "inputTokens": "Prompt tokens",
+          "outputTokens": "Answer tokens",
+          "tokens": "Tokens (prompt / answer)",
+          "cached": "{n} from or to the cache",
+          "cost": "Cost",
+          "unpriced": "{n} calls of models the app gives no price are not in the cost.",
+          "truncated": "The period has more calls than one reading takes: the figures are of the newest ones.",
+          "empty": "No call in the period.",
+          "byUser": "By user",
+          "byModel": "By model",
+          "byDay": "By day (UTC)",
+          "recent": "Latest calls",
+          "user": "User",
+          "model": "Model",
+          "day": "Day",
+          "when": "When",
+          "task": "Task",
+          "outcome": "Outcome",
+          "tasks": {
+            "fill": "Fill",
+            "extract": "Extract"
+          },
+          "outcomes": {
+            "answered": "Answered",
+            "refused": "Refused",
+            "failed": "Failed"
+          }
+        },
+        "actions": {
+          "title": "Changes",
+          "intro": "Who changed the keys and the AI settings, and when. Never a key, an instruction or a word.",
+          "empty": "No change in the period.",
+          "who": "Who",
+          "what": "What",
+          "details": "Details",
+          "ofUser": "token of user {user}",
+          "keyChanged": "key changed",
+          "loosened": "less prudent: {rules}",
+          "truncated": "Only the newest 500 changes of the period are listed.",
+          "kinds": {
+            "assignmentSaved": "Assignment saved",
+            "assignmentRemoved": "Assignment removed",
+            "groupsOrdered": "Groups ordered",
+            "tokenSaved": "Own token saved",
+            "tokenRemoved": "Own token removed",
+            "settingsSaved": "How the AI works changed"
+          },
+          "blocks": {
+            "instructions": "instructions",
+            "verification": "verification",
+            "secretWords": "secret fields",
+            "providers": "providers"
+          }
         }
       }
     }

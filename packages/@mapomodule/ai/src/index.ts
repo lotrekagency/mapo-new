@@ -4,7 +4,10 @@
  */
 
 import type { MapoAiAccessRule } from "./runtime/server/auth/user";
-import type { MapoAiProviderOptions } from "./runtime/server/run/options";
+import type {
+  MapoAiModelPrice,
+  MapoAiProviderOptions,
+} from "./runtime/server/run/options";
 import type { MapoAiLimits } from "./runtime/shared/gateway";
 import type { AiVerificationRules } from "./runtime/shared/sanitize";
 
@@ -21,6 +24,9 @@ export type {
   MapoAiKeyStatus,
   MapoAiLimits,
   MapoAiPreference,
+  MapoAiAction,
+  MapoAiActionKind,
+  MapoAiActionsAnswer,
   MapoAiPreviewInput,
   MapoAiPreviewResponse,
   MapoAiProviderSettings,
@@ -44,6 +50,12 @@ export type {
   MapoAiTextPart,
   MapoAiTokenInput,
   MapoAiUsage,
+  MapoAiUsageAnswer,
+  MapoAiUsageByDay,
+  MapoAiUsageByModel,
+  MapoAiUsageByUser,
+  MapoAiUsageCall,
+  MapoAiUsageTotals,
 } from "./runtime/shared/gateway";
 export type {
   MapoAiAccessRule,
@@ -70,7 +82,10 @@ export type {
   MapoAiPromptContext,
   MapoAiPromptEntity,
 } from "./runtime/server/run/run";
-export type { MapoAiProviderOptions } from "./runtime/server/run/options";
+export type {
+  MapoAiModelPrice,
+  MapoAiProviderOptions,
+} from "./runtime/server/run/options";
 export type { MapoAiEffort } from "./runtime/server/providers/cloud";
 export type { AiChoice } from "./runtime/shared/entity";
 export type {
@@ -213,10 +228,25 @@ export interface MapoAiOptions {
   limits?: Partial<MapoAiLimits>;
   /**
    * The audit of `run`: one sealed record per call, metadata only, kept
-   * `retentionDays` days.
+   * `retentionDays` days. The AI settings page reads it for the usage.
    * @default { retentionDays: 90 }
    */
   audit?: { retentionDays?: number };
+  /**
+   * The app's prices of its models, for the costs of the usage on the AI
+   * settings page: by provider id, then model id, the price of a million
+   * tokens of the prompt (`input`), of the answer with its reasoning
+   * (`output`), and of the prompt's tokens read from or written to the
+   * provider's cache (`cacheRead`, `cacheWrite`, as `input` unless set).
+   * Mapo keeps no price list: a model the app does not price shows its
+   * tokens only.
+   * @default { currency: "USD", providers: {} }
+   * @example { currency: "USD", providers: { openai: { "gpt-6.1-sol": { input: 2, output: 10, cacheRead: 0.1 } } } }
+   */
+  prices?: {
+    currency?: string;
+    providers: Record<string, Record<string, MapoAiModelPrice>>;
+  };
   /**
    * The AI settings page, which the module adds when the app has no page on
    * its path: each user picks their provider and model, sees the key in

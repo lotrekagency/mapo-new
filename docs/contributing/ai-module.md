@@ -11,9 +11,9 @@ The module is meant to help an operator enter data with a language model, in two
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-The foundations are in place; neither feature has its interface yet. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: they are the first pieces of Magic Fill, without its panel, and no page yet calls the routes of the keys. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+The foundations are in place; neither feature has its interface yet. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: they are the first pieces of Magic Fill, without its panel, and the AI settings page calls the routes of the keys. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
-What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): the usage in the AI settings, Magic Fill, readers for PDFs and images, then Import AI.
+What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): Magic Fill, readers for PDFs and images, then Import AI.
 
 ## How a value travels
 
@@ -52,6 +52,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
 | `src/runtime/server/keys/`        | The chain of keys, the admins' assignments in one sealed record, the users' own tokens, the key routes' wiring               |
 | `src/runtime/server/settings/`    | The settings page's server: the preference, the check of a connection, the admins' settings                                  |
+| `src/runtime/server/usage/`       | The usage and the changes, read from the audit and summed when read; their costs                                             |
 | `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read` and the routes of the keys                                            |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
@@ -641,6 +642,10 @@ The module adds a page at `/ai-settings` (`src/settings.ts` reads the option; `m
 | `src/runtime/components/MapoAiSettingsBehaviour.vue`  | How the AI works, for the admins; parts `…Instructions`, `…Rules`, `…Secrets`, `…Providers`   |
 | `src/runtime/server/settings/admin.ts`                | The admins' record: read, a change checked, applied to `run`; pure                            |
 | `src/runtime/server/settings/store.ts`                | The record in the `settings` purpose, one change at a time, 503                               |
+| `src/runtime/components/MapoAiSettingsUsage.vue`      | The usage of a period: everyone's for the admins, the user's own                              |
+| `src/runtime/components/MapoAiSettingsActions.vue`    | The changes of the keys and the settings, for the admins                                      |
+| `src/runtime/server/usage/report.ts`                  | The period, the cost of a call, the sums by user, model and day; pure                         |
+| `src/runtime/server/usage/read.ts`                    | The records of a period from the audit: only those of its days                                |
 
 ### The preference
 
@@ -656,6 +661,13 @@ One sealed record, `admin` in the `settings` purpose, outside every user's space
 
 - **Strengths**: the app keeps the frame (`adminModels`, `fallbacks`), and the admins work within it without a deploy; the preview shows the rules the model reads, with the instructions not saved yet; the audit names every looser rule; the words of secrets reach nested objects and lists' items.
 - **Weaknesses**: the words of secrets are matched on keys only, never on labels; a model the admins added that the provider later drops fails at the call, not when the server starts (the startup check knows the app's models only); the settings hold for the whole app, not for one entity (those come with the catalog).
+
+### The usage
+
+The usage is summed from the audit when the page asks for it (`usage/report.ts`), never at each call: `run` keeps writing one sealed record per call, in its user's space, and nothing else. `readUsageRecords()` lists the keys of the audit (every user's under `u:`, or one user's space) and opens only those of the period, since a key ends in its UTC day and time (`2026:11:06:t101530123-9f2c1e7a`); the newest 20,000 at most, with `truncated` past that. The log of the changes reads the `actions:` records the same way, the newest 500. A cost exists only where the app prices the model that answered (`mapo.ai.prices`), with the cache's tokens at their own price; Mapo keeps no list, so a stale price is never Mapo's. `AUDIT_RECORD_VERSION` stays 1: no release wrote an older format, and the first change after the first release raises it, keeping the older readable.
+
+- **Strengths**: nothing more to write per call, no counter to drift between processes; the period bounds what is opened; a user reads only their own space, which the keyed hash of their id names.
+- **Weaknesses**: each look lists every key the audit keeps, up to its retention, and opens the period's records, 50 at a time and 20,000 at most, on a file system one file each; the days are UTC days; the costs are as good as the app's prices.
 
 ### Users and groups by name
 
@@ -738,6 +750,7 @@ The whole core, the storage and the gateway run without network or UI, with Vite
 | `nested.test.ts`    | Nested values from the form to the outcome: lists, templates, objects, points, depth, every declaration                                            |
 | `keys.test.ts`      | The chain of keys, the assignments, the bodies of the routes; `keys-routes.test.ts` runs the routes: who, keys, tokens, audit                      |
 | `settings.test.ts`  | The users and groups of the backend, the check of a connection, the preference in the policy, the admins' settings                                 |
+| `usage.test.ts`     | The period, the days of a key, the cost of a call, the sums, the app's prices; the routes in `keys-routes.test.ts`                                 |
 | `sealed.test.ts`    | Values read back as sealed, nothing in clear in memory or on disk, records bound to their place, the sweep                                         |
 | `secret.test.ts`    | The secret read from the runtime config, the temporary one, and what the log says                                                                  |
 | `storage.test.ts`   | Where the default mount goes, and that the app's own mounts stay                                                                                   |
@@ -865,7 +878,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
-| AI settings                                      | The settings page: preferences, keys, the check of a connection  |
+| AI settings                                      | The settings page: preferences, keys, how the AI works, usage    |
 | The prompt, Verification, Limits, The audit      | The `run` route                                                  |
 | The secret and the storage                       | The encrypted storage                                            |
 | Options                                          | Every option, in the change that makes it work (written to date) |
@@ -874,7 +887,6 @@ Still to write, each with the work that fills it:
 
 | Section                       | Filled by                                                |
 | ----------------------------- | -------------------------------------------------------- |
-| AI settings                   | The AI settings: usage, read from the audit              |
 | Read a file (PDFs, images)    | The readers for PDFs and images                          |
 | Fill a form with Magic Fill   | Magic Fill                                               |
 | Verified and to check         | Magic Fill, from the verification described on this page |
@@ -890,10 +902,9 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **The usage in the AI settings**, in the page that exists: the usage read from the audit, by user and model, and the log of the changes of the keys and of the settings. The settings for one entity come with the catalog.
-2. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
-3. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
-4. **Import AI**, with a check for duplicates between new items and existing records.
+1. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
+2. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
+3. **Import AI**, with a check for duplicates between new items and existing records.
 
 ### Nice to have
 
