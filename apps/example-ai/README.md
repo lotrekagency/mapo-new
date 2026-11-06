@@ -12,7 +12,7 @@ pnpm build                # once after cloning
 pnpm dev:example-ai       # http://localhost:3002
 ```
 
-Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`, `writer` and `viewer` accounts (password equal to the username) are plain users: `editor` is in the group `editors`, `writer` in `editors` and `reporters`, `viewer` in none (`server/utils/session.ts`).
+Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`, `writer` and `viewer` accounts (password equal to the username) are plain users: `editor` is in the group `editors`, `writer` in `editors` and `reporters`, `viewer` in none (`server/utils/session.ts`). In development, the selector at the top right signs in as another account in one click (`app/components/DevUserSwitcher.vue`); to see two accounts at once, use a private window or another browser, since the session is one cookie per address.
 
 ## Pages
 
