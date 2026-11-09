@@ -664,7 +664,6 @@ export const RECIPES: Recipe[] = [
     task: "Fill a detail form with the AI from a pasted text",
     keywords: [
       "useMapoAiFill",
-      "magic fill",
       "pasted text",
       "fill the form",
       "detail extension",
@@ -677,6 +676,27 @@ export const RECIPES: Recipe[] = [
     seeAlso: ["uikit/detail.md", "uikit/form/annotations.md"],
     summary:
       "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore; undo() puts back what it wrote.",
+  },
+  {
+    id: "ai-magic-fill",
+    task: "Use Magic Fill, the AI panel of detail pages",
+    keywords: [
+      "magic fill",
+      "magicFill",
+      "disable",
+      "useMapoAiMagicFill",
+      "MapoAiMagicFillPanel",
+      "what i send to the ai",
+      "run/preview",
+      "cancel the call",
+      "undo all",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Magic Fill",
+    seeAlso: ["uikit/detail.md", "uikit/mapoverride.md"],
+    summary:
+      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the answer, with Undo all. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail) gives their state.",
   },
   {
     id: "ai-read-files",
@@ -791,7 +811,7 @@ export const RECIPES: Recipe[] = [
     doc: "modules/ai.md",
     heading: "How the AI works",
     summary:
-      "Experimental: on the AI settings page the AI's admins change how the AI works in the whole app (GET/PUT /_mapo/ai/settings, POST /_mapo/ai/settings/preview): their instructions (layer 3 of the prompt, after Mapo's and the app's), the rules of verification over mapo.ai.verification, words that keep a field from the AI besides Mapo's and mapo.ai.secretWords, the prompt cache of openai and anthropic, Anthropic's fallbacks (off; on only where the app's anthropic.fallbacks leaves them on), and models they add where the app sets providers.<id>.adminModels: true, saved once the provider's server lists them. The app's options stay the defaults; changes are audited, and an unreadable record closes the AI with 503.",
+      "Experimental: on the AI settings page the AI's admins change how the AI works in the whole app (GET/PUT /_mapo/ai/settings, POST /_mapo/ai/settings/preview): their instructions (layer 3 of the prompt, after Mapo's and the app's; every user of the AI reads them in Magic Fill's What I send to the AI), the rules of verification over mapo.ai.verification, words that keep a field from the AI besides Mapo's and mapo.ai.secretWords, the prompt cache of openai and anthropic, Anthropic's fallbacks (off; on only where the app's anthropic.fallbacks leaves them on), and models they add where the app sets providers.<id>.adminModels: true, saved once the provider's server lists them. The app's options stay the defaults; changes are audited, and an unreadable record closes the AI with 503.",
   },
   {
     id: "ai-usage",
