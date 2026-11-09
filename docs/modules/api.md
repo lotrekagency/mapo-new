@@ -720,7 +720,7 @@ Language context helpers for nested field components.
 
 ### `useMapoDetail()`
 
-The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel and `metadata()`, the endpoint's `OPTIONS` response requested once per page. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
+The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, `modelName` and `permissionModel`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel, `metadata()`, the endpoint's `OPTIONS` response requested once per page, and the page's `schemaFromMetadata`. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
 
 **Returns:** `MapoDetailContext<T> | undefined` — `undefined` outside a `MapoDetail`.
 

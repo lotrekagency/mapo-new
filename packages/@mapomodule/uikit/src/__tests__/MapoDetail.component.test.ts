@@ -451,6 +451,35 @@ describe("MapoDetail context", () => {
     expect(detail.isDirty.value).toBe(true);
   });
 
+  it("tells what the page names the record: its model, its permissions' model and how it reads OPTIONS", async () => {
+    const schemaFromMetadata = () => undefined;
+    const seen = mountWithProbe({
+      fields,
+      modelName: "Article",
+      permissionModel: "article",
+      schemaFromMetadata,
+    });
+    await settle();
+    const detail = seen.detail!;
+
+    expect(detail.modelName?.value).toBe("Article");
+    expect(detail.permissionModel?.value).toBe("article");
+    expect(detail.schemaFromMetadata?.value).toBe(schemaFromMetadata);
+  });
+
+  it("names nothing the page does not name", async () => {
+    const seen = mountWithProbe({ fields });
+    await settle();
+    const detail = seen.detail!;
+
+    // Optional in the type: MapoDetail still gives each, empty.
+    expect(detail.modelName?.value).toBeNull();
+    expect(detail.permissionModel).toBeDefined();
+    expect(detail.permissionModel?.value).toBeUndefined();
+    expect(detail.schemaFromMetadata).toBeDefined();
+    expect(detail.schemaFromMetadata?.value).toBeUndefined();
+  });
+
   it("saves through the context as the buttons do", async () => {
     const seen = mountWithProbe({ fields });
     await settle();

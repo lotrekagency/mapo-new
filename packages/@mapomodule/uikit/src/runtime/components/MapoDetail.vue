@@ -700,6 +700,8 @@ const context: MapoDetailContext<T> = {
   endpoint: computed(() => props.endpoint),
   id: computed(() => props.id),
   isNew,
+  modelName: computed(() => props.modelName ?? null),
+  permissionModel: computed(() => props.permissionModel),
   model,
   fields: activeFields,
   sidebarFields: computed(() => props.sidebarFields ?? []),
@@ -717,6 +719,7 @@ const context: MapoDetailContext<T> = {
   save,
   back,
   metadata: describe,
+  schemaFromMetadata: computed(() => props.schemaFromMetadata),
 };
 provide(DETAIL_KEY, context as unknown as MapoDetailContext);
 

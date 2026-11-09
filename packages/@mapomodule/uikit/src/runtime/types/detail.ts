@@ -4,6 +4,7 @@ import type {
   FieldAnnotations,
   FieldRegistry,
 } from "@mapomodule/form/types";
+import type { JSONSchema } from "@mapomodule/utils";
 
 /**
  * What `MapoDetail` shares with the components inside it: its slots, its forms
@@ -15,6 +16,18 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
   /** The record id; `"new"` for a record not created yet. */
   id: ComputedRef<string | number>;
   isNew: ComputedRef<boolean>;
+  /**
+   * The name of the record's model for people, as the page titles it
+   * (`modelName`): "Article"; `null` without one. `MapoDetail` always gives
+   * it; optional, so a context built elsewhere, as a test's, still compiles.
+   */
+  modelName?: ComputedRef<string | null>;
+  /**
+   * The backend model the page checks the permissions of (`permissionModel`):
+   * `article`; `undefined` without one. `MapoDetail` always gives it;
+   * optional, as `modelName`.
+   */
+  permissionModel?: ComputedRef<string | undefined>;
   /** The record being edited: write to it to change the values of the form. */
   model: Ref<T>;
   /** The body fields rendered: the `fields` prop, or the ones derived from the schema. */
@@ -55,6 +68,15 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
    * with `MapoDetail`, or `undefined` when the endpoint has none.
    */
   metadata: () => Promise<Record<string, unknown> | undefined>;
+  /**
+   * How the page turns the `OPTIONS` response into a JSON Schema
+   * (`schemaFromMetadata`), when it has its own way; `undefined`: Mapo's
+   * `metadataToJsonSchema`. `MapoDetail` always gives it; optional, as
+   * `modelName`.
+   */
+  schemaFromMetadata?: ComputedRef<
+    ((metadata: Record<string, unknown>) => JSONSchema | undefined) | undefined
+  >;
 }
 
 /**

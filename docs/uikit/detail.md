@@ -281,6 +281,7 @@ const detail = useMapoDetail<Article>(); // undefined outside a MapoDetail
 | Member                                                   | Type                                                  | What it is                                                                       |
 | -------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `endpoint`, `id`, `isNew`                                | `ComputedRef`                                         | The record and where it lives                                                    |
+| `modelName`, `permissionModel`                           | `ComputedRef<string \| null>`, `ComputedRef<string>`  | The props: the model's name for people, the model of the permissions             |
 | `model`                                                  | `Ref<T>`                                              | The record being edited: write to it to change the values of the form            |
 | `fields`, `sidebarFields`                                | `ComputedRef<AnyFieldDescriptor<T>[]>`                | The fields rendered: the props, or the ones derived from the schema              |
 | `languages`, `currentLang`                               | `ComputedRef<string[]>`, `Ref<string>`                | The languages of the record, and the one being edited: write to it to switch     |
@@ -291,6 +292,7 @@ const detail = useMapoDetail<Article>(); // undefined outside a MapoDetail
 | `extensions`                                             | `ComputedRef<boolean \| readonly string[]>`           | The extensions the page allows                                                   |
 | `save(andBack?)`, `back()`                               | functions                                             | What the buttons do; ignored while a save, a delete or a navigation is under way |
 | `metadata()`                                             | `() => Promise<Record<string, unknown> \| undefined>` | The endpoint's `OPTIONS` response, requested once per page (below)               |
+| `schemaFromMetadata`                                     | `ComputedRef`                                         | The prop: how the page reads a schema from `OPTIONS`, when it has its own        |
 
 **Write the record and mark what you wrote.** A component can fill the form and show where its values come from, as an importer or an assistant does:
 
