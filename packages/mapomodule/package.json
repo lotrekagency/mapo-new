@@ -1,6 +1,6 @@
 {
   "name": "mapomodule",
-  "version": "1.0.0",
+  "version": "2.0.0-beta.2",
   "description": "Mapo meta-package: registers and re-exports all @mapomodule/* modules",
   "type": "module",
   "license": "MIT",
@@ -34,7 +34,6 @@
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
     "build": "nuxt-module-build build",
-    "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
