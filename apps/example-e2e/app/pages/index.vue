@@ -108,6 +108,11 @@ const sections = [
         desc: "The panel on every detail page: a text or files, What I send, the model, the summary, Cancel and Undo all",
       },
       {
+        label: "Magic Fill off",
+        to: "/ai/magic-fill-off/new",
+        desc: "The same article on a page with definePageMeta({ magicFill: false }): no button, no banner",
+      },
+      {
         label: "Fill a new article",
         to: "/ai/fill/new",
         desc: "useMapoAiFill through run with the mock: verified values, marks, Apply, Undo, failures",
