@@ -1461,6 +1461,9 @@ describe("the routes of the usage and of the changes", () => {
       provider: "acme",
       key: ALL_KEY,
     });
+    // A record's key holds its millisecond: two changes in the same one have
+    // no order, so the second comes in the next.
+    await new Promise((resolve) => setTimeout(resolve, 2));
     await handle(
       request("PUT", "/settings", "admin", {
         verification: { soleNumber: false },
