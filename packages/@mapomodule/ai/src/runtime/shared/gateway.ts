@@ -704,6 +704,65 @@ export type MapoAiRunResponse =
       refusal: string;
     });
 
+/** A field of an entity, as the preview of a call names it. */
+export interface MapoAiPreviewField {
+  /** Its key: a value path of the form, such as `seo.title`. */
+  key: string;
+  /** Its label, when the descriptions give one. */
+  label?: string;
+}
+
+/** A field the AI leaves alone, and why. */
+export interface MapoAiPreviewSkipped extends MapoAiPreviewField {
+  /**
+   * `secret`, `readonly`, `excluded`, `media`, `relation`, `unsupported` and
+   * `conflict` from the entity model; `too-deep` for a list nested deeper
+   * than every provider accepts.
+   */
+  reason: string;
+}
+
+/** One entity of a call, as the preview of the call shows it. */
+export interface MapoAiPreviewEntity {
+  /** Its type in an extraction. */
+  type?: string;
+  /** Its name for people. */
+  label?: string;
+  /** The fields the AI may fill, in the form's order. */
+  fields: MapoAiPreviewField[];
+  /** The fields kept away from the AI. */
+  skipped: MapoAiPreviewSkipped[];
+}
+
+/**
+ * The answer of `POST /_mapo/ai/run/preview`, which takes the body of `run`:
+ * what `run` would send for it, for "What I send to the AI". The gateway
+ * checks and composes as `run` does, the app's `mapo-ai:prompt` hooks
+ * included, and calls no provider, counts no call and audits nothing.
+ */
+export interface MapoAiRunPreviewResponse {
+  task: "fill" | "extract";
+  /** The provider and model `run` would call. */
+  provider: { id: string; model: string };
+  /** The version of Mapo's base rules. */
+  prompt: number;
+  /**
+   * Layers 1–4 of the prompt, as the model reads them: Mapo's rules, the
+   * app's (those its hooks add for this request included), the admins'
+   * instructions, and what the records are.
+   */
+  instructions: string;
+  /** Layer 5: the operator's instructions, as the model reads them. */
+  operator?: string;
+  /**
+   * Layer 6, the source: each part by its name and its characters. Its
+   * text is the page's own, and never comes back.
+   */
+  parts: { name?: string; chars: number }[];
+  /** What the AI is asked of each entity, and what it leaves alone. */
+  entities: MapoAiPreviewEntity[];
+}
+
 // ─── read ────────────────────────────────────────────────────────────────────
 
 /**

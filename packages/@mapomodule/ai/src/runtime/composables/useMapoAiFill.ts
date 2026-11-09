@@ -147,8 +147,10 @@ export interface MapoAiFill {
    */
   undo(): void;
   /**
-   * Stops waiting for the answer. The gateway still finishes the call, and
-   * counts it against the user's limit.
+   * Stops waiting for the answer, and closes the request: the gateway
+   * stops the provider's call, which counts against the user's limit once
+   * the provider was called. Behind a proxy that keeps the request open,
+   * or on an edge runtime, the call runs until it ends.
    */
   cancel(): void;
   /** A call is waiting for its answer. */

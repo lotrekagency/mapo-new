@@ -229,6 +229,12 @@ export default defineNuxtModule<MapoAiOptions>({
       method: "post",
       handler: resolver.resolve("./runtime/server/routes/run.post"),
     });
+    // What a call would send, for "What I send to the AI": it calls nothing.
+    addServerHandler({
+      route: `${MAPO_AI_GATEWAY_PATH}/run/preview`,
+      method: "post",
+      handler: resolver.resolve("./runtime/server/routes/run-preview.post"),
+    });
     // The keys: the admins assign them, each user saves their own token
     // where an assignment allows one; the AI settings: the user's
     // preference, the check of a provider's connection, how the AI works

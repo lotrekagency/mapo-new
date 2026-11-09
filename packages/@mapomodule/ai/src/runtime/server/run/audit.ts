@@ -36,6 +36,12 @@ export const AUDIT_RECORD_VERSION = 1;
 /** What became of a call: answered, refused by the model, or failed. */
 export type MapoAiAuditOutcome = "answered" | "refused" | "failed";
 
+/**
+ * Why a call failed: one of the provider's failures; `cancelled` when the
+ * page stopped it, closing its request; `error` for anything else.
+ */
+export type MapoAiAuditFailure = MapoAiProviderFailure | "cancelled" | "error";
+
 /** One call to `run`, as the audit keeps it. */
 export interface MapoAiAuditRecord {
   v: typeof AUDIT_RECORD_VERSION;
@@ -65,8 +71,8 @@ export interface MapoAiAuditRecord {
   prompt: number;
   usage: MapoAiUsage;
   outcome: MapoAiAuditOutcome;
-  /** For a failed call, why: one of the provider's failures, or `error` for anything else. */
-  failure?: MapoAiProviderFailure | "error";
+  /** For a failed call, why. */
+  failure?: MapoAiAuditFailure;
   /** How long the provider took, in milliseconds. */
   durationMs: number;
 }
@@ -114,6 +120,7 @@ const AUDIT_RECORD = z.strictObject({
       "refused-request",
       "too-long",
       "truncated",
+      "cancelled",
       "error",
     ])
     .optional(),

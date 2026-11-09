@@ -68,7 +68,7 @@ The gateway is a set of routes on your app's own Nitro server, under `/_mapo/ai/
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /_mapo/ai/status` | The version of the gateway's contract, whether the app lets the user use the AI and whether they administer it; to a user the app lets in, the `providers` with their models, the `default`, the `limits` and the `readers`; to an admin, also `storage` |
 | `POST /_mapo/ai/read`  | The text of a file, as `run` takes it, or why there is none ([Read a file](#read-a-file))                                                                                                                                                                |
-| `POST /_mapo/ai/run`   | What the AI proposes for a record, or for the records of a source, read field by field ([Ask the AI](#ask-the-ai))                                                                                                                                       |
+| `POST /_mapo/ai/run`   | What the AI proposes for a record, or for the records of a source, read field by field ([Ask the AI](#ask-the-ai)); `run/preview`, what a call would send, calling nothing ([Preview a call](#preview-a-call))                                           |
 | `/_mapo/ai/keys`       | For the AI's admins: the keys they assign to everyone, a group or a user, the models they open, and the order of the groups ([Keys](#keys))                                                                                                              |
 | `/_mapo/ai/token`      | The user's own token for a provider, where an admin's assignment allows one ([Personal tokens](#personal-tokens))                                                                                                                                        |
 | `/_mapo/ai/test`       | Checks a provider's connection with the user's key, at no cost; `PUT` and `DELETE /_mapo/ai/preferences` save and remove the user's provider and model ([AI settings](#ai-settings))                                                                     |
@@ -325,10 +325,10 @@ In this order, and a request stops at the first refusal:
 6. the user's limit per minute, looked at without counting the call (429);
 7. what the AI may fill: nothing to fill, two entities of an extraction at one endpoint, or descriptions too large or too deep for the providers get a 422;
 8. the app's `mapo-ai:prompt` hooks (a hook that throws fails the request with a 500);
-9. the limit counts the call (429 when calls made meanwhile used it up), and the provider is called, within its `timeout`;
+9. the limit counts the call (429 when calls made meanwhile used it up), and the provider is called, within its `timeout`, while the page waits;
 10. the audit of the call, as soon as the provider answers, then the answer, read against what was asked.
 
-A request counts against the user's limit only once it reaches step 9, whatever the provider then does.
+A request counts against the user's limit only once it reaches step 9, whatever the provider then does. A page that goes away closes its request, as `cancel()` of [`useMapoAiFill()`](#fill-a-detail-form) does: before step 9 the request is dropped, not counted and not audited; after it, the gateway stops the provider's call, which frees a model on your own server, and the audit says `cancelled`. Where the server has no Node response to watch, as on an edge runtime, or a proxy in front keeps the request open, the call runs until it answers or its `timeout`.
 
 The permission on the model keeps the gateway in step with an honest page, which offers the AI only where the user may add or change a record. It is not a boundary: a request names the model it wants, or none. What may spend is decided by `users`, the `mapo-ai:user` hook and the limits.
 
@@ -346,7 +346,37 @@ The permission on the model keeps the gateway in step with an honest page, which
 | 503    | No provider, no key for it, the storage closed or its keys unreadable, or the provider busy (`Retry-After`)           |
 | 504    | The provider did not answer within its `timeout`                                                                      |
 
-A provider that needs a key is refused with a 503 before it is called when no level gives the user one, and every call while the admins' keys cannot be read ([Keys](#keys)). When the provider fails, the answer's `data.failure` names how: `timeout`, `rate-limit`, `unavailable`, `invalid-response`, `refused-request`, `too-long` (413), `truncated` (a cut answer, 502) or `error`. Why it failed goes to the server's log, never to the browser.
+A provider that needs a key is refused with a 503 before it is called when no level gives the user one, and every call while the admins' keys cannot be read ([Keys](#keys)). When the provider fails, the answer's `data.failure` names how: `timeout`, `rate-limit`, `unavailable`, `invalid-response`, `refused-request`, `too-long` (413), `truncated` (a cut answer, 502) or `error`. Why it failed goes to the server's log, never to the browser. A call stopped because its page went away answers no one: the audit records it as `cancelled`, and the log says nothing.
+
+### Preview a call
+
+`POST /_mapo/ai/run/preview` takes the body of `run` and answers what `run` would send for it, without calling anything, so a page can show the operator the prompt as the model would read it, before they send.
+
+It checks what `run` checks before the call: the session, the provider and the model, the user's permission on the model and what the AI may fill, with the same errors. It composes the prompt as `run` does, with the app's rules, the admins' and those the app's `mapo-ai:prompt` hooks add, which are told it is a preview (`preview: true`). It calls no provider, counts nothing against `perUserPerMinute` and leaves no audit record. Previews have a limit of their own, 30 a minute per user (429, with `Retry-After`).
+
+Its answer holds the rules as the model reads them: Mapo's, the app's, those the hooks add and the admins' instructions. Whoever the AI is open to can read them, on any record, since the permission on the model is no boundary ([What the gateway checks](#what-the-gateway-checks)): a rule holds nothing those users should not read.
+
+```json
+{
+  "task": "fill",
+  "provider": { "id": "mock", "model": "mock" },
+  "prompt": 1,
+  "instructions": "# Rules (Mapo, version 1)\n…\n# The record\n…",
+  "operator": "# The operator's instructions\n…\nOnly the title.",
+  "parts": [{ "name": "about.md", "chars": 15 }],
+  "entities": [
+    {
+      "label": "Article",
+      "fields": [{ "key": "title", "label": "Title" }],
+      "skipped": [
+        { "key": "password", "label": "Password", "reason": "secret" }
+      ]
+    }
+  ]
+}
+```
+
+`instructions` holds the layers that stay the same from one request to the next, as the model reads them ([The prompt](#the-prompt)), and `operator` the operator's own instructions. `parts` names each part of the source with its length, never its text, which is the page's own. `entities` lists, for each record, the fields the AI is asked for and those it leaves alone, with why: `secret`, `readonly`, `excluded`, `media`, `relation`, `unsupported`, `conflict`, or `too-deep` for a list nested deeper than the providers accept. The answer never holds a key.
 
 ## Fill a detail form
 
@@ -407,7 +437,7 @@ It returns:
 | `restore(path)`       | Puts back what the field held before the AI's value went in, when the field still holds that value                                                                                                                                                         |
 | `dismiss(path?)`      | Removes the mark of a field, or every mark; the values stay                                                                                                                                                                                                |
 | `undo()`              | Puts back every field that still holds the AI's value, as it was before, and removes the marks                                                                                                                                                             |
-| `cancel()`            | Stops waiting for the answer; the gateway still finishes the call, which counts against the user's limit                                                                                                                                                   |
+| `cancel()`            | Stops waiting and closes the request: the gateway stops the provider's call ([What the gateway checks](#what-the-gateway-checks)), which counts against the user's limit once the provider was called                                                      |
 | `pending`             | A call waits for its answer                                                                                                                                                                                                                                |
 | `error`               | Why the last call got no answer: the gateway's `status` (`0` without one), a `message` for the operator and, when the gateway sends `Retry-After` (429, 503), `retryAfter` in seconds                                                                      |
 | `response`            | The last answer of `run`: the outcomes, or the model's refusal (`status: "refused"`)                                                                                                                                                                       |
@@ -1099,6 +1129,7 @@ export default defineNitroPlugin((nitroApp) => {
 | `user`, `admin` | Who asks, as the gateway reads them, and whether they administer the AI                         |
 | `task`          | `fill` or `extract`                                                                             |
 | `entities`      | The entities of the request: their `type`, `label`, `endpoint` and `model`, never their schemas |
+| `preview`       | `true` for a [preview of the call](#preview-a-call): no provider is called                      |
 | `addRule(rule)` | Adds a rule for this request, after `instructions`; blank text adds nothing                     |
 
 The context is read-only: a hook adds rules, and cannot remove what Mapo, `instructions` or another hook wrote. A hook that throws fails the request with a 500. A rule that changes from one request to the next keeps a provider from reusing its cache of the stable layers.
@@ -1154,9 +1185,9 @@ Past either length of `run` the request gets a 413. Besides the source and the i
 
 ## The audit
 
-Every call that reaches a provider leaves a record in the storage, written as soon as the provider answers, before its answer is read: who made it and when, the task, the entities (`type`, `label`, `endpoint`, `model`), the provider and the model that answered, for a provider that calls with a key the level that gave it (`key`, never the key), the version of the prompt, the tokens (those of the provider's [prompt cache](#the-prompt-cache) among them), the outcome (`answered`, `refused`, or `failed` with why) and how long it took. A call that failed after the provider started answering, as an answer cut at its cap, keeps the tokens the provider says it used: it is paid. Never the source, the instructions, the values or the text of a refusal. Records are sealed like the rest of the state, filed in the space of their user, and expire after `audit.retentionDays` days, 90 by default.
+Every call that reaches a provider leaves a record in the storage, written as soon as the provider answers, before its answer is read: who made it and when, the task, the entities (`type`, `label`, `endpoint`, `model`), the provider and the model that answered, for a provider that calls with a key the level that gave it (`key`, never the key), the version of the prompt, the tokens (those of the provider's [prompt cache](#the-prompt-cache) among them), the outcome (`answered`, `refused`, or `failed` with why: `cancelled` when the page went away) and how long it took. A call that failed after the provider started answering, as an answer cut at its cap, keeps the tokens the provider says it used: it is paid. Never the source, the instructions, the values or the text of a refusal. Records are sealed like the rest of the state, filed in the space of their user, and expire after `audit.retentionDays` days, 90 by default.
 
-A request refused before the provider leaves no record. Without an open storage, `run` answers 503 and calls nothing: a call that cannot be audited is not made. When writing a record fails after the call, the server's log says so, and the answer still reaches the user.
+A request refused before the provider leaves no record, nor does a [preview](#preview-a-call). Without an open storage, `run` answers 503 and calls nothing: a call that cannot be audited is not made. When writing a record fails after the call, the server's log says so, and the answer still reaches the user.
 
 Every change of the keys leaves a record too, under `actions:` in the audit's own space: an admin's assignment saved (and whether its key changed) or removed, the order of the groups, a user's own token saved or removed, with who did it and for whom. Never a key. So does every change of the admins' settings (`settings-saved`): who, which blocks and providers, and which rules of verification it made less prudent than the app's or Mapo's defaults, never the instructions or the words. The AI settings page reads both, for [the usage](#usage) and the changes; nothing else does.
 

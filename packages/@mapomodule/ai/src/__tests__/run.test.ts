@@ -1,7 +1,14 @@
 import { createServer, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createApp, createRouter, toNodeListener, toWebHandler } from "h3";
+import {
+  createApp,
+  createRouter,
+  readRawBody,
+  toNodeListener,
+  toWebHandler,
+} from "h3";
+import type { H3Event } from "h3";
 import { createStorage, prefixStorage } from "unstorage";
 import type { Storage } from "unstorage";
 import memoryDriver from "unstorage/drivers/memory";
@@ -13,6 +20,7 @@ import { createSealedStorage } from "../runtime/server/storage/sealed";
 import { MAPO_AI_GATEWAY_PATH } from "../runtime/shared/gateway";
 import { documented } from "./servers";
 import type {
+  MapoAiRunPreviewResponse,
   MapoAiRunRequest,
   MapoAiRunResponse,
 } from "../runtime/shared/gateway";
@@ -1379,5 +1387,326 @@ describe("POST /_mapo/ai/run — the prompt and the app's providers", () => {
       key: "code",
       pattern: "^(a+)+$",
     });
+  });
+});
+
+describe("POST /_mapo/ai/run — a page that goes away", () => {
+  /** The run route on a Node server, as Nitro serves it with the node presets. */
+  async function nodeGateway(): Promise<{
+    port: number;
+    close: () => Promise<unknown>;
+  }> {
+    const run = (await import("../runtime/server/routes/run.post")).default;
+    const server = createServer(
+      toNodeListener(createApp().use(createRouter().post(runPath, run))),
+    );
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const { port } = server.address() as AddressInfo;
+    return {
+      port,
+      close: () => new Promise((resolve) => server.close(resolve)),
+    };
+  }
+
+  /** Sends a request of run and closes it after `ms`, as a page that goes away does. */
+  function sendAndLeave(
+    port: number,
+    body: unknown,
+    ms: number,
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      const request = httpRequest({
+        host: "127.0.0.1",
+        port,
+        method: "POST",
+        path: runPath,
+        headers: {
+          "content-type": "application/json",
+          cookie: "sessionid=editor",
+        },
+      });
+      request.on("error", () => resolve());
+      request.end(JSON.stringify(body));
+      setTimeout(() => {
+        request.destroy();
+        resolve();
+      }, ms);
+    });
+  }
+
+  /** The audit once it holds `count` records, waiting two seconds at most. */
+  async function auditedSoon(count: number): Promise<MapoAiAuditRecord[]> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const records = await auditRecords();
+      if (records.length >= count) return records;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return auditRecords();
+  }
+
+  it("stops the provider's call, audits it as cancelled without an error in the log, and counts it", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { mock: { timeout: 30 } },
+      limits: { perUserPerMinute: 1 },
+    };
+    const server = await nodeGateway();
+    try {
+      const started = Date.now();
+      // The mock never answers `#mock:timeout`: only its signal stops it.
+      await sendAndLeave(server.port, fillBody("#mock:timeout"), 150);
+      const records = await auditedSoon(1);
+
+      expect(records).toMatchObject([
+        { outcome: "failed", failure: "cancelled" },
+      ]);
+      expect(Date.now() - started).toBeLessThan(5000);
+      expect(
+        logged.mock.calls.some((call) => String(call[0]).includes("failed")),
+      ).toBe(false);
+      // It reached the provider: it counts against the limit.
+      const next = await (
+        await gateway()
+      )(runRequest(fillBody("Title: About us")));
+      expect(next.status).toBe(429);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("neither counts nor audits a call whose page went away before the provider was called", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      limits: { perUserPerMinute: 1 },
+    };
+    onHook(
+      "mapo-ai:prompt",
+      () => new Promise((resolve) => setTimeout(resolve, 300)),
+    );
+    const server = await nodeGateway();
+    try {
+      await sendAndLeave(server.port, fillBody("Title: About us"), 100);
+      // The hook ends, and the gateway finds the page gone.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      expect(await auditRecords()).toEqual([]);
+      const next = await (
+        await gateway()
+      )(runRequest(fillBody("Title: About us")));
+      expect(next.status).toBe(200);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("neither calls nor audits for a page that went away while its session was read", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      limits: { perUserPerMinute: 1 },
+    };
+    // The app's user hook reads the body, as an app's middleware may, and
+    // takes its time: the page leaves meanwhile, and the body is still there.
+    let first = true;
+    onHook("mapo-ai:user", async (context) => {
+      if (!first) return;
+      first = false;
+      await readRawBody((context as { event: H3Event }).event);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    const server = await nodeGateway();
+    try {
+      await sendAndLeave(server.port, fillBody("Title: About us"), 100);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      expect(await auditRecords()).toEqual([]);
+      const next = await (
+        await gateway()
+      )(runRequest(fillBody("Title: About us")));
+      expect(next.status).toBe(200);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("audits a provider that names its failure cancelled as an error: only the gateway cancels", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      providers: { acme: {} },
+    };
+    const { registerMapoAiProvider } = await providers();
+    const { MapoAiProviderError } =
+      await import("../runtime/server/providers/types");
+    registerMapoAiProvider({
+      id: "acme",
+      capabilities: {
+        structuredOutput: "json",
+        pdf: false,
+        images: false,
+        streaming: false,
+        tools: false,
+      },
+      models: ["acme-1"],
+      run: async () => {
+        throw new MapoAiProviderError("cancelled" as never, "Not mine to say");
+      },
+    });
+
+    const response = await (
+      await gateway()
+    )(runRequest(fillBody("Title: About us")));
+
+    expect(response.status).toBe(502);
+    expect(await auditRecords()).toMatchObject([
+      { outcome: "failed", failure: "error" },
+    ]);
+  });
+});
+
+describe("POST /_mapo/ai/run/preview", () => {
+  const previewPath = `${MAPO_AI_GATEWAY_PATH}/run/preview`;
+
+  /** The run route and its preview on a bare h3 app. */
+  async function previewGateway(): Promise<
+    (request: Request) => Promise<Response>
+  > {
+    const run = (await import("../runtime/server/routes/run.post")).default;
+    const preview = (await import("../runtime/server/routes/run-preview.post"))
+      .default;
+    const router = createRouter().post(runPath, run).post(previewPath, preview);
+    return toWebHandler(createApp().use(router));
+  }
+
+  function previewRequest(body: unknown, session?: string): Request {
+    return new Request(`http://localhost${previewPath}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(session ? { cookie: `sessionid=${session}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("answers 401 without a session, and 403 without the permission run would ask", async () => {
+    const handle = await previewGateway();
+    const body = fillBody("Title: About us");
+
+    expect((await handle(previewRequest(body))).status).toBe(401);
+    // The writer may change articles, not add them.
+    expect((await handle(previewRequest(body, "writer"))).status).toBe(403);
+    expect(
+      (await handle(previewRequest({ ...body, existing: true }, "writer")))
+        .status,
+    ).toBe(200);
+  });
+
+  it("shows the layers as run composes them, the parts by name and length, and the fields asked and kept away", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      instructions: { all: "Prices are in euros." },
+    };
+    onHook("mapo-ai:prompt", (context) => {
+      (context as MapoAiPromptContext).addRule("A rule of the hook.");
+    });
+    const fields = {
+      type: "object",
+      properties: {
+        ...ARTICLE_FIELDS.properties,
+        password: { type: "string", title: "Password" },
+      },
+    };
+    const body = {
+      task: "fill",
+      entity: { fields, label: "Article", model: "article" },
+      parts: [{ kind: "text", text: "Title: About us", name: "about.md" }],
+      instructions: "Only the title.",
+    };
+
+    const response = await (
+      await previewGateway()
+    )(previewRequest(body, "editor"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const preview = (await response.json()) as MapoAiRunPreviewResponse;
+    expect(preview.provider).toEqual({ id: "mock", model: "mock" });
+    const order = [
+      "# Rules (Mapo, version 1)",
+      "# The app's rules",
+      "Prices are in euros.",
+      "A rule of the hook.",
+      "# The record",
+      '"Article"',
+    ].map((text) => preview.instructions.indexOf(text));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(preview.operator).toContain("# The operator's instructions");
+    expect(preview.operator).toContain("Only the title.");
+    expect(preview.parts).toEqual([{ name: "about.md", chars: 15 }]);
+    expect(preview.entities).toEqual([
+      {
+        label: "Article",
+        fields: [
+          { key: "title", label: "Title" },
+          { key: "summary", label: "Summary" },
+          { key: "status", label: "Status" },
+        ],
+        skipped: [{ key: "password", label: "Password", reason: "secret" }],
+      },
+    ]);
+    // The source's text is the page's own: it never comes back.
+    expect(JSON.stringify(preview)).not.toContain("About us");
+  });
+
+  it("calls no provider, audits nothing, counts nothing against run's limit, and tells the hooks it is a preview", async () => {
+    runtime.config.mapoAi = {
+      ...(runtime.config.mapoAi as object),
+      limits: { perUserPerMinute: 1 },
+    };
+    const previews: boolean[] = [];
+    onHook("mapo-ai:prompt", (context) => {
+      previews.push((context as MapoAiPromptContext).preview);
+    });
+    const handle = await previewGateway();
+    const body = fillBody("Title: About us");
+
+    for (let count = 0; count < 3; count++) {
+      expect((await handle(previewRequest(body, "editor"))).status).toBe(200);
+    }
+    expect(await auditRecords()).toEqual([]);
+    expect((await handle(runRequest(body))).status).toBe(200);
+    expect(await auditRecords()).toHaveLength(1);
+    expect(previews).toEqual([true, true, true, false]);
+  });
+
+  it("has a limit of its own, thirty previews a minute, and says when to try again", async () => {
+    const handle = await previewGateway();
+    const body = fillBody("Title: About us");
+
+    for (let count = 0; count < 30; count++) {
+      expect((await handle(previewRequest(body, "editor"))).status).toBe(200);
+    }
+    const refused = await handle(previewRequest(body, "editor"));
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
+    // Another user counts for themselves.
+    expect((await handle(previewRequest(body, "admin"))).status).toBe(200);
+  });
+
+  it("refuses a provider the app does not enable, as run does", async () => {
+    const response = await (
+      await previewGateway()
+    )(
+      previewRequest(
+        fillBody("Title: About us", { provider: { id: "acme" } }),
+        "editor",
+      ),
+    );
+
+    expect(response.status).toBe(403);
   });
 });

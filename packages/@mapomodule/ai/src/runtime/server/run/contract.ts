@@ -18,6 +18,16 @@ import { buildAiEntity } from "../../shared/entity";
 import type { MapoAiRunEntity, MapoAiRunRequest } from "../../shared/gateway";
 import { capped } from "./request";
 
+/** A request's contract, with what it was compiled from. */
+export interface CompiledRequest {
+  contract: AiContract;
+  /**
+   * The contract's entities as sources, in its order: each one's model,
+   * with the fields the AI leaves alone (`entity.skipped`).
+   */
+  sources: AiContractSource[];
+}
+
 /**
  * The contract of a request of `run`. An extraction leaves out the entities
  * the AI may fill nothing of.
@@ -29,18 +39,32 @@ export function contractOf(
   request: MapoAiRunRequest,
   options: { secretWords?: readonly string[] } = {},
 ): AiContract {
+  return compiledOf(request, options).contract;
+}
+
+/**
+ * The contract of a request of `run`, as {@link contractOf} builds it, with
+ * the sources it was compiled from: what the preview of a call shows.
+ * @throws H3Error 422, as {@link contractOf}
+ */
+export function compiledOf(
+  request: MapoAiRunRequest,
+  options: { secretWords?: readonly string[] } = {},
+): CompiledRequest {
   const words = options.secretWords ?? [];
   try {
     if (request.task === "fill") {
       const source = sourceOf(request.entity, words);
       if (!source.entity.fields.length) throw nothingToFill();
-      return compileFillContract(source, languageOf(request));
+      const contract = compileFillContract(source, languageOf(request));
+      return { contract, sources: [source] };
     }
     const sources = request.entities
       .map((entity) => sourceOf(entity, words))
       .filter((source) => source.entity.fields.length > 0);
     if (!sources.length) throw nothingToFill();
-    return compileExtractContract(sources, languageOf(request));
+    const contract = compileExtractContract(sources, languageOf(request));
+    return { contract, sources };
   } catch (error) {
     if (isError(error)) throw error;
     // The compiler's messages name limits and keys, never values.

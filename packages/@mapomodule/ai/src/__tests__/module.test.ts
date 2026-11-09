@@ -280,6 +280,11 @@ describe("the module", () => {
         handler: "resolved:./runtime/server/routes/run.post",
       },
       {
+        route: "/_mapo/ai/run/preview",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/run-preview.post",
+      },
+      {
         route: "/_mapo/ai/keys",
         method: "get",
         handler: "resolved:./runtime/server/routes/keys.get",

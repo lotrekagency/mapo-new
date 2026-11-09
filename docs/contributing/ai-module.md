@@ -347,14 +347,14 @@ A page asks `status` to know whether to offer the AI at all, and "not for you" i
 
 | File                                      | Role                                                                                                         |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `src/runtime/server/routes/run.post.ts`   | The route: the session, the dependencies, the body, the operation; `Retry-After` on a 429 or a busy provider |
+| `src/runtime/server/routes/run.post.ts`   | The route: the session, the body, the operation, stopped if its page goes away; `Retry-After` on 429 and 503 |
 | `src/runtime/server/run/request.ts`       | The body as outside data: JSON by its type, a size bound before it is read, zod on the envelope              |
 | `src/runtime/server/run/contract.ts`      | The contract, built by the gateway from the request's two descriptions                                       |
 | `src/runtime/server/run/options.ts`       | The options of `run`, read at build time and again at runtime with the same rules; pure                      |
 | `src/runtime/server/run/policy.ts`        | Which provider and model a request gets; pure                                                                |
 | `src/runtime/server/run/limiter.ts`       | Each user's calls of the last minute, in the memory of the process; pure                                     |
 | `src/runtime/server/run/audit.ts`         | The audit record: its key, its validator, its write                                                          |
-| `src/runtime/server/run/run.ts`           | The operation, with its dependencies passed in                                                               |
+| `src/runtime/server/run/run.ts`           | The operation and its preview (`run-preview.post.ts`), with their dependencies passed in                     |
 | `src/runtime/server/run/nitro.ts`         | The wiring: the runtime config, the registry, the storage, the limiter, the `mapo-ai:prompt` hooks           |
 | `src/runtime/server/providers/`           | The interface (`types.ts`), the registry (`registry.ts`), the mock (`mock.ts`), the cloud and local models   |
 | `src/runtime/server/prompts/`             | Mapo's base rules, versioned (`base.ts`), and the composition in layers (`compose.ts`)                       |
@@ -372,6 +372,10 @@ The page sends the two descriptions of each record, its backend schema and its f
 ### The order of the checks
 
 `runMapoAi()` keeps what costs for last. The provider, the model and the permission on the record's model come first; then the user's limit is looked at, without counting, so a user past it costs no contract and no hook; then the contract and the `mapo-ai:prompt` hooks; only then does the limit count the call. A refused request never uses up the limit, and only a call that reached the provider is audited, as soon as the provider answers, before the answer is read: a call made and paid for is counted even if reading its answer fails. The storage is opened before the body is read: without it the call is not made, since it could not be audited. `requireModelPermission()` asks `add_` on each entity's `model`, or `change_` for an existing record, and checks nothing without a model: a page that fills no backend model can use the AI.
+
+The route watches its response: when it closes before the answer is written, the page has gone away (its `cancel()`, a closed tab), and an abort signal reaches `runMapoAi()`. Found before the limit counts, the request is dropped: no count, no call, no audit. Found while the provider works, it aborts the provider's signal as the timeout does, with another reason, so the audit says `cancelled` instead of `timeout`, and the log stays quiet: an operator who cancels is no failure. A provider's own error never says `cancelled`: only the gateway does. Watching the response needs Node's: on an edge runtime the call runs to its end, and so it does behind a proxy that keeps the request open when the browser closes it.
+
+`previewMapoAiRun()` shares the first half with `runMapoAi()` (`prepareRun()`: provider, model, permission, contract, hooks) and stops at the prompt: it answers the layers the model would read, the parts of the source by name and length, and the fields asked and kept away (`compiledOf()` keeps the entity model the contract was compiled from, with its skipped fields). It calls no provider and audits nothing; the hooks are told it is a preview. It counts against a limit of its own, 30 previews a minute, never against `run`'s: opening "What I send to the AI" must not cost the operator a call, and the limit still bounds what a client can make the server compile.
 
 ### Providers
 
@@ -401,7 +405,7 @@ The audit has one record per call that reached the provider, in the `audit` purp
 - **Only the gateway calls a provider**: keys, prompts and base rules never reach the browser, and a client cannot remove an app's rules.
 - **Every call is counted, and none is made without the storage**, so an app without a secret in production has no AI.
 - **The limit is per process**, and forgets at a restart.
-- **A provider the gateway stopped waiting for may go on**: the signal asks it to stop, nothing forces it, and a call the browser leaves is not stopped yet.
+- **A provider the gateway stopped waiting for may go on**: the signal asks it to stop, nothing forces it. Mapo's providers stop their `fetch`; a call the browser leaves stops only where the server sees its request close.
 - **The descriptions come from the page.** What the AI may fill is what the page says, read with the gateway's own rules.
 - **Every text of a request reaches the model**: the entities' names and descriptions, the fields' labels, hints and descriptions in the schemas, the operator's instructions, the source. They come after what the server holds, but a user who crafts requests can steer the model for their own answers, which they review and the backend checks; `maxInstructionsChars` bounds the operator's instructions only.
 - **Patterns get a rough bound**: on long values some harmless patterns are not applied, and their values are not verified.
@@ -721,7 +725,7 @@ The marks go to the detail's `annotations` channel, at the path the form looks a
 
 ### Waiting and failing
 
-The call goes through `$mapoFetch` when the app has it, so a session that ended leads to the login page as anywhere in Mapo, and through `$fetch` otherwise. `cancel()`, a new `fill()` and the end of the component's scope stop the browser's wait; the gateway still finishes the call, which counts against the user's limit and is audited. The previous answer's marks and memory are replaced only when a new answer arrives: a call that fails or is cancelled leaves them as they were. An error keeps the gateway's status and its `Retry-After`, with a message from `mapo.ai.errors.*`; a `FetchError` without a status is the network, any other failure (the app's own `schemaFromMetadata` throwing) is a failure.
+The call goes through `$mapoFetch` when the app has it, so a session that ended leads to the login page as anywhere in Mapo, and through `$fetch` otherwise. `cancel()`, a new `fill()` and the end of the component's scope stop the browser's wait and close the request: the gateway notices the response closing unfinished and stops the provider's call (a model on the app's own server is free again), which counts against the user's limit once the provider was called and is audited as `cancelled`. A request whose page went away before the provider was called is dropped, neither counted nor audited. The previous answer's marks and memory are replaced only when a new answer arrives: a call that fails or is cancelled leaves them as they were. An error keeps the gateway's status and its `Retry-After`, with a message from `mapo.ai.errors.*`; a `FetchError` without a status is the network, any other failure (the app's own `schemaFromMetadata` throwing) is a failure.
 
 ### Strengths and weaknesses
 
@@ -732,7 +736,7 @@ The call goes through `$mapoFetch` when the app has it, so a session that ended 
 - **A list goes in whole or waits**: there is no merge with the items a record already has.
 - **The marks and the memory of `undo()` live in the page**: a reload forgets them.
 - **`false` counts as a value**: a default `false` of a new record keeps a verified `true` waiting.
-- **The browser cannot stop the provider**: a cancelled call still costs.
+- **Cancel stops the provider only where the server sees the request close**: on a Node server, directly or behind a proxy that closes its request too. On an edge runtime, or behind a proxy that keeps the request open, a cancelled call runs on and costs.
 - **The form's write is copied, not called**: `useMapoForm()` keeps `setFieldValue()` to itself, so the composable repeats its steps (accessor, `synci18n`, `onChange`) and must follow it when it changes. It does not mark the field as touched, so the form's own validation of that field waits for Save.
 
 ## Testing
@@ -918,7 +922,6 @@ Ideas with no place in the plan yet:
 - A point of a map from a place name, through a geocoder outside the model, verified against the place the source names.
 - Rotate the storage's secret: read with the previous one too, and seal again with the new one at the next write.
 - Tell the gateway an entity's model from the server, through the catalog, instead of taking it from the request; with the catalog, also its descriptions.
-- Stop a provider's call when the browser that asked for it goes away.
 - A limit per user shared by the processes of a server, and caps by day or by cost, read from the audit.
 - Stream the answer to the browser, for slow local models.
 - Export the providers' factories, so an app can register a second server of a kind under an id of its own, such as a GPU machine beside a laptop's Ollama.

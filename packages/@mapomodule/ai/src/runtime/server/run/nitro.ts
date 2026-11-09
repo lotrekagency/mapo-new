@@ -29,10 +29,20 @@ import { plainKeyWarning, providerKeyOf, readRunOptions } from "./options";
 import type { MapoAiRunOptions } from "./options";
 import { policyForUser, policyOf } from "./policy";
 import type { MapoAiPolicy, UnusableProvider, UsableProvider } from "./policy";
-import type { MapoAiPromptContext, RunDependencies } from "./run";
+import type {
+  MapoAiPromptContext,
+  PreviewDependencies,
+  RunDependencies,
+} from "./run";
 
 /** The counts of the users' calls, in this process. */
 const limiter = createRateLimiter();
+/**
+ * Previews ("What I send to the AI") one user may ask in a minute: each one
+ * composes a prompt and runs the app's hooks, and calls no provider.
+ */
+const PREVIEWS_PER_MINUTE = 30;
+const previewLimiter = createRateLimiter();
 const warned = new Set<string>();
 
 /**
@@ -264,6 +274,23 @@ export async function mapoAiRunDependencies(
     policy: await mapoAiUserPolicy(event, session.user),
     audit,
     limiter,
+    promptRules: (facts) => askPromptHooks(event, facts),
+  };
+}
+
+/**
+ * What the preview of a call needs from the server, for this request and
+ * its user: no audit, since it calls no provider, and a limit of its own.
+ * @throws H3Error 503 when the admins' keys or settings cannot be read
+ */
+export async function mapoAiPreviewDependencies(
+  event: H3Event,
+  session: MapoAiSession,
+): Promise<PreviewDependencies> {
+  return {
+    policy: await mapoAiUserPolicy(event, session.user),
+    limiter: previewLimiter,
+    perMinute: PREVIEWS_PER_MINUTE,
     promptRules: (facts) => askPromptHooks(event, facts),
   };
 }
