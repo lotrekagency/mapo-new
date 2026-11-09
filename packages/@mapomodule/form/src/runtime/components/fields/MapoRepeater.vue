@@ -75,7 +75,9 @@ function undo() {
 const templates = computed(() => attrs.value.templates);
 
 // Bare field arrays and RepeaterTemplate objects are both accepted.
-const templateList = computed(() => normalizeTemplates(templates.value));
+const templateList = computed(() =>
+  normalizeTemplates(templates.value, attrs.value.templateImageFit),
+);
 const templateByKey = computed(
   () => new Map(templateList.value.map((tpl) => [tpl.key, tpl])),
 );

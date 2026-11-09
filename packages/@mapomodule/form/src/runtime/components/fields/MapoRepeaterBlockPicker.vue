@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { NormalizedRepeaterTemplate } from "../../types/descriptor.js";
+import type {
+  NormalizedRepeaterTemplate,
+  RepeaterImageFit,
+} from "../../types/descriptor.js";
 import {
   filterTemplates,
   wireframeShapes,
@@ -42,6 +45,19 @@ const categories = computed(
 const filtered = computed(() =>
   filterTemplates(props.templates, query.value, category.value),
 );
+
+// Whole class names, so Tailwind finds them when it scans this file. An unknown
+// value from untyped app code falls back to `contain`.
+const IMAGE_FIT_CLASS: Record<RepeaterImageFit, string> = {
+  contain: "object-contain",
+  cover: "object-cover",
+  fill: "object-fill",
+  none: "object-none",
+  "scale-down": "object-scale-down",
+};
+function imageFitClass(fit: RepeaterImageFit): string {
+  return IMAGE_FIT_CLASS[fit] ?? IMAGE_FIT_CLASS.contain;
+}
 
 const shapesFor = wireframeShapes;
 function pick(key: string, event: MouseEvent) {
@@ -102,7 +118,8 @@ function pick(key: string, event: MouseEvent) {
                 v-if="tpl.image"
                 :src="tpl.image"
                 alt=""
-                class="h-full w-full object-cover"
+                class="h-full w-full"
+                :class="imageFitClass(tpl.imageFit)"
               />
               <div
                 v-else-if="tpl.wireframe"
