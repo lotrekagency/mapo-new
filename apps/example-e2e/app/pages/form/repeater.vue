@@ -169,7 +169,19 @@ const repeaterE: RepeaterDescriptor<PickerModel> = {
         description: "Grid of images.",
         icon: "i-lucide-images",
         category: "Media",
+        // A square preview: the default `imageFit: "contain"` shows it whole.
+        image: "https://picsum.photos/id/1/300/300",
         fields: [{ key: "title", type: "text", label: "Title" }],
+      },
+      banner: {
+        label: "Banner",
+        description: "Full-width image.",
+        icon: "i-lucide-image",
+        category: "Media",
+        // The same preview filling the card, cropped at the edges.
+        image: "https://picsum.photos/id/1/300/300",
+        imageFit: "cover",
+        fields: [{ key: "image", type: "media", label: "Image" }],
       },
       // A bare field array still works: label falls back to the key.
       cta: [{ key: "title", type: "text", label: "Title" }],
@@ -289,13 +301,15 @@ const formA = useMapoForm({
     <UCard>
       <template #header>
         <span class="font-semibold text-sm text-highlighted"
-          >E — Block picker (4 templates → modal)</span
+          >E — Block picker (5 templates → modal)</span
         >
       </template>
       <p class="text-xs text-muted mb-3">
         More than 3 templates: "Add block" opens a gallery with search and
-        category filters. Cards show wireframe, icon or image. Hold Shift to add
-        several blocks. Each item shows its block type as a badge.
+        category filters. Cards show wireframe, icon or image; an image is shown
+        whole by default (Gallery) or cropped with
+        <code>imageFit: "cover"</code> (Banner). Hold Shift to add several
+        blocks. Each item shows its block type as a badge.
       </p>
       <MapoForm
         v-model="modelE"
