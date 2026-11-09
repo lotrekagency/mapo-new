@@ -1,3 +1,9 @@
+# @mapomodule/form [2.0.0-beta.14](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.13...@mapomodule/form@2.0.0-beta.14) (2026-11-09)
+
+### Features
+
+- **form:** fit repeater preview images with contain and add imageFit ([cede73d](https://github.com/lotrekagency/mapo-new/commit/cede73d600e55008df74395505e0a4c1a4c468a7))
+
 # @mapomodule/form [2.0.0-beta.13](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.12...@mapomodule/form@2.0.0-beta.13) (2026-10-29)
 
 ### Bug Fixes
