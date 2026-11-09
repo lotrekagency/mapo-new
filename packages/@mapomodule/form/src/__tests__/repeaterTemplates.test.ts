@@ -43,6 +43,26 @@ describe("normalizeTemplates", () => {
     });
   });
 
+  it("fits preview images with contain by default", () => {
+    const [bare, rich] = normalizeTemplates({
+      cta: [title],
+      hero: { image: "/hero.png", fields: [title] },
+    });
+    expect(bare?.imageFit).toBe("contain");
+    expect(rich?.imageFit).toBe("contain");
+  });
+
+  it("applies the repeater's image fit and lets a template override it", () => {
+    const list = normalizeTemplates(
+      {
+        hero: { image: "/hero.png", fields: [title] },
+        logo: { image: "/logo.svg", imageFit: "scale-down", fields: [title] },
+      },
+      "cover",
+    );
+    expect(list.map((tpl) => tpl.imageFit)).toEqual(["cover", "scale-down"]);
+  });
+
   it("tolerates a template object without fields", () => {
     expect(
       normalizeTemplates({ empty: { label: "Empty" } as never })[0]?.fields,

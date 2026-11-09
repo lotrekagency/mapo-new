@@ -2,6 +2,7 @@ import type {
   AnyFieldDescriptor,
   NormalizedRepeaterTemplate,
   RepeaterDescriptor,
+  RepeaterImageFit,
   RepeaterTemplate,
 } from "../types/descriptor.js";
 
@@ -10,10 +11,13 @@ export const MODAL_PICKER_THRESHOLD = 3;
 
 /**
  * Turns `attrs.templates` into a list with defaults applied. A bare field array
- * becomes a template whose label is its key.
+ * becomes a template whose label is its key. `imageFit` falls back to the
+ * repeater's `templateImageFit`, then to `contain`, so a preview is never cropped
+ * unless someone asks for it.
  */
 export function normalizeTemplates(
   templates: NonNullable<RepeaterDescriptor["attrs"]>["templates"],
+  defaultImageFit: RepeaterImageFit = "contain",
 ): NormalizedRepeaterTemplate[] {
   return Object.entries(templates ?? {}).map(([key, tpl]) => {
     const meta: Partial<RepeaterTemplate> = Array.isArray(tpl) ? {} : tpl;
@@ -23,6 +27,7 @@ export function normalizeTemplates(
       description: meta.description,
       icon: meta.icon,
       image: meta.image,
+      imageFit: meta.imageFit ?? defaultImageFit,
       wireframe: meta.wireframe,
       category: meta.category,
       fields: Array.isArray(tpl) ? tpl : (tpl.fields ?? []),

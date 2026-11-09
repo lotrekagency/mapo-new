@@ -292,39 +292,41 @@ Dynamic list field with drag-and-drop reordering, bulk selection, duplication, a
 
 #### `descriptor.attrs`
 
-| Key                 | Type                                                         | Default  | Description                                                                                                                    |
-| ------------------- | ------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `templates`         | `Record<string, FieldDescriptor[] \| RepeaterTemplate>`      | —        | Named templates (one per item type). A value is a bare field array or a [`RepeaterTemplate`](#repeatertemplate).               |
-| `picker`            | `'auto' \| 'select' \| 'modal'`                              | `'auto'` | How the user chooses a template on add: dropdown, block gallery modal, or `auto` (modal when there are more than 3 templates). |
-| `previewLabel`      | `(item, index) => string`                                    | —        | Callback to generate an item's collapsed preview label.                                                                        |
-| `defaultExpanded`   | `boolean`                                                    | `false`  | Start all items expanded.                                                                                                      |
-| `allowDuplicate`    | `boolean`                                                    | `true`   | Show the Duplicate action on each item.                                                                                        |
-| `showPositionField` | `boolean`                                                    | `false`  | Show a numeric position input in each item's header for explicit reordering.                                                   |
-| `minItems`          | `number`                                                     | —        | Minimum number of items (validated on submit).                                                                                 |
-| `maxItems`          | `number`                                                     | —        | Maximum number of items (Add button hidden when reached).                                                                      |
-| `confirmDelete`     | `boolean`                                                    | `true`   | Show a confirmation dialog before deleting an item.                                                                            |
-| `miniCard`          | `(item, idx) => { title, subtitle, thumbnail, statusColor }` | —        | Config for the compressed mini-card view.                                                                                      |
-| `compressThreshold` | `number`                                                     | `3`      | Number of items above which the list switches to mini-card view.                                                               |
+| Key                 | Type                                                         | Default     | Description                                                                                                                    |
+| ------------------- | ------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `templates`         | `Record<string, FieldDescriptor[] \| RepeaterTemplate>`      | —           | Named templates (one per item type). A value is a bare field array or a [`RepeaterTemplate`](#repeatertemplate).               |
+| `picker`            | `'auto' \| 'select' \| 'modal'`                              | `'auto'`    | How the user chooses a template on add: dropdown, block gallery modal, or `auto` (modal when there are more than 3 templates). |
+| `templateImageFit`  | `RepeaterImageFit`                                           | `'contain'` | How the templates' preview images fit the picker cards (CSS `object-fit`). A template's own `imageFit` wins.                   |
+| `previewLabel`      | `(item, index) => string`                                    | —           | Callback to generate an item's collapsed preview label.                                                                        |
+| `defaultExpanded`   | `boolean`                                                    | `false`     | Start all items expanded.                                                                                                      |
+| `allowDuplicate`    | `boolean`                                                    | `true`      | Show the Duplicate action on each item.                                                                                        |
+| `showPositionField` | `boolean`                                                    | `false`     | Show a numeric position input in each item's header for explicit reordering.                                                   |
+| `minItems`          | `number`                                                     | —           | Minimum number of items (validated on submit).                                                                                 |
+| `maxItems`          | `number`                                                     | —           | Maximum number of items (Add button hidden when reached).                                                                      |
+| `confirmDelete`     | `boolean`                                                    | `true`      | Show a confirmation dialog before deleting an item.                                                                            |
+| `miniCard`          | `(item, idx) => { title, subtitle, thumbnail, statusColor }` | —           | Config for the compressed mini-card view.                                                                                      |
+| `compressThreshold` | `number`                                                     | `3`         | Number of items above which the list switches to mini-card view.                                                               |
 
 #### `RepeaterTemplate`
 
 Exported from `@mapomodule/form/types`. Presentation metadata for a template, used by the select and the block picker.
 
-| Key           | Type                | Default        | Description                                                                               |
-| ------------- | ------------------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `fields`      | `FieldDescriptor[]` | — **required** | Field descriptors of the block.                                                           |
-| `label`       | `string`            | template key   | Human-readable name.                                                                      |
-| `description` | `string`            | —              | Short explanation of what the block is for.                                               |
-| `icon`        | `string`            | —              | Iconify name (e.g. `i-lucide-image`). Preview fallback and icon in the item header badge. |
-| `image`       | `string`            | —              | Preview image URL for the picker card. Takes precedence over `wireframe` and `icon`.      |
-| `wireframe`   | `boolean`           | —              | Draw a schematic preview from the template fields (used when there is no `image`).        |
-| `category`    | `string`            | —              | Group name: the picker shows one filter chip per category.                                |
+| Key           | Type                | Default                                             | Description                                                                                                                                                             |
+| ------------- | ------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fields`      | `FieldDescriptor[]` | — **required**                                      | Field descriptors of the block.                                                                                                                                         |
+| `label`       | `string`            | template key                                        | Human-readable name.                                                                                                                                                    |
+| `description` | `string`            | —                                                   | Short explanation of what the block is for.                                                                                                                             |
+| `icon`        | `string`            | —                                                   | Iconify name (e.g. `i-lucide-image`). Preview fallback and icon in the item header badge.                                                                               |
+| `image`       | `string`            | —                                                   | Preview image URL for the picker card. Takes precedence over `wireframe` and `icon`.                                                                                    |
+| `imageFit`    | `RepeaterImageFit`  | the repeater's `templateImageFit`, else `'contain'` | How `image` fits the card: `'contain'` shows the whole image, `'cover'` fills the card and crops the edges; also `'fill'`, `'none'`, `'scale-down'` (CSS `object-fit`). |
+| `wireframe`   | `boolean`           | —                                                   | Draw a schematic preview from the template fields (used when there is no `image`).                                                                                      |
+| `category`    | `string`            | —                                                   | Group name: the picker shows one filter chip per category.                                                                                                              |
 
 ---
 
 ## MapoRepeaterBlockPicker
 
-Modal gallery used by `MapoRepeater` to choose a template when adding an item. It has a search box, category chips and one card per template; the card preview is `image`, else `wireframe`, else `icon`. Internal to the repeater: you configure it through `attrs.picker` and `RepeaterTemplate`.
+Modal gallery used by `MapoRepeater` to choose a template when adding an item. It has a search box, category chips and one card per template; the card preview is `image` (fitted with `imageFit`, `contain` by default), else `wireframe`, else `icon`. Internal to the repeater: you configure it through `attrs.picker` and `RepeaterTemplate`.
 
 ### Props
 
