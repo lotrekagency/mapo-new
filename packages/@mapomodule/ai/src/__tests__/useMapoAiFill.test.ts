@@ -641,6 +641,37 @@ describe("useMapoAiFill — a call that fails", () => {
 });
 
 describe("useMapoAiFill — the form's own rules", () => {
+  it("applies a waiting value only while the form shows its field, as it is now", async () => {
+    serve(answered({ notes: filled("Long notes", false) }));
+    const fields: AnyFieldDescriptor[] = [
+      { key: "kind", type: "text", label: "Kind" },
+      {
+        key: "notes",
+        type: "text",
+        label: "Notes",
+        show: ({ model }) => model.kind === "long",
+      },
+    ];
+    const form = {
+      ...target({ kind: "long" }),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    expect(ai.isShown("notes")).toBe(true);
+
+    // The operator changes what shows the field, after the answer came.
+    form.model.value.kind = "short";
+    ai.apply("notes");
+
+    expect(ai.isShown("notes")).toBe(false);
+    expect(form.model.value.notes).toBeUndefined();
+    form.model.value.kind = "long";
+    ai.apply("notes");
+    expect(form.model.value.notes).toBe("Long notes");
+  });
+
   it("reads the form's language once OPTIONS answered, as a detail that takes its languages from there", async () => {
     const post = serve(answered({ subtitle: filled("Chi siamo") }));
     const form = { ...target(), currentLang: ref("") };

@@ -1,6 +1,7 @@
 import {
   addComponent,
   addImports,
+  addPluginTemplate,
   addServerHandler,
   addServerImports,
   addServerPlugin,
@@ -8,6 +9,7 @@ import {
   createResolver,
   defineNuxtModule,
   extendPages,
+  hasNuxtModule,
   useLogger,
   useNitro,
 } from "@nuxt/kit";
@@ -26,6 +28,87 @@ import { settingsOption } from "./settings";
 import { addDefaultStorageMount } from "./storage";
 
 export type { MapoAiOptions, MapoAiStatus } from "./index";
+
+/** Magic Fill's components, registered by name. */
+const MAGIC_FILL_COMPONENTS = [
+  "MapoAiMagicFillAction",
+  "MapoAiMagicFillBanner",
+  "MapoAiMagicFillPanel",
+  "MapoAiMagicFillPreview",
+] as const;
+
+/**
+ * The plugin that adds Magic Fill to every `MapoDetail`: the button in the
+ * sidebar card (`actions`) and the banner above the form (`body-top`), each
+ * handed the detail it sits in. Generated in the app, which has uikit.
+ */
+const MAGIC_FILL_PLUGIN = `import { defineComponent, h } from "vue";
+import { defineDetailExtension, defineNuxtPlugin, useMapoDetail } from "#imports";
+import {
+  LazyMapoAiMagicFillAction,
+  LazyMapoAiMagicFillBanner,
+} from "#components";
+
+// A part of Magic Fill, handed the detail it sits in.
+function withDetail(name, component) {
+  return defineComponent({
+    name,
+    setup() {
+      const detail = useMapoDetail();
+      return () => (detail ? h(component, { detail }) : null);
+    },
+  });
+}
+
+export default defineNuxtPlugin({
+  name: "mapo-ai:magic-fill",
+  setup(nuxtApp) {
+    // definePageMeta({ magicFill: false }) turns it off on a page.
+    const shown = () =>
+      nuxtApp.$router?.currentRoute.value.meta.magicFill !== false;
+    defineDetailExtension({
+      key: "mapo-ai-magic-fill",
+      placement: "actions",
+      component: withDetail("MapoAiMagicFillActionHost", LazyMapoAiMagicFillAction),
+      visible: shown,
+    });
+    defineDetailExtension({
+      key: "mapo-ai-magic-fill-summary",
+      placement: "body-top",
+      component: withDetail("MapoAiMagicFillBannerHost", LazyMapoAiMagicFillBanner),
+      visible: shown,
+      order: -100,
+    });
+  },
+});
+`;
+
+/** The page's meta key that turns Magic Fill off, typed for the app's pages. */
+const MAGIC_FILL_PAGE_META = `declare module "#app" {
+  interface PageMeta {
+    /** \`false\` turns Magic Fill off on this page. */
+    magicFill?: boolean;
+  }
+}
+declare module "vue-router" {
+  interface RouteMeta {
+    /** \`false\` turns Magic Fill off on this page. */
+    magicFill?: boolean;
+  }
+}
+export {};
+`;
+
+/** `mapo.ai.magicFill`: on unless `false`; another value keeps it on, with a warning. */
+function magicFillOption(
+  value: unknown,
+  warn: (message: string) => void,
+): boolean {
+  const isRead = value === undefined || typeof value === "boolean";
+  if (!isRead)
+    warn("mapo.ai.magicFill is not true or false: Magic Fill stays on.");
+  return value !== false;
+}
 
 /**
  * Mapo AI-assisted data entry (experimental).
@@ -137,6 +220,14 @@ export default defineNuxtModule<MapoAiOptions>({
       name: "MapoAiSettings",
       filePath: resolver.resolve("./runtime/components/MapoAiSettings.vue"),
     });
+    // Magic Fill's parts, registered by name: an app replaces one with a
+    // file of the same name in `app/mapooverride/`, as uikit's.
+    for (const name of MAGIC_FILL_COMPONENTS) {
+      addComponent({
+        name,
+        filePath: resolver.resolve(`./runtime/components/${name}.vue`),
+      });
+    }
     const { path: settingsPath, label: settingsLabel } = settings;
     if (settingsPath !== false) {
       // Added only when the app has no page on that path, as uikit does
@@ -159,6 +250,30 @@ export default defineNuxtModule<MapoAiOptions>({
         });
       });
     }
+
+    // Magic Fill on every MapoDetail: two detail extensions, registered by a
+    // plugin generated in the app, since this package does not depend on
+    // uikit. It reads uikit's `defineDetailExtension()` and `useMapoDetail()`
+    // from the app's imports, and the components by name, overrides
+    // included. A page turns it off with `definePageMeta({ magicFill: false })`.
+    const magicFill = magicFillOption(options.magicFill, warn);
+    addTypeTemplate({
+      filename: "types/mapo-ai-magic-fill.d.ts",
+      getContents: () => MAGIC_FILL_PAGE_META,
+    });
+    nuxt.hook("modules:done", () => {
+      if (!magicFill) return;
+      if (!hasNuxtModule("@mapomodule/uikit", nuxt)) {
+        logger.warn(
+          "Magic Fill needs @mapomodule/uikit, which this app does not install: it is left out.",
+        );
+        return;
+      }
+      addPluginTemplate({
+        filename: "mapo-ai-magic-fill.mjs",
+        getContents: () => MAGIC_FILL_PLUGIN,
+      });
+    });
 
     // The hooks, `mapo-ai:user`, `mapo-ai:prompt` and `mapo-ai:read`, typed
     // in the app's server code.
@@ -202,7 +317,8 @@ export default defineNuxtModule<MapoAiOptions>({
     ]);
 
     // What the app's pages use, without an import: the composables that
-    // fill a detail form and read a file through the gateway.
+    // fill a detail form and read a file through the gateway, Magic Fill's
+    // state of a detail, and what the gateway offers the user.
     addImports([
       {
         name: "useMapoAiFill",
@@ -211,6 +327,14 @@ export default defineNuxtModule<MapoAiOptions>({
       {
         name: "useMapoAiRead",
         from: resolver.resolve("./runtime/composables/useMapoAiRead"),
+      },
+      {
+        name: "useMapoAiMagicFill",
+        from: resolver.resolve("./runtime/composables/useMapoAiMagicFill"),
+      },
+      {
+        name: "useMapoAiStatus",
+        from: resolver.resolve("./runtime/composables/useMapoAiStatus"),
       },
     ]);
 

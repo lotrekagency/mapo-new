@@ -42,6 +42,8 @@ const kit = vi.hoisted(() => {
     nitro: { options: unknown };
     components: unknown[];
     pages: Array<(pages: Array<Record<string, unknown>>) => void>;
+    appPlugins: Array<{ filename: string; getContents: () => string }>;
+    modules: string[];
   } = {
     handlers: [],
     plugins: [],
@@ -52,6 +54,8 @@ const kit = vi.hoisted(() => {
     nitro: { options: {} },
     components: [],
     pages: [],
+    appPlugins: [],
+    modules: [],
   };
   return state;
 });
@@ -70,6 +74,11 @@ vi.mock("@nuxt/kit", () => ({
   addComponent: (component: unknown) => kit.components.push(component),
   extendPages: (extend: (pages: Array<Record<string, unknown>>) => void) =>
     kit.pages.push(extend),
+  addPluginTemplate: (plugin: {
+    filename: string;
+    getContents: () => string;
+  }) => kit.appPlugins.push(plugin),
+  hasNuxtModule: (name: string) => kit.modules.includes(name),
 }));
 
 /** The pages the module adds to an app that has `existing`. */
@@ -107,6 +116,8 @@ beforeEach(() => {
   kit.templates = [];
   kit.components = [];
   kit.pages = [];
+  kit.appPlugins = [];
+  kit.modules = ["@mapomodule/uikit"];
 });
 
 describe("the AI settings page", () => {
@@ -127,12 +138,10 @@ describe("the AI settings page", () => {
         },
       },
     ]);
-    expect(kit.components).toEqual([
-      {
-        name: "MapoAiSettings",
-        filePath: "resolved:./runtime/components/MapoAiSettings.vue",
-      },
-    ]);
+    expect(kit.components).toContainEqual({
+      name: "MapoAiSettings",
+      filePath: "resolved:./runtime/components/MapoAiSettings.vue",
+    });
   });
 
   it("leaves the path to a page of the app", async () => {
@@ -169,7 +178,11 @@ describe("the AI settings page", () => {
     kit.pages = [];
     await setup({ public: {} }, { settings: { path: false } });
     expect(pagesAdded()).toEqual([]);
-    expect(kit.components).toHaveLength(2);
+    // The component stays, for a page of the app's own.
+    const settingsComponents = kit.components.filter(
+      (component) => isRecord(component) && component.name === "MapoAiSettings",
+    );
+    expect(settingsComponents).toHaveLength(2);
   });
 
   it("keeps the defaults of what it cannot read, and says so", async () => {
@@ -380,7 +393,7 @@ describe("the module", () => {
     ]);
   });
 
-  it("gives the app's pages the composables that fill a detail form and read a file", async () => {
+  it("gives the app's pages the composables that fill a detail form, read a file, run Magic Fill and ask the status", async () => {
     await setup({ public: {} });
 
     expect(kit.appImports).toEqual([
@@ -392,20 +405,28 @@ describe("the module", () => {
         name: "useMapoAiRead",
         from: "resolved:./runtime/composables/useMapoAiRead",
       },
+      {
+        name: "useMapoAiMagicFill",
+        from: "resolved:./runtime/composables/useMapoAiMagicFill",
+      },
+      {
+        name: "useMapoAiStatus",
+        from: "resolved:./runtime/composables/useMapoAiStatus",
+      },
     ]);
   });
 
   it("types the mapo-ai:user hook in the app's server code", async () => {
     await setup({ public: {} });
 
-    expect(kit.templates).toHaveLength(1);
-    const [{ template, context }] = kit.templates as [
-      {
+    const found = (
+      kit.templates as Array<{
         template: { filename: string; getContents: () => string };
         context: unknown;
-      },
-    ];
-    expect(template.filename).toBe("types/mapo-ai.d.ts");
+      }>
+    ).find(({ template }) => template.filename === "types/mapo-ai.d.ts");
+    if (!found) throw new Error("No type template of the hooks");
+    const { template, context } = found;
     expect(template.getContents()).toContain(
       'import "resolved:./runtime/server/auth/hooks";',
     );
@@ -980,5 +1001,81 @@ describe("the options of run", () => {
 
     expect(kit.warnings).toHaveLength(1);
     expect(String(kit.warnings[0])).toContain('"acme"');
+  });
+});
+
+describe("Magic Fill", () => {
+  /** The app plugin the module generates once every module is set up. */
+  async function pluginAdded(
+    options: Record<string, unknown> = {},
+  ): Promise<string | undefined> {
+    const hooks = await setup({ public: {} }, options);
+    hooks.get("modules:done")?.();
+    return kit.appPlugins
+      .find((plugin) => plugin.filename === "mapo-ai-magic-fill.mjs")
+      ?.getContents();
+  }
+
+  it("registers its components by name, so an app can replace them", async () => {
+    await setup({ public: {} });
+
+    for (const name of [
+      "MapoAiMagicFillAction",
+      "MapoAiMagicFillBanner",
+      "MapoAiMagicFillPanel",
+      "MapoAiMagicFillPreview",
+    ]) {
+      expect(kit.components).toContainEqual({
+        name,
+        filePath: `resolved:./runtime/components/${name}.vue`,
+      });
+    }
+  });
+
+  it("adds it to every detail with a plugin of the app, through uikit's extensions, which a page turns off", async () => {
+    const plugin = await pluginAdded();
+
+    expect(plugin).toBeDefined();
+    expect(plugin).toContain(
+      'import { defineDetailExtension, defineNuxtPlugin, useMapoDetail } from "#imports";',
+    );
+    expect(plugin).toContain('key: "mapo-ai-magic-fill"');
+    expect(plugin).toContain('placement: "actions"');
+    expect(plugin).toContain('key: "mapo-ai-magic-fill-summary"');
+    expect(plugin).toContain('placement: "body-top"');
+    expect(plugin).toContain("meta.magicFill !== false");
+    expect(kit.warnings).toEqual([]);
+  });
+
+  it("leaves it out with magicFill: false, and keeps it on, with a warning, for a value it cannot read", async () => {
+    expect(await pluginAdded({ magicFill: false })).toBeUndefined();
+
+    kit.appPlugins = [];
+    expect(await pluginAdded({ magicFill: "no" })).toBeDefined();
+    expect(kit.warnings).toContainEqual(
+      "mapo.ai.magicFill is not true or false: Magic Fill stays on.",
+    );
+  });
+
+  it("leaves it out, and says so, in an app without uikit", async () => {
+    kit.modules = [];
+
+    expect(await pluginAdded()).toBeUndefined();
+    expect(kit.warnings).toContainEqual(
+      "Magic Fill needs @mapomodule/uikit, which this app does not install: it is left out.",
+    );
+  });
+
+  it("types the key a page turns it off with", async () => {
+    await setup({ public: {} });
+
+    const found = (
+      kit.templates as Array<{
+        template: { filename: string; getContents: () => string };
+      }>
+    ).find(
+      ({ template }) => template.filename === "types/mapo-ai-magic-fill.d.ts",
+    );
+    expect(found?.template.getContents()).toContain("magicFill?: boolean;");
   });
 });

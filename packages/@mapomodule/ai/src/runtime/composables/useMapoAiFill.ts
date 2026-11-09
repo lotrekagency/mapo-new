@@ -34,6 +34,8 @@ import type { MapoAiSourcePart } from "../shared/gateway";
 import { isRecord } from "../shared/guards";
 import type { AiFieldOutcome } from "../shared/sanitize";
 import { gatewayPoster } from "./poster";
+import { translatorOf } from "./translate";
+import type { Translate } from "./translate";
 
 /**
  * The form `useMapoAiFill()` fills: what it reads and what it writes. The
@@ -132,7 +134,10 @@ export interface MapoAiFill {
     source: string | readonly MapoAiSourcePart[],
     call?: MapoAiFillCall,
   ): Promise<void>;
-  /** Writes the AI's value of a field that waits for the operator, by its path. */
+  /**
+   * Writes the AI's value of a field that waits for the operator, by its
+   * path, when the form shows the field now: a hidden one keeps waiting.
+   */
   apply(path: string): void;
   /**
    * Puts back what a field held before the AI's value went in, when the
@@ -153,6 +158,11 @@ export interface MapoAiFill {
    * or on an edge runtime, the call runs until it ends.
    */
   cancel(): void;
+  /**
+   * Whether the form shows a field of the last answer now, by its path:
+   * `apply()` writes only into a field the operator sees.
+   */
+  isShown(path: string): boolean;
   /** A call is waiting for its answer. */
   pending: Readonly<Ref<boolean>>;
   /** Why the last call got no answer. */
@@ -335,7 +345,7 @@ export function useMapoAiFill<T extends object>(
       refreshMarks(fields.value.map(markPathOf));
     } catch (failure) {
       if (controller !== own) return;
-      error.value = errorOf(failure, t);
+      error.value = mapoAiFillErrorOf(failure, t);
     } finally {
       if (controller === own) {
         controller = undefined;
@@ -474,8 +484,18 @@ export function useMapoAiFill<T extends object>(
   function apply(path: string): void {
     const field = fieldAt(path);
     const isWaiting = field?.action === "apply" || field?.action === "confirm";
-    if (!field || !isWaiting || !write(path)) return;
+    if (!field || !isWaiting) return;
+    // The form may have hidden the field since the answer came: a value
+    // the operator would not see go in waits until it shows again.
+    if (!shownNow(path)) return;
+    if (!write(path)) return;
     refreshMarks([markPathOf(field)]);
+  }
+
+  /** The form shows a field of the answer now: its predicates on the model as it is. */
+  function shownNow(path: string): boolean {
+    const field = fieldAt(path);
+    return field ? isShown(targets.get(field.key)) : false;
   }
 
   function restore(path: string): void {
@@ -703,6 +723,7 @@ export function useMapoAiFill<T extends object>(
     dismiss,
     undo,
     cancel,
+    isShown: shownNow,
     pending,
     error,
     response,
@@ -758,21 +779,15 @@ function quoteOf(outcome: AiFieldOutcome): string | undefined {
   return undefined;
 }
 
-type Translate = (key: string, params?: Record<string, unknown>) => string;
-
-/** The app's `t()` of `@nuxtjs/i18n`; the key itself without one. */
-function translatorOf(app: object): Translate {
-  const i18n: unknown = Reflect.get(app, "$i18n");
-  const translate: unknown = isRecord(i18n) ? i18n.t : undefined;
-  if (typeof translate !== "function") return (key) => key;
-  return (key, params = {}) => {
-    const text: unknown = Reflect.apply(translate, i18n, [key, params]);
-    return typeof text === "string" ? text : key;
-  };
-}
-
-/** The error of a call, for the operator. */
-function errorOf(failure: unknown, t: Translate): MapoAiFillError {
+/**
+ * The error of a call to the gateway, for the operator: its status, a
+ * message from `mapo.ai.errors.*` and the seconds of `Retry-After`. Not
+ * public: Magic Fill reads the errors of its preview with it.
+ */
+export function mapoAiFillErrorOf(
+  failure: unknown,
+  t: Translate,
+): MapoAiFillError {
   if (failure instanceof MapoAiFillAnswerError) {
     return { status: 0, message: t("mapo.ai.errors.badAnswer") };
   }

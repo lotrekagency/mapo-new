@@ -104,6 +104,23 @@ export type {
 } from "./runtime/shared/read";
 export type { MapoAiRead } from "./runtime/composables/useMapoAiRead";
 export type {
+  MapoAiFillSummary,
+  MapoAiProviderChoice,
+  MapoAiSourceProblem,
+  MapoAiToConfirm,
+  MapoAiWaitReason,
+} from "./runtime/shared/magicFill";
+export type { MapoAiStatusState } from "./runtime/composables/useMapoAiStatus";
+export type {
+  MapoAiMagicFill,
+  MapoAiMagicFillDetail,
+  MapoAiMagicFillFile,
+  MapoAiMagicFillFileState,
+  MapoAiMagicFillPhase,
+  MapoAiMagicFillPreview,
+  MapoAiMagicFillProblem,
+} from "./runtime/composables/useMapoAiMagicFill";
+export type {
   MapoAiFill,
   MapoAiFillCall,
   MapoAiFillError,
@@ -270,4 +287,15 @@ export interface MapoAiOptions {
     usersApi?: string;
     groupsApi?: string;
   };
+  /**
+   * Magic Fill on every `MapoDetail` of the app, with `@mapomodule/uikit`:
+   * a button in the sidebar card that opens a panel (a text or files, the
+   * operator's instructions, what is sent, the provider and the model),
+   * and a banner above the form with where a call is and its summary.
+   * `false` leaves it out of the app. A page turns it off with
+   * `definePageMeta({ magicFill: false })`, or shows only some extensions
+   * with the `extensions` prop of `MapoDetail`.
+   * @default true
+   */
+  magicFill?: boolean;
 }

@@ -3,7 +3,7 @@
 AI-assisted data entry for Mapo backoffices. Its purpose: an operator hands Mapo a source, such as a text, a document or a spreadsheet, a language model proposes the values of a form, and the operator reviews them before anything is saved.
 
 ::: warning Experimental
-The package is at its first building blocks. It installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), reads a file into text (`read`), asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field, and keeps the keys of the providers on three levels (`keys`, `token`). Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, `useMapoAiRead()` sends a file to `read` and `useMapoAiFill()` fills a detail form through `run`, from components the app writes: Mapo ships no panel of its own. Routes, responses and options can change in any release while the package is experimental.
+The package is at its first building blocks. It installs the **AI gateway** on your app's server, with an encrypted storage for the gateway's state. The gateway tells a signed-in user what it offers them (`status`), reads a file into text (`read`), asks a provider to fill a record or to extract the records of a source (`run`), answering what the AI proposes, checked field by field, and keeps the keys of the providers on three levels (`keys`, `token`). Mapo ships five providers: `mock`, which answers without a network; `openai` and `anthropic`, for OpenAI's and Anthropic's models; and `ollama` and `openai-compatible`, for models served on your own servers; an app can register its own. In the browser, **Magic Fill** adds a panel to every detail page, where an operator gives the AI a text or files and reviews what it fills; underneath, `useMapoAiRead()` sends a file to `read` and `useMapoAiFill()` fills a detail form through `run`, for components the app writes. Routes, responses and options can change in any release while the package is experimental.
 :::
 
 ## What works today
@@ -22,6 +22,7 @@ The package is at its first building blocks. It installs the **AI gateway** on y
 - The prompt is composed in layers: Mapo's base rules, the app's (`instructions`, and the `mapo-ai:prompt` hook), the entity's context, the operator's instructions, then the source, which is data and never instructions.
 - The app sets the verification rules (`verification`) and the limits (`limits`): calls per user per minute, the length of a source and of the operator's instructions, the size of a file.
 - Every call that reaches a provider is audited in the storage: who, when, which provider and model answered, the tokens (those of the provider's prompt cache among them) and the outcome, never the contents, for 90 days by default (`audit`).
+- **Magic Fill** is on every `MapoDetail`: a button in the sidebar card opens a panel where the operator pastes a text or attaches files, adds instructions, sees what is sent and picks the model; a banner above the form says where the call is, lets the operator cancel it, and sums up what the AI filled and what waits for them, with Undo all. `magicFill: false` leaves it out, and a page turns it off with `definePageMeta({ magicFill: false })`.
 - `useMapoAiFill()`, auto-imported in the app's components, fills a detail form through `run`: it sends the form's fields and the backend's schema from `OPTIONS`, writes each value a quote verifies into an empty field, and marks the others on their fields for the operator to apply, choose or ignore. `undo()` puts back what it wrote; nothing is saved until the operator saves.
 - The gateway has an encrypted storage on the server, the Nitro mount `mapo-ai`, sealed with the secret `NUXT_MAPO_AI_SECRET`. The server checks the secret and the mount when it starts, and sweeps expired records every hour.
 - `mapomodule/types` exports `MapoAiOptions`, `MapoAiStatus`, the types of `run` (`MapoAiRunRequest`, `MapoAiRunResponse` and the outcomes, `AiFieldOutcome`), of `useMapoAiFill()` (`MapoAiFill`, `MapoAiFillTarget`, `MapoAiFillField`), of `read` (`MapoAiReadResponse`, `MapoAiReader`), of the providers (`MapoAiProvider`, `MapoAiMockFixture`), of the keys and the settings (`MapoAiModelPrice`, `MapoAiKeyStatus`, `MapoAiKeyAssignment`, `MapoAiKeysAnswer`, `MapoAiPreference`, `MapoAiTestResponse`, `MapoAiSettingsAnswer`, `MapoAiSettingsInput`, `MapoAiPreviewResponse`, `MapoAiUsageAnswer`, `MapoAiActionsAnswer`) and of the hooks (`MapoAiUserContext`, `MapoAiPromptContext`, `MapoAiReadContext`).
@@ -378,6 +379,44 @@ Its answer holds the rules as the model reads them: Mapo's, the app's, those the
 
 `instructions` holds the layers that stay the same from one request to the next, as the model reads them ([The prompt](#the-prompt)), and `operator` the operator's own instructions. `parts` names each part of the source with its length, never its text, which is the page's own. `entities` lists, for each record, the fields the AI is asked for and those it leaves alone, with why: `secret`, `readonly`, `excluded`, `media`, `relation`, `unsupported`, `conflict`, or `too-deep` for a list nested deeper than the providers accept. The answer never holds a key.
 
+## Magic Fill
+
+Magic Fill is the AI on every detail page: the operator gives it a text or files, and it fills the empty fields of the record, each value marked for review. It runs [`useMapoAiFill()`](#fill-a-detail-form), so the same rule decides what goes in by itself: a value a quote of the source verifies, on an empty field the form shows. The rest waits for the operator, on its field. Nothing is saved until the operator saves.
+
+With `mapo.ai` set and `@mapomodule/uikit` installed, as the meta-module installs it, every `MapoDetail` gets two parts, for a user the app lets use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai)) on a record they may edit:
+
+- **Fill with AI**, a button in the sidebar card above Save, opens the panel. When no model can be called for the user, as without a key, it is off and says why.
+- **A banner above the form** says where a call is, with the time it takes and Cancel; why it failed, or that the model refused; and after an answer, the summary, until the next one. It counts what went into the form, what waits, what to set by hand, what the gateway discarded and what the AI did not find, and offers Undo all. On a phone, where the sidebar card comes after the form, the banner opens the panel too.
+
+### The panel
+
+The panel slides in from the right, and closing it neither stops nor loses a call:
+
+- **Text**: what the operator pastes, with a count of the characters against `maxSourceChars`.
+- **Files**: each one is read through [`read`](#read-a-file) as it is attached, and its text joins the source after the pasted text. The formats and the largest file come from `status`; a file larger than `maxFileBytes` is refused before it is sent.
+- **Instructions for this extraction**, closed by default: what the operator wants, such as "only the first event", below the app's and the admins' rules. Hidden when `maxInstructionsChars` is `0`.
+- **What I send to the AI**, closed by default: what a call would send now, as the gateway composes it ([Preview a call](#preview-a-call)): the model, the rules and instructions the model reads, the operator's instructions, the source by part and length, the fields the AI may fill and those kept away from it, with why. Never a key. It is composed when it opens with nothing current to show; when the panel changes after, it says so, and Compose again composes it anew, so typing spends nothing.
+- **The provider and the model**: those the user may call, from their default; a select when there are several. It says where what is sent goes.
+- **Extract**, off while a file is read, the source is empty or longer than the limits, or the record is busy, and the panel says why.
+
+Extract reads the record's description first (the detail's `OPTIONS`), then asks the model; the panel closes when the answer arrives. The banner shows the time it takes, and after twenty seconds says that a model can take minutes. Cancel closes the request, and the gateway stops the provider's call ([What the gateway checks](#what-the-gateway-checks)). Errors and refusals show in the banner, and an error in the panel too, which stays open.
+
+The summary lists the values that wait for Apply, with why they wait: no quote proves the value, it would replace the value of the field, or the form hides the field. Apply writes the value from there, except into a hidden field, which the operator would not see; on its field, the value's mark has Apply too ([Fill a detail form](#fill-a-detail-form)).
+
+### Turn it off
+
+| Where          | How                                                                    |
+| -------------- | ---------------------------------------------------------------------- |
+| The whole app  | `magicFill: false` in `mapo.ai`                                        |
+| A page         | `definePageMeta({ magicFill: false })`                                 |
+| A `MapoDetail` | The `extensions` prop, listing the keys it shows: not Magic Fill's two |
+
+The two parts are [detail extensions](/uikit/detail#how-to-add-an-action-to-every-detail-page) that a plugin the module adds to the app registers: the button, `mapo-ai-magic-fill` in `actions`, and the banner, `mapo-ai-magic-fill-summary` in `body-top`. A page that registers an AI panel of its own, as the pages of the reference app's AI lab do, lists its own key in `extensions`, or the detail shows both.
+
+### Customize it
+
+The components are registered by name, so an app replaces one with a file of the same name in `app/mapooverride/` ([MapoOverride](/uikit/mapoverride)): `MapoAiMagicFillAction`, `MapoAiMagicFillBanner`, `MapoAiMagicFillPanel` and `MapoAiMagicFillPreview`, each with the prop `detail`, the detail's context. Their state is `useMapoAiMagicFill(detail)`, auto-imported: one state per detail, which the parts share, with the source, the files, the instructions, the model, where the call is, `extract()`, `cancel()`, `undoAll()`, `loadPreview()` and the summary. `useMapoAiStatus()` gives what `status` answers, read once per app and asked again on every detail page. Labels come from the `mapo.ai.magicFill.*` messages of `@mapomodule/i18n`, in English and Italian.
+
 ## Fill a detail form
 
 `useMapoAiFill()` fills the form of a `MapoDetail` from a source the operator gives, through `run`. It sends the form's fields and the backend's schema of the record, read from the endpoint's `OPTIONS` that the detail asks for once, then applies the answer field by field:
@@ -433,11 +472,12 @@ It returns:
 | Member                | What it is                                                                                                                                                                                                                                                 |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `fill(source, call?)` | Sends the source, a text or its parts, with the operator's `call.instructions` and the `call.provider` to use; resolves once the answer is applied, and never rejects: a failure goes to `error`                                                           |
-| `apply(path)`         | Writes a value that waits, by the path of its field                                                                                                                                                                                                        |
+| `apply(path)`         | Writes a value that waits, by the path of its field, when the form shows the field now: a hidden one keeps waiting                                                                                                                                         |
 | `restore(path)`       | Puts back what the field held before the AI's value went in, when the field still holds that value                                                                                                                                                         |
 | `dismiss(path?)`      | Removes the mark of a field, or every mark; the values stay                                                                                                                                                                                                |
 | `undo()`              | Puts back every field that still holds the AI's value, as it was before, and removes the marks                                                                                                                                                             |
 | `cancel()`            | Stops waiting and closes the request: the gateway stops the provider's call ([What the gateway checks](#what-the-gateway-checks)), which counts against the user's limit once the provider was called                                                      |
+| `isShown(path)`       | Whether the form shows a field of the last answer now, by its path: `apply()` writes only into a field the operator sees                                                                                                                                   |
 | `pending`             | A call waits for its answer                                                                                                                                                                                                                                |
 | `error`               | Why the last call got no answer: the gateway's `status` (`0` without one), a `message` for the operator and, when the gateway sends `Retry-After` (429, 503), `retryAfter` in seconds                                                                      |
 | `response`            | The last answer of `run`: the outcomes, or the model's refusal (`status: "refused"`)                                                                                                                                                                       |
@@ -1010,7 +1050,7 @@ Without a model, the check looks for the user's default model of the provider. A
 
 The AI's admins also see **How the AI works**, below the keys, for the whole app. The app's options stay the defaults: the admins change instructions, rules, words and the cache; what widens the models or the spending only where the app allows it. Each block saves on its own, and every change is audited.
 
-- **Instructions**, for every task (`all`), to fill a record and to extract records: layer 3 of [the prompt](#the-prompt), after Mapo's rules and the app's, which win where they disagree. The page shows the rules the model reads for a task, the instructions as written included, before they are saved; it calls no model.
+- **Instructions**, for every task (`all`), to fill a record and to extract records: layer 3 of [the prompt](#the-prompt), after Mapo's rules and the app's, which win where they disagree. The page shows the rules the model reads for a task, the instructions as written included, before they are saved; it calls no model. Whoever uses the AI reads them too, under What I send to the AI in Magic Fill: they hold nothing those users should not read.
 - **Verification**: each [rule](#verification) follows the app's value, or takes the admins' own, in either direction. A rule less prudent than the app's or Mapo's default shows a warning, and the audit names it. No rule verifies a value without a quote found in the source.
 - **Secret fields**: words that keep a field from the AI, besides Mapo's and the app's (`secretWords`), found as whole words in the field's key or a key around it: `vault` keeps `vault_url` and `backup.vault` out, never `vaulted`; `card number` keeps `cardNumber` out. Mapo's own (`password`, `token`, `secret`, `credentials`, `jwt`, `otp`, `api key`, `signing key`, `database url`…) always apply.
 - **Providers**: the prompt cache of `openai` and `anthropic` ([The prompt cache](#the-prompt-cache)), on or off over the app's `promptCache`; Anthropic's fallbacks, which the admins can turn off, and on again only where the app leaves them on; and the models they add, where the app sets `adminModels: true` for the provider. A model is saved only once the provider's server lists it, asked with the key the admin's own calls use, at no cost; then it comes after the app's models, and the admins assign it in the keys as the others. Where the app turns `adminModels` off again, the models added stop applying.
@@ -1133,6 +1173,8 @@ export default defineNitroPlugin((nitroApp) => {
 | `addRule(rule)` | Adds a rule for this request, after `instructions`; blank text adds nothing                     |
 
 The context is read-only: a hook adds rules, and cannot remove what Mapo, `instructions` or another hook wrote. A hook that throws fails the request with a 500. A rule that changes from one request to the next keeps a provider from reusing its cache of the stable layers.
+
+Whoever the AI is open to reads the rules as the model does: Magic Fill shows them under What I send to the AI ([Preview a call](#preview-a-call)). Write nothing in a rule that its users should not read; a rule meant for some users only is added for them, from `context.user`.
 
 ## Verification
 
@@ -1280,6 +1322,7 @@ Setting `mapo.ai` (or `mapoAi`) installs the module and turns the gateway on. It
 | `audit`        | `{ retentionDays?: number }`                                                                                   | `{ retentionDays: 90 }`                | How long an audit record is kept ([The audit](#the-audit))                               |
 | `prices`       | `{ currency?: string; providers: Record<string, Record<string, MapoAiModelPrice>> }`                           | None: tokens only                      | The prices of the app's models, for the usage's costs ([Usage](#usage))                  |
 | `settings`     | `{ path?: string \| false; label?: string; usersApi?: string; groupsApi?: string }`                            | `/ai-settings`, "AI settings"          | The AI settings page ([AI settings](#ai-settings))                                       |
+| `magicFill`    | `boolean`                                                                                                      | `true`                                 | Magic Fill on every detail page ([Magic Fill](#magic-fill))                              |
 
 An entry of `providers` (`MapoAiProviderOptions`) takes `models` and `timeout`, at most 3600 seconds; `openai`, `anthropic`, `ollama` and `openai-compatible` also take `baseURL`; `openai` and `anthropic` take `effort` (`"low"`, `"medium"` or `"high"`, `"low"` by default) and `promptCache` (`false` by default); every provider but the mock takes `adminModels` (`false` by default), which lets the AI's admins add models ([How the AI works](#how-the-ai-works)); `anthropic` takes `fallbacks` (`true` by default); `openai-compatible` takes `contextTokens`, a whole number of tokens from 1024 to 10,000,000 ([Providers](#providers)).
 

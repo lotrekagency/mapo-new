@@ -10,6 +10,7 @@ import type { JSONSchema } from "@mapomodule/utils";
 import { createError } from "h3";
 import type { H3Event } from "h3";
 import { z } from "zod";
+import { MAPO_AI_MAX_PARTS, MAPO_AI_MAX_PART_NAME } from "../../shared/gateway";
 import type {
   MapoAiLimits,
   MapoAiRunEntity,
@@ -20,8 +21,8 @@ import { readJsonBody } from "../body";
 
 /** Bytes a body may have besides its source and instructions: the entities' schemas. */
 export const RUN_BODY_BASE_BYTES = 2 * 1024 * 1024;
-/** Parts of a source a request may send. */
-export const MAX_PARTS = 20;
+/** Parts of a source a request may send: the page checks the same bound. */
+export const MAX_PARTS = MAPO_AI_MAX_PARTS;
 /** Entities an extraction may ask for. */
 export const MAX_ENTITIES = 20;
 
@@ -59,7 +60,7 @@ const ENTITY = z.strictObject({
 const PART = z.strictObject({
   kind: z.literal("text"),
   text: z.string(),
-  name: SHORT.optional(),
+  name: z.string().max(MAPO_AI_MAX_PART_NAME).optional(),
 });
 
 const COMMON = {

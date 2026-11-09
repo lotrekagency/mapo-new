@@ -744,7 +744,7 @@ Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. S
 
 ## AI — `@mapomodule/ai`
 
-Experimental, installed with `mapo.ai`. `useMapoAiFill()` and `useMapoAiRead()` are auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
+Experimental, installed with `mapo.ai`. `useMapoAiFill()`, `useMapoAiRead()`, `useMapoAiMagicFill()` and `useMapoAiStatus()` are auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
 
 ### `useMapoAiFill(target, options?)`
 
@@ -761,11 +761,12 @@ Fills a detail form from a source, through the gateway's `run`: each value a quo
 | Member     | Type                                                                                      | Description                                                                                                                                                                                                |
 | ---------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `fill`     | `(source: string \| readonly MapoAiSourcePart[], call?: MapoAiFillCall) => Promise<void>` | Sends the source with `call.instructions` and `call.provider`, then writes and marks the answer. Never rejects: a failure goes to `error`. A new call stops the previous one's wait and removes its marks. |
-| `apply`    | `(path: string) => void`                                                                  | Writes the AI's value of a field that waits, by its path: one to confirm, or one put back with `restore()`.                                                                                                |
+| `apply`    | `(path: string) => void`                                                                  | Writes the AI's value of a field that waits, by its path: one to confirm, or one put back with `restore()`. A field the form hides keeps waiting.                                                          |
 | `restore`  | `(path: string) => void`                                                                  | Puts back what the field held before the AI's value went in, while the field still holds that value.                                                                                                       |
 | `dismiss`  | `(path?: string) => void`                                                                 | Removes the AI's mark of a field, or all of them; the values stay.                                                                                                                                         |
 | `undo`     | `() => void`                                                                              | Puts back every field that still holds the AI's value, as it was before, and removes the AI's marks.                                                                                                       |
 | `cancel`   | `() => void`                                                                              | Stops waiting and closes the request: the gateway stops the provider's call, which counts once the provider was called.                                                                                    |
+| `isShown`  | `(path: string) => boolean`                                                               | Whether the form shows a field of the last answer now, by its path: `apply()` writes only into a field the operator sees.                                                                                  |
 | `pending`  | `Readonly<Ref<boolean>>`                                                                  | A call is waiting for its answer.                                                                                                                                                                          |
 | `error`    | `Readonly<Ref<MapoAiFillError \| undefined>>`                                             | `{ status, message, retryAfter? }`: why the last call got no answer; `status` is `0` without one.                                                                                                          |
 | `response` | `Readonly<Ref<MapoAiFillResponse \| undefined>>`                                          | The last answer of `run`: the outcomes, or the model's refusal.                                                                                                                                            |
@@ -789,6 +790,47 @@ Reads the operator's files into text through the gateway's `read`, as `run` take
 | -------- | ------------- | ------------------------------ | ---------------------------------- |
 | `name`   | `string`      | The `File`'s name, else `file` | The name of a `Blob` that has none |
 | `signal` | `AbortSignal` | —                              | Stops waiting for the answer       |
+
+---
+
+### `useMapoAiMagicFill(detail)`
+
+Magic Fill's state on a detail page: the source, the call and its summary. The button, the panel and the banner of Magic Fill share it, one per detail, alive while one of them is mounted, so closing the panel neither stops nor loses a call. Call it in a component inside a `MapoDetail`. See [Magic Fill](/modules/ai#magic-fill).
+
+| Parameter | Type                    | Default        | Description                                                                                                                                                       |
+| --------- | ----------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `detail`  | `MapoAiMagicFillDetail` | — **required** | `useMapoDetail()`, or a `MapoAiFillTarget` with, optionally, `modelName` (the record's name for the AI), `permissionModel`, `schemaFromMetadata` and `isLoading`. |
+
+**Returns:** `MapoAiMagicFill`:
+
+| Member                     | Type                                                      | Description                                                                                                                      |
+| -------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `open`                     | `Ref<boolean>`                                            | Whether the panel is open.                                                                                                       |
+| `text`, `instructions`     | `Ref<string>`                                             | The pasted text, and the operator's instructions.                                                                                |
+| `files`                    | `Readonly<Ref<readonly MapoAiMagicFillFile[]>>`           | The files attached, each with its `state`: `reading`, `read`, `unsupported`, `empty`, `too-long`, `too-large`, `failed`.         |
+| `attach`, `detach`         | `(files: File[]) => void`, `(id: number) => void`         | Attaches files, each read through `read` at once; removes one, and stops reading it.                                             |
+| `choice`, `choices`        | `Ref<MapoAiProviderChoice>`, `ComputedRef<...[]>`         | The provider and model of the next call, from the user's default, and those the user may call.                                   |
+| `status`, `available`      | `Ref<MapoAiStatus>`, `ComputedRef<boolean>`               | What `status` answers, and whether Magic Fill is offered: the user may use the AI, the record can be edited.                     |
+| `parts`, `problems`        | `ComputedRef`                                             | The source as it would be sent, and why Extract cannot run (`empty`, `too-long`, `reading`, `no-provider`, `busy`…).             |
+| `phase`, `startedAt`       | `Ref<"idle" \| "describing" \| "waiting">`, `Ref<number>` | Where the call is, and when it started.                                                                                          |
+| `extract()`, `cancel()`    | `() => Promise<void>`, `() => void`                       | Sends the source and applies the answer, closing the panel; stops the call, and the provider's.                                  |
+| `undoAll()`                | `() => void`                                              | Puts back every field that still holds a value of the last answer.                                                               |
+| `preview`, `loadPreview()` | `Ref<MapoAiMagicFillPreview>`, `() => Promise<void>`      | What "What I send to the AI" shows, from `run/preview`, and whether it is `stale`: the panel changed since it was asked.         |
+| `fill`, `summary`          | `MapoAiFill`, `ComputedRef<MapoAiFillSummary>`            | The `useMapoAiFill()` underneath, and the summary of its last answer: `applied`, `toConfirm`, `manual`, `discarded`, `notFound`. |
+
+---
+
+### `useMapoAiStatus()`
+
+What the gateway's `status` answers the signed-in user, read as outside data: one state per app, asked again with `refresh()`. See [The gateway](/modules/ai#the-gateway).
+
+**Returns:** `MapoAiStatusState`: `status` (`Readonly<Ref<MapoAiStatus | undefined>>`, empty until it answers or when it cannot be reached), `loading`, and `refresh()`, one request at a time.
+
+---
+
+### Magic Fill's components
+
+`<MapoAiMagicFillAction>`, `<MapoAiMagicFillBanner>`, `<MapoAiMagicFillPanel>` and `<MapoAiMagicFillPreview>`: the button in the sidebar card, the banner above the form, the panel, and "What I send to the AI". Each takes one prop, `detail`, the detail's context, and no events or slots; the module adds the first two to every `MapoDetail`, and the button or the banner renders the panel. An app replaces one with `app/mapooverride/` ([MapoOverride](/uikit/mapoverride)). See [Magic Fill](/modules/ai#magic-fill).
 
 ---
 

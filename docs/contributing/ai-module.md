@@ -735,9 +735,49 @@ The call goes through `$mapoFetch` when the app has it, so a session that ended 
 - **Related records wait**: the AI's name, or id, is shown, and the operator chooses the record; searching for it is Magic Fill's.
 - **A list goes in whole or waits**: there is no merge with the items a record already has.
 - **The marks and the memory of `undo()` live in the page**: a reload forgets them.
-- **`false` counts as a value**: a default `false` of a new record keeps a verified `true` waiting.
+- **`false` counts as a value**: a `false` someone wrote, the operator, a draft or the app's code, keeps a verified `true` waiting. A new record of `MapoDetail` starts empty and no field writes a default, so an untouched switch is empty and takes a verified `true` by itself.
 - **Cancel stops the provider only where the server sees the request close**: on a Node server, directly or behind a proxy that closes its request too. On an edge runtime, or behind a proxy that keeps the request open, a cancelled call runs on and costs.
 - **The form's write is copied, not called**: `useMapoForm()` keeps `setFieldValue()` to itself, so the composable repeats its steps (accessor, `synci18n`, `onChange`) and must follow it when it changes. It does not mark the field as touched, so the form's own validation of that field waits for Save.
+
+## Magic Fill
+
+Magic Fill is the browser's part that an operator uses: a button and a banner on every `MapoDetail`, a panel, and what they share. It adds no rule of its own about what goes into a form: it runs `useMapoAiFill()`, so the rule of [Filling a form](#filling-a-form) holds.
+
+| File                                                | Role                                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `src/module.ts`                                     | The option `magicFill`, the components by name, the page's key typed, the plugin generated in the app |
+| `src/runtime/shared/magicFill.ts`                   | Pure: `status` read, the models to pick, the source and its check, the preview, the summary           |
+| `src/runtime/composables/useMapoAiMagicFill.ts`     | One state per detail: source, files, model, the call and its phases, the preview, the summary         |
+| `src/runtime/composables/useMapoAiStatus.ts`        | What `status` answers, read once per app and asked again on every detail                              |
+| `src/runtime/components/MapoAiMagicFillAction.vue`  | The button in the sidebar card (`actions`)                                                            |
+| `src/runtime/components/MapoAiMagicFillBanner.vue`  | The banner above the form (`body-top`): the call, its errors, the summary, Undo all                   |
+| `src/runtime/components/MapoAiMagicFillPanel.vue`   | The panel: text, files, instructions, What I send, the model, Extract                                 |
+| `src/runtime/components/MapoAiMagicFillPreview.vue` | What I send to the AI, from `run/preview`                                                             |
+
+### How it reaches every detail
+
+The package does not depend on uikit, and its runtime files are type-checked outside Nuxt, where `#imports` does not resolve. So the module generates a plugin in the app (`addPluginTemplate`), once every module is set up and only when `@mapomodule/uikit` is installed: the plugin imports `defineDetailExtension()` and `useMapoDetail()` from the app's `#imports`, and the components from `#components`, where an override of `app/mapooverride/` takes their place. Each extension is a small component that hands the detail's context to Magic Fill's as the prop `detail`: the context fits `MapoAiMagicFillDetail` by its shape, and `modelName`, `permissionModel` and `schemaFromMetadata` came into the context for this. The extensions' `visible` reads the route's `meta.magicFill`, so `definePageMeta({ magicFill: false })` turns a page off, reactively; the `extensions` prop of `MapoDetail` filters them by key.
+
+### One state per detail
+
+The button and the banner are rendered apart, and the slideover unmounts its content when closed, so the state cannot live in a component: `useMapoAiMagicFill(detail)` keeps it in a `WeakMap` keyed by the detail's context, built in a detached effect scope and counted by the components that use it. The last one to go stops the scope, which cancels a call and stops the files being read and the preview. The first component mounted renders the panel (`joinMagicFill()`, which also tells the banner whether the button is there): a page that shows only one of the two still has the panel.
+
+### The call
+
+`extract()` awaits the detail's `metadata()` first, which `MapoDetail` asks once and shares, so the phase "describing" is honest and `useMapoAiFill()` finds the answer ready; then "waiting", with the time it takes. `cancel()` aborts the request, and the gateway stops the provider's call when it sees the request close ([The run route](#the-run-route)). "What I send" posts the same body to `run/preview`, built from the same descriptions, with an empty part when the operator has written nothing yet: `run` takes one part at least. The preview keeps what it was asked with (the parts, the instructions, the choice, the form's fields, its language and the record), compared by identity: a change marks it `stale`, and the section, opened again, asks only when it has nothing current to show, so typing and reopening spend nothing against the previews' limit.
+
+### Strengths and weaknesses
+
+- **One rule for every page**: Magic Fill writes through `useMapoAiFill()`, so what goes in by itself is decided in one place.
+- **What is sent is shown as sent**: the preview is composed by the gateway, with the app's and the admins' rules and the hooks', not guessed by the browser.
+- **So every rule reaches every user of the AI**: whoever the AI is open to reads the app's, the hooks' and the admins' rules in the preview, on any record, since the permission on the model is no boundary. A rule holds nothing those users should not read; the docs say so where the rules are written, and so does the settings page.
+- **The panel cannot lose a call**: the state outlives the slideover, and the banner follows the call.
+- **Headless**: every part is a registered component an app replaces, over a composable an app can use alone.
+- **The plugin is generated, so it is typed only in the app**: the package's typecheck does not see it; `module.test.ts` checks its text.
+- **The marks and the summary live in the page**: a reload forgets them, as it forgets `undo()`.
+- **A new extraction replaces the previous one's marks and memory**: the values stay, unmarked, and Undo all reaches only the last answer.
+- **"Keep" only removes a mark, and an edit leaves it**: Undo all puts back a kept value the field still holds, and a mark stays on a field the operator changed.
+- **A hidden field waits**: the summary does not apply into it, and a field the answer itself reveals is not filled by the same answer.
 
 ## Testing
 
@@ -783,6 +823,8 @@ The browser's half, also run in Node:
 | `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
 | `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
 | `useMapoAiRead.test.ts` | The answer of `read` read as outside data, the file sent as a form, the composable through `$mapoFetch`                     |
+
+Magic Fill's: `magicFill.test.ts` proves its pure half (`status` read as outside data, the models to pick, the source and its check, the preview read, the summary), and `useMapoAiMagicFill.test.ts` the composable (one state per detail, the panel's host, the models, the problems, Extract and Cancel, the files, the preview).
 
 The providers that call a server: the local ones on the answers Ollama 0.40.13 sent on its two APIs, kept in `recorded/`, and the cloud ones on the answers of OpenAI and Anthropic as their API references describe them, written by hand in `documented/`; `servers.ts` serves both through a fake `fetch` that keeps every call. Record them again when a server's API changes, and record the cloud ones once a real call can:
 
@@ -879,6 +921,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Who may use the gateway                          | The gateway's authentication                                     |
 | Ask the AI                                       | The `run` route                                                  |
 | Fill a detail form                               | `useMapoAiFill()`                                                |
+| Magic Fill                                       | The panel and the call of Magic Fill                             |
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
@@ -892,7 +935,6 @@ Still to write, each with the work that fills it:
 | Section                       | Filled by                                                |
 | ----------------------------- | -------------------------------------------------------- |
 | Read a file (PDFs, images)    | The readers for PDFs and images                          |
-| Fill a form with Magic Fill   | Magic Fill                                               |
 | Verified and to check         | Magic Fill, from the verification described on this page |
 | Keep a field away from the AI | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets |
 | Import several records        | Import AI                                                |
@@ -906,7 +948,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Magic Fill**, on `useMapoAiFill()` and `useMapoAiRead()`: its panel, with files read through `read`, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
+1. **Magic Fill**, after its panel and its call: what the operator's review does to the values (a kept value, an edited one, several extractions in a row, the save), the provenance kept with the form's draft, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
 2. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
 3. **Import AI**, with a check for duplicates between new items and existing records.
 

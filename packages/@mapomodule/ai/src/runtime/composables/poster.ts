@@ -34,3 +34,30 @@ export function gatewayPoster(app: object): GatewayPoster {
       ? fetcher(path, { method: "POST", body, signal })
       : Promise.reject(new Error("No $fetch to call the AI gateway with"));
 }
+
+/** Gets a path of the app's server, and resolves with the answer read as JSON. */
+export type GatewayGetter = (path: string) => Promise<unknown>;
+
+type GetFetcher = (
+  request: string,
+  options: { method: "GET" },
+) => Promise<unknown>;
+
+function isGetFetcher(value: unknown): value is GetFetcher {
+  return typeof value === "function";
+}
+
+/** The getter of the Nuxt app `app`: its `$mapoFetch`, else the global `$fetch`. */
+export function gatewayGetter(app: object): GatewayGetter {
+  const mapoFetch: unknown = Reflect.get(app, "$mapoFetch");
+  const globalFetch: unknown = Reflect.get(globalThis, "$fetch");
+  const fetcher = isGetFetcher(mapoFetch)
+    ? mapoFetch
+    : isGetFetcher(globalFetch)
+      ? globalFetch
+      : undefined;
+  return (path) =>
+    fetcher
+      ? fetcher(path, { method: "GET" })
+      : Promise.reject(new Error("No $fetch to call the AI gateway with"));
+}

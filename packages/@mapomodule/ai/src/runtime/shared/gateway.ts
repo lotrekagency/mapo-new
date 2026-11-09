@@ -570,6 +570,12 @@ export interface MapoAiTextPart {
 /** One part of a source. Today the gateway reads text only. */
 export type MapoAiSourcePart = MapoAiTextPart;
 
+/** Parts of a source one request of `run` may send. */
+export const MAPO_AI_MAX_PARTS = 20;
+
+/** Characters of a part's name, such as a file's, that `run` takes. */
+export const MAPO_AI_MAX_PART_NAME = 200;
+
 /**
  * An entity as the page describes it to `run`: the two descriptions of its
  * records, and what the AI should know about it. The gateway builds from

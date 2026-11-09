@@ -38,6 +38,8 @@ const { fetch, loading } = useMapoFetch();
 | `when` / `whenAny` / `whenNot` / `matchesField` | ✅            | `@mapomodule/form`  |
 | `useMapoAiFill`                                 | ✅            | `@mapomodule/ai`    |
 | `useMapoAiRead`                                 | ✅            | `@mapomodule/ai`    |
+| `useMapoAiMagicFill`                            | ✅            | `@mapomodule/ai`    |
+| `useMapoAiStatus`                               | ✅            | `@mapomodule/ai`    |
 
 > Only `@mapomodule/utils` functions (`debounce`, `deepMerge`, `objectDiff`, `formatDate`, etc.) are **not** auto-imported and require an explicit import.
 
@@ -113,6 +115,8 @@ import type { CamomillaPathRewrite } from "@mapomodule/mapo-integrations-camomil
 | `isOneOf` / `isNoneOf` / `isEmpty` / …          | matchers    | auto-imported                                                              | use with `matchesField`      |
 | `useMapoAiFill`                                 | composable  | auto-imported                                                              | with `mapo.ai`, experimental |
 | `useMapoAiRead`                                 | composable  | auto-imported                                                              | with `mapo.ai`, experimental |
+| `useMapoAiMagicFill`                            | composable  | auto-imported                                                              | with `mapo.ai`, experimental |
+| `useMapoAiStatus`                               | composable  | auto-imported                                                              | with `mapo.ai`, experimental |
 | `debounce`                                      | utility     | `import { debounce } from '@mapomodule/utils'`                             | not a composable             |
 | `deepMerge`                                     | utility     | `import { deepMerge } from '@mapomodule/utils'`                            | —                            |
 | `objectDiff`                                    | utility     | `import { objectDiff } from '@mapomodule/utils'`                           | —                            |
