@@ -18,6 +18,8 @@ definePageMeta({
 
 const route = useRoute();
 const showExtensions = ref(true);
+// Only the page's own: with mapo.ai on, every MapoDetail also gets Magic Fill.
+const DEMO_EXTENSIONS = ["demo-fill", "demo-summary"];
 
 const removeExtensions = [
   defineDetailExtension({
@@ -67,7 +69,7 @@ const sidebarFields: AnyFieldDescriptor[] = [
       model-name="Article"
       :fields="fields"
       :sidebar-fields="sidebarFields"
-      :extensions="showExtensions"
+      :extensions="showExtensions ? DEMO_EXTENSIONS : false"
     >
       <template
         #side-bottom="{ fields: bodyFields, sidebarFields: sideFields }"

@@ -1,0 +1,80 @@
+<script setup lang="ts">
+// Tests: Magic Fill of @mapomodule/ai, as every detail page of an app gets
+// it with mapo.ai. The page registers no extension of its own: the module's
+// plugin adds the "Fill with AI" button to the sidebar card and the banner
+// above the form. Open the panel, paste a sample from the list below (or
+// attach a file of public/ai-files/) and Extract: the mock answers, the
+// verified values go into the empty fields, the others wait in the banner's
+// summary and on their fields. Try it:
+// - /ai/magic-fill/new: a new article;
+// - /ai/magic-fill/1: a value that would replace one waits for Apply;
+// - "What I send to the AI": the prompt the gateway composes, with the
+//   app's rules (nuxt.config.ts and server/plugins/mapo-ai-rules.ts);
+// - the sample "Slow": the phases, the time it takes, and Cancel, which
+//   stops the mock on the server too (the audit says `cancelled`);
+// - as viewer: the app's mapo-ai:user hook keeps the account out, and the
+//   page shows no AI.
+// `permission-model` names the backend model, so the gateway checks
+// add_article (change_article for /1), as Save does.
+import { AI_ARTICLE_SAMPLES } from "#shared/aiArticleSamples";
+import {
+  AI_ARTICLE_FIELDS,
+  AI_ARTICLE_LANGUAGES,
+  AI_ARTICLE_SIDEBAR_FIELDS,
+} from "~/utils/aiArticleForm";
+
+definePageMeta({
+  layout: "mapo-default",
+  icon: "i-lucide-sparkles",
+  middleware: ["auth"],
+});
+
+const route = useRoute();
+const copied = ref<string>();
+
+async function copy(label: string, text: string) {
+  await navigator.clipboard.writeText(text);
+  copied.value = label;
+}
+</script>
+
+<template>
+  <div class="p-4 max-w-[1400px] mx-auto space-y-4">
+    <MapoDetail
+      :id="String(route.params.id)"
+      endpoint="/api/articles"
+      model-name="Article"
+      permission-model="article"
+      :fields="AI_ARTICLE_FIELDS"
+      :sidebar-fields="AI_ARTICLE_SIDEBAR_FIELDS"
+      :languages="AI_ARTICLE_LANGUAGES"
+    />
+    <UCard>
+      <template #header>
+        <p class="font-semibold">Samples to paste in the panel</p>
+        <p class="text-sm text-muted">
+          The mock answers each one as its description says.
+        </p>
+      </template>
+      <ul class="divide-y divide-default text-sm">
+        <li
+          v-for="sample in AI_ARTICLE_SAMPLES"
+          :key="sample.label"
+          class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
+        >
+          <span class="font-medium">{{ sample.label }}</span>
+          <span class="min-w-0 flex-1 text-muted">
+            {{ sample.description }}
+          </span>
+          <UButton
+            size="xs"
+            variant="soft"
+            icon="i-lucide-copy"
+            :label="copied === sample.label ? 'Copied' : 'Copy'"
+            @click="copy(sample.label, sample.text)"
+          />
+        </li>
+      </ul>
+    </UCard>
+  </div>
+</template>

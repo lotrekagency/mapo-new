@@ -20,6 +20,8 @@ import {
   AI_ARTICLE_SIDEBAR_FIELDS,
 } from "~/utils/aiArticleForm";
 
+// The detail shows only this page's panel (`extensions`): Magic Fill, which
+// the module adds to every MapoDetail, has a page of its own, /ai/magic-fill.
 definePageMeta({
   layout: "mapo-default",
   icon: "i-lucide-sparkles",
@@ -39,6 +41,7 @@ onUnmounted(removeExtension);
 <template>
   <div class="p-4 max-w-[1400px] mx-auto">
     <MapoDetail
+      :extensions="['ai-fill']"
       :id="String(route.params.id)"
       endpoint="/api/articles"
       model-name="Article"

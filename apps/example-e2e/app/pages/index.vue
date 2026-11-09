@@ -103,6 +103,11 @@ const sections = [
         desc: "Which key a call uses: the admins' assignments, the order of the groups, the users' own tokens",
       },
       {
+        label: "Magic Fill",
+        to: "/ai/magic-fill/new",
+        desc: "The panel on every detail page: a text or files, What I send, the model, the summary, Cancel and Undo all",
+      },
+      {
         label: "Fill a new article",
         to: "/ai/fill/new",
         desc: "useMapoAiFill through run with the mock: verified values, marks, Apply, Undo, failures",

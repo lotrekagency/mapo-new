@@ -99,7 +99,7 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
   {
     label: "Slow",
     description:
-      "#mock:slow=8: the answer takes 8 seconds. Cancel stops waiting; the call still counts.",
+      "#mock:slow=8: the answer takes 8 seconds. Cancel stops the call, the mock's on the server too; it still counts.",
     text: "#mock:slow=8\nTitle: Slow but sure",
   },
   {

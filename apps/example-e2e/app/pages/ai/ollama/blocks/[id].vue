@@ -24,6 +24,8 @@ import {
   AI_PAGE_SIDEBAR_FIELDS,
 } from "~/utils/aiPageForm";
 
+// The detail shows only this page's panel (`extensions`): Magic Fill, which
+// the module adds to every MapoDetail, has a page of its own, /ai/magic-fill.
 definePageMeta({
   layout: "mapo-default",
   icon: "i-lucide-blocks",
@@ -54,6 +56,7 @@ onUnmounted(removeExtension);
 <template>
   <div class="p-4 max-w-[1400px] mx-auto">
     <MapoDetail
+      :extensions="['ai-ollama']"
       :id="String(route.params.id)"
       endpoint="/api/pages"
       model-name="Page"
