@@ -238,8 +238,8 @@ Replace the whole action card (Save/Back) or the danger card entirely:
   </UCard>
 </template>
 
-<!-- Suppress the delete card entirely -->
-<template #side-danger />
+<!-- Hide the delete card: an element of your own (an empty slot keeps the built-in card) -->
+<template #side-danger><span hidden /></template>
 ```
 
 ## How to: add custom sidebar / body sections
@@ -463,11 +463,13 @@ On the next page load a `UAlert` banner appears automatically offering **Restore
 </MapoDetail>
 ```
 
-**Suppress the banner** — pass an empty template:
+**Hide the banner** — render an element of your own in the slot. An empty `<template #draft-banner />` does not hide it: Vue renders a slot's built-in content when the slot gives no element, and the comment a `v-if` leaves counts as none.
 
 ```vue
-<template #draft-banner />
+<template #draft-banner><span hidden /></template>
 ```
+
+The draft is still saved and found, and `draft-found` still fires: a page without the banner restores the draft from there.
 
 Drafts expire automatically after 24 h and are cleared from localStorage on successful save. A draft the page wrote also goes once the record is back as it was loaded; one from an earlier visit stays on offer until it is restored or discarded.
 
@@ -515,7 +517,7 @@ interface DetailSlotProps<T> {
 
 | Slot                                                     | Replaces / adds                                                                                                                                            |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `#draft-banner`                                          | The draft restore banner (shown automatically when `draftKey` is set and a draft exists). Override for a custom UI; pass an empty template to suppress it. |
+| `#draft-banner`                                          | The draft restore banner, when a draft is found. Replace it for a custom UI; to hide it, render your own element: an empty slot keeps the built-in banner. |
 | `#title`                                                 | The page title                                                                                                                                             |
 | `#body`                                                  | The entire body form (advanced — usually not needed)                                                                                                       |
 | `#body-lang`                                             | The language switch above the body                                                                                                                         |
@@ -525,7 +527,7 @@ interface DetailSlotProps<T> {
 | `#button-save` / `#button-savecontinue` / `#button-back` | Single buttons inside the action card                                                                                                                      |
 | `#side-top`                                              | Section above the sidebar form fields                                                                                                                      |
 | `#side-bottom`                                           | Section below the sidebar form fields, above the danger card                                                                                               |
-| `#side-danger`                                           | The danger card at the bottom (Delete button). Shown only for existing records. Pass an empty template to suppress it.                                     |
+| `#side-danger`                                           | The danger card at the bottom (Delete button), for existing records only. To hide it, render your own element: an empty slot keeps the built-in card.      |
 | `#button-delete`                                         | The Delete button inside `#side-danger`                                                                                                                    |
 | `#field.<key>`                                           | Replace the entire field cell                                                                                                                              |
 | `#field.<key>.before` / `#field.<key>.after`             | Content injected before / after the field widget within its grid column                                                                                    |

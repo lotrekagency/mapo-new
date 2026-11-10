@@ -955,7 +955,9 @@ defineSlots<{
   /**
    * Draft restore banner shown when a localStorage draft is found.
    * Receives `draftBanner` (with `savedAt`, `restore`, `discard`) plus the full slot bindings.
-   * Override to render a completely custom banner; set to an empty slot to suppress it.
+   * Override to render a completely custom banner. To hide it, render an
+   * element of your own, such as `<span hidden />`: a slot that gives no
+   * element, an empty one included, renders the built-in banner.
    */
   "draft-banner"(props: SlotBindings): VNode[];
   /** Extra content above the main form. */
@@ -980,7 +982,9 @@ defineSlots<{
   "side-bottom"(props: SlotBindings): VNode[];
   /**
    * Danger-zone card at the very bottom of the sidebar (delete action).
-   * Rendered only for existing records (`!isNew`). Override to replace or suppress it.
+   * Rendered only for existing records (`!isNew`). Override to replace it;
+   * to hide it, render an element of your own, such as `<span hidden />`: a
+   * slot that gives no element, an empty one included, renders the built-in card.
    */
   "side-danger"(props: SlotBindings): VNode[];
   /** Per-field slot. Slot name: `field.{key}`, `field.{key}.before`, `field.{key}.after`. */
