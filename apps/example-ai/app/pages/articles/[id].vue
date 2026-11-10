@@ -3,7 +3,9 @@
 // panel, where a text or files go to the provider and model the signed-in
 // user may call (the keys of the AI settings page). The verified values go
 // into the empty fields; the others wait in the banner above the form and
-// on their fields. Nothing is saved until Save.
+// on their fields. Nothing is saved until Save. The page keeps drafts: after
+// a reload, Restore brings back the values and Magic Fill's session, the
+// marks with their quotes and Undo all, without calling the provider again.
 // `permission-model` names the backend model: the gateway checks
 // add_article (change_article for an article that exists), as Save does,
 // so `viewer`, who only reads articles, gets no Magic Fill.
@@ -52,6 +54,7 @@ const sidebarFields: AnyFieldDescriptor[] = [
       permission-model="article"
       :fields="fields"
       :sidebar-fields="sidebarFields"
+      :draft="true"
     />
   </div>
 </template>
