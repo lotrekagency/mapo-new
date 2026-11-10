@@ -77,6 +77,15 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
   schemaFromMetadata?: ComputedRef<
     ((metadata: Record<string, unknown>) => JSONSchema | undefined) | undefined
   >;
+  /**
+   * Calls `handler` after each save that succeeds, with the record as the
+   * backend returned it, before the page moves to a new record's address
+   * or goes back. Returns the function that removes it; one registered in
+   * a component's setup goes with the component. A handler that throws
+   * leaves the save done. `MapoDetail` always gives it; optional, as
+   * `modelName`.
+   */
+  onSaved?: (handler: (record: T) => void) => () => void;
 }
 
 /**

@@ -480,6 +480,42 @@ describe("MapoDetail context", () => {
     expect(detail.schemaFromMetadata?.value).toBeUndefined();
   });
 
+  it("tells the components inside of a save, with the record, before the page moves to it", async () => {
+    crud.create.mockResolvedValue({ id: 9, title: "Fresh" });
+    const steps: string[] = [];
+    router.replace.mockImplementation(async () => {
+      steps.push("replace");
+    });
+    const seen = mountWithProbe({ fields, id: "new" });
+    await settle();
+    const detail = seen.detail!;
+    detail.onSaved?.((saved) => {
+      steps.push(`saved ${(saved as { id: number }).id}`);
+    });
+
+    await detail.save();
+
+    expect(steps).toEqual(["saved 9", "replace"]);
+  });
+
+  it("stops telling a handler once removed, and a handler that throws leaves the save done", async () => {
+    const seen = mountWithProbe({ fields });
+    await settle();
+    const detail = seen.detail!;
+    const removed = vi.fn();
+    const remove = detail.onSaved!(removed);
+    remove();
+    detail.onSaved!(() => {
+      throw new Error("a broken extension");
+    });
+
+    await detail.save();
+
+    expect(removed).not.toHaveBeenCalled();
+    expect(crud.partialUpdate).toHaveBeenCalledTimes(1);
+    expect(detail.isSaving.value).toBe(false);
+  });
+
   it("saves through the context as the buttons do", async () => {
     const seen = mountWithProbe({ fields });
     await settle();

@@ -293,6 +293,9 @@ const detail = useMapoDetail<Article>(); // undefined outside a MapoDetail
 | `save(andBack?)`, `back()`                               | functions                                             | What the buttons do; ignored while a save, a delete or a navigation is under way |
 | `metadata()`                                             | `() => Promise<Record<string, unknown> \| undefined>` | The endpoint's `OPTIONS` response, requested once per page (below)               |
 | `schemaFromMetadata`                                     | `ComputedRef`                                         | The prop: how the page reads a schema from `OPTIONS`, when it has its own        |
+| `onSaved(handler)`                                       | `(handler) => () => void`                             | Calls `handler(record)` after each save that succeeds, before the page moves     |
+
+**Know when the record is saved.** `onSaved(handler)` calls `handler` with the record the backend returned after each save that succeeds, before the page moves to a new record's address or goes back. It returns the function that removes it, and one registered in a component's setup goes with the component; a handler that throws leaves the save done. A component that writes into the form can end its work there, as [Magic Fill](/modules/ai#magic-fill) does with its marks.
 
 **Write the record and mark what you wrote.** A component can fill the form and show where its values come from, as an importer or an assistant does:
 

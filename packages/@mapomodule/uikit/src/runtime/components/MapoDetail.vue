@@ -11,6 +11,8 @@ import {
   type Ref,
   type VNode,
   shallowRef,
+  getCurrentScope,
+  onScopeDispose,
 } from "vue";
 import { useRouter, onBeforeRouteLeave, useNuxtApp } from "#app";
 import { useI18n } from "vue-i18n";
@@ -480,6 +482,31 @@ async function fetchModel() {
   }
 }
 
+// ─── Saved ───────────────────────────────────────────────────────────────────
+// The components inside hear of each save that succeeds before the page
+// moves: a new record's page gives way to the record's own address.
+
+const savedHandlers = new Set<(record: T) => void>();
+
+function onSaved(handler: (record: T) => void): () => void {
+  savedHandlers.add(handler);
+  const remove = () => {
+    savedHandlers.delete(handler);
+  };
+  if (getCurrentScope()) onScopeDispose(remove);
+  return remove;
+}
+
+function notifySaved(record: T): void {
+  for (const handler of [...savedHandlers]) {
+    try {
+      handler(record);
+    } catch {
+      // A component's failure leaves the save done.
+    }
+  }
+}
+
 // ─── Save ────────────────────────────────────────────────────────────────────
 
 async function save(andBack = false) {
@@ -532,6 +559,7 @@ async function save(andBack = false) {
       "success",
     );
     emit("saved", model.value);
+    notifySaved(model.value);
     if (isNew.value && result && "id" in result) {
       const id = (result as unknown as { id: string | number }).id;
       await router.replace({
@@ -720,6 +748,7 @@ const context: MapoDetailContext<T> = {
   back,
   metadata: describe,
   schemaFromMetadata: computed(() => props.schemaFromMetadata),
+  onSaved,
 };
 provide(DETAIL_KEY, context as unknown as MapoDetailContext);
 
