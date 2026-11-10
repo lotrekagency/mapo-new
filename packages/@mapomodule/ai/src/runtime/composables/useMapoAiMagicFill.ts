@@ -179,13 +179,33 @@ export interface MapoAiMagicFill {
   t: Translate;
 }
 
-/** Who shows a detail's Magic Fill: its button, its banner, its panel. */
-type Role = "action" | "banner" | "panel";
+/** The parts of a detail's Magic Fill: its button, its banner, its panel. */
+export type MapoAiMagicFillPart = "action" | "banner" | "panel";
+
+/** How a component takes part in a detail's Magic Fill. */
+export interface MapoAiMagicFillOptions {
+  /**
+   * The part of Magic Fill the calling component is, when it replaces one
+   * with MapoOverride: `action`, the button; `banner`, the banner above the
+   * form; `panel`, the panel. The other parts then know it is there: the
+   * banner shows no button of its own beside a button that says it is
+   * one. Leave it out in any other component.
+   */
+  part?: MapoAiMagicFillPart;
+}
+
+/** One component that takes part, and whether it may render the panel. */
+interface Member {
+  id: symbol;
+  role: MapoAiMagicFillPart;
+  /** One of Magic Fill's own parts, which renders the panel when it comes first. */
+  hosts: boolean;
+}
 
 /** What the components of one detail share besides the public state. */
 interface Presence {
   /** The components mounted, in order, each with its role. */
-  members: Ref<readonly { id: symbol; role: Role }[]>;
+  members: Ref<readonly Member[]>;
 }
 
 interface Shared {
@@ -207,7 +227,11 @@ const presences = new WeakMap<MapoAiMagicFill, Presence>();
  * banner above the form share it, and it lives while one of them is
  * mounted, so closing the panel neither stops nor loses a call; when the
  * last goes, it stops at the end of that update, so a component replaced
- * keeps it. Call it in a component's setup, with the detail's context.
+ * keeps it. Call it in a component's setup, with the detail's context. A
+ * component that replaces a part of Magic Fill passes `part`.
+ *
+ * @param detail  The detail's context, from `useMapoDetail()`.
+ * @param options Which part of Magic Fill the calling component is, if any.
  *
  * @example
  * // A component inside a MapoDetail
@@ -217,15 +241,21 @@ const presences = new WeakMap<MapoAiMagicFill, Presence>();
  *   magic.text.value = "Title: About us";
  *   await magic.extract();
  * }
+ *
+ * @example
+ * // app/mapooverride/MapoAiMagicFillAction.vue: a button of the app's own
+ * const props = defineProps<{ detail: MapoAiMagicFillDetail }>();
+ * const magic = useMapoAiMagicFill(props.detail, { part: "action" });
  */
 export function useMapoAiMagicFill<T extends object>(
   detail: MapoAiMagicFillDetail<T>,
+  options: MapoAiMagicFillOptions = {},
 ): MapoAiMagicFill {
   let entry = shared.get(detail);
   if (!entry) {
     const scope = effectScope(true);
     const presence: Presence = {
-      members: shallowRef<readonly { id: symbol; role: Role }[]>([]),
+      members: shallowRef<readonly Member[]>([]),
     };
     const state = scope.run(() => magicFillState(detail))!;
     presences.set(state, presence);
@@ -244,6 +274,13 @@ export function useMapoAiMagicFill<T extends object>(
   const own = entry;
   own.users += 1;
   if (getCurrentScope()) {
+    // A part the app replaced tells the others it is there; it never
+    // renders the panel, which Magic Fill's own parts keep rendering.
+    const part = options.part;
+    if (part) {
+      const presence = joinMagicFill(own.state, part, { hosts: false });
+      onScopeDispose(presence.leave);
+    }
     onScopeDispose(() => {
       own.users -= 1;
       // A component replaced in one update goes before the new one comes:
@@ -260,16 +297,18 @@ export function useMapoAiMagicFill<T extends object>(
 }
 
 /**
- * How a component of the detail takes part. The first button or banner
- * mounted renders the panel, and the first panel mounted renders the
- * slideover: an override that renders the panel itself, or a panel that
- * does not take part, still makes one. The banner knows whether the button
- * is there. Not public: the components of Magic Fill share it. Call
- * `leave()` when it unmounts.
+ * How a component of the detail takes part. The first of Magic Fill's own
+ * buttons and banners mounted renders the panel, and the first of its
+ * panels renders the slideover: an override that renders the panel itself,
+ * or a part the app replaced, still leaves one. The banner knows whether a
+ * button is there, the app's own included (`part` of
+ * `useMapoAiMagicFill()`). Not public: the components of Magic Fill share
+ * it. Call `leave()` when it unmounts.
  */
 export function joinMagicFill(
   magic: MapoAiMagicFill,
-  role: Role,
+  role: MapoAiMagicFillPart,
+  { hosts = true }: { hosts?: boolean } = {},
 ): {
   isFirst: ComputedRef<boolean>;
   hasAction: ComputedRef<boolean>;
@@ -285,11 +324,12 @@ export function joinMagicFill(
     };
   }
   const isPanel = role === "panel";
-  presence.members.value = [...presence.members.value, { id, role }];
+  presence.members.value = [...presence.members.value, { id, role, hosts }];
   return {
     isFirst: computed(() => {
+      if (!hosts) return false;
       const kin = presence.members.value.filter(
-        (one) => (one.role === "panel") === isPanel,
+        (one) => one.hosts && (one.role === "panel") === isPanel,
       );
       return kin[0]?.id === id;
     }),

@@ -4,7 +4,7 @@ Replace any Mapo component entirely at build time — no imports, no registratio
 
 ## How it works
 
-The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` lifecycle. At build time it scans the consuming app's `app/mapooverride/` directory and, for every `.vue` file whose name matches a registered Mapo component, swaps the default `filePath` with the override. Any package that registers its components by name takes part: the `MapoAiMagicFill*` components of `@mapomodule/ai` too ([Magic Fill](/modules/ai#customize-it)).
+The `@mapomodule/uikit` module hooks into Nuxt's `components:extend` lifecycle. At build time it scans the consuming app's `app/mapooverride/` directory and, for every `.vue` file whose name matches a registered Mapo component, swaps the default `filePath` with the override. Any package that registers its components by name takes part: the `MapoAiMagicFill*` components of `@mapomodule/ai` too ([Magic Fill](/modules/ai#customize-it)); a replacement of one part says which part it is with `useMapoAiMagicFill(detail, { part })`.
 
 ```
 app/

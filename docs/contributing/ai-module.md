@@ -772,7 +772,7 @@ The package does not depend on uikit, and its runtime files are type-checked out
 
 ### One state per detail
 
-The button and the banner are rendered apart, and the slideover unmounts its content when closed, so the state cannot live in a component: `useMapoAiMagicFill(detail)` keeps it in a `WeakMap` keyed by the detail's context, built in a detached effect scope and counted by the components that use it. The last one to go stops the scope, which cancels a call and stops the files being read and the preview. The first component mounted renders the panel (`joinMagicFill()`, which also tells the banner whether the button is there): a page that shows only one of the two still has the panel.
+The button and the banner are rendered apart, and the slideover unmounts its content when closed, so the state cannot live in a component: `useMapoAiMagicFill(detail)` keeps it in a `WeakMap` keyed by the detail's context, built in a detached effect scope and counted by the components that use it. The last one to go stops the scope, which cancels a call and stops the files being read and the preview. The first of Magic Fill's own components mounted renders the panel (`joinMagicFill()`, which also tells the banner whether a button is there): a page that shows only one of the two still has the panel. A part the app replaced says what it is with `useMapoAiMagicFill(detail, { part })` (R118): it counts for `hasAction`, so the banner shows no button of its own beside the app's, and never hosts the panel, which Magic Fill's own parts keep rendering.
 
 ### The call
 
@@ -789,6 +789,7 @@ The button and the banner are rendered apart, and the slideover unmounts its con
 - **The marks and the summary live in the page**: a reload forgets them, as it forgets `undo()`.
 - **A session per record**: a second extraction keeps the first one's marks, and Undo all reaches every extraction, newest first; the summary counts the session, and says when the last extraction found nothing new.
 - **A hidden field waits**: the summary does not apply into it; a field the answer's own writes reveal takes its verified value by itself (R116).
+- **An override of a part must say so**: one that does not pass `part` is unknown to the others, so the banner shows its own button beside an override of the button.
 
 ## Testing
 

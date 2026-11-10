@@ -117,6 +117,8 @@ export type {
   MapoAiMagicFillDetail,
   MapoAiMagicFillFile,
   MapoAiMagicFillFileState,
+  MapoAiMagicFillOptions,
+  MapoAiMagicFillPart,
   MapoAiMagicFillPhase,
   MapoAiMagicFillPreview,
   MapoAiMagicFillProblem,

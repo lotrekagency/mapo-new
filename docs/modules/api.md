@@ -796,13 +796,14 @@ Reads the operator's files into text through the gateway's `read`, as `run` take
 
 ---
 
-### `useMapoAiMagicFill(detail)`
+### `useMapoAiMagicFill(detail, options?)`
 
 Magic Fill's state on a detail page: the source, the call and its summary. The button, the panel and the banner of Magic Fill share it, one per detail, alive while one of them is mounted, so closing the panel neither stops nor loses a call. Call it in a component inside a `MapoDetail`. See [Magic Fill](/modules/ai#magic-fill).
 
-| Parameter | Type                    | Default        | Description                                                                                                                                          |
-| --------- | ----------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `detail`  | `MapoAiMagicFillDetail` | — **required** | `useMapoDetail()`, or a `MapoAiFillTarget` with, optionally, `modelName` (the record's name for the AI), `permissionModel` and `schemaFromMetadata`. |
+| Parameter      | Type                              | Default        | Description                                                                                                                                          |
+| -------------- | --------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `detail`       | `MapoAiMagicFillDetail`           | — **required** | `useMapoDetail()`, or a `MapoAiFillTarget` with, optionally, `modelName` (the record's name for the AI), `permissionModel` and `schemaFromMetadata`. |
+| `options.part` | `"action" \| "banner" \| "panel"` | —              | The part of Magic Fill the calling component is, when it replaces one with MapoOverride: the other parts know it is there.                           |
 
 **Returns:** `MapoAiMagicFill`:
 

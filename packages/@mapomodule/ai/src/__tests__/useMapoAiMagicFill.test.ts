@@ -234,6 +234,24 @@ describe("useMapoAiMagicFill — one state per detail", () => {
     expect(banner.hasAction.value).toBe(false);
   });
 
+  it("lets a part the app replaced say it is there, and leaves the panel to Magic Fill's own parts", () => {
+    gateway({});
+    const form = detail();
+    const { magic } = mounted(form);
+    const banner = joinMagicFill(magic, "banner");
+    expect(banner.hasAction.value).toBe(false);
+
+    // The app's own button, as an override of MapoAiMagicFillAction.
+    const button = effectScope();
+    scopes.push(button);
+    button.run(() => useMapoAiMagicFill(form, { part: "action" }));
+
+    expect(banner.hasAction.value).toBe(true);
+    expect(banner.isFirst.value).toBe(true);
+    button.stop();
+    expect(banner.hasAction.value).toBe(false);
+  });
+
   it("lets the first panel show, apart from the button and the banner", () => {
     gateway({});
     const { magic } = mounted(detail());
