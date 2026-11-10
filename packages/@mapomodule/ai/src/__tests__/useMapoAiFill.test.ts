@@ -730,6 +730,31 @@ describe("useMapoAiFill — the form's own rules", () => {
     });
   });
 
+  it("leaves waiting a synci18n field that holds a value in another language: the write would replace it", async () => {
+    serve(answered({ slug: filled("about-us") }));
+    const fields: AnyFieldDescriptor[] = [
+      { key: "slug", type: "text", label: "Slug", synci18n: true },
+    ];
+    const form = {
+      ...target({ translations: { en: {}, it: { slug: "chi-siamo" } } }),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+      languages: computed(() => ["en", "it"]),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value).toEqual({
+      translations: { en: {}, it: { slug: "chi-siamo" } },
+    });
+    expect(ai.fields.value[0]).toMatchObject({
+      key: "slug",
+      action: "confirm",
+      replaces: true,
+    });
+  });
+
   it("converts with the accessor the registry gives the field's type", async () => {
     serve(answered({ tags: filled(["a", "b"]) }));
     const fields: AnyFieldDescriptor[] = [

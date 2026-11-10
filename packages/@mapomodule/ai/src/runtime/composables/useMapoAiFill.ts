@@ -322,6 +322,10 @@ export function useMapoAiFill<T extends object>(
           form: {
             pathOf: (key) => locate(key)?.path,
             read: (path) => readModelValue(target.model.value, path),
+            pathsOf: (key) => {
+              const found = locate(key);
+              return found ? writePaths(found) : [];
+            },
             isShown: (key) => isShown(locate(key)),
             canTake: (key) => canTake(locate(key)),
           },
@@ -424,14 +428,7 @@ export function useMapoAiFill<T extends object>(
     const model = target.model.value;
     const { descriptor, rest } = located;
     const isWhole = rest === "";
-    const languages = target.languages?.value ?? [];
-    const isSynced = isWhole && descriptor.synci18n === true;
-    // As the form's own write: the field's key in every language.
-    const key = String(descriptor.key);
-    const paths =
-      isSynced && languages.length
-        ? languages.map((lang) => `translations.${lang}.${key}`)
-        : [located.path];
+    const paths = writePaths(located);
     let stored: unknown;
     try {
       const { set } = accessorOf(descriptor);
@@ -459,6 +456,21 @@ export function useMapoAiFill<T extends object>(
       // The app's handler failed: the value is in, as when the operator types.
     }
     return records;
+  }
+
+  /**
+   * Where a value of a field is written, as the form's own write: the
+   * field's key in every language for a `synci18n` field, its path
+   * otherwise. The plan reads the same paths, so a value that would go
+   * into every language waits when any of them holds one.
+   */
+  function writePaths(located: KeyTarget<T>): string[] {
+    const { descriptor, rest } = located;
+    const languages = target.languages?.value ?? [];
+    const isSynced = rest === "" && descriptor.synci18n === true;
+    if (!isSynced || !languages.length) return [located.path];
+    const key = String(descriptor.key);
+    return languages.map((lang) => `translations.${lang}.${key}`);
   }
 
   /** Puts back what a field held, where it still holds what was written. */

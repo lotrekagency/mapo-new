@@ -439,6 +439,13 @@ export interface MapoAiFillForm {
   pathOf(key: string): string | undefined;
   /** The value at a path of the model. */
   read(path: string): unknown;
+  /**
+   * Every path a value of the key is written to, as the form writes it:
+   * the field's key in each language for a `synci18n` field. Default: none
+   * besides `pathOf(key)`. The field holds a value when any of these, or
+   * its own path, does.
+   */
+  pathsOf?(key: string): readonly string[];
   /** The form shows the field of a key. Default: it does. */
   isShown?(key: string): boolean;
   /**
@@ -466,7 +473,11 @@ export function planMapoAiFill(
   for (const [key, outcome] of Object.entries(fields)) {
     const path = form.pathOf(key);
     if (path === undefined || !isSafePath(path)) continue;
-    const replaces = !isEmptyFormValue(form.read(path));
+    // A value that goes into every language replaces any of them.
+    const written = (form.pathsOf?.(key) ?? []).filter(isSafePath);
+    const replaces = [path, ...written].some(
+      (at) => !isEmptyFormValue(form.read(at)),
+    );
     const shown = form.isShown?.(key) ?? true;
     const takes = form.canTake?.(key) ?? true;
     entries.push({

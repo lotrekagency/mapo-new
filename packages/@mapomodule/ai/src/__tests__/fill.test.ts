@@ -325,6 +325,31 @@ describe("planMapoAiFill", () => {
     expect(entry).toMatchObject({ action: "confirm", replaces: true });
   });
 
+  it("has the operator confirm a value that goes into every language when any of them holds one", () => {
+    const model = { translations: { en: {}, it: { slug: "chi-siamo" } } };
+    const form: MapoAiFillForm = {
+      ...formOf(model),
+      pathsOf: () => ["translations.en.slug", "translations.it.slug"],
+    };
+
+    const [entry] = planMapoAiFill({ slug: filled("about-us") }, form);
+
+    expect(entry).toMatchObject({ action: "confirm", replaces: true });
+  });
+
+  it("reads only the paths it can reach, never through a prototype", () => {
+    const form: MapoAiFillForm = {
+      ...formOf({}),
+      read: (path) =>
+        path === "__proto__.slug" ? "polluted" : readModelValue({}, path),
+      pathsOf: () => ["__proto__.slug"],
+    };
+
+    const [entry] = planMapoAiFill({ slug: filled("about-us") }, form);
+
+    expect(entry).toMatchObject({ action: "apply", replaces: false });
+  });
+
   it("counts false and 0 as values, and blank texts and empty lists as none", () => {
     const outcomes: AiFieldOutcomes = {
       featured: filled(true),
