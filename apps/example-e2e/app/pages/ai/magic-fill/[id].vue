@@ -13,7 +13,11 @@
 // - the sample "Slow": the phases, the time it takes, and Cancel, which
 //   stops the mock on the server too (the audit says `cancelled`);
 // - as viewer: the app's mapo-ai:user hook keeps the account out, and the
-//   page shows no AI.
+//   page shows no AI;
+// - reload after Extract: the page keeps drafts, so its banner offers
+//   Restore, which brings back the values, the marks with their quotes, the
+//   summary and Undo all; Discard drops them, and Save clears the draft.
+//   Leaving a new article that holds values asks for confirmation.
 // `permission-model` names the backend model, so the gateway checks
 // add_article (change_article for /1), as Save does.
 import { AI_ARTICLE_SAMPLES } from "#shared/aiArticleSamples";
@@ -48,6 +52,7 @@ async function copy(label: string, text: string) {
       :fields="AI_ARTICLE_FIELDS"
       :sidebar-fields="AI_ARTICLE_SIDEBAR_FIELDS"
       :languages="AI_ARTICLE_LANGUAGES"
+      :draft="true"
     />
     <UCard>
       <template #header>
