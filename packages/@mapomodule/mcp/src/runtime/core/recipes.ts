@@ -105,12 +105,14 @@ export const RECIPES: Recipe[] = [
       "current record",
       "record being edited",
       "shared OPTIONS",
+      "state in the draft",
+      "draft part",
     ],
     doc: "uikit/detail.md",
     heading: "How to: read the detail from a component inside it",
     seeAlso: ["uikit/form/annotations.md"],
     summary:
-      "useMapoDetail() gives a component inside MapoDetail the record, the fields rendered, languages, state, save() and an annotations channel.",
+      "useMapoDetail() gives a component inside MapoDetail the record, the fields rendered, languages, state, save(), onSaved(), an annotations channel and draft.part(), which keeps the component's own state in the page's draft, restored, discarded and cleared with the record's values.",
   },
   {
     id: "detail-extensions",
@@ -392,11 +394,19 @@ export const RECIPES: Recipe[] = [
   {
     id: "form-draft",
     task: "Autosave form drafts",
-    keywords: ["draft", "autosave", "useFormDraft", "restore", "unsaved"],
+    keywords: [
+      "draft",
+      "autosave",
+      "useFormDraft",
+      "restore",
+      "unsaved",
+      "noDraft",
+      "saved draft",
+    ],
     doc: "uikit/form/draft.md",
-    seeAlso: ["howto/crud-detail.md"],
+    seeAlso: ["uikit/detail.md", "howto/crud-detail.md"],
     summary:
-      "useFormDraft keeps unsaved edits in localStorage and offers to restore them on the next visit.",
+      'useFormDraft keeps unsaved edits in localStorage and offers to restore them on the next visit. MapoDetail does it with :draft="true", and useMapoForm with draftKey: per user, without the fields marked noDraft wherever their value is (every language, dotted keys, repeater items), new records included once they hold a value.',
   },
   {
     id: "schema-to-form",
@@ -675,7 +685,7 @@ export const RECIPES: Recipe[] = [
     heading: "Fill a detail form",
     seeAlso: ["uikit/detail.md", "uikit/form/annotations.md"],
     summary:
-      "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore. The answers of a session add up: keep() or a change in the field makes a value the operator's, undo() puts back every answer's values, newest first, and a save of the record ends the session.",
+      "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore. The answers of a session add up: keep() or a change in the field makes a value the operator's, undo() puts back every answer's values, newest first, and a save of the record ends the session. snapshot() and resume() keep the session in a draft and take it back, read as outside data.",
   },
   {
     id: "ai-magic-fill",
@@ -691,13 +701,14 @@ export const RECIPES: Recipe[] = [
       "cancel the call",
       "undo all",
       "proposals without proof",
+      "after a reload",
       "experimental",
     ],
     doc: "modules/ai.md",
     heading: "Magic Fill",
     seeAlso: ["uikit/detail.md", "uikit/mapoverride.md"],
     summary:
-      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, values with no quote at all are listed apart as proposals without proof, and Save ends the session. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
+      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, values with no quote at all are listed apart as proposals without proof, and Save ends the session. On a page with drafts, the session goes into MapoDetail's draft: after a reload, Restore brings back the marks with their quotes, the summary and Undo all, never the source. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
   },
   {
     id: "ai-read-files",
