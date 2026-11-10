@@ -1366,3 +1366,186 @@ describe("useMapoAiFill — the form's own rules", () => {
     expect(model.value.title).toBe("About us");
   });
 });
+
+describe("useMapoAiFill — the session in a draft", () => {
+  /** What a draft keeps, as `localStorage` stores it. */
+  const stored = (data: unknown) => JSON.parse(JSON.stringify(data));
+
+  it("keeps the values, their quotes, what undoes them and who answered, never the source or the instructions", async () => {
+    serve(
+      answered({ title: filled("About us"), excerpt: filled("Ours", false) }),
+    );
+    const form = target({ excerpt: "Old" });
+    const ai = useMapoAiFill(form);
+    await ai.fill("Title: About us. A line no field quotes.", {
+      instructions: "Only the title.",
+    });
+
+    const kept = stored(ai.snapshot());
+
+    const text = JSON.stringify(kept);
+    expect(text).not.toContain("A line no field quotes");
+    expect(text).not.toContain("Only the title");
+    expect(kept).toMatchObject({
+      format: 1,
+      rounds: 1,
+      answers: [
+        { round: 1, provider: { id: "mock", model: "mock" }, prompt: 1 },
+      ],
+    });
+    const byPath = Object.fromEntries(
+      kept.fields.map((field: { path: string }) => [field.path, field]),
+    );
+    expect(byPath.title).toMatchObject({
+      action: "apply",
+      applied: true,
+      undoable: true,
+      round: 1,
+      outcome: { quotes: [{ quote: "Quote of About us" }] },
+      writes: [
+        { order: 1, records: [{ path: "title", written: '"About us"' }] },
+      ],
+    });
+    expect(byPath.excerpt).toMatchObject({
+      action: "confirm",
+      applied: false,
+      undoable: false,
+      // What the field held, at its path and at each it is written to.
+      held: '["Old","Old"]',
+      writes: [],
+    });
+  });
+
+  it("takes the session back on the form a draft restored: marks, answers and Undo all", async () => {
+    serve(
+      answered({ title: filled("About us"), excerpt: filled("Ours", false) }),
+    );
+    const before = target({ excerpt: "Old" });
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    const kept = stored(ai.snapshot());
+
+    // The page loads again, and the draft puts its values back first.
+    const after = target();
+    Object.assign(after.model.value, stored(before.model.value));
+    const again = useMapoAiFill(after);
+    expect(again.resume(kept)).toBe(true);
+    await nextTick();
+
+    expect(again.fields.value).toEqual(ai.fields.value);
+    expect(again.rounds.value).toBe(1);
+    expect(again.answers.value).toEqual(ai.answers.value);
+    expect(after.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+    expect(after.annotations.value.excerpt?.description).toBe(
+      before.annotations.value.excerpt?.description,
+    );
+
+    again.undo();
+    expect(after.model.value).toEqual({ excerpt: "Old" });
+    expect(after.annotations.value).toEqual({});
+  });
+
+  it("gives the operator a value the restored form no longer holds as written", async () => {
+    serve(answered({ title: filled("About us"), excerpt: filled("Ours") }));
+    const before = target();
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    const kept = stored(ai.snapshot());
+
+    const after = target({ title: "About us, Milan", excerpt: "Ours" });
+    const again = useMapoAiFill(after);
+    again.resume(kept);
+    await nextTick();
+
+    expect(
+      again.fields.value.find((one) => one.path === "title"),
+    ).toMatchObject({ review: "edited", undoable: false });
+    again.undo();
+    expect(after.model.value).toEqual({ title: "About us, Milan" });
+  });
+
+  it("leaves out a field the form no longer has, and never undoes a write outside a field's own paths", async () => {
+    serve(answered({ title: filled("About us"), excerpt: filled("Ours") }));
+    const before = target();
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    const kept = stored(ai.snapshot());
+    const title = kept.fields.find(
+      (one: { path: string }) => one.path === "title",
+    );
+    title.writes[0].records[0].path = "status";
+    kept.fields.push({ ...title, key: "gone", path: "gone" });
+
+    const after = target({
+      title: "About us",
+      excerpt: "Ours",
+      status: "live",
+    });
+    const again = useMapoAiFill(after);
+    again.resume(kept);
+    await nextTick();
+
+    expect(again.fields.value.map((one) => one.path).sort()).toEqual([
+      "excerpt",
+      "title",
+    ]);
+    expect(
+      again.fields.value.find((one) => one.path === "title")?.undoable,
+    ).toBe(false);
+    again.undo();
+    expect(after.model.value).toEqual({ title: "About us", status: "live" });
+  });
+
+  it("reads only a session of its own format, and ends the one under way for anything else", async () => {
+    serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    expect(ai.resume({ format: 2, rounds: 1, fields: [] })).toBe(false);
+
+    expect(ai.fields.value).toEqual([]);
+    expect(form.annotations.value).toEqual({});
+    expect(form.model.value).toEqual({ title: "About us" });
+    expect(ai.snapshot()).toBeUndefined();
+    expect(ai.resume(undefined)).toBe(false);
+  });
+
+  it("takes a new answer as the next round of a session taken back", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const before = target();
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    const kept = stored(ai.snapshot());
+    const after = target({ title: "About us" });
+    const again = useMapoAiFill(after);
+    again.resume(kept);
+    post.mockResolvedValueOnce(answered({ excerpt: filled("Ours") }));
+
+    await again.fill("y");
+
+    expect(again.rounds.value).toBe(2);
+    expect(again.answers.value.map((one) => one.round)).toEqual([1, 2]);
+    expect(
+      again.fields.value.map((one) => [one.path, one.round, one.undoable]),
+    ).toEqual([
+      ["title", 1, true],
+      ["excerpt", 2, true],
+    ]);
+    again.undo();
+    expect(after.model.value).toEqual({});
+  });
+
+  it("keeps no write whose earlier value JSON cannot carry back as it was", async () => {
+    serve(answered({ title: filled("About us") }));
+    const form = target({ title: new Date(0) });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    ai.apply("title");
+    expect(form.model.value.title).toBe("About us");
+
+    const kept = stored(ai.snapshot());
+
+    expect(kept.fields[0]).toMatchObject({ undoable: false, writes: [] });
+  });
+});

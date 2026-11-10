@@ -211,6 +211,17 @@ function outcomesOf(
   return Object.fromEntries(outcomes);
 }
 
+/**
+ * A field's outcome read as outside data, as `run` answers it and as a
+ * draft keeps it; `undefined` when it cannot be read. Not public: the
+ * session's reader uses it.
+ */
+export function readMapoAiFieldOutcome(
+  value: unknown,
+): AiFieldOutcome | undefined {
+  return outcomeOf(value, 0);
+}
+
 function outcomeOf(value: unknown, depth: number): AiFieldOutcome | undefined {
   if (!isRecord(value)) return undefined;
   if (value.status === "empty") return { status: "empty" };

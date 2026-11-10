@@ -103,6 +103,7 @@ export type {
   MapoAiReadDependencies,
   MapoAiReadOptions,
 } from "./runtime/shared/read";
+export type { MapoAiFillAnswer } from "./runtime/shared/fillSession";
 export type { MapoAiRead } from "./runtime/composables/useMapoAiRead";
 export type {
   MapoAiFillSummary,

@@ -469,6 +469,36 @@ describe("Magic Fill's parts on a detail", () => {
     expect(form.model.value).toEqual({});
   });
 
+  it("name the model of the session's last answer for a session taken back from a draft, with no hint to start", async () => {
+    gateway(STATUS, { title: filled("About us", true) });
+    // Messages with their values, to see which model the summary names.
+    nuxt.app.$i18n = {
+      t: (key: string, params: Record<string, unknown> = {}) =>
+        Object.keys(params).length ? `${key} ${JSON.stringify(params)}` : key,
+    };
+    const before = detail(FIELDS);
+    const { extract } = await ready(before);
+    await extract();
+    const kept: unknown = JSON.parse(
+      JSON.stringify(useMapoAiMagicFill(before).fill.snapshot()),
+    );
+    app?.unmount();
+
+    // The page loads again; its draft puts the values back, then the session.
+    const after = detail(FIELDS);
+    after.model.value = { title: "About us" };
+    const root = mountDetail(after);
+    await settle();
+    useMapoAiMagicFill(after).fill.resume(kept);
+    await settle();
+
+    expect(textOf(root)).toContain(
+      'mapo.ai.magicFill.summary.by {"provider":"mock","model":"mock"}',
+    );
+    expect(textOf(root)).not.toContain("mapo.ai.magicFill.actionHint");
+    expect(button("mapo.ai.magicFill.summary.undoAll")).toBeDefined();
+  });
+
   it("offer Undo all while the AI's earlier value waits under a new proposal", async () => {
     gateway(STATUS, { title: filled("Ten years", true) });
     runs.push({

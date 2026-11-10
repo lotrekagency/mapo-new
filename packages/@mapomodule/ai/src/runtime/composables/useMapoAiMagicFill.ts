@@ -57,7 +57,22 @@ export interface MapoAiMagicFillDetail<
       | undefined
     >
   >;
+  /**
+   * The page's draft, as the context of `MapoDetail` gives it: Magic Fill
+   * keeps its session there, as the part `mapo-ai-magic-fill`, on a page
+   * that keeps drafts.
+   */
+  draft?: {
+    part(
+      key: string,
+      part: { save: () => unknown; restore: (data: unknown) => void },
+    ): () => void;
+    touch(): void;
+  };
 }
+
+/** The part of the page's draft that holds Magic Fill's session. */
+const DRAFT_PART = "mapo-ai-magic-fill";
 
 /** What became of a file the operator attached. */
 export type MapoAiMagicFillFileState =
@@ -373,6 +388,27 @@ function magicFillState<T extends object>(
       return schemaReaderOf();
     },
   });
+
+  // The session goes with the page's draft, where the page keeps one: a
+  // reload and Restore bring back the marks, their quotes and Undo all. A
+  // draft restored during a call takes its place.
+  const draft = detail.draft;
+  if (draft) {
+    const leave = draft.part(DRAFT_PART, {
+      save: () => fill.snapshot(),
+      restore: (data) => {
+        cancel();
+        // A form whose fields come from the record's description (`OPTIONS`)
+        // has them once it answers: the session comes back on them.
+        const described = detail.metadata?.().catch(() => undefined);
+        void Promise.resolve(described).then(() => {
+          fill.resume(data);
+        });
+      },
+    });
+    onScopeDispose(leave);
+    watch([fill.fields, fill.rounds], () => draft.touch());
+  }
 
   const open = shallowRef(false);
   const text = shallowRef("");

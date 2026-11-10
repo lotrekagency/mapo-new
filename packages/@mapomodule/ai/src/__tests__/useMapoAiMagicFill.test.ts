@@ -769,3 +769,131 @@ describe("useMapoAiMagicFill — labels", () => {
     expect(magic.labelOf("unknown_key")).toBe("Unknown Key");
   });
 });
+
+describe("useMapoAiMagicFill — the page's draft", () => {
+  type Part = { save: () => unknown; restore: (data: unknown) => void };
+
+  /** A page's draft: the parts registered, and the calls to save soon. */
+  function pageDraft() {
+    const parts = new Map<string, Part>();
+    const touch = vi.fn();
+    const draft = {
+      part: (key: string, part: Part) => {
+        parts.set(key, part);
+        return () => {
+          parts.delete(key);
+        };
+      },
+      touch,
+    };
+    return { parts, touch, draft };
+  }
+
+  it("keeps the session as a part of the draft, saved at each change, and leaves with the state", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(VERIFIED_TITLE),
+    });
+    const page = pageDraft();
+    const { magic, scope } = mounted(detail({ draft: page.draft }));
+    await useMapoAiStatus().refresh();
+    const part = page.parts.get("mapo-ai-magic-fill");
+    expect(part?.save()).toBeUndefined();
+
+    magic.text.value = "Title: About us";
+    await magic.extract();
+    await flush();
+
+    expect(page.touch).toHaveBeenCalled();
+    expect(part?.save()).toMatchObject({
+      format: 1,
+      rounds: 1,
+      answers: [{ provider: { id: "ollama", model: "gemma4:12b" } }],
+    });
+    scope.stop();
+    await flush();
+    expect(page.parts.has("mapo-ai-magic-fill")).toBe(false);
+  });
+
+  it("takes the session back when the page restores its draft, in place of a call under way", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(VERIFIED_TITLE),
+    });
+    const first = pageDraft();
+    const { magic: before } = mounted(detail({ draft: first.draft }));
+    await useMapoAiStatus().refresh();
+    before.text.value = "Title: About us";
+    await before.extract();
+    const kept: unknown = JSON.parse(
+      JSON.stringify(first.parts.get("mapo-ai-magic-fill")?.save()),
+    );
+
+    // The page loads again: its draft puts the values back, then the parts.
+    const run = held();
+    gateway({ "/_mapo/ai/status": () => STATUS, "/_mapo/ai/run": run.route });
+    const page = pageDraft();
+    const form = detail({ draft: page.draft });
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: Contacts";
+    const call = magic.extract();
+    await flush();
+    expect(magic.phase.value).toBe("waiting");
+
+    form.model.value = { title: "About us" };
+    page.parts.get("mapo-ai-magic-fill")?.restore(kept);
+    await call;
+    await flush();
+
+    expect(magic.phase.value).toBe("idle");
+    expect(magic.fill.rounds.value).toBe(1);
+    expect(magic.summary.value).toMatchObject({ applied: 1 });
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+    magic.undoAll();
+    expect(form.model.value).toEqual({});
+  });
+  it("takes the session back on the fields the record's description gives, once it answers", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(VERIFIED_TITLE),
+    });
+    const first = pageDraft();
+    const { magic: before } = mounted(detail({ draft: first.draft }));
+    await useMapoAiStatus().refresh();
+    before.text.value = "Title: About us";
+    await before.extract();
+    const kept: unknown = JSON.parse(
+      JSON.stringify(first.parts.get("mapo-ai-magic-fill")?.save()),
+    );
+
+    // A page whose fields come from OPTIONS: none until it answers.
+    const described = ref<AnyFieldDescriptor[]>([]);
+    let answer: () => void = () => undefined;
+    const page = pageDraft();
+    const form = detail({
+      draft: page.draft,
+      fields: computed(() => described.value),
+      metadata: vi.fn(
+        () =>
+          new Promise<Record<string, unknown> | undefined>((resolve) => {
+            answer = () => {
+              described.value = FIELDS;
+              resolve(undefined);
+            };
+          }),
+      ),
+    });
+    const { magic } = mounted(form);
+    form.model.value = { title: "About us" };
+    page.parts.get("mapo-ai-magic-fill")?.restore(kept);
+    await flush();
+    expect(magic.fill.rounds.value).toBe(0);
+
+    answer();
+    await flush();
+
+    expect(magic.fill.fields.value.map((one) => one.path)).toEqual(["title"]);
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+  });
+});

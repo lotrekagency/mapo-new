@@ -42,6 +42,16 @@ import type {
 } from "../shared/fill";
 import type { MapoAiSourcePart } from "../shared/gateway";
 import { isRecord } from "../shared/guards";
+import {
+  MAPO_AI_FILL_SESSION_FORMAT,
+  isPlainData,
+  readMapoAiFillSession,
+} from "../shared/fillSession";
+import type {
+  MapoAiFillAnswer,
+  MapoAiFillSession,
+  MapoAiFillSessionField,
+} from "../shared/fillSession";
 import type { AiFieldOutcome } from "../shared/sanitize";
 import { gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
@@ -221,6 +231,29 @@ export interface MapoAiFill {
   fields: Readonly<Ref<readonly MapoAiFillField[]>>;
   /** How many answers the session has had: a field's `round` names its answer. */
   rounds: Readonly<Ref<number>>;
+  /**
+   * The answers of the session, oldest first: the provider and the model
+   * that gave each, and when. A field's `round` names its answer.
+   */
+  answers: Readonly<Ref<readonly MapoAiFillAnswer[]>>;
+  /**
+   * The session as data `JSON.stringify()` can write, for a draft: each
+   * field with the AI's value, its quotes and what became of it, what
+   * `restore()` and `undo()` would put back, and the answers. Never the
+   * source, the files or the instructions. `undefined` without a session.
+   * Store it as it is: its format is Mapo's own.
+   */
+  snapshot(): object | undefined;
+  /**
+   * Takes back a session `snapshot()` gave, in place of the one under
+   * way, on the form as it is now: restore the form's values first, and
+   * call it once the form has its fields, those `OPTIONS` gives too. The
+   * data is read as outside data; a field the form no longer has there is
+   * left out, and a write outside a field's own paths is never undone.
+   * Anything else that is not such a session ends the one under way, as
+   * `close()`. Returns whether a session was taken back.
+   */
+  resume(snapshot: unknown): boolean;
 }
 
 /** Where a key of the answer goes in the form. */
@@ -321,6 +354,7 @@ export function useMapoAiFill<T extends object>(
   const response = shallowRef<MapoAiFillResponse>();
   const fields = shallowRef<readonly MapoAiFillField[]>([]);
   const rounds = shallowRef(0);
+  const answers = shallowRef<readonly MapoAiFillAnswer[]>([]);
 
   let controller: AbortController | undefined;
   /** The marks the composable set, by the path they sit at: the only ones it removes. */
@@ -406,6 +440,15 @@ export function useMapoAiFill<T extends object>(
       // The answer joins the session: the marks and the memory of the
       // earlier answers stay where it gives nothing new.
       rounds.value += 1;
+      answers.value = [
+        ...answers.value,
+        {
+          round: rounds.value,
+          provider: { ...reply.provider },
+          prompt: reply.prompt,
+          at: Date.now(),
+        },
+      ];
       for (const [key, found] of located) targets.set(key, found);
       const { joined, renewed } = join(answer.entries, rounds.value);
       for (const path of joined) {
@@ -804,6 +847,141 @@ export function useMapoAiFill<T extends object>(
     held.clear();
     targets.clear();
     rounds.value = 0;
+    answers.value = [];
+  }
+
+  function snapshot(): object | undefined {
+    if (rounds.value === 0) return undefined;
+    const session: MapoAiFillSession = {
+      format: MAPO_AI_FILL_SESSION_FORMAT,
+      rounds: rounds.value,
+      answers: answers.value.map((answer) => ({
+        ...answer,
+        provider: { ...answer.provider },
+      })),
+      fields: fields.value.map(keptField),
+    };
+    return session;
+  }
+
+  /**
+   * A field as a draft keeps it. Its writes go only when JSON carries what
+   * they put back: a file or a date that was there is not written back as
+   * text, so nothing undoes that field after a restore.
+   */
+  function keptField(field: MapoAiFillField): MapoAiFillSessionField {
+    const stack = memory.get(field.path) ?? [];
+    const isCarried = stack.every((one) =>
+      one.records.every((record) => isPlainData(record.before)),
+    );
+    const kept = isCarried
+      ? stack.map((one) => ({
+          order: one.order,
+          records: one.records.map((record) => ({ ...record })),
+        }))
+      : [];
+    const wasHeld = held.get(field.path);
+    return {
+      key: field.key,
+      path: field.path,
+      action: field.action,
+      replaces: field.replaces,
+      shown: field.shown,
+      outcome: field.outcome,
+      applied: field.applied,
+      ...(field.review ? { review: field.review } : {}),
+      undoable: field.undoable && kept.length > 0,
+      round: field.round,
+      ...(wasHeld !== undefined ? { held: wasHeld } : {}),
+      writes: kept,
+    };
+  }
+
+  function resume(data: unknown): boolean {
+    close();
+    const session = readMapoAiFillSession(data);
+    if (!session) return false;
+    const descriptors = [
+      ...target.fields.value,
+      ...(target.sidebarFields?.value ?? []),
+    ];
+    const declared = declaredKeys(fieldsToJsonSchema(descriptors));
+    const taken: MapoAiFillField[] = [];
+    for (const saved of session.fields) {
+      const located = locateKept(descriptors, declared, saved);
+      if (!located) continue;
+      targets.set(saved.key, located);
+      // Undoing writes only where the field's value goes.
+      const reach = new Set([located.path, ...writePaths(located)]);
+      const isReached = saved.writes.every((one) =>
+        one.records.every((record) => reach.has(record.path)),
+      );
+      const kept = isReached ? saved.writes : [];
+      if (kept.length) {
+        memory.set(
+          saved.path,
+          kept.map((one) => ({
+            order: one.order,
+            records: one.records.map((record) => ({
+              path: record.path,
+              before: record.before,
+              write: record.write,
+              written: record.written,
+            })),
+          })),
+        );
+      }
+      if (saved.held !== undefined) held.set(saved.path, saved.held);
+      taken.push({
+        key: saved.key,
+        path: saved.path,
+        action: saved.action,
+        replaces: saved.replaces,
+        shown: saved.shown,
+        outcome: saved.outcome,
+        applied: saved.applied,
+        ...(saved.review ? { review: saved.review } : {}),
+        undoable: saved.undoable && kept.length > 0,
+        round: saved.round,
+      });
+    }
+    fields.value = taken;
+    // A field that waits with nothing kept of what it held starts from
+    // what it holds now.
+    for (const field of taken) {
+      const isWaiting = !field.applied && field.review === undefined;
+      if (isWaiting && !held.has(field.path)) {
+        held.set(field.path, snapshotOf(field));
+      }
+    }
+    rounds.value = session.rounds;
+    answers.value = session.answers;
+    const orders = [...memory.values()].flat().map((one) => one.order);
+    writes = Math.max(0, ...orders);
+    refreshMarks(taken.map(markPathOf));
+    return true;
+  }
+
+  /**
+   * Where a kept field goes in the form as it is now: its key, at the
+   * descriptor that declares it, in the language of its path; `undefined`
+   * when the form no longer has it there.
+   */
+  function locateKept(
+    descriptors: readonly AnyFieldDescriptor<T>[],
+    declared: ReadonlySet<string>,
+    saved: MapoAiFillSessionField,
+  ): KeyTarget<T> | undefined {
+    const languages = new Set([
+      target.currentLang?.value ?? "",
+      ...(target.languages?.value ?? []),
+      "",
+    ]);
+    for (const language of languages) {
+      const found = keyTarget(descriptors, saved.key, language, declared);
+      if (found?.path === saved.path) return found;
+    }
+    return undefined;
   }
 
   function cancel(): void {
@@ -1044,6 +1222,9 @@ export function useMapoAiFill<T extends object>(
     response,
     fields,
     rounds,
+    answers,
+    snapshot,
+    resume,
   };
 }
 

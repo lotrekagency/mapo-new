@@ -698,6 +698,7 @@ The components use Nuxt UI and Tailwind utilities. Tailwind generates only the c
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `src/runtime/shared/fill.ts`               | Pure: the request from the two descriptions, the answer read as outside data, the plan, the model's paths |
 | `src/runtime/composables/useMapoAiFill.ts` | The composable: the plan applied to the detail, the marks, `restore()` and `undo()`, waiting and failing  |
+| `src/runtime/shared/fillSession.ts`        | Pure: the session as a draft keeps it, its format and its reader as outside data                          |
 
 ### What goes in by itself
 
@@ -731,6 +732,12 @@ The operator's decisions end the AI's claim on a field: `keep()` (R113), a chang
 
 After an answer's direct writes, a pass that only promotes looks again at the verified values of that answer that waited for a hidden field (R116): one whose field the writes revealed, empty and shown now, goes in, and the pass runs again while a write changes what the form shows. A value of an earlier answer keeps waiting: nothing goes in by itself after the answer that gave it. A value with no quote at all marks no field (R115, `isUnprovenValue()`), and Magic Fill lists it apart. A target with `onSaved`, as the detail's context, ends the session on each save (R117): `close()` stops a call under way, whose answer is dropped, removes the marks and forgets the stack, and the values stay, since they are the record's now. Nothing is written while the detail loads (`isLoading`).
 
+### The session in a draft
+
+`snapshot()` writes the session as data (`MAPO_AI_FILL_SESSION_FORMAT` in `shared/fillSession.ts`): each field as the session holds it, with its outcome (the value and its quotes), what became of it, what it held while it waited (`held`) and its stack of writes, each record with what the path held before; and the answers, with the provider, the model, the prompt's version and the time. The source, the files and the instructions are never in it. `resume()` reads it back as outside data (`readMapoAiFillSession()`), then on the form as it is: a field comes back only where its key, at the descriptor that declares it now and in a language the form edits, leads to the same path; a record of a write only at the field's own paths, with the objects it made on the way to them, so undoing writes nowhere else. The same comparison that finds an operator's change then makes a value theirs when the restored form holds something else. A write whose earlier value JSON cannot carry back as it was (a file, a date) is left out, and its field can no longer be undone: writing text back where a file was would be wrong.
+
+Magic Fill keeps the session as a part of the detail's draft (`draft.part()` of uikit's context), and asks the draft to save at each change of the session (`draft.touch()`): one lifecycle with the values, under the user, for 24 hours, gone with Discard and Save. A draft restored during a call takes its place: the call stops. The session comes back once the detail's `metadata()` answers, so a form whose fields come from `OPTIONS` has them; and it lives while Magic Fill's state does, that is while one of its parts is on the page.
+
 ### Waiting and failing
 
 The call goes through `$mapoFetch` when the app has it, so a session that ended leads to the login page as anywhere in Mapo, and through `$fetch` otherwise. `cancel()`, a new `fill()` and the end of the component's scope stop the browser's wait and close the request: the gateway notices the response closing unfinished and stops the provider's call (a model on the app's own server is free again), which counts against the user's limit once the provider was called and is audited as `cancelled`. A request whose page went away before the provider was called is dropped, neither counted nor audited. A call that fails or is cancelled, and a refusal, leave the session as it was. An error keeps the gateway's status and its `Retry-After`, with a message from `mapo.ai.errors.*`; a `FetchError` without a status is the network, any other failure (the app's own `schemaFromMetadata` throwing) is a failure.
@@ -743,7 +750,7 @@ The call goes through `$mapoFetch` when the app has it, so a session that ended 
 - **The operator decides once**: Keep, a change in the field and Ignore end the AI's claim on it; a save ends the session.
 - **Related records wait**: the AI's name, or id, is shown, and the operator chooses the record; searching for it is Magic Fill's.
 - **A list goes in whole or waits**: there is no merge with the items a record already has.
-- **The marks and the memory of `undo()` live in the page**: a reload forgets them.
+- **The marks and the memory of `undo()` live in the page, and in its draft**: a page without drafts forgets them at a reload; with drafts, `snapshot()` and `resume()` carry them, the quotes included, in clear in the browser's storage.
 - **`false` counts as a value**: a `false` someone wrote, the operator, a draft or the app's code, keeps a verified `true` waiting. A new record of `MapoDetail` starts empty and no field writes a default, so an untouched switch is empty and takes a verified `true` by itself.
 - **Cancel stops the provider only where the server sees the request close**: on a Node server, directly or behind a proxy that closes its request too. On an edge runtime, or behind a proxy that keeps the request open, a cancelled call runs on and costs.
 - **A change is read on the model**: a field whose component rewrites its value by itself would count as the operator's change and lose its mark. The editor rewrote its HTML when only its read-only state changed: fixed (B9); a component of an app that rewrites on mount would show the same.
@@ -786,7 +793,7 @@ The button and the banner are rendered apart, and the slideover unmounts its con
 - **The panel cannot lose a call**: the state outlives the slideover, and the banner follows the call.
 - **Headless**: every part is a registered component an app replaces, over a composable an app can use alone.
 - **The plugin is generated, so it is typed only in the app**: the package's typecheck does not see it; `module.test.ts` checks its text.
-- **The marks and the summary live in the page**: a reload forgets them, as it forgets `undo()`.
+- **The session follows the page's draft**: with drafts on, a reload and Restore bring back the marks, the summary with the model that answered, and Undo all; without them, a reload forgets the session, as it forgets the values. The quotes are pieces of the source, kept in clear in the browser's storage, under the user, for the draft's 24 hours.
 - **A session per record**: a second extraction keeps the first one's marks, and Undo all reaches every extraction, newest first; the summary counts the session, and says when the last extraction found nothing new.
 - **A hidden field waits**: the summary does not apply into it; a field the answer's own writes reveal takes its verified value by itself (R116).
 - **An override of a part must say so**: one that does not pass `part` is unknown to the others, so the banner shows its own button beside an override of the button.
@@ -833,6 +840,7 @@ The browser's half, also run in Node:
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `fill.test.ts`          | The request from the two descriptions, the answer read as outside data, each action of the plan, the model's paths          |
 | `useMapoAiFill.test.ts` | The composable with a mocked `useNuxtApp()`: what it writes and marks, apply, restore, undo, cancel, the errors             |
+| `fillSession.test.ts`   | What a kept session reads back: its format, the fields and answers it leaves out, writes only on the way to their paths     |
 | `fill-gateway.test.ts`  | The browser's request through the real `run` route, the mock and the sanitizer, its answer read and planned as a page would |
 | `useMapoAiRead.test.ts` | The answer of `read` read as outside data, the file sent as a form, the composable through `$mapoFetch`                     |
 

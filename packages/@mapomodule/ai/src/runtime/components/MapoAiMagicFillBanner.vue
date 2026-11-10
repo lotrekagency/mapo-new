@@ -28,7 +28,7 @@ const SLOW_AFTER_SECONDS = 20;
 
 const magic = useMapoAiMagicFill(props.detail);
 const { t, available, choices, phase, startedAt, summary, open } = magic;
-const { error, response, fields, rounds } = magic.fill;
+const { error, response, fields, rounds, answers } = magic.fill;
 const presence = joinMagicFill(magic, "banner");
 onBeforeUnmount(presence.leave);
 // The first of the button and the banner renders the panel.
@@ -85,7 +85,9 @@ const isUnreadable = computed(
   () =>
     response.value?.status === "answered" && !response.value.result.readable,
 );
-const answeredBy = computed(() => response.value?.provider);
+// The model of the session's last answer: a refusal has its own line, and a
+// session restored from a draft has no answer of this page.
+const answeredBy = computed(() => answers.value.at(-1)?.provider);
 // Something of the AI's in the form that Undo all would put back.
 const hasApplied = computed(() => fields.value.some((field) => field.undoable));
 // The last answer joined the session and gave no field a new value, the
@@ -134,10 +136,11 @@ const counts = computed(() => {
     { key: "notFound", n: found.notFound },
   ].filter((count) => count.n > 0);
 });
-// Nothing of a call to show: the banner offers the panel, on a phone, or
-// wherever the sidebar's button is left out.
+// Nothing of a call or a session to show: the banner offers the panel, on a
+// phone, or wherever the sidebar's button is left out.
 const isQuiet = computed(
-  () => !isRunning.value && !error.value && !response.value,
+  () =>
+    !isRunning.value && !error.value && !response.value && rounds.value === 0,
 );
 const hasNoModel = computed(() => choices.value.length === 0);
 
