@@ -18,6 +18,8 @@ export type {
 } from "./runtime/types/media.js";
 export type {
   MapoDetailContext,
+  MapoDetailDraft,
+  MapoDetailDraftPart,
   DetailExtension,
   DetailExtensionLoader,
   DetailExtensionPlacement,

@@ -914,3 +914,155 @@ describe("MapoDetail drafts", () => {
     expect(stored.size).toBe(0);
   });
 });
+
+describe("MapoDetail draft parts", () => {
+  const stored = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+    removeItem: (key: string) => void stored.delete(key),
+  };
+  const fields = [{ key: "title", type: "text" }];
+  const key = "mapo:draft:7:/api/news/:5";
+  /** A page with drafts and a banner of its own: the built-in one needs a DOM to leave. */
+  const mountDrafting = (props: Record<string, unknown> = {}) =>
+    mountWithProbe(
+      { fields, draft: true, ...props },
+      { "draft-banner": () => [h("i")] },
+    );
+
+  beforeEach(() => {
+    stored.clear();
+    vi.stubGlobal("localStorage", storage);
+    crud.detail.mockImplementation(async () => ({ id: 5, title: "News" }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  async function autosave(): Promise<void> {
+    await nextTick();
+    vi.advanceTimersByTime(2000);
+  }
+
+  it("keeps what a part saves, on touch(), with the record unchanged", async () => {
+    const seen = mountDrafting();
+    await settle();
+    vi.useFakeTimers();
+    const draft = seen.detail!.draft!;
+    let notes: object | undefined = { n: 1 };
+    draft.part("notes", { save: () => notes, restore: () => {} });
+    draft.part("empty", { save: () => undefined, restore: () => {} });
+
+    draft.touch();
+    await autosave();
+    const saved = JSON.parse(stored.get(key)!);
+    expect(saved.model).toEqual({ id: 5, title: "News" });
+    expect(saved.parts).toEqual({ notes: { n: 1 } });
+
+    // Nothing left to keep: the draft this page wrote goes.
+    notes = undefined;
+    draft.touch();
+    await autosave();
+    expect(stored.has(key)).toBe(false);
+  });
+
+  it("leaves out a part that throws, and keeps the others", async () => {
+    const seen = mountDrafting();
+    await settle();
+    vi.useFakeTimers();
+    const draft = seen.detail!.draft!;
+    draft.part("broken", {
+      save: () => {
+        throw new Error("a broken extension");
+      },
+      restore: () => {},
+    });
+    draft.part("notes", { save: () => ({ n: 1 }), restore: () => {} });
+
+    draft.touch();
+    await autosave();
+    expect(JSON.parse(stored.get(key)!).parts).toEqual({ notes: { n: 1 } });
+  });
+
+  it("restores the parts after the values, and a part that comes later gets its data then", async () => {
+    stored.set(
+      key,
+      JSON.stringify({
+        model: { title: "Draft" },
+        savedAt: Date.now(),
+        parts: { notes: { n: 2 }, later: { m: 3 } },
+      }),
+    );
+    const found = vi.fn();
+    const seen = mountDrafting({ onDraftFound: found });
+    await settle();
+    vi.useFakeTimers();
+    const detail = seen.detail!;
+    const titles: unknown[] = [];
+    const notes = vi.fn(() => {
+      titles.push((detail.model.value as { title: string }).title);
+    });
+    const fresh = vi.fn();
+    detail.draft!.part("notes", { save: () => undefined, restore: notes });
+    detail.draft!.part("fresh", { save: () => undefined, restore: fresh });
+
+    const [, , restore] = found.mock.calls[0]!;
+    restore();
+    expect(notes).toHaveBeenCalledWith({ n: 2 });
+    expect(titles).toEqual(["Draft"]);
+    // The draft holds nothing for it: it starts again.
+    expect(fresh).toHaveBeenCalledWith(undefined);
+
+    const later = vi.fn();
+    detail.draft!.part("later", { save: () => undefined, restore: later });
+    expect(later).toHaveBeenCalledWith({ m: 3 });
+  });
+
+  it("gives a later part nothing once the record is saved, and stops asking a part removed", async () => {
+    stored.set(
+      key,
+      JSON.stringify({
+        model: { title: "Draft" },
+        savedAt: Date.now(),
+        parts: { later: { m: 3 } },
+      }),
+    );
+    const found = vi.fn();
+    const seen = mountDrafting({ onDraftFound: found });
+    await settle();
+    vi.useFakeTimers();
+    const detail = seen.detail!;
+    const removed = vi.fn(() => ({ n: 1 }));
+    const remove = detail.draft!.part("gone", {
+      save: removed,
+      restore: () => {},
+    });
+    remove();
+
+    found.mock.calls[0]![2]();
+    await detail.save();
+    const later = vi.fn();
+    detail.draft!.part("later", { save: () => undefined, restore: later });
+    expect(later).not.toHaveBeenCalled();
+
+    detail.draft!.touch();
+    await autosave();
+    expect(removed).not.toHaveBeenCalled();
+    expect(stored.has(key)).toBe(false);
+  });
+
+  it("keeps nothing with drafts off", async () => {
+    const seen = mountWithProbe({ fields });
+    await settle();
+    vi.useFakeTimers();
+    const draft = seen.detail!.draft!;
+    draft.part("notes", { save: () => ({ n: 1 }), restore: () => {} });
+
+    draft.touch();
+    await autosave();
+    expect(stored.size).toBe(0);
+  });
+});

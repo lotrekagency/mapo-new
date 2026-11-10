@@ -41,7 +41,7 @@ import { usePermissions } from "@mapomodule/store/runtime/composables/usePermiss
 import { languagesFromMetadata } from "../utils/langInfo";
 import { holdsFormValue } from "../utils/formValues";
 import { DETAIL_KEY } from "../composables/useMapoDetail";
-import type { MapoDetailContext } from "../types/detail";
+import type { MapoDetailContext, MapoDetailDraftPart } from "../types/detail";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
 import { modelForDraft } from "@mapomodule/form/runtime/utils/draft";
 import type { JSONSchema } from "@mapomodule/utils";
@@ -404,6 +404,7 @@ function removeUnownedDraft(): void {
 }
 
 function clearDraft() {
+  unclaimedParts.clear();
   const key = draftStorageKey();
   if (key && typeof localStorage !== "undefined") localStorage.removeItem(key);
 }
@@ -415,7 +416,11 @@ function checkDraft() {
     removeUnownedDraft();
     const raw = localStorage.getItem(key);
     if (!raw) return;
-    const entry = JSON.parse(raw) as { model: T; savedAt: number };
+    const entry = JSON.parse(raw) as {
+      model: T;
+      savedAt: number;
+      parts?: unknown;
+    };
     if (Date.now() - entry.savedAt > DRAFT_TTL) {
       localStorage.removeItem(key);
       return;
@@ -423,6 +428,7 @@ function checkDraft() {
     const savedAt = new Date(entry.savedAt);
     const restore = () => {
       Object.assign(model.value, entry.model);
+      restoreParts(entry.parts);
       draftBanner.value = null;
     };
     const discard = () => {
@@ -436,6 +442,69 @@ function checkDraft() {
   }
 }
 
+// ─── Draft parts ─────────────────────────────────────────────────────────────
+// A component inside the detail keeps a state of its own in the draft, beside
+// the record's values: the context's `draft`.
+
+const draftParts = new Map<string, MapoDetailDraftPart>();
+/** Data of a restored draft whose part was not there yet: it gets it when it comes. */
+const unclaimedParts = new Map<string, unknown>();
+
+function addDraftPart(key: string, part: MapoDetailDraftPart): () => void {
+  draftParts.set(key, part);
+  if (unclaimedParts.has(key)) {
+    const data = unclaimedParts.get(key);
+    unclaimedParts.delete(key);
+    restorePart(part, data);
+  }
+  const remove = () => {
+    if (draftParts.get(key) === part) draftParts.delete(key);
+  };
+  if (getCurrentScope()) onScopeDispose(remove);
+  return remove;
+}
+
+function restorePart(part: MapoDetailDraftPart, data: unknown): void {
+  try {
+    part.restore(data);
+  } catch {
+    // A component's failure leaves the record's values restored.
+  }
+}
+
+/**
+ * Puts back each part of a restored draft, as read from the storage: a
+ * part the draft holds nothing for starts again from nothing.
+ */
+function restoreParts(parts: unknown): void {
+  const isRecord =
+    typeof parts === "object" && parts !== null && !Array.isArray(parts);
+  const kept = new Map(isRecord ? Object.entries(parts) : []);
+  for (const [key, part] of draftParts) {
+    restorePart(part, kept.get(key));
+    kept.delete(key);
+  }
+  for (const [key, data] of kept) unclaimedParts.set(key, data);
+}
+
+/** What the parts keep, by key; `undefined` when none keeps anything. */
+function keptParts(): Record<string, unknown> | undefined {
+  const kept: Record<string, unknown> = {};
+  for (const [key, part] of draftParts) {
+    let data: unknown;
+    try {
+      data = part.save();
+    } catch {
+      continue;
+    }
+    if (data !== undefined) kept[key] = data;
+  }
+  return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
+/** Saves the draft two seconds after the last change; nothing with drafts off. */
+let saveDraftSoon: () => void = () => {};
+
 // Auto-save draft debounced whenever model changes and form is dirty.
 if (props.draft || props.draftKey) {
   /** This page wrote the draft: once nothing is left to keep, it goes. */
@@ -444,9 +513,11 @@ if (props.draft || props.draftKey) {
     const key = draftStorageKey();
     if (!key || typeof localStorage === "undefined") return;
     try {
-      // Back as loaded: a draft written by an earlier visit stays on offer,
-      // the one this page wrote goes.
-      if (!isDirty.value) {
+      const parts = keptParts();
+      // Back as loaded, and no part keeps anything: a draft written by an
+      // earlier visit stays on offer, the one this page wrote goes.
+      const hasParts = parts !== undefined;
+      if (!isDirty.value && !hasParts) {
         if (isWritten) localStorage.removeItem(key);
         isWritten = false;
         return;
@@ -454,16 +525,15 @@ if (props.draft || props.draftKey) {
       // The fields marked `noDraft` hold nothing in the draft, at any path.
       const fields = [...activeFields.value, ...(props.sidebarFields ?? [])];
       const values = modelForDraft(toRaw(model.value), fields);
-      localStorage.setItem(
-        key,
-        JSON.stringify({ model: values, savedAt: Date.now() }),
-      );
+      const entry = { model: values, savedAt: Date.now(), parts };
+      localStorage.setItem(key, JSON.stringify(entry));
       isWritten = true;
     } catch {
       /* quota exceeded, or a value with no JSON form — ignore */
     }
   }, 2000);
   watch(model, saveDraft, { deep: true });
+  saveDraftSoon = () => saveDraft();
 }
 
 // ─── Fetch ───────────────────────────────────────────────────────────────────
@@ -806,6 +876,7 @@ const context: MapoDetailContext<T> = {
   metadata: describe,
   schemaFromMetadata: computed(() => props.schemaFromMetadata),
   onSaved,
+  draft: { part: addDraftPart, touch: () => saveDraftSoon() },
 };
 provide(DETAIL_KEY, context as unknown as MapoDetailContext);
 

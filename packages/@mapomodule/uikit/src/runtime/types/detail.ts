@@ -90,6 +90,50 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
    * `modelName`.
    */
   onSaved?: (handler: (record: T) => void) => () => void;
+  /**
+   * The detail's draft, for a component that keeps a state of its own
+   * beside the record's values: it is saved, restored, discarded and
+   * cleared with them. With drafts off nothing is kept. `MapoDetail` always
+   * gives it; optional, as `modelName`.
+   */
+  draft?: MapoDetailDraft;
+}
+
+/**
+ * A part of the detail's draft: the state of a component inside it, saved
+ * and restored with the record's values.
+ */
+export interface MapoDetailDraftPart {
+  /**
+   * What to keep, as data `JSON.stringify()` can write; `undefined` when
+   * there is nothing. Called each time the draft is saved; a part that
+   * throws is left out of that save.
+   */
+  save: () => unknown;
+  /**
+   * Puts back what `save()` returned, when the operator restores the
+   * draft, after the record's values; `undefined` when the draft holds
+   * nothing for the part, which then starts again from nothing. It comes
+   * from the browser's storage: read it as outside data.
+   */
+  restore: (data: unknown) => void;
+}
+
+/** The draft of a `MapoDetail`, for the components inside it. */
+export interface MapoDetailDraft {
+  /**
+   * Keeps a part of the draft under `key`, one per detail: registering the
+   * key again replaces the part. The draft is saved when the record changed
+   * or a part has something to keep. A part registered after the draft was
+   * restored gets its data then. Returns the function that removes it; one
+   * registered in a component's setup goes with the component.
+   */
+  part: (key: string, part: MapoDetailDraftPart) => () => void;
+  /**
+   * Saves the draft soon, after a change of a part's state: a change of
+   * the record's values saves it by itself.
+   */
+  touch: () => void;
 }
 
 /**
