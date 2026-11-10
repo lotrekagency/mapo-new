@@ -8,7 +8,7 @@
 // gateway's checks like any answer: a value whose quote is not in the
 // source comes back to check, one that breaks a rule of its field comes
 // back discarded. The sources are in shared/aiArticleSamples.ts.
-import { NO_SOURCE, NOTE, RELEASE } from "#shared/aiArticleSamples";
+import { NO_SOURCE, NOTE, RELEASE, UPDATE } from "#shared/aiArticleSamples";
 
 /** Every field of the article form (app/utils/aiArticleForm.ts), empty. */
 const EMPTY = {
@@ -78,6 +78,31 @@ export default defineNitroPlugin(() => {
           quote("reading_time", "a 300 minutes read"),
           quote("published_at", "to be built by 2028"),
           quote("category", NOTE.category),
+        ],
+      },
+    },
+    {
+      // An update of article 1 (/ai/magic-fill/1), whose values it mostly
+      // holds already: a new title, verified; a subtitle quoted from words
+      // the source does not have and a reading time with no quote, which
+      // would replace the article's; its own slug, and `featured` as it is.
+      // The first three wait in the preview, before and after; the last
+      // two are already in the record. On a new article, the title and the
+      // slug go in by themselves.
+      name: "article-update",
+      answer: {
+        values: {
+          ...EMPTY,
+          title: UPDATE.title,
+          slug: UPDATE.slug,
+          subtitle: "A shorter guide to the form engine",
+          featured: "true",
+          reading_time: "10",
+        },
+        evidence: [
+          quote("title", UPDATE.title),
+          quote("slug", UPDATE.slug),
+          quote("subtitle", "A shorter guide to the form engine"),
         ],
       },
     },

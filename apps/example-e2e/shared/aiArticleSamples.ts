@@ -20,6 +20,15 @@ export const NOTE = {
   category: "Category: Culture",
 };
 
+/**
+ * Words of an update of article 1, quoted by the fixture `article-update`:
+ * its slug is the one the article already has.
+ */
+export const UPDATE = {
+  title: "Building admin UIs with Mapo v2, second edition",
+  slug: "building-admin-uis-mapo-v2",
+};
+
 /** A source the mock answers by its very text, with no mark: a refusal. */
 export const NO_SOURCE = "Write an article about the weather.";
 
@@ -72,6 +81,17 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
       NOTE.title,
       `${NOTE.excerpt} Works start in the spring.`,
       NOTE.category,
+    ].join("\n"),
+  },
+  {
+    label: "Update",
+    description:
+      "Fixture article-update, for the existing article (/ai/magic-fill/1): a new title, a subtitle no quote proves and a reading time with no quote would replace the article's, so they wait before and after; the slug and Featured are what it already holds.",
+    text: [
+      "#mock:fixture=article-update",
+      "",
+      UPDATE.title,
+      `The article keeps its address: ${UPDATE.slug}.`,
     ].join("\n"),
   },
   {

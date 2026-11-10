@@ -7,7 +7,10 @@
 // verified values go into the empty fields, the others wait in the banner's
 // summary and on their fields. Try it:
 // - /ai/magic-fill/new: a new article;
-// - /ai/magic-fill/1: a value that would replace one waits for Apply;
+// - /ai/magic-fill/1 with the sample "Update": the banner's preview lists
+//   the values that would replace the article's, before and after and
+//   unticked, and counts those it already holds; tick one and Apply
+//   selected, or Apply on its field, whose mark says what it replaces;
 // - "What I send to the AI": the prompt the gateway composes, with the
 //   app's rules (nuxt.config.ts and server/plugins/mapo-ai-rules.ts);
 // - the sample "Slow": the phases, the time it takes, and Cancel, which

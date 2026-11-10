@@ -189,7 +189,7 @@ function report() {
   const count = (action: MapoAiFillField["action"]) =>
     fields.filter((field) => field.action === action).length;
   say(
-    `the plan: ${fields.filter((field) => field.applied).length} values went into the form by themselves, ${count("confirm")} wait for Apply, ${count("manual")} to set by hand, ${count("discard")} discarded, ${count("empty")} not given`,
+    `the plan: ${fields.filter((field) => field.applied).length} values went into the form by themselves, ${count("confirm")} wait for Apply, ${count("manual")} to set by hand, ${count("unchanged")} already held, ${count("discard")} discarded, ${count("empty")} not given`,
   );
 }
 
