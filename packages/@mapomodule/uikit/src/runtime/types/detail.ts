@@ -50,7 +50,11 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
   isSaving: ComputedRef<boolean>;
   /** While a save, a delete or a navigation back is under way. */
   isBusy: ComputedRef<boolean>;
-  /** Whether the model differs from the record as loaded or last saved. */
+  /**
+   * Whether the model differs from the record as loaded or last saved; for
+   * a new record, whether it holds a value it did not hold when the page
+   * opened (a blank text, an empty list or an empty object is none).
+   */
   isDirty: ComputedRef<boolean>;
   /**
    * Marks set from inside the detail, shown with those of the `annotations`

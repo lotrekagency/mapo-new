@@ -29,6 +29,8 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 | `registry`                     | `FieldRegistry \| null`                 | `null`         | Field registry. Falls back to `$mapoFormRegistry` if omitted.                                                                                                                                                                     |
 | `annotations`                  | `FieldAnnotations`                      | —              | Marks on the fields of the body and the sidebar forms. See [Field annotations](./form/annotations).                                                                                                                               |
 | `extensions`                   | `boolean \| string[]`                   | `true`         | Which extensions registered with `defineDetailExtension()` the page shows: all, none (`false`) or the listed keys. See [Detail page](./detail#how-to-add-an-action-to-every-detail-page).                                         |
+| `draft`                        | `boolean`                               | `false`        | Auto-save a draft to localStorage, per user, without the fields marked `noDraft`. See [Detail page](./detail#how-to-enable-draft-auto-save).                                                                                      |
+| `draftKey`                     | `string`                                | —              | Own key of the draft (`mapo:draft:<user id>:<key>`); setting it also turns drafts on.                                                                                                                                             |
 
 ### Emits
 

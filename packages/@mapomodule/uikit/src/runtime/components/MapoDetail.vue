@@ -30,6 +30,7 @@ import {
 } from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
+import { useAuthStore } from "@mapomodule/store/runtime/stores/auth";
 import type {
   AnyFieldDescriptor,
   FieldAnnotations,
@@ -38,9 +39,11 @@ import type {
 } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { languagesFromMetadata } from "../utils/langInfo";
+import { holdsFormValue } from "../utils/formValues";
 import { DETAIL_KEY } from "../composables/useMapoDetail";
 import type { MapoDetailContext } from "../types/detail";
 import { useFormFromSchema } from "@mapomodule/form/runtime/composables/useFormFromSchema";
+import { modelForDraft } from "@mapomodule/form/runtime/utils/draft";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { MultipartPolicy } from "@mapomodule/core";
 
@@ -113,13 +116,16 @@ const props = withDefaults(
      * Enable automatic draft persistence to localStorage.
      * When `true`, the key is auto-generated as `${endpoint}:${id}`.
      * Provide `draftKey` to override with a custom key.
-     * Drafts expire after 24 h. The built-in banner handles restore/discard.
+     * Drafts are kept per user, leave out the fields marked `noDraft`, and
+     * expire after 24 h. A new record is saved as a draft once it holds a
+     * value. The built-in banner handles restore/discard.
      */
     draft?: boolean;
     /**
-     * Custom localStorage key for draft persistence. Requires `draft: true`.
-     * Key is prefixed with `mapo:draft:`.
-     * Example: `"article:42"` → `mapo:draft:article:42`.
+     * Custom localStorage key for draft persistence; setting it also turns
+     * drafts on. Key is prefixed with `mapo:draft:` and the signed-in
+     * user's id (`anonymous` without one).
+     * Example: `"article:42"` → `mapo:draft:1:article:42` for the user with id `1`.
      * Falls back to `${endpoint}:${id}` when omitted.
      */
     draftKey?: string;
@@ -212,6 +218,7 @@ const { t } = useI18n();
 const router = useRouter();
 const snack = useSnackStore();
 const confirm = useConfirmStore();
+const auth = useAuthStore();
 const crud = useCrud<T>(props.endpoint);
 
 type ValidateClientFn = () => {
@@ -264,11 +271,26 @@ const draftBanner = ref<{
   discard: () => void;
 } | null>(null);
 
-const isDirty = computed(
-  () =>
-    backup.value !== null &&
-    Object.keys(objectDiff(backup.value, model.value)).length > 0,
-);
+/**
+ * What a new record held when the page opened, as the page and the
+ * components inside it set it up: none of it is the operator's change.
+ */
+const opened = ref<T | null>(null);
+
+/**
+ * The record differs from the one loaded or last saved. A new record has
+ * none to differ from: it counts as changed once it holds a value it did
+ * not hold when the page opened, so it gets a draft and the warnings on
+ * leaving, as an existing record does.
+ */
+const isDirty = computed(() => {
+  if (backup.value !== null) {
+    return Object.keys(objectDiff(backup.value, model.value)).length > 0;
+  }
+  if (!isNew.value) return false;
+  const start = opened.value ?? ({} as T);
+  return holdsFormValue(objectDiff(start, model.value));
+});
 const mainCols = computed(() => 12 - props.sidebarCols);
 
 // ─── Languages (auto-derive from lang_info) ──────────────────────────────────
@@ -357,10 +379,28 @@ const sidebarColsClass = computed(
 
 const DRAFT_TTL = 86_400_000; // 24h
 
-function draftStorageKey() {
+/** The page's own key of the draft, without the prefix; `null` with drafts off. */
+function draftName(): string | null {
   if (!props.draft && !props.draftKey) return null;
-  const key = props.draftKey ?? `${props.endpoint}:${props.id}`;
-  return `mapo:draft:${key}`;
+  return props.draftKey ?? `${props.endpoint}:${props.id}`;
+}
+
+/** Where the draft is kept: one per user, so accounts on a browser never share one. */
+function draftStorageKey(): string | null {
+  const name = draftName();
+  if (name === null) return null;
+  const userId = auth.info?.id ?? "anonymous";
+  return `mapo:draft:${userId}:${name}`;
+}
+
+/**
+ * Removes a draft kept before drafts were kept per user: nobody can say
+ * whose it is, so it is never offered.
+ */
+function removeUnownedDraft(): void {
+  const name = draftName();
+  if (name === null) return;
+  localStorage.removeItem(`mapo:draft:${name}`);
 }
 
 function clearDraft() {
@@ -372,6 +412,7 @@ function checkDraft() {
   const key = draftStorageKey();
   if (!key || typeof localStorage === "undefined") return;
   try {
+    removeUnownedDraft();
     const raw = localStorage.getItem(key);
     if (!raw) return;
     const entry = JSON.parse(raw) as { model: T; savedAt: number };
@@ -397,16 +438,29 @@ function checkDraft() {
 
 // Auto-save draft debounced whenever model changes and form is dirty.
 if (props.draft || props.draftKey) {
+  /** This page wrote the draft: once nothing is left to keep, it goes. */
+  let isWritten = false;
   const saveDraft = debounce(() => {
     const key = draftStorageKey();
-    if (!key || !isDirty.value || typeof localStorage === "undefined") return;
+    if (!key || typeof localStorage === "undefined") return;
     try {
+      // Back as loaded: a draft written by an earlier visit stays on offer,
+      // the one this page wrote goes.
+      if (!isDirty.value) {
+        if (isWritten) localStorage.removeItem(key);
+        isWritten = false;
+        return;
+      }
+      // The fields marked `noDraft` hold nothing in the draft, at any path.
+      const fields = [...activeFields.value, ...(props.sidebarFields ?? [])];
+      const values = modelForDraft(toRaw(model.value), fields);
       localStorage.setItem(
         key,
-        JSON.stringify({ model: toRaw(model.value), savedAt: Date.now() }),
+        JSON.stringify({ model: values, savedAt: Date.now() }),
       );
+      isWritten = true;
     } catch {
-      /* quota exceeded — ignore */
+      /* quota exceeded, or a value with no JSON form — ignore */
     }
   }, 2000);
   watch(model, saveDraft, { deep: true });
@@ -466,6 +520,9 @@ async function describeEndpoint() {
 async function fetchModel() {
   if (isNew.value) {
     backup.value = null;
+    // The components inside are set up by now: what they and the page put
+    // in is where the record starts.
+    opened.value = deepClone(model.value) as T;
     checkDraft();
     return;
   }

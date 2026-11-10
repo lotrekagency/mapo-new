@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRenderer, h, onUnmounted } from "vue";
+import { createRenderer, h, nextTick, onUnmounted } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoDetail from "../runtime/components/MapoDetail.vue";
@@ -31,12 +31,23 @@ const crud = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 const confirm = vi.hoisted(() => ({ ask: vi.fn() }));
+// The signed-in user: drafts are kept under their id.
+const auth = vi.hoisted(() => ({ info: { id: 7 } as { id: number } | null }));
+type LeaveGuard = (
+  to: unknown,
+  from: unknown,
+  next: (ok: boolean) => void,
+) => void;
+// The unsaved-changes guard each detail registers, newest last.
+const leaveGuards = vi.hoisted(() => [] as LeaveGuard[]);
 // One app instance for every call, as in an app: the extensions live on it.
 const nuxtApp = vi.hoisted(() => ({ $mapoFormRegistry: {} }));
 
 vi.mock("#app", () => ({
   useRouter: () => router,
-  onBeforeRouteLeave: () => {},
+  onBeforeRouteLeave: (guard: LeaveGuard) => {
+    leaveGuards.push(guard);
+  },
   useNuxtApp: () => nuxtApp,
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -46,6 +57,9 @@ vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
 }));
 vi.mock("@mapomodule/store/runtime/stores/confirm", () => ({
   useConfirmStore: () => confirm,
+}));
+vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
+  useAuthStore: () => auth,
 }));
 vi.mock("@mapomodule/store/runtime/composables/usePermissions", () => ({
   usePermissions: () => ({
@@ -239,6 +253,8 @@ afterEach(() => {
   app?.unmount();
   app = undefined;
   detailExtensions(nuxtApp).splice(0);
+  leaveGuards.splice(0);
+  auth.info = { id: 7 };
 });
 
 describe("MapoDetail actions", () => {
@@ -418,7 +434,10 @@ describe("MapoDetail schema mode", () => {
 });
 
 /** Mounts a component in `body-top` that keeps the context it reads. */
-function mountWithProbe(extraProps: Record<string, unknown> = {}) {
+function mountWithProbe(
+  extraProps: Record<string, unknown> = {},
+  extraSlots: Record<string, (bindings: never) => VNode[]> = {},
+) {
   const seen: { detail?: MapoDetailContext } = {};
   const Probe: Component = {
     setup() {
@@ -426,7 +445,7 @@ function mountWithProbe(extraProps: Record<string, unknown> = {}) {
       return () => h("i");
     },
   };
-  mountDetail({ "body-top": () => [h(Probe)] }, extraProps);
+  mountDetail({ "body-top": () => [h(Probe)], ...extraSlots }, extraProps);
   return seen;
 }
 
@@ -691,5 +710,207 @@ describe("MapoDetail extensions", () => {
     for (let step = 0; step < 4; step++) await settle();
 
     expect(rendered).toEqual(["loaded"]);
+  });
+});
+
+describe("MapoDetail drafts", () => {
+  const stored = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+    removeItem: (key: string) => void stored.delete(key),
+  };
+  const fields = [
+    { key: "title", type: "text", translatable: true },
+    { key: "token", type: "text", translatable: true, noDraft: true },
+  ];
+  const draftOf = (model: object, savedAt = Date.now()) =>
+    JSON.stringify({ model, savedAt });
+
+  beforeEach(() => {
+    stored.clear();
+    vi.stubGlobal("localStorage", storage);
+    // A record of its own each time: a change through the model writes into it.
+    crud.detail.mockImplementation(async () => ({ id: 5, title: "News" }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** Lets the autosave, debounced by two seconds, write. */
+  async function autosave(): Promise<void> {
+    await nextTick();
+    vi.advanceTimersByTime(2000);
+  }
+
+  it("counts a new record as changed only once it holds a value", async () => {
+    const seen = mountWithProbe({ fields, id: "new" });
+    await settle();
+    const detail = seen.detail!;
+    const model = detail.model.value as Record<string, unknown>;
+    expect(detail.isDirty.value).toBe(false);
+
+    // Blank texts, an editor's empty paragraph, empty lists and objects.
+    model.slug = "";
+    model.translations = { en: { title: "<p><br></p>" }, it: {} };
+    model.tags = [];
+    expect(detail.isDirty.value).toBe(false);
+
+    model.featured = false;
+    expect(detail.isDirty.value).toBe(true);
+  });
+
+  it("counts what the page put in a new record before it opened as no change", async () => {
+    // A component inside sets a value up, as a page that prefills a record.
+    const seen: { detail?: MapoDetailContext } = {};
+    const Prefill: Component = {
+      setup() {
+        seen.detail = useMapoDetail();
+        (seen.detail!.model.value as Record<string, unknown>).category = 3;
+        return () => h("i");
+      },
+    };
+    mountDetail({ "body-top": () => [h(Prefill)] }, { fields, id: "new" });
+    await settle();
+    const detail = seen.detail!;
+    const model = detail.model.value as Record<string, unknown>;
+    expect(detail.isDirty.value).toBe(false);
+
+    model.slug = "hello";
+    expect(detail.isDirty.value).toBe(true);
+    model.slug = "";
+    expect(detail.isDirty.value).toBe(false);
+    model.category = 4;
+    expect(detail.isDirty.value).toBe(true);
+  });
+
+  it("asks before leaving a new record that holds a value, and before closing the tab", async () => {
+    const unloads: ((event: object) => void)[] = [];
+    vi.stubGlobal("addEventListener", (type: string, handler: () => void) => {
+      if (type === "beforeunload") unloads.push(handler);
+    });
+    vi.stubGlobal("removeEventListener", () => {});
+    const seen = mountWithProbe({ fields, id: "new" });
+    await settle();
+    const [leave] = leaveGuards;
+    const left = vi.fn();
+    leave!({}, {}, left);
+    await settle();
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(left).toHaveBeenCalledWith(true);
+
+    (seen.detail!.model.value as Record<string, unknown>).slug = "hello";
+    confirm.ask.mockResolvedValue(false);
+    const kept = vi.fn();
+    leave!({}, {}, kept);
+    await settle();
+    expect(confirm.ask).toHaveBeenCalledTimes(1);
+    expect(kept).toHaveBeenCalledWith(false);
+
+    const closing = { preventDefault: vi.fn(), returnValue: undefined };
+    for (const handler of unloads) handler(closing);
+    expect(closing.preventDefault).toHaveBeenCalled();
+  });
+
+  it("keeps a new record's draft under the user, without the noDraft fields", async () => {
+    const sidebarFields = [{ key: "pin", type: "text", noDraft: true }];
+    const seen = mountWithProbe({
+      fields,
+      sidebarFields,
+      id: "new",
+      draft: true,
+    });
+    await settle();
+    vi.useFakeTimers();
+    const model = seen.detail!.model.value as Record<string, unknown>;
+    model.translations = {
+      en: { title: "Hello", token: "t-en" },
+      it: { token: "t-it" },
+    };
+    model.pin = "1234";
+    await autosave();
+
+    expect([...stored.keys()]).toEqual(["mapo:draft:7:/api/news/:new"]);
+    const saved = JSON.parse(stored.get("mapo:draft:7:/api/news/:new")!);
+    expect(saved.model).toEqual({
+      translations: { en: { title: "Hello" }, it: {} },
+    });
+  });
+
+  it("removes the draft it wrote once the record is back as loaded, and leaves an earlier one", async () => {
+    stored.set("mapo:draft:7:/api/news/:5", draftOf({ title: "Earlier" }));
+    const seen = mountWithProbe(
+      { fields, draft: true },
+      { "draft-banner": () => [h("i")] },
+    );
+    await settle();
+    vi.useFakeTimers();
+    const model = seen.detail!.model.value as Record<string, unknown>;
+    // The record loads: nothing changed, and the earlier draft stays.
+    await autosave();
+    expect(stored.has("mapo:draft:7:/api/news/:5")).toBe(true);
+
+    model.title = "Changed";
+    await autosave();
+    const saved = JSON.parse(stored.get("mapo:draft:7:/api/news/:5")!);
+    expect(saved.model.title).toBe("Changed");
+
+    model.title = "News";
+    await autosave();
+    expect(stored.size).toBe(0);
+  });
+
+  it("never offers a draft kept without its user, and removes it, nor another user's", async () => {
+    stored.set("mapo:draft:/api/news/:5", draftOf({ title: "Whose?" }));
+    stored.set("mapo:draft:8:/api/news/:5", draftOf({ title: "Another's" }));
+    const found = vi.fn();
+    mountWithProbe({ fields, draft: true, onDraftFound: found });
+    await settle();
+
+    expect(found).not.toHaveBeenCalled();
+    expect(stored.has("mapo:draft:/api/news/:5")).toBe(false);
+    expect(stored.has("mapo:draft:8:/api/news/:5")).toBe(true);
+  });
+
+  it("offers the user's draft, and restores it or discards it", async () => {
+    stored.set("mapo:draft:7:/api/news/:5", draftOf({ title: "Draft" }));
+    const found = vi.fn();
+    // A banner of the page's own: the built-in one leaves with a transition,
+    // which needs a DOM. An empty slot would render the built-in one.
+    const seen = mountWithProbe(
+      { fields, draft: true, onDraftFound: found },
+      { "draft-banner": () => [h("i")] },
+    );
+    await settle();
+    // The autosave a change schedules never fires after the test.
+    vi.useFakeTimers();
+    expect(found).toHaveBeenCalledTimes(1);
+    const [draft, , restore, discard] = found.mock.calls[0]!;
+    expect(draft).toEqual({ title: "Draft" });
+
+    restore();
+    expect(seen.detail!.model.value).toEqual({ id: 5, title: "Draft" });
+    discard();
+    expect(stored.size).toBe(0);
+  });
+
+  it("drops a draft older than a day, and clears the draft once saved", async () => {
+    const dayAndMinute = 86_400_000 + 60_000;
+    stored.set(
+      "mapo:draft:7:/api/news/:5",
+      draftOf({ title: "Stale" }, Date.now() - dayAndMinute),
+    );
+    const found = vi.fn();
+    const seen = mountWithProbe({ fields, draft: true, onDraftFound: found });
+    await settle();
+    vi.useFakeTimers();
+    expect(found).not.toHaveBeenCalled();
+    expect(stored.size).toBe(0);
+
+    stored.set("mapo:draft:7:/api/news/:5", draftOf({ title: "Draft" }));
+    await seen.detail!.save();
+    expect(stored.size).toBe(0);
   });
 });

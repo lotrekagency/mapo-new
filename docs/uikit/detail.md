@@ -70,8 +70,8 @@ The page now supports:
 | `usePatch`                     | `boolean`                        | `true`        | Send PATCH (diff only) on update; otherwise PUT                                                                                                                                                       |
 | `readonly`                     | `boolean`                        | `false`       | Force read-only mode                                                                                                                                                                                  |
 | `registry`                     | `FieldRegistry`                  | auto-injected | Optional registry override                                                                                                                                                                            |
-| `draft`                        | `boolean`                        | `false`       | Enable auto-save draft to localStorage. Key is auto-generated as `${endpoint}:${id}`.                                                                                                                 |
-| `draftKey`                     | `string`                         | —             | Custom localStorage key for draft persistence. Requires `draft: true`. Prefix: `mapo:draft:`.                                                                                                         |
+| `draft`                        | `boolean`                        | `false`       | Enable auto-save draft to localStorage, kept per user. Key is auto-generated as `${endpoint}:${id}`. Fields marked `noDraft` are left out; a new record is saved once it holds a value.               |
+| `draftKey`                     | `string`                         | —             | Custom localStorage key for draft persistence; setting it also turns drafts on. Prefix: `mapo:draft:<user id>:`.                                                                                      |
 | `multipart`                    | `"auto" \| "force" \| "disable"` | `"auto"`      | Controls multipart/form-data upload behaviour. `"auto"` uses multipart only when the model contains a `File` or `Blob`; `"force"` always uses it; `"disable"` never does.                             |
 | `permissionModel`              | `string`                         | —             | Django model label (e.g. `"news.article"`). When set, save buttons are hidden if the user lacks `add_*` / `change_*`, and the delete card is hidden without `delete_*`. Superusers are never blocked. |
 | `previewField`                 | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
@@ -425,6 +425,10 @@ function onDeleted() {
 
 Pass `:draft="true"` to activate automatic draft persistence. The component debounces saves to localStorage every 2 s while the form is dirty and shows a built-in restore banner on the next load.
 
+- **Per user.** The draft is stored under `mapo:draft:<user id>:`, with the id of the signed-in user (`anonymous` without one), so two accounts on one browser never see each other's drafts. A draft stored before drafts were kept per user cannot be told apart by account: it is removed when found, never offered. So give `useFormDraft()` keys of its own: one without `userId` under a detail's key would go too.
+- **Without `noDraft` fields.** A field marked `noDraft`, in the body or in the sidebar, holds nothing in the draft wherever its value is: at its key, in every language of a translatable or `synci18n` field, in each item of a repeater that declares it. Nor does a value JSON cannot carry back as it was, such as a file not uploaded yet or a date: a restore never writes it back changed.
+- **New records too.** A new record counts as edited once it holds a value it did not hold when the page opened: it is saved as a draft, and leaving it asks for confirmation. What the page, or a component inside it, sets up before is where the record starts. A blank text, an empty list or an empty object is no value; `false` and `0` are.
+
 ```vue
 <MapoDetail
   :id="route.params.id"
@@ -436,7 +440,7 @@ Pass `:draft="true"` to activate automatic draft persistence. The component debo
 
 On the next page load a `UAlert` banner appears automatically offering **Restore** / **Discard**. No extra code needed.
 
-**Custom key** — by default the key is `${endpoint}:${id}` (e.g. `/api/articles:42`). Override it when the default key is not unique enough:
+**Custom key** — by default the key is `${endpoint}:${id}` (e.g. `/api/articles:42`). Override it when the default key is not unique enough; `draft-key` alone also turns drafts on:
 
 ```vue
 <MapoDetail :draft="true" draft-key="article:42" … />
@@ -462,7 +466,7 @@ On the next page load a `UAlert` banner appears automatically offering **Restore
 <template #draft-banner />
 ```
 
-Drafts expire automatically after 24 h and are cleared from localStorage on successful save.
+Drafts expire automatically after 24 h and are cleared from localStorage on successful save. A draft the page wrote also goes once the record is back as it was loaded; one from an earlier visit stays on offer until it is restored or discarded.
 
 ## How to: choose PATCH vs PUT
 
@@ -621,5 +625,5 @@ Use `forceLanguages` when you need to restrict the editor to a subset of the sit
 
 - **`id` prop expects `'new'`, not `0` or `null`** — for create mode, pass the literal string. Nuxt's route param will already be `'new'` if you wire the URL as `/articles/new`.
 - **PATCH semantics** — the diff is computed against the snapshot taken at fetch time. If something else mutates `model` outside `<MapoDetail>` (e.g. a parent component), the diff may include unintended changes.
-- **Leaving with unsaved edits** — the guard hooks both `onBeforeRouteLeave` and `window.beforeunload`. Avoid replacing `<MapoDetail>` in tests with a stub that does not propagate the `isDirty` state, or you will lose the warning.
+- **Leaving with unsaved edits** — the guard hooks both `onBeforeRouteLeave` and `window.beforeunload`, on new records too once they hold a value. Avoid replacing `<MapoDetail>` in tests with a stub that does not propagate the `isDirty` state, or you will lose the warning.
 - **Sidebar errors** — sidebar fields share the same error map as the body. A 400 on a sidebar field renders inside the sidebar form, not the body — keep the descriptor `key` consistent with the API payload so the matcher finds it.

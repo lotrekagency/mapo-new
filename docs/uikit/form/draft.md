@@ -40,6 +40,7 @@ async function save() {
 | `model`     | `Ref<T>`                   | —            | Reactive model to persist                           |
 | `isDirty`   | `Ref<boolean>`             | —            | Only persists while the form is dirty               |
 | `key`       | `string`                   | —            | Unique key (prefixed with `mapo:draft:` internally) |
+| `userId`    | `string \| number`         | —            | Scopes the key to a user: `mapo:draft:{userId}:`    |
 | `debounce`  | `number`                   | `2000`       | ms between writes                                   |
 | `ttl`       | `number`                   | `86_400_000` | ms before the draft expires (24h)                   |
 | `onRestore` | `(draft, savedAt) => void` | —            | Called at mount when a valid draft exists           |
@@ -152,4 +153,4 @@ useFormDraft({
 - **Persists when `isDirty` is true** — make sure the dirty state actually flips. Use `useMapoForm({ immediate: true })` if you want dirty tracking to start before the first edit.
 - **Per-tab isolation does not exist** — two tabs editing the same record will overwrite each other's drafts. If multi-tab editing matters, consider `BroadcastChannel` to coordinate.
 - **`localStorage` is synchronous** — large models (50+ kB) can stutter on slow devices. Strip large blobs (file inputs, base64 images) before storing.
-- **Drafts survive logout** — they are tied to the browser, not the user session. If users share a device, scope `key` with a user identifier.
+- **Drafts survive logout** — they are tied to the browser, not the user session. If users share a device, pass `userId`, which scopes the key to the user. `MapoDetail` (`draft`) and `useMapoForm()` (`draftKey`) do it by themselves, and leave out the fields marked `noDraft`; `useFormDraft` stores the model it is given as it is.
