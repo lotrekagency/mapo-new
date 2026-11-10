@@ -53,6 +53,7 @@ describe("matchRecipes", () => {
     ["use magic fill on a detail page", "ai-magic-fill"],
     ["disable magic fill on one page", "ai-magic-fill"],
     ["show the operator what Magic Fill sends to the AI", "ai-magic-fill"],
+    ["list the proposals without proof the AI gave", "ai-magic-fill"],
     ["apply the values the AI proposed to the form", "ai-fill"],
     ["call the AI gateway's run route to extract records", "ai-run"],
     ["read the outcome of each field from the run route", "ai-run"],

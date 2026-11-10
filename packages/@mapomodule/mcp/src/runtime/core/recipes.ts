@@ -675,7 +675,7 @@ export const RECIPES: Recipe[] = [
     heading: "Fill a detail form",
     seeAlso: ["uikit/detail.md", "uikit/form/annotations.md"],
     summary:
-      "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore; undo() puts back what it wrote.",
+      "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, set by hand or ignore. The answers of a session add up: keep() or a change in the field makes a value the operator's, undo() puts back every answer's values, newest first, and a save of the record ends the session.",
   },
   {
     id: "ai-magic-fill",
@@ -690,13 +690,14 @@ export const RECIPES: Recipe[] = [
       "run/preview",
       "cancel the call",
       "undo all",
+      "proposals without proof",
       "experimental",
     ],
     doc: "modules/ai.md",
     heading: "Magic Fill",
     seeAlso: ["uikit/detail.md", "uikit/mapoverride.md"],
     summary:
-      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the answer, with Undo all. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail) gives their state.",
+      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, values with no quote at all are listed apart as proposals without proof, and Save ends the session. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
   },
   {
     id: "ai-read-files",
