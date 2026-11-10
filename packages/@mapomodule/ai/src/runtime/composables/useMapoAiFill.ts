@@ -1,4 +1,11 @@
-import { getCurrentScope, onScopeDispose, shallowRef, toRaw } from "vue";
+import {
+  computed,
+  getCurrentScope,
+  onScopeDispose,
+  shallowRef,
+  toRaw,
+  watch,
+} from "vue";
 import type { Ref } from "vue";
 import { useNuxtApp } from "nuxt/app";
 import { metadataToJsonSchema } from "@mapomodule/utils";
@@ -18,6 +25,8 @@ import {
   dataOf,
   declaredKeys,
   holdsRelation,
+  isEmptyFormValue,
+  isUnprovenValue,
   mapoAiValueText,
   readModelValue,
   runMapoAiFill,
@@ -28,6 +37,7 @@ import type {
   MapoAiFillEntity,
   MapoAiFillEntry,
   MapoAiFillResponse,
+  MapoAiFillReview,
   MapoAiModelWrite,
 } from "../shared/fill";
 import type { MapoAiSourcePart } from "../shared/gateway";
@@ -74,6 +84,14 @@ export interface MapoAiFillTarget<T extends object = Record<string, unknown>> {
    * value that would have gone in by itself waits, marked, for Apply.
    */
   isBusy?: Readonly<Ref<boolean>>;
+  /** The record is loading: nothing is written meanwhile, since the load would replace it. */
+  isLoading?: Readonly<Ref<boolean>>;
+  /**
+   * Calls a function after each save of the record that succeeds: the
+   * session ends there, since the values now belong to the record. The
+   * context of `MapoDetail` gives it.
+   */
+  onSaved?: (handler: (record: T) => void) => () => void;
 }
 
 /** How `useMapoAiFill()` describes the record. */
@@ -104,10 +122,19 @@ export interface MapoAiFillCall {
   provider?: { id?: string; model?: string };
 }
 
-/** A field of the last answer, and whether its value is in the form. */
+/** A field of the session, and what became of the AI's value. */
 export interface MapoAiFillField extends MapoAiFillEntry {
   /** The AI's value is in the form: it went in by itself, or the operator applied it. */
   applied: boolean;
+  /** What the operator did with it; none while the value waits or stays marked. */
+  review?: MapoAiFillReview;
+  /**
+   * The field holds a value the AI wrote in the session, this answer's or
+   * an earlier one's: `restore()` and `undo()` put back what it held before.
+   */
+  undoable: boolean;
+  /** The answer of the session that gave it, from 1: `undo()` goes back newest first. */
+  round: number;
 }
 
 /** Why the last `fill()` got no answer. */
@@ -125,10 +152,13 @@ export interface MapoAiFill {
   /**
    * Sends the source to the AI with the record's two descriptions, then
    * writes into the form each value a quote verifies on an empty field it
-   * shows, and marks every field the answer gives. A new call cancels the
-   * wait of the previous one; the previous answer's marks go when the new
-   * answer arrives, and stay if it fails. Never rejects: a failure is in
-   * `error`.
+   * shows, and marks the fields the answer gives. Once those writes are
+   * done, a verified value on an empty field they revealed goes in too.
+   * The answer joins the session: it takes a field's place only where it
+   * gives a value, so the marks and the memory of the earlier answers stay
+   * until the operator decides, saves or ends the session. A new call
+   * cancels the wait of the previous one. Never rejects: a failure is in
+   * `error`, and the session stays as it was.
    */
   fill(
     source: string | readonly MapoAiSourcePart[],
@@ -140,17 +170,32 @@ export interface MapoAiFill {
    */
   apply(path: string): void;
   /**
-   * Puts back what a field held before the AI's value went in, when the
-   * field still holds that value: an operator's own change stays.
+   * Puts back what a field held before the AI's values went in, while the
+   * field still holds what the AI wrote; the value waits again.
    */
   restore(path: string): void;
-  /** Removes the composable's mark of a field, or every mark; the values stay. */
+  /**
+   * Keeps the AI's value of a field as the operator's: its mark goes, and
+   * `undo()` leaves it.
+   */
+  keep(path: string): void;
+  /**
+   * Removes the composable's mark of a field, by its path or the mark's,
+   * or every mark: a value that waits is ignored, one in the form stays.
+   */
   dismiss(path?: string): void;
   /**
-   * Puts back every field that still holds the value the AI wrote, as it
-   * was before (a key the AI added goes away), and removes the marks.
+   * Puts back every field that still holds a value the AI wrote in the
+   * session, newest first, as it was before (a key the AI added goes
+   * away), then ends the session. Values the operator kept or changed stay.
    */
   undo(): void;
+  /**
+   * Ends the session: the marks and the memory of what to undo go, a call
+   * under way stops, and the values stay as they are. A save of the record
+   * ends it by itself (`onSaved` of the target).
+   */
+  close(): void;
   /**
    * Stops waiting for the answer, and closes the request: the gateway
    * stops the provider's call, which counts against the user's limit once
@@ -169,8 +214,13 @@ export interface MapoAiFill {
   error: Readonly<Ref<MapoAiFillError | undefined>>;
   /** The last answer: the AI's proposal, or its refusal (`status: "refused"`). */
   response: Readonly<Ref<MapoAiFillResponse | undefined>>;
-  /** Each field of the last answer, and what became of it. */
+  /**
+   * Each field of the session, and what became of it: for each, the last
+   * answer that gave it a value, or that gave it first.
+   */
   fields: Readonly<Ref<readonly MapoAiFillField[]>>;
+  /** How many answers the session has had: a field's `round` names its answer. */
+  rounds: Readonly<Ref<number>>;
 }
 
 /** Where a key of the answer goes in the form. */
@@ -192,6 +242,13 @@ interface WriteRecord {
   write: MapoAiModelWrite;
   /** The data written, to tell whether the field still holds it. */
   written: string | undefined;
+}
+
+/** One write of a field's value, at each of its paths: what `restore()` and `undo()` put back. */
+interface FieldWrite {
+  /** When it was made in the session: `undo()` goes back newest first. */
+  order: number;
+  records: WriteRecord[];
 }
 
 /** The message of each error status of `run`, under `mapo.ai.errors`. */
@@ -263,18 +320,24 @@ export function useMapoAiFill<T extends object>(
   const error = shallowRef<MapoAiFillError>();
   const response = shallowRef<MapoAiFillResponse>();
   const fields = shallowRef<readonly MapoAiFillField[]>([]);
+  const rounds = shallowRef(0);
 
   let controller: AbortController | undefined;
   /** The marks the composable set, by the path they sit at: the only ones it removes. */
   const marks = new Map<string, FieldAnnotation>();
-  /** Where each key of the last answer goes. */
-  let targets = new Map<string, KeyTarget<T>>();
-  /** What the composable wrote for each field of the last answer, by its path. */
-  let memory = new Map<string, WriteRecord[]>();
+  /** Where each key of the session's answers goes. */
+  const targets = new Map<string, KeyTarget<T>>();
+  /** What the composable wrote into each field in the session, by its path, oldest first. */
+  const memory = new Map<string, FieldWrite[]>();
+  /** What a field that waits held when its answer came: a change is the operator's. */
+  const held = new Map<string, string | undefined>();
+  /** Writes made in the session, to order them. */
+  let writes = 0;
 
   const isReadonly = () => target.readonly?.value === true;
   const isBusy = () => target.isBusy?.value === true;
-  const canWrite = () => !isReadonly() && !isBusy();
+  const isLoading = () => target.isLoading?.value === true;
+  const canWrite = () => !isReadonly() && !isBusy() && !isLoading();
   const fieldAt = (path: string) =>
     fields.value.find((field) => field.path === path);
   const markPathOf = (field: MapoAiFillField) =>
@@ -334,19 +397,23 @@ export function useMapoAiFill<T extends object>(
         { post },
       );
       if (controller !== own) return;
-      // A new answer: the marks of the previous one go, its values stay.
-      dismiss();
-      targets = located;
-      memory = new Map();
-      response.value = answer.response;
-      fields.value = answer.entries.map((entry) => ({
-        ...entry,
-        applied: false,
-      }));
-      for (const field of fields.value) {
-        if (field.action === "apply") write(field.path);
+      const reply = answer.response;
+      response.value = reply;
+      // A refusal, and an answer that cannot be read, leave the session
+      // as it was.
+      const isAnswered = reply.status === "answered";
+      if (!isAnswered || !reply.result.readable) return;
+      // The answer joins the session: the marks and the memory of the
+      // earlier answers stay where it gives nothing new.
+      rounds.value += 1;
+      for (const [key, found] of located) targets.set(key, found);
+      const { joined, renewed } = join(answer.entries, rounds.value);
+      for (const path of joined) {
+        if (fieldAt(path)?.action === "apply") write(path);
       }
-      refreshMarks(fields.value.map(markPathOf));
+      promoteRevealed(rounds.value);
+      const reworded = retakeWaiting();
+      refreshMarks(marksAt([...joined, ...renewed, ...reworded]));
     } catch (failure) {
       if (controller !== own) return;
       error.value = mapoAiFillErrorOf(failure, t);
@@ -409,11 +476,14 @@ export function useMapoAiFill<T extends object>(
     const outcome = field?.outcome;
     const located = field ? targets.get(field.key) : undefined;
     if (!field || !located || outcome?.status !== "filled") return false;
-    if (field.applied || !canWrite()) return false;
+    if (field.applied || field.review !== undefined || !canWrite()) {
+      return false;
+    }
     const records = writeField(located, structuredClone(outcome.value));
     if (!records) return false;
-    memory.set(path, records);
-    update(path, true);
+    writes += 1;
+    memory.set(path, [...(memory.get(path) ?? []), { order: writes, records }]);
+    setField(path, { applied: true, undoable: true });
     return true;
   }
 
@@ -473,23 +543,170 @@ export function useMapoAiFill<T extends object>(
     return languages.map((lang) => `translations.${lang}.${key}`);
   }
 
-  /** Puts back what a field held, where it still holds what was written. */
-  function revert(path: string): void {
-    const records = memory.get(path) ?? [];
+  /** The records of a write whose paths still hold what was written. */
+  function untouchedOf(records: readonly WriteRecord[]): WriteRecord[] {
     const model = target.model.value;
-    const untouched = records.filter((record) => {
+    return records.filter((record) => {
       const current = dataOf(readModelValue(model, record.path));
       return record.written !== undefined && current === record.written;
     });
-    undoRecords(untouched);
-    memory.delete(path);
-    update(path, false);
+  }
+
+  /**
+   * A path of a write no longer holds what was written. A value whose data
+   * could not be read when it was written (a cycle, a `BigInt`) tells no
+   * change, and is left alone.
+   */
+  function isChanged(records: readonly WriteRecord[]): boolean {
+    const model = target.model.value;
+    return records.some((record) => {
+      if (record.written === undefined) return false;
+      return dataOf(readModelValue(model, record.path)) !== record.written;
+    });
   }
 
   function undoRecords(records: readonly WriteRecord[]): void {
     const model = target.model.value;
     for (const record of [...records].reverse()) {
       undoModelWrite(model, record.path, record.write, record.before);
+    }
+  }
+
+  /** What a field holds now, at every path its value is written to. */
+  function snapshotOf(field: MapoAiFillField): string | undefined {
+    const located = targets.get(field.key);
+    const paths = located ? [field.path, ...writePaths(located)] : [field.path];
+    const model = target.model.value;
+    return dataOf(paths.map((path) => readModelValue(model, path)));
+  }
+
+  /** The field holds a value at any path its value would be written to. */
+  function holdsValue(field: MapoAiFillField): boolean {
+    const located = targets.get(field.key);
+    const paths = located ? [field.path, ...writePaths(located)] : [field.path];
+    const model = target.model.value;
+    return paths.some((path) => !isEmptyFormValue(readModelValue(model, path)));
+  }
+
+  /**
+   * Adds an answer's fields to the session. A field takes the place of
+   * the session's one at its path only when it is news: a value the
+   * session did not have there, or a discard where it had found nothing.
+   * The same value again leaves what became of it: a value still the AI's,
+   * in the form or waiting, only takes the new answer's proof when that
+   * verifies it (`renewed`).
+   */
+  function join(
+    entries: readonly MapoAiFillEntry[],
+    round: number,
+  ): { joined: string[]; renewed: string[] } {
+    const next = new Map(fields.value.map((field) => [field.path, field]));
+    const joined: string[] = [];
+    const renewed: string[] = [];
+    for (const entry of entries) {
+      const earlier = next.get(entry.path);
+      if (earlier === undefined || isNews(earlier, entry)) {
+        next.set(entry.path, {
+          ...entry,
+          applied: false,
+          // An earlier answer's value may still be in the field.
+          undoable: memory.has(entry.path),
+          round,
+        });
+        joined.push(entry.path);
+        continue;
+      }
+      // The operator's decision stays; so does the proof the new one lacks.
+      const isUndecided = earlier.review === undefined;
+      const isProof =
+        entry.outcome.status === "filled" && entry.outcome.verified;
+      if (!isUndecided || !isProof) continue;
+      next.set(entry.path, { ...earlier, outcome: entry.outcome });
+      renewed.push(entry.path);
+    }
+    fields.value = [...next.values()];
+    for (const path of joined) {
+      const field = fieldAt(path);
+      if (field) held.set(path, snapshotOf(field));
+    }
+    return { joined, renewed };
+  }
+
+  /**
+   * An answer's field says something the session's did not: a value it
+   * did not have, or a value discarded where it had found nothing.
+   */
+  function isNews(earlier: MapoAiFillField, entry: MapoAiFillEntry): boolean {
+    const now = entry.outcome;
+    const before = earlier.outcome;
+    if (now.status === "filled") {
+      if (before.status !== "filled") return true;
+      // A value with no JSON form is never the same.
+      const was = dataOf(before.value);
+      return was === undefined || was !== dataOf(now.value);
+    }
+    const isDiscarded = now.status === "discarded";
+    return isDiscarded && before.status === "empty";
+  }
+
+  /**
+   * After writes, what each field that waits holds is where the operator
+   * starts from: a field's `onChange` may have written into another one,
+   * which is no change of the operator's. Whether its value would replace
+   * one is read again too. Returns the paths whose wording changed.
+   */
+  function retakeWaiting(): string[] {
+    const reworded: string[] = [];
+    for (const field of fields.value) {
+      const isWaiting =
+        !field.applied &&
+        field.review === undefined &&
+        field.outcome.status !== "empty";
+      if (!isWaiting) continue;
+      held.set(field.path, snapshotOf(field));
+      if (field.outcome.status !== "filled") continue;
+      const replaces = holdsValue(field);
+      if (replaces === field.replaces) continue;
+      setField(field.path, { replaces });
+      reworded.push(field.path);
+    }
+    return reworded;
+  }
+
+  /** The paths of the marks of fields, by their value paths. */
+  function marksAt(paths: readonly string[]): string[] {
+    return paths.flatMap((path) => {
+      const field = fieldAt(path);
+      return field ? [markPathOf(field)] : [];
+    });
+  }
+
+  /**
+   * After an answer's own writes, a field they revealed may take its value
+   * by itself: verified, empty and shown now. The pass only promotes, and
+   * runs again while a write changes what the form shows.
+   */
+  function promoteRevealed(round: number): void {
+    let isChanging = true;
+    while (isChanging) {
+      isChanging = false;
+      for (const field of fields.value) {
+        const { outcome } = field;
+        const isCandidate =
+          field.round === round &&
+          field.action === "confirm" &&
+          !field.applied &&
+          field.review === undefined &&
+          outcome.status === "filled" &&
+          outcome.verified;
+        if (!isCandidate) continue;
+        const located = targets.get(field.key);
+        const isTakenNow =
+          isShown(located) && canTake(located) && !holdsValue(field);
+        if (!isTakenNow) continue;
+        setField(field.path, { action: "apply", shown: true, replaces: false });
+        if (write(field.path)) isChanging = true;
+      }
     }
   }
 
@@ -501,7 +718,8 @@ export function useMapoAiFill<T extends object>(
     // the operator would not see go in waits until it shows again.
     if (!shownNow(path)) return;
     if (!write(path)) return;
-    refreshMarks([markPathOf(field)]);
+    const reworded = retakeWaiting();
+    refreshMarks([markPathOf(field), ...marksAt(reworded)]);
   }
 
   /** The form shows a field of the answer now: its predicates on the model as it is. */
@@ -512,26 +730,80 @@ export function useMapoAiFill<T extends object>(
 
   function restore(path: string): void {
     const field = fieldAt(path);
-    if (!field?.applied || !canWrite()) return;
-    revert(path);
+    const holdsAiValue = field?.applied === true || field?.undoable === true;
+    if (!field || !holdsAiValue || field.review !== undefined || !canWrite()) {
+      return;
+    }
+    // Every write of the field, newest first: an earlier answer's value
+    // goes too, so the field is as it was before the AI.
+    const stack = memory.get(path) ?? [];
+    for (const one of [...stack].reverse()) {
+      undoRecords(untouchedOf(one.records));
+    }
+    memory.delete(path);
+    setField(path, { applied: false, undoable: false });
+    // What the fields that wait hold now is where the operator starts from.
+    const reworded = retakeWaiting();
+    refreshMarks([markPathOf(field), ...marksAt(reworded)]);
+  }
+
+  function keep(path: string): void {
+    const field = fieldAt(path);
+    if (!field?.applied || field.review !== undefined) return;
+    memory.delete(path);
+    setField(path, { review: "kept", undoable: false });
     refreshMarks([markPathOf(field)]);
   }
 
   function dismiss(path?: string): void {
-    const field = path === undefined ? undefined : fieldAt(path);
+    const chosen = fields.value.filter(
+      (field) =>
+        path === undefined || field.path === path || markPathOf(field) === path,
+    );
+    for (const field of chosen) {
+      if (field.review === undefined) {
+        setField(field.path, { review: "ignored" });
+      }
+    }
     const paths =
       path === undefined
         ? [...marks.keys()]
-        : [field ? markPathOf(field) : path];
-    setMarks(paths.map((one) => [one, undefined]));
+        : chosen.length
+          ? chosen.map(markPathOf)
+          : [path];
+    refreshMarks(paths);
+  }
+
+  /**
+   * An operator's change makes a value theirs: the mark goes, and so does
+   * what would undo the AI's value.
+   */
+  function markEdited(path: string): void {
+    const field = fieldAt(path);
+    if (!field || field.review !== undefined) return;
+    memory.delete(path);
+    setField(path, { review: "edited", undoable: false });
+    refreshMarks([markPathOf(field)]);
   }
 
   function undo(): void {
     if (!canWrite()) return;
-    for (const field of fields.value) {
-      if (field.applied) revert(field.path);
-    }
-    dismiss();
+    const made = [...memory.values()].flat();
+    made.sort((one, other) => other.order - one.order);
+    for (const one of made) undoRecords(untouchedOf(one.records));
+    close();
+  }
+
+  function close(): void {
+    cancel();
+    setMarks([...marks.keys()].map((path) => [path, undefined]));
+    fields.value = [];
+    response.value = undefined;
+    error.value = undefined;
+    memory.clear();
+    held.clear();
+    targets.clear();
+    rounds.value = 0;
   }
 
   function cancel(): void {
@@ -540,11 +812,33 @@ export function useMapoAiFill<T extends object>(
     pending.value = false;
   }
 
-  function update(path: string, applied: boolean): void {
+  function setField(path: string, change: Partial<MapoAiFillField>): void {
     fields.value = fields.value.map((field) =>
-      field.path === path ? { ...field, applied } : field,
+      field.path === path ? { ...field, ...change } : field,
     );
   }
+
+  // The fields the operator changed: a value in the form that no longer
+  // holds what the AI wrote, or a field that waits and no longer holds what
+  // it held when the answer came. Read on the form as it is now.
+  const changedPaths = computed(() =>
+    fields.value
+      .filter((field) => {
+        const isTracked =
+          field.review === undefined && field.outcome.status !== "empty";
+        if (!isTracked) return false;
+        if (!field.applied) return snapshotOf(field) !== held.get(field.path);
+        const last = memory.get(field.path)?.at(-1);
+        return last ? isChanged(last.records) : false;
+      })
+      .map((field) => field.path),
+  );
+  watch(changedPaths, (paths) => {
+    for (const path of paths) markEdited(path);
+  });
+
+  // A save makes the values the record's: the session ends there.
+  target.onSaved?.(() => close());
 
   function refreshMarks(paths: readonly string[]): void {
     const unique = [...new Set(paths)];
@@ -574,9 +868,14 @@ export function useMapoAiFill<T extends object>(
    * gets one mark, at the field, that tells each part.
    */
   function markOf(markPath: string): FieldAnnotation | undefined {
+    // A field the operator decided has no mark, and neither does a value
+    // with no quote at all while it waits: it is listed apart.
     const group = fields.value.filter(
       (field) =>
-        markPathOf(field) === markPath && field.outcome.status !== "empty",
+        markPathOf(field) === markPath &&
+        field.outcome.status !== "empty" &&
+        field.review === undefined &&
+        (field.applied || !isUnprovenValue(field.outcome)),
     );
     if (!group.length) return undefined;
     const waiting = group.filter(
@@ -585,6 +884,7 @@ export function useMapoAiFill<T extends object>(
         (field.action === "apply" || field.action === "confirm"),
     );
     const applied = group.filter((field) => field.applied);
+    const undoable = group.filter((field) => field.undoable);
     const manual = group.filter((field) => field.action === "manual");
     const isWaiting = waiting.length > 0;
     const isApplied = applied.length > 0;
@@ -610,12 +910,12 @@ export function useMapoAiFill<T extends object>(
     const restoreAll: FieldAnnotationAction = {
       label: t("mapo.restore"),
       icon: "i-lucide-undo-2",
-      onClick: () => applied.forEach((field) => restore(field.path)),
+      onClick: () => undoable.forEach((field) => restore(field.path)),
     };
-    const keep: FieldAnnotationAction = {
+    const keepAll: FieldAnnotationAction = {
       label: t("mapo.ai.fill.keep"),
       icon: "i-lucide-check",
-      onClick: () => dismiss(markPath),
+      onClick: () => applied.forEach((field) => keep(field.path)),
     };
     if (isWaiting) {
       return {
@@ -624,7 +924,8 @@ export function useMapoAiFill<T extends object>(
         color: "warning",
         dot: true,
         description,
-        actions: isApplied
+        // An earlier answer's value in the field: Restore puts it back too.
+        actions: undoable.length
           ? [applyAll, restoreAll, ignore]
           : [applyAll, ignore],
       };
@@ -638,7 +939,7 @@ export function useMapoAiFill<T extends object>(
         icon: "i-lucide-sparkles",
         color: isVerified ? "success" : "warning",
         description,
-        actions: [keep, restoreAll],
+        actions: [keepAll, restoreAll],
       };
     }
     if (isManual) {
@@ -732,14 +1033,17 @@ export function useMapoAiFill<T extends object>(
     fill,
     apply,
     restore,
+    keep,
     dismiss,
     undo,
+    close,
     cancel,
     isShown: shownNow,
     pending,
     error,
     response,
     fields,
+    rounds,
   };
 }
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, effectScope, ref } from "vue";
+import { computed, effectScope, nextTick, ref } from "vue";
 import type {
   AnyFieldDescriptor,
   FieldAnnotations,
@@ -52,6 +52,23 @@ function answered(fields: Record<string, unknown>): Record<string, unknown> {
     prompt: 1,
     usage: { inputTokens: 10, outputTokens: 5 },
   };
+}
+
+const REFUSED = {
+  task: "fill",
+  status: "refused",
+  refusal: "No.",
+  provider: { id: "mock", model: "mock" },
+  prompt: 1,
+  usage: { inputTokens: 1, outputTokens: 1 },
+};
+
+/** An answer without the shape asked: every field is empty. */
+function unreadable(keys: readonly string[]): Record<string, unknown> {
+  const empty = keys.map((key) => [key, { status: "empty" }]);
+  const answer = answered(Object.fromEntries(empty));
+  const result = { readable: false, fields: Object.fromEntries(empty) };
+  return { ...answer, result: { ...result, warnings: [] } };
 }
 
 /**
@@ -356,14 +373,7 @@ describe("useMapoAiFill — the answer in the form", () => {
   });
 
   it("shows the refusal of the model, with nothing written", async () => {
-    serve({
-      task: "fill",
-      status: "refused",
-      refusal: "No.",
-      provider: { id: "mock", model: "mock" },
-      prompt: 1,
-      usage: { inputTokens: 1, outputTokens: 1 },
-    });
+    serve(REFUSED);
     const form = target();
     const ai = useMapoAiFill(form);
 
@@ -554,10 +564,11 @@ describe("useMapoAiFill — the operator's own changes", () => {
     ai.undo();
 
     expect(form.model.value.title).toBe("About us, Milan");
-    expect(ai.fields.value[0]?.applied).toBe(false);
+    // Undo all ends the session.
+    expect(ai.fields.value).toEqual([]);
   });
 
-  it("restores what the field held just before the AI's last value went in", async () => {
+  it("restores the operator's own value when the AI's went in over it after a restore", async () => {
     serve(answered({ title: filled("About us") }));
     const form = target({ title: "Home" });
     const ai = useMapoAiFill(form);
@@ -589,6 +600,414 @@ describe("useMapoAiFill — the operator's own changes", () => {
 
     expect(form.model.value).toEqual(original);
     expect(Object.hasOwn(form.model.value, "title")).toBe(false);
+  });
+});
+
+describe("useMapoAiFill — the session across answers", () => {
+  it("keeps the marks and the memory of an earlier answer where a new one gives nothing new", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(
+      answered({ excerpt: filled("Ours"), title: { status: "empty" } }),
+    );
+
+    await ai.fill("a file");
+
+    expect(form.model.value).toEqual({ title: "About us", excerpt: "Ours" });
+    expect(Object.keys(form.annotations.value).sort()).toEqual([
+      "excerpt",
+      "title",
+    ]);
+    expect(
+      ai.fields.value.map((field) => [field.path, field.round, field.applied]),
+    ).toEqual([
+      ["title", 1, true],
+      ["excerpt", 2, true],
+    ]);
+    expect(ai.rounds.value).toBe(2);
+  });
+
+  it("undoes every answer of the session, newest first, then ends it", async () => {
+    const post = serve(answered({ excerpt: filled("Ours") }));
+    const form = target({ title: "Home" });
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+    await ai.fill("a file");
+    ai.apply("title");
+    expect(form.model.value).toEqual({ title: "About us", excerpt: "Ours" });
+
+    ai.undo();
+
+    expect(form.model.value).toEqual({ title: "Home" });
+    expect(form.annotations.value).toEqual({});
+    expect(ai.fields.value).toEqual([]);
+    expect(ai.rounds.value).toBe(0);
+  });
+
+  it("lets Keep make a value the operator's: its mark goes, and undo leaves it", async () => {
+    serve(
+      answered({ title: filled("About us"), excerpt: filled("Ours", true) }),
+    );
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    form.annotations.value.title?.actions?.[0]?.onClick();
+    ai.undo();
+
+    expect(form.model.value).toEqual({ title: "About us" });
+  });
+
+  it("gives a field the operator changes to the operator: its mark goes, and undo leaves it", async () => {
+    serve(answered({ title: filled("About us"), excerpt: filled("Ours") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    form.model.value.title = "About us, Milan";
+    await nextTick();
+
+    expect(form.annotations.value.title).toBeUndefined();
+    expect(ai.fields.value[0]).toMatchObject({
+      path: "title",
+      review: "edited",
+    });
+    ai.restore("title");
+    ai.undo();
+    expect(form.model.value).toEqual({ title: "About us, Milan" });
+  });
+
+  it("drops the proposal of a field that waits once the operator writes in it, so Apply never writes over it", async () => {
+    serve(answered({ title: filled("About us") }));
+    const form = target({ title: "Home" });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.confirm");
+
+    form.model.value.title = "Homepage";
+    await nextTick();
+    ai.apply("title");
+
+    expect(form.annotations.value.title).toBeUndefined();
+    expect(form.model.value.title).toBe("Homepage");
+  });
+
+  it("ignores a value that waits when its mark is dismissed: it waits no more", async () => {
+    serve(answered({ title: filled("About us", false) }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    ai.dismiss("title");
+    ai.apply("title");
+
+    expect(form.model.value).toEqual({});
+    expect(ai.fields.value[0]?.review).toBe("ignored");
+  });
+
+  it("marks no field for a value with no quote at all, until the operator applies it", async () => {
+    const unproven: AiFieldOutcome = {
+      status: "filled",
+      value: "In review",
+      verified: false,
+      quotes: [],
+    };
+    serve(answered({ title: unproven, excerpt: filled("Ours", false) }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    // A quote given and not found still marks its field.
+    expect(Object.keys(form.annotations.value)).toEqual(["excerpt"]);
+
+    ai.apply("title");
+
+    expect(form.model.value.title).toBe("In review");
+    expect(form.annotations.value.title).toMatchObject({
+      label: "mapo.ai.fill.applied",
+      color: "warning",
+    });
+  });
+
+  it("writes a verified value into an empty field the answer's own writes reveal, and no hidden one", async () => {
+    serve(
+      answered({
+        status: filled("published"),
+        published_at: filled("2026-11-04"),
+        notes: filled("Read twice"),
+      }),
+    );
+    const fields: AnyFieldDescriptor[] = [
+      { key: "status", type: "text", label: "Status" },
+      {
+        key: "published_at",
+        type: "date",
+        label: "Published at",
+        show: ({ model }) => model.status === "published",
+      },
+      {
+        key: "notes",
+        type: "text",
+        label: "Notes",
+        show: ({ model }) => model.status === "archived",
+      },
+    ];
+    const form = {
+      ...target(),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value).toEqual({
+      status: "published",
+      published_at: "2026-11-04",
+    });
+    expect(ai.fields.value.find((one) => one.key === "notes")).toMatchObject({
+      action: "confirm",
+      applied: false,
+      shown: false,
+    });
+  });
+
+  it("ends the session when the record is saved: the marks and the memory go, the values stay", async () => {
+    serve(answered({ title: filled("About us") }));
+    const handlers: Array<(record: Record<string, unknown>) => void> = [];
+    const form = {
+      ...target(),
+      onSaved: (handler: (record: Record<string, unknown>) => void) => {
+        handlers.push(handler);
+        return () => undefined;
+      },
+    };
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    for (const handler of handlers) handler(form.model.value);
+    ai.undo();
+
+    expect(form.model.value).toEqual({ title: "About us" });
+    expect(form.annotations.value).toEqual({});
+    expect(ai.fields.value).toEqual([]);
+  });
+
+  it("gives no field a new round when the next answer finds nothing new", async () => {
+    const first = answered({
+      title: filled("About us"),
+      excerpt: filled("Ours", false),
+      status: { status: "empty" },
+    });
+    const post = serve(first);
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(first);
+
+    await ai.fill("the same text");
+
+    expect(ai.rounds.value).toBe(2);
+    expect(ai.fields.value.map((field) => [field.path, field.round])).toEqual([
+      ["title", 1],
+      ["excerpt", 1],
+      ["status", 1],
+    ]);
+    expect(form.model.value).toEqual({ title: "About us" });
+    const marks = Object.entries(form.annotations.value).map(([path, mark]) => [
+      path,
+      mark.label,
+    ]);
+    expect(marks.sort()).toEqual([
+      ["excerpt", "mapo.ai.fill.confirm"],
+      ["title", "mapo.ai.fill.applied"],
+    ]);
+  });
+
+  it("takes the proof of a later answer that gives the same value, and never loses one", async () => {
+    const post = serve(answered({ title: filled("About us", false) }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    ai.apply("title");
+    expect(form.annotations.value.title?.color).toBe("warning");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("a file");
+
+    expect(form.annotations.value.title?.color).toBe("success");
+    expect(ai.fields.value[0]).toMatchObject({ applied: true, round: 1 });
+    post.mockResolvedValueOnce(answered({ title: filled("About us", false) }));
+    await ai.fill("another file");
+    expect(form.annotations.value.title?.color).toBe("success");
+  });
+
+  it("never writes again by itself a value the operator restored, when the next answer gives it again", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    ai.restore("title");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("the same text");
+
+    expect(form.model.value).toEqual({});
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.confirm");
+  });
+
+  it("proposes nothing over a value the operator kept, unless a later answer gives another", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    ai.keep("title");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("the same text");
+
+    expect(form.annotations.value.title).toBeUndefined();
+    expect(ai.fields.value[0]).toMatchObject({ review: "kept", round: 1 });
+    post.mockResolvedValueOnce(answered({ title: filled("Ten years") }));
+    await ai.fill("a file");
+    expect(form.annotations.value.title?.description).toContain(
+      "mapo.ai.fill.proposesInstead",
+    );
+  });
+
+  it("keeps the session as it was after a refusal, or an answer it cannot read", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(REFUSED);
+    await ai.fill("a file");
+    expect(ai.response.value?.status).toBe("refused");
+    post.mockResolvedValueOnce(unreadable(["title", "excerpt"]));
+
+    await ai.fill("another file");
+
+    expect(ai.rounds.value).toBe(1);
+    expect(ai.fields.value.map((field) => field.path)).toEqual(["title"]);
+    ai.undo();
+    expect(form.model.value).toEqual({});
+  });
+
+  it("restores a field the AI wrote twice to what it held before the AI", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(answered({ title: filled("Ten years") }));
+    await ai.fill("a file");
+    ai.apply("title");
+    expect(form.model.value).toEqual({ title: "Ten years" });
+
+    ai.restore("title");
+
+    expect(form.model.value).toEqual({});
+    expect(ai.fields.value[0]).toMatchObject({
+      applied: false,
+      undoable: false,
+    });
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.confirm");
+  });
+
+  it("offers Restore on a value that waits over the AI's earlier one", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(answered({ title: filled("Ten years") }));
+    await ai.fill("a file");
+
+    const mark = form.annotations.value.title;
+    expect(mark?.label).toBe("mapo.ai.fill.confirm");
+    expect(mark?.actions?.map((action) => action.label)).toEqual([
+      "mapo.apply",
+      "mapo.restore",
+      "mapo.ai.fill.ignore",
+    ]);
+    mark?.actions?.[1]?.onClick();
+
+    expect(form.model.value).toEqual({});
+    expect(ai.fields.value[0]).toMatchObject({ undoable: false });
+  });
+
+  it("keeps waiting a field another field's onChange writes into: no change of the operator's", async () => {
+    serve(
+      answered({ title: filled("About us"), slug: filled("about", false) }),
+    );
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "title",
+        type: "text",
+        label: "Title",
+        onChange: ({ model, val }) => {
+          model.slug = String(val).toLowerCase().replace(/\s+/g, "-");
+        },
+      },
+      { key: "slug", type: "text", label: "Slug" },
+    ];
+    const form = {
+      ...target(),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+    await nextTick();
+
+    expect(form.model.value).toEqual({ title: "About us", slug: "about-us" });
+    const slug = ai.fields.value.find((one) => one.key === "slug");
+    expect(slug).toMatchObject({ applied: false, replaces: true });
+    expect(slug?.review).toBeUndefined();
+    expect(form.annotations.value.slug?.label).toBe("mapo.ai.fill.confirm");
+    ai.apply("slug");
+    expect(form.model.value.slug).toBe("about");
+    ai.restore("slug");
+    expect(form.model.value.slug).toBe("about-us");
+  });
+
+  it("tells no change of a value whose data it cannot read, as a BigInt an accessor makes", async () => {
+    serve(answered({ views: filled("12") }));
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "views",
+        type: "text",
+        label: "Views",
+        accessor: { set: ({ val }) => BigInt(String(val)) },
+      },
+    ];
+    const form = {
+      ...target(),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+    await nextTick();
+
+    expect(form.model.value.views).toBe(BigInt(12));
+    expect(ai.fields.value[0]).toMatchObject({ applied: true });
+    expect(ai.fields.value[0]?.review).toBeUndefined();
+    expect(form.annotations.value.views?.label).toBe("mapo.ai.fill.applied");
+  });
+
+  it("writes nothing while the record loads", async () => {
+    serve(answered({ title: filled("About us") }));
+    const form = { ...target(), isLoading: ref(true) };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value).toEqual({});
+    expect(ai.fields.value[0]).toMatchObject({ applied: false });
   });
 });
 
@@ -776,9 +1195,14 @@ describe("useMapoAiFill — the form's own rules", () => {
       })),
     };
 
-    await useMapoAiFill(form).fill("x");
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    await nextTick();
 
     expect(form.model.value).toEqual({ tags: "a,b" });
+    // The value converted is the one written: no change of the operator's.
+    expect(ai.fields.value[0]?.review).toBeUndefined();
+    expect(form.annotations.value.tags?.label).toBe("mapo.ai.fill.applied");
   });
 
   it("marks the parts of an object at the field, where the form shows a mark", async () => {

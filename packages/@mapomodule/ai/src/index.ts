@@ -97,6 +97,7 @@ export type {
   MapoAiFillEntity,
   MapoAiFillEntry,
   MapoAiFillResponse,
+  MapoAiFillReview,
 } from "./runtime/shared/fill";
 export type {
   MapoAiReadDependencies,

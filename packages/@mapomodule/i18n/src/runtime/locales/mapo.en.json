@@ -395,6 +395,8 @@
           "title": "Filled with AI",
           "by": "{provider} · {model}",
           "applied": "In the form: {n}",
+          "kept": "Kept: {n}",
+          "edited": "Changed by you: {n}",
           "toConfirm": "To confirm: {n}",
           "manual": "To set by hand: {n}",
           "discarded": "Discarded: {n}",
@@ -402,6 +404,8 @@
           "nothing": "No new value found.",
           "toConfirmTitle": "To confirm",
           "toConfirmHint": "Check each value in its field, or apply it here.",
+          "unprovenTitle": "Proposals without proof",
+          "unprovenHint": "The AI gives these values without quoting the source, so their fields carry no mark: check each one before you apply it.",
           "reasons": {
             "not-proven": "no quote of the source proves it",
             "replaces": "in place of the current value",

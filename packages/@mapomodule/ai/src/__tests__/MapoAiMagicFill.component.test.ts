@@ -23,16 +23,23 @@ vi.mock("nuxt/app", () => ({ useNuxtApp: () => nuxt.app }));
 interface HeadlessNode {
   parent: HeadlessNode | null;
   children: HeadlessNode[];
+  /** The text of a text node. */
+  text?: string;
 }
 
 const headlessNode = (): HeadlessNode => ({ parent: null, children: [] });
+const textNode = (text: string): HeadlessNode => ({ ...headlessNode(), text });
 
 const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
   createElement: headlessNode,
-  createText: headlessNode,
+  createText: textNode,
   createComment: headlessNode,
-  setText: () => {},
-  setElementText: () => {},
+  setText: (node, text) => {
+    node.text = text;
+  },
+  setElementText: (node, text) => {
+    node.children = text ? [{ ...textNode(text), parent: node }] : [];
+  },
   patchProp: () => {},
   insert(child, parent, anchor) {
     child.parent = parent;
@@ -47,6 +54,12 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
   nextSibling: (node) =>
     node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
 });
+
+/** The text a node renders, its pieces joined by single spaces. */
+function textOf(node: HeadlessNode): string {
+  const pieces = [node.text ?? "", ...node.children.map(textOf)];
+  return pieces.join(" ").replace(/\s+/g, " ").trim();
+}
 
 const passthrough = (name: string): Component => ({
   name,
@@ -86,6 +99,24 @@ const UButton: Component = {
     buttons.push(stub);
     onUnmounted(() => buttons.splice(buttons.indexOf(stub), 1));
     return () => h("button");
+  },
+};
+
+/** Each `UAlert` mounted, by its title. */
+const alerts: Array<{ readonly title: string }> = [];
+
+const UAlert: Component = {
+  name: "UAlert",
+  props: { title: String },
+  setup(props: { title?: string }, { slots }: SetupContext) {
+    const stub = {
+      get title() {
+        return props.title ?? "";
+      },
+    };
+    alerts.push(stub);
+    onUnmounted(() => alerts.splice(alerts.indexOf(stub), 1));
+    return () => h("div", null, slots.default?.());
   },
 };
 
@@ -155,7 +186,7 @@ const STUBS: Record<string, Component> = {
   UButton,
   USlideover,
   UCollapsible,
-  UAlert: passthrough("UAlert"),
+  UAlert,
   UIcon: passthrough("UIcon"),
   UTextarea: passthrough("UTextarea"),
   UFileUpload: passthrough("UFileUpload"),
@@ -203,6 +234,18 @@ function filled(value: string, verified: boolean) {
 /** The paths the gateway was asked, in order. */
 const requests: string[] = [];
 
+/** The next answers of `run`, before the one `gateway()` gives every time. */
+const runs: unknown[] = [];
+
+const REFUSED = {
+  task: "fill",
+  status: "refused",
+  refusal: "No.",
+  provider: { id: "mock", model: "mock" },
+  prompt: 1,
+  usage: { inputTokens: 1, outputTokens: 1 },
+};
+
 /** The gateway: `status`, `run` answering `fields`, and `run/preview`. */
 function gateway(
   status: Record<string, unknown>,
@@ -215,6 +258,7 @@ function gateway(
       if (path === "/_mapo/ai/status") return status;
       if (path === "/_mapo/ai/run/preview") return PREVIEW;
       if (path === "/_mapo/ai/run") {
+        if (runs.length) return runs.shift();
         return {
           task: "fill",
           status: "answered",
@@ -246,12 +290,13 @@ let app: App<HeadlessNode> | undefined;
 
 /**
  * Mounts the button and the banner on one detail, as MapoDetail renders
- * them, and what else a test adds, as an override would.
+ * them, and what else a test adds, as an override would; returns the root
+ * of what they render.
  */
 function mountDetail(
   form: MapoAiMagicFillDetail,
   extra: Component[] = [],
-): void {
+): HeadlessNode {
   const root: Component = {
     render: () => [
       h(MapoAiMagicFillBanner, { detail: form }),
@@ -261,7 +306,9 @@ function mountDetail(
   };
   app = createApp(root);
   for (const [name, stub] of Object.entries(STUBS)) app.component(name, stub);
-  app.mount(headlessNode());
+  const node = headlessNode();
+  app.mount(node);
+  return node;
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
@@ -269,9 +316,11 @@ const button = (label: string) => buttons.find((one) => one.label === label);
 
 beforeEach(() => {
   buttons.splice(0);
+  alerts.splice(0);
   slideovers.splice(0);
   collapsibles.splice(0);
   requests.splice(0);
+  runs.splice(0);
 });
 
 afterEach(() => {
@@ -356,6 +405,93 @@ describe("Magic Fill's parts on a detail", () => {
     expect(apply?.disabled).toBe(false);
     apply?.click();
     expect(form.model.value.excerpt).toBe("A summary");
+  });
+
+  /** Mounts the parts on a detail, lets status answer, and gives the panel a source. */
+  async function ready(form: MapoAiMagicFillDetail) {
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Title: About us";
+    async function extract(): Promise<void> {
+      await magic.extract();
+      await settle();
+    }
+    return { root, extract };
+  }
+  const NOTHING = "mapo.ai.magicFill.summary.nothing";
+
+  it("say that a first answer found nothing", async () => {
+    gateway(STATUS, {
+      title: { status: "empty" },
+      excerpt: { status: "empty" },
+    });
+    const { root, extract } = await ready(detail(FIELDS));
+
+    await extract();
+
+    expect(textOf(root)).toContain(NOTHING);
+    expect(button("mapo.ai.magicFill.summary.undoAll")).toBeUndefined();
+  });
+
+  it("say that a second answer giving the same values found nothing new, and keep the session's summary", async () => {
+    gateway(STATUS, {
+      title: filled("About us", true),
+      excerpt: filled("A summary", false),
+    });
+    const { root, extract } = await ready(detail(FIELDS));
+    await extract();
+    expect(textOf(root)).not.toContain(NOTHING);
+
+    await extract();
+
+    expect(textOf(root)).toContain(NOTHING);
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.applied");
+    expect(button("mapo.ai.magicFill.summary.undoAll")).toBeDefined();
+  });
+
+  it("keep the session's summary and Undo all beside a later refusal", async () => {
+    gateway(STATUS, { title: filled("About us", true) });
+    const form = detail(FIELDS);
+    const { root, extract } = await ready(form);
+    await extract();
+    runs.push(REFUSED);
+
+    await extract();
+
+    expect(alerts.map((alert) => alert.title)).toEqual([
+      "mapo.ai.magicFill.summary.refused",
+    ]);
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.title");
+    expect(textOf(root)).not.toContain(NOTHING);
+    button("mapo.ai.magicFill.summary.undoAll")?.click();
+    expect(form.model.value).toEqual({});
+  });
+
+  it("offer Undo all while the AI's earlier value waits under a new proposal", async () => {
+    gateway(STATUS, { title: filled("Ten years", true) });
+    runs.push({
+      task: "fill",
+      status: "answered",
+      result: {
+        readable: true,
+        fields: { title: filled("About us", true) },
+        warnings: [],
+      },
+      provider: { id: "mock", model: "mock" },
+      prompt: 1,
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    const form = detail(FIELDS);
+    const { extract } = await ready(form);
+    await extract();
+
+    await extract();
+
+    expect(form.model.value.title).toBe("About us");
+    button("mapo.ai.magicFill.summary.undoAll")?.click();
+    expect(form.model.value).toEqual({});
   });
 
   it("compose what is sent when it opens with nothing current, not at every opening", async () => {

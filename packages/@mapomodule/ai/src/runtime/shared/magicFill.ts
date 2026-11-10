@@ -10,11 +10,16 @@
 
 import type { AiOmittedField } from "./contract";
 import type { AiSkipReason } from "./entity";
-import { MapoAiFillAnswerError, mapoAiFillRequest } from "./fill";
+import {
+  MapoAiFillAnswerError,
+  isUnprovenValue,
+  mapoAiFillRequest,
+} from "./fill";
 import type {
   MapoAiFillDependencies,
   MapoAiFillEntry,
   MapoAiFillInput,
+  MapoAiFillReview,
 } from "./fill";
 import {
   MAPO_AI_GATEWAY_PATH,
@@ -526,12 +531,21 @@ export interface MapoAiToConfirm {
   items?: { total: number; verified: number };
 }
 
-/** What became of an answer, as the operator reads it. */
+/** What became of the answers of a session, as the operator reads it. */
 export interface MapoAiFillSummary {
-  /** Values in the form: those that went in by themselves and those applied. */
+  /** Values the AI wrote that are in the form, still its own: by themselves or applied. */
   applied: number;
-  /** Values that wait for the operator's Apply. */
+  /** Values the operator kept as theirs (Keep): undo leaves them. */
+  kept: number;
+  /** Values the operator changed in their field: theirs now. */
+  edited: number;
+  /** Values that wait for the operator's Apply, each with a quote of the source, and why they wait. */
   toConfirm: MapoAiToConfirm[];
+  /**
+   * Values the AI gave without any quote: no mark on their fields, listed
+   * apart until the operator applies one.
+   */
+  unproven: MapoAiToConfirm[];
   /** Values the operator sets by hand: related records, fields that convert their values. */
   manual: number;
   /** Values the gateway discarded, never written. */
@@ -540,30 +554,48 @@ export interface MapoAiFillSummary {
   notFound: number;
 }
 
-/** The summary of the fields of an answer, as `useMapoAiFill()` lists them. */
+/**
+ * The summary of a session's fields, as `useMapoAiFill()` lists them. A
+ * value that waits and that the operator ignored is left out, and one in
+ * the form still counts as the AI's; a kept or changed value is theirs.
+ * Only a value the AI gave counts as changed: a discarded one the operator
+ * then wrote over stays discarded.
+ */
 export function summarizeMapoAiFill(
-  fields: readonly (MapoAiFillEntry & { applied: boolean })[],
+  fields: readonly (MapoAiFillEntry & {
+    applied: boolean;
+    review?: MapoAiFillReview;
+  })[],
 ): MapoAiFillSummary {
   const summary: MapoAiFillSummary = {
     applied: 0,
+    kept: 0,
+    edited: 0,
     toConfirm: [],
+    unproven: [],
     manual: 0,
     discarded: 0,
     notFound: 0,
   };
   for (const field of fields) {
-    const { action, outcome } = field;
-    if (field.applied) summary.applied += 1;
+    const { action, outcome, review } = field;
+    const isChanged = review === "edited" && outcome.status === "filled";
+    if (review === "kept") summary.kept += 1;
+    else if (isChanged) summary.edited += 1;
+    else if (field.applied) summary.applied += 1;
+    else if (review === "ignored") continue;
     else if (action === "manual") summary.manual += 1;
     else if (action === "discard") summary.discarded += 1;
     else if (action === "empty") summary.notFound += 1;
     else if (outcome.status === "filled") {
-      summary.toConfirm.push({
+      const isUnproven = isUnprovenValue(outcome);
+      const waiting: MapoAiToConfirm = {
         key: field.key,
         path: field.path,
         value: outcome.value,
         reasons: [
-          ...(outcome.verified ? [] : ["not-proven" as const]),
+          // A value without proof is listed as one: no reason to repeat.
+          ...(outcome.verified || isUnproven ? [] : ["not-proven" as const]),
           ...(field.replaces ? ["replaces" as const] : []),
           ...(field.shown ? [] : ["hidden" as const]),
         ],
@@ -575,7 +607,8 @@ export function summarizeMapoAiFill(
               },
             }
           : {}),
-      });
+      };
+      (isUnproven ? summary.unproven : summary.toConfirm).push(waiting);
     }
   }
   return summary;

@@ -182,8 +182,8 @@ New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
 | Keys on three levels        | ✅     | The user's own token where an admin allows it, the admins' keys for a user, a group or everyone, the project's; admins narrow the models                                     |
 | AI settings page            | ✅     | `/ai-settings` and `MapoAiSettings`: each user's provider, model, key, own token and check; the admins' keys and how the AI works                                            |
 | AI usage                    | ✅     | On the AI settings page: calls, tokens and costs by user, model and day; the changes of keys and settings                                                                    |
-| Filling forms from a source | ✅     | `useMapoAiFill()` sends a detail's fields and backend schema to `run`, writes each verified value into an empty field, and marks the others for the operator                 |
-| Magic Fill                  | ✅     | On every detail page: a panel with a text, files, the operator's instructions, what is sent and the model; a banner with the call, Cancel, the summary, Undo all             |
+| Filling forms from a source | ✅     | `useMapoAiFill()` sends a detail's fields and backend schema to `run`, writes each verified value into an empty field, marks the others; one session across answers          |
+| Magic Fill                  | ✅     | On every detail page: a panel with a text, files, the operator's instructions, what is sent and the model; a banner with the call, Cancel, the session's summary, Undo all   |
 | Importing several entities  | 🔲     | Planned: one source split into records of several entities, reviewed in bulk                                                                                                 |
 
 ---

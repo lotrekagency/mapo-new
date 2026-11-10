@@ -395,6 +395,8 @@
           "title": "Compilato con AI",
           "by": "{provider} · {model}",
           "applied": "Nel form: {n}",
+          "kept": "Tenuti: {n}",
+          "edited": "Cambiati da te: {n}",
           "toConfirm": "Da confermare: {n}",
           "manual": "Da impostare a mano: {n}",
           "discarded": "Scartati: {n}",
@@ -402,6 +404,8 @@
           "nothing": "Nessun valore nuovo trovato.",
           "toConfirmTitle": "Da confermare",
           "toConfirmHint": "Controlla ogni valore nel suo campo, o applicalo da qui.",
+          "unprovenTitle": "Proposte senza prova",
+          "unprovenHint": "L'AI dà questi valori senza citare la sorgente, quindi i loro campi non hanno segni: controlla ciascuno prima di applicarlo.",
           "reasons": {
             "not-proven": "nessuna citazione della sorgente lo prova",
             "replaces": "al posto del valore attuale",

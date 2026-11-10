@@ -418,6 +418,13 @@ export type MapoAiFillAction =
   | "discard"
   | "empty";
 
+/**
+ * What the operator did with a field the AI gave a value for: kept the
+ * AI's value (Keep), changed the field, or ignored the mark. A kept or
+ * changed value is the operator's: undo leaves it.
+ */
+export type MapoAiFillReview = "kept" | "edited" | "ignored";
+
 /** One field of the answer, and what becomes of it in the form. */
 export interface MapoAiFillEntry {
   /** The field's key, as the answer names it: `title`, `seo.title`. */
@@ -514,6 +521,25 @@ export function holdsRelation(outcome: AiFieldOutcome): boolean {
     Object.values(item.fields).some(holdsRelation),
   );
   return inItems === true || namesRecord(outcome.value, 0);
+}
+
+/**
+ * A value the AI gave without any quote, on itself or on any of its items:
+ * nothing ties it to the source. Unlike a quote given and not found, it is
+ * no claim to check in the text, so it marks no field: it is listed apart,
+ * as a proposal without proof, until the operator applies it.
+ */
+export function isUnprovenValue(outcome: AiFieldOutcome): boolean {
+  if (outcome.status !== "filled" || outcome.verified) return false;
+  return !quotesSomething(outcome);
+}
+
+function quotesSomething(outcome: AiFieldOutcome): boolean {
+  if (outcome.status !== "filled") return false;
+  if (outcome.quotes.length > 0) return true;
+  return (outcome.items ?? []).some((item) =>
+    Object.values(item.fields).some(quotesSomething),
+  );
 }
 
 function namesRecord(value: unknown, depth: number): boolean {

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * Magic Fill above the detail's form: where a call is, with Cancel; why it
- * failed; and after an answer the summary, in view until the next one:
- * what went into the form, what waits for the operator, what to set by
- * hand, what the gateway discarded and what the AI did not find, with
- * Undo all. On a phone, where the sidebar card comes after the form, and
- * on a page that leaves out the sidebar's button, it also opens the panel.
- * The module adds it to every `MapoDetail`, with the button.
+ * failed, or that the model refused; and the summary of the session, in
+ * view until it ends, beside a later failure or refusal: what went into
+ * the form, what the operator kept or changed, what waits for them, what
+ * to set by hand, what the gateway discarded and what the AI did not find,
+ * with Undo all. On a phone, where the sidebar card comes after the form,
+ * and on a page that leaves out the sidebar's button, it also opens the
+ * panel. The module adds it to every `MapoDetail`, with the button.
  */
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
 import {
@@ -27,7 +28,7 @@ const SLOW_AFTER_SECONDS = 20;
 
 const magic = useMapoAiMagicFill(props.detail);
 const { t, available, choices, phase, startedAt, summary, open } = magic;
-const { error, response, fields } = magic.fill;
+const { error, response, fields, rounds } = magic.fill;
 const presence = joinMagicFill(magic, "banner");
 onBeforeUnmount(presence.leave);
 // The first of the button and the banner renders the panel.
@@ -85,18 +86,48 @@ const isUnreadable = computed(
     response.value?.status === "answered" && !response.value.result.readable,
 );
 const answeredBy = computed(() => response.value?.provider);
-const hasApplied = computed(() => fields.value.some((field) => field.applied));
+// Something of the AI's in the form that Undo all would put back.
+const hasApplied = computed(() => fields.value.some((field) => field.undoable));
+// The last answer joined the session and gave no field a new value, the
+// first answer included: it says so, while the session's summary stays.
 const isNothingNew = computed(() => {
+  const last = rounds.value;
+  const reply = response.value;
+  const isJoined = reply?.status === "answered" && reply.result.readable;
+  if (last === 0 || !isJoined) return false;
+  const isNew = (field: (typeof fields.value)[number]) =>
+    field.round === last && field.outcome.status === "filled";
+  return !fields.value.some(isNew);
+});
+/**
+ * The values that wait, in two lists: those with a quote of the source,
+ * marked on their fields, and those without any (R115), listed only here.
+ */
+const waiting = computed(() => {
   const found = summary.value;
-  if (!found) return false;
-  const changed = found.applied + found.toConfirm.length + found.manual;
-  return changed === 0;
+  if (!found) return [];
+  return [
+    {
+      key: "toConfirm",
+      title: "mapo.ai.magicFill.summary.toConfirmTitle",
+      hint: "mapo.ai.magicFill.summary.toConfirmHint",
+      items: found.toConfirm,
+    },
+    {
+      key: "unproven",
+      title: "mapo.ai.magicFill.summary.unprovenTitle",
+      hint: "mapo.ai.magicFill.summary.unprovenHint",
+      items: found.unproven,
+    },
+  ].filter((group) => group.items.length > 0);
 });
 const counts = computed(() => {
   const found = summary.value;
   if (!found) return [];
   return [
     { key: "applied", n: found.applied },
+    { key: "kept", n: found.kept },
+    { key: "edited", n: found.edited },
     { key: "toConfirm", n: found.toConfirm.length },
     { key: "manual", n: found.manual },
     { key: "discarded", n: found.discarded },
@@ -192,8 +223,9 @@ function canApply(item: MapoAiToConfirm): boolean {
       icon="i-lucide-file-question"
       :title="t('mapo.ai.magicFill.summary.unreadable')"
     />
+    <!-- The session's summary stays beside a later refusal or failure. -->
     <section
-      v-else-if="summary"
+      v-if="summary"
       class="space-y-2 rounded-md border border-default p-3"
       aria-live="polite"
     >
@@ -245,17 +277,17 @@ function canApply(item: MapoAiToConfirm): boolean {
         </li>
       </ul>
       <!-- TEMP(ai-magicfill-preview): the values that wait, with Apply one
-           by one; step 15's preview of the values replaces this list. -->
-      <div v-if="summary.toConfirm.length" class="space-y-1">
+           by one; step 15's preview of the values replaces these lists. -->
+      <div v-for="group in waiting" :key="group.key" class="space-y-1">
         <p class="font-medium">
-          {{ t("mapo.ai.magicFill.summary.toConfirmTitle") }}
+          {{ t(group.title) }}
         </p>
         <p class="text-xs text-muted">
-          {{ t("mapo.ai.magicFill.summary.toConfirmHint") }}
+          {{ t(group.hint) }}
         </p>
         <ul class="divide-y divide-default">
           <li
-            v-for="item in summary.toConfirm"
+            v-for="item in group.items"
             :key="item.path"
             class="flex flex-wrap items-center gap-x-2 gap-y-1 py-1"
           >

@@ -500,6 +500,35 @@ describe("useMapoAiMagicFill — Extract", () => {
 });
 
 describe("useMapoAiMagicFill — the summary", () => {
+  it("keeps the session's summary, and what Undo all puts back, beside a later refusal", async () => {
+    let answer: unknown = answered(VERIFIED_TITLE);
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answer,
+    });
+    const form = detail();
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: About us";
+    await magic.extract();
+    answer = {
+      task: "fill",
+      status: "refused",
+      refusal: "No.",
+      provider: { id: "ollama", model: "gemma4:12b" },
+      prompt: 1,
+      usage: { inputTokens: 1, outputTokens: 1 },
+    };
+
+    await magic.extract();
+
+    expect(magic.fill.response.value?.status).toBe("refused");
+    expect(magic.summary.value).toMatchObject({ applied: 1 });
+    magic.undoAll();
+    expect(form.model.value).toEqual({});
+    expect(magic.summary.value).toBeUndefined();
+  });
+
   it("says a value waits for a hidden field as the form is now, not as it was when the answer came", async () => {
     gateway({
       "/_mapo/ai/status": () => STATUS,
@@ -509,7 +538,8 @@ describe("useMapoAiMagicFill — the summary", () => {
             status: "filled",
             value: "Long notes",
             verified: false,
-            quotes: [],
+            // A quote not found: the value waits to be confirmed, marked.
+            quotes: [{ quote: "Long notes", where: "", found: false }],
           },
         }),
     });

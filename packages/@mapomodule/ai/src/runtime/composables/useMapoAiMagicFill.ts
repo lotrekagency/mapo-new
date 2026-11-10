@@ -57,8 +57,6 @@ export interface MapoAiMagicFillDetail<
       | undefined
     >
   >;
-  /** While the record loads: nothing is asked meanwhile. */
-  isLoading?: Readonly<Ref<boolean>>;
 }
 
 /** What became of a file the operator attached. */
@@ -161,7 +159,11 @@ export interface MapoAiMagicFill {
   extract(): Promise<void>;
   /** Stops the call: the gateway stops the provider's call. */
   cancel(): void;
-  /** Puts back every field that still holds a value the last answer wrote. */
+  /**
+   * Puts back every field that still holds a value the AI wrote in the
+   * session, newest first, and ends the session: the values the operator
+   * kept or changed stay.
+   */
   undoAll(): void;
   /** What "What I send to the AI" shows, after `loadPreview()`, and whether it is stale. */
   preview: Readonly<Ref<MapoAiMagicFillPreview>>;
@@ -609,9 +611,10 @@ function magicFillState<T extends object>(
 
   // Whether a field is shown is read from the form as it is now, not as it
   // was when the answer came: the operator may have changed what hides it.
+  // The session's, once an answer joined it: a later refusal or failure
+  // leaves it, with Undo all, beside its message.
   const summary = computed(() => {
-    const response = fill.response.value;
-    if (response?.status !== "answered") return undefined;
+    if (fill.rounds.value === 0) return undefined;
     return summarizeMapoAiFill(
       fill.fields.value.map((field) => ({
         ...field,

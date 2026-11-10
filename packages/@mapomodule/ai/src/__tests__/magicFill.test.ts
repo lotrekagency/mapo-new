@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import en from "../../../i18n/src/runtime/locales/mapo.en.json";
 import it_ from "../../../i18n/src/runtime/locales/mapo.it.json";
-import type { MapoAiFillEntry } from "../runtime/shared/fill";
+import type { MapoAiFillEntry, MapoAiFillReview } from "../runtime/shared/fill";
 import {
   MapoAiFillAnswerError,
   mapoAiFillRequest,
@@ -326,8 +326,10 @@ describe("summarizeMapoAiFill", () => {
     key: string,
     action: MapoAiFillEntry["action"],
     outcome: AiFieldOutcome,
-    extra: Partial<MapoAiFillEntry & { applied: boolean }> = {},
-  ): MapoAiFillEntry & { applied: boolean } {
+    extra: Partial<
+      MapoAiFillEntry & { applied: boolean; review: MapoAiFillReview }
+    > = {},
+  ): MapoAiFillEntry & { applied: boolean; review?: MapoAiFillReview } {
     return {
       key,
       path: key,
@@ -339,11 +341,16 @@ describe("summarizeMapoAiFill", () => {
       ...extra,
     };
   }
-  const filled = (value: string, verified: boolean): AiFieldOutcome => ({
+  /** A value with a quote, found when it is verified; with none when `quoted` is false. */
+  const filled = (
+    value: string,
+    verified: boolean,
+    quoted = true,
+  ): AiFieldOutcome => ({
     status: "filled",
     value,
     verified,
-    quotes: [],
+    quotes: quoted ? [{ quote: value, where: "", found: verified }] : [],
   });
 
   it("counts what went in, what waits, what to set by hand, what was discarded and what was not found", () => {
@@ -364,6 +371,8 @@ describe("summarizeMapoAiFill", () => {
 
     expect(summary).toEqual({
       applied: 1,
+      kept: 0,
+      edited: 0,
       toConfirm: [
         {
           key: "summary",
@@ -379,10 +388,67 @@ describe("summarizeMapoAiFill", () => {
           reasons: ["not-proven", "hidden"],
         },
       ],
+      unproven: [],
       manual: 1,
       discarded: 1,
       notFound: 1,
     });
+  });
+
+  it("lists a value with no quote at all apart, without repeating that nothing proves it", () => {
+    const summary = summarizeMapoAiFill([
+      entry("status", "confirm", filled("review", false, false)),
+      entry("notes", "confirm", filled("Read twice", false, false), {
+        shown: false,
+      }),
+    ]);
+
+    expect(summary.toConfirm).toEqual([]);
+    expect(summary.unproven).toEqual([
+      { key: "status", path: "status", value: "review", reasons: [] },
+      { key: "notes", path: "notes", value: "Read twice", reasons: ["hidden"] },
+    ]);
+  });
+
+  it("counts what the operator kept or changed as theirs, and leaves out what they ignored", () => {
+    const summary = summarizeMapoAiFill([
+      entry("title", "apply", filled("About us", true), {
+        applied: true,
+        review: "kept",
+      }),
+      entry("slug", "apply", filled("about-us", true), {
+        applied: true,
+        review: "edited",
+      }),
+      entry("excerpt", "apply", filled("Ours", true), {
+        applied: true,
+        review: "ignored",
+      }),
+      entry("summary", "confirm", filled("A summary", false), {
+        review: "ignored",
+      }),
+    ]);
+
+    expect(summary).toMatchObject({
+      applied: 1,
+      kept: 1,
+      edited: 1,
+      toConfirm: [],
+      unproven: [],
+    });
+  });
+
+  it("counts as changed only a value the AI gave: a discarded one the operator wrote over stays discarded", () => {
+    const summary = summarizeMapoAiFill([
+      entry(
+        "rating",
+        "discard",
+        { status: "discarded", reason: "too-high", proposed: 9, quotes: [] },
+        { review: "edited" },
+      ),
+    ]);
+
+    expect(summary).toMatchObject({ edited: 0, discarded: 1 });
   });
 
   it("says how many items of a list waiting are verified", () => {
@@ -390,7 +456,7 @@ describe("summarizeMapoAiFill", () => {
       status: "filled",
       value: [{ name: "A" }, { name: "B" }],
       verified: false,
-      quotes: [],
+      quotes: [{ quote: "A and B", where: "", found: false }],
       items: [
         { fields: {}, verified: true },
         { template: "hero", fields: {}, verified: false },
