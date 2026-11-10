@@ -22,6 +22,7 @@ import type {
 } from "../types/index.js";
 import { resolveFieldAccessor } from "../types/index.js";
 import { valuePath } from "../utils/annotations.js";
+import { modelForDraft } from "../utils/draft.js";
 import { useCurrentLang } from "./useCurrentLang.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
@@ -46,9 +47,11 @@ export interface UseMapoFormOptions<T extends object> {
   registry: FieldRegistry;
   /**
    * When set, enables automatic draft persistence to localStorage.
-   * Key is prefixed with `mapo:draft:`. Drafts expire after 24 h.
+   * Key is prefixed with `mapo:draft:` and the signed-in user's id, so
+   * accounts on one browser never share a draft. Drafts expire after 24 h,
+   * and the fields marked `noDraft` are left out of them.
    * Call the returned `checkDraft()` after the model is populated to offer restore.
-   * Example: `"article:42"` → `mapo:draft:article:42`.
+   * Example: `"article:42"` → `mapo:draft:1:article:42` for the user with id `1`.
    */
   draftKey?: MaybeRef<string | undefined>;
   /**
@@ -227,24 +230,15 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
       const key = _draftStorageKey();
       if (!key || !isDirty.value || typeof localStorage === "undefined") return;
       try {
-        const noDraftKeys = new Set(
-          toValue(fields)
-            .filter((f) => f.noDraft)
-            .map((f) => f.key as string),
-        );
-        const snapshot = toRaw(model.value) as Record<string, unknown>;
-        const filtered =
-          noDraftKeys.size > 0
-            ? Object.fromEntries(
-                Object.entries(snapshot).filter(([k]) => !noDraftKeys.has(k)),
-              )
-            : snapshot;
+        // The fields marked `noDraft` hold nothing in the draft, at any
+        // path: in every language, under a dotted key, in a repeater's items.
+        const values = modelForDraft(toRaw(model.value), toValue(fields));
         localStorage.setItem(
           key,
-          JSON.stringify({ model: filtered, savedAt: Date.now() }),
+          JSON.stringify({ model: values, savedAt: Date.now() }),
         );
       } catch {
-        /* quota exceeded — ignore */
+        /* quota exceeded, or a value with no JSON form — ignore */
       }
     }, 2000);
     watch(model, saveDraft, { deep: true });

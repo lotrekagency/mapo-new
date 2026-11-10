@@ -114,6 +114,8 @@ await form.submit(async (data, isNew) => {
 
 When using `useMapoForm()` without `<MapoDetail>`, pass `draftKey` to enable auto-save to localStorage. The composable debounces saves every 2 s while the form is dirty and clears the draft automatically on `submit()`.
 
+The draft is kept per user: its key is `mapo:draft:<user id>:<draftKey>`, with the id of the signed-in user (`anonymous` without one), so two accounts on one browser never see each other's drafts. A field marked `noDraft` holds nothing in the draft, wherever its value is: at its key (`api.key` included), in every language of a translatable or `synci18n` field, and in each item of a repeater that declares it. A value that an `accessor` writes at another path is not reached: mark the field of that path too. Only what JSON carries back as it was goes in the draft: a file not uploaded yet, a date or a map stays out.
+
 ```ts
 const form = useMapoForm({
   model,

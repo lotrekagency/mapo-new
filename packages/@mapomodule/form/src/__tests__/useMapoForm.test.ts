@@ -382,3 +382,51 @@ describe("submit", () => {
     expect(calls[1]).toHaveProperty("slug", "new-slug"); // full model
   });
 });
+
+// ─── draft ────────────────────────────────────────────────────────────────────
+
+describe("draft", () => {
+  it("keeps a noDraft field out of the draft in every language and under a dotted key", async () => {
+    vi.useFakeTimers();
+    const stored = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+      removeItem: (key: string) => void stored.delete(key),
+    });
+    try {
+      const model = ref<Record<string, unknown>>({ translations: {} });
+      const fields = ref<FieldDescriptor[]>([
+        { key: "title", type: "text" as const, translatable: true },
+        {
+          key: "token",
+          type: "text" as const,
+          translatable: true,
+          noDraft: true,
+        },
+        { key: "api.key", type: "text" as const, noDraft: true },
+      ]);
+      const form = useMapoForm({
+        model,
+        fields,
+        registry: defaultRegistry,
+        currentLang: ref("en"),
+        languages: ["en", "it"],
+        draftKey: "article:new",
+      });
+      form.setFieldValue("title", "Hello");
+      form.setFieldValue("token", "t-en");
+      form.setFieldValue("api.key", "k-123");
+      await nextTick();
+      vi.advanceTimersByTime(2000);
+      const saved = JSON.parse(stored.get("mapo:draft:1:article:new") ?? "{}");
+      expect(saved.model).toEqual({
+        translations: { en: { title: "Hello" } },
+        api: {},
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+});

@@ -189,8 +189,11 @@ interface FieldBase<T> extends FieldExtensions {
   /** Direct component override. Takes priority over `registry.mapping[type]`. */
   is?: Component;
   /**
-   * When `true`, this field's value is excluded from draft snapshots saved to localStorage.
+   * When `true`, this field's value is excluded from draft snapshots saved to localStorage,
+   * wherever it is: at its key (a dotted key included), in every language for a
+   * translatable or `synci18n` field, and in each item of a repeater that declares it.
    * Use for sensitive fields (passwords, API keys, tokens) that should never be persisted client-side.
+   * A value that an `accessor` writes at another path is not reached: mark that field too.
    */
   noDraft?: boolean;
 }
