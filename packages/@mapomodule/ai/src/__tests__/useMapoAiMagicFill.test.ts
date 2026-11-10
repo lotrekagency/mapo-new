@@ -398,7 +398,12 @@ describe("useMapoAiMagicFill — Extract", () => {
     expect(magic.startedAt.value).toBeUndefined();
     expect(magic.open.value).toBe(false);
     expect(form.model.value.title).toBe("About us");
-    expect(magic.summary.value).toMatchObject({ applied: 1, toConfirm: [] });
+    expect(magic.summary.value).toMatchObject({
+      applied: 1,
+      toFill: [],
+      toReplace: [],
+      unproven: [],
+    });
     const request = calls.find((call) => call.path === "/_mapo/ai/run");
     expect(request?.options.body).toMatchObject({
       task: "fill",
@@ -576,14 +581,274 @@ describe("useMapoAiMagicFill — the summary", () => {
     await useMapoAiStatus().refresh();
     magic.text.value = "Notes: Long notes";
     await magic.extract();
-    expect(magic.summary.value?.toConfirm[0]?.reasons).toEqual(["not-proven"]);
+    expect(magic.summary.value?.toFill[0]?.reasons).toEqual(["not-proven"]);
 
     form.model.value.kind = "short";
 
-    expect(magic.summary.value?.toConfirm[0]?.reasons).toEqual([
+    expect(magic.summary.value?.toFill[0]?.reasons).toEqual([
       "not-proven",
       "hidden",
     ]);
+  });
+
+  it("gives a value that would replace one with what the field holds now, read as the form is", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(VERIFIED_TITLE),
+    });
+    const form = detail({ isNew: computed(() => false) });
+    form.model.value = { title: "Old title" };
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: About us";
+    await magic.extract();
+
+    expect(magic.summary.value?.toReplace).toEqual([
+      {
+        key: "title",
+        path: "title",
+        value: "About us",
+        reasons: ["replaces"],
+        quote: "About us",
+        current: "Old title",
+      },
+    ]);
+  });
+
+  it("counts a value the record already holds, and lists nothing for it", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(VERIFIED_TITLE),
+    });
+    const form = detail({ isNew: computed(() => false) });
+    form.model.value = { title: "About us" };
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: About us";
+    await magic.extract();
+
+    expect(magic.summary.value).toMatchObject({
+      unchanged: 1,
+      toFill: [],
+      toReplace: [],
+      unproven: [],
+    });
+    expect(form.annotations.value).toEqual({});
+  });
+});
+
+describe("useMapoAiMagicFill — the preview's ticks", () => {
+  /** An answer with a value for each group of the preview, and one for a hidden field. */
+  const MIXED = {
+    title: {
+      status: "filled",
+      value: "About us",
+      verified: true,
+      quotes: [{ quote: "About us", where: "", found: true }],
+    },
+    summary: {
+      status: "filled",
+      value: "A summary",
+      verified: false,
+      quotes: [{ quote: "A summary", where: "", found: false }],
+    },
+    slug: { status: "filled", value: "about-us", verified: false, quotes: [] },
+    notes: {
+      status: "filled",
+      value: "Long notes",
+      verified: false,
+      quotes: [{ quote: "Long notes", where: "", found: false }],
+    },
+  };
+  const MIXED_FIELDS: AnyFieldDescriptor[] = [
+    { key: "title", type: "text", label: "Title" },
+    { key: "summary", type: "text", label: "Summary" },
+    { key: "slug", type: "text", label: "Slug" },
+    { key: "kind", type: "text", label: "Kind" },
+    {
+      key: "notes",
+      type: "text",
+      label: "Notes",
+      show: ({ model }) => model.kind === "long",
+    },
+  ];
+
+  /** An existing record whose title the answer would replace, with the preview's groups. */
+  async function previewed() {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(MIXED),
+    });
+    const form = detail({
+      fields: computed(() => MIXED_FIELDS),
+      isNew: computed(() => false),
+    });
+    form.model.value = { title: "Old title" };
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "About us";
+    await magic.extract();
+    return { form, magic };
+  }
+
+  it("ticks the values for empty fields the form shows, proven or not, and not a replacement, a value with no quote at all or a hidden field", async () => {
+    const { magic } = await previewed();
+
+    expect(magic.summary.value).toMatchObject({
+      toFill: [{ path: "summary" }, { path: "notes" }],
+      toReplace: [{ path: "title" }],
+      unproven: [{ path: "slug" }],
+    });
+    expect(magic.selected.value).toEqual(["summary"]);
+    expect(magic.isSelected("title")).toBe(false);
+    expect(magic.isSelected("slug")).toBe(false);
+    expect(magic.isSelected("notes")).toBe(false);
+  });
+
+  it("applies the ticked values only, and leaves the others waiting", async () => {
+    const { form, magic } = await previewed();
+    magic.select("title", true);
+    magic.select("summary", false);
+    magic.select("slug", true);
+
+    magic.applySelected();
+
+    expect(form.model.value).toMatchObject({
+      title: "About us",
+      slug: "about-us",
+    });
+    expect(form.model.value.summary).toBeUndefined();
+    // What was not ticked keeps waiting, in the preview and on its field.
+    expect(magic.summary.value).toMatchObject({
+      applied: 2,
+      toFill: [{ path: "summary" }, { path: "notes" }],
+      toReplace: [],
+      unproven: [],
+    });
+    expect(form.annotations.value.summary?.actions?.[0]?.label).toBe(
+      "mapo.apply",
+    );
+  });
+
+  it("never ticks nor writes a field the form hides", async () => {
+    const { form, magic } = await previewed();
+
+    magic.select("notes", true);
+    magic.applySelected();
+
+    expect(magic.isSelected("notes")).toBe(false);
+    expect(form.model.value.notes).toBeUndefined();
+  });
+
+  it("ignores every value that waits, and leaves the values in the form", async () => {
+    const { form, magic } = await previewed();
+    magic.select("title", true);
+    magic.select("summary", false);
+    magic.applySelected();
+
+    magic.ignoreWaiting();
+
+    expect(form.model.value.title).toBe("About us");
+    expect(magic.summary.value).toMatchObject({
+      applied: 1,
+      toFill: [],
+      toReplace: [],
+      unproven: [],
+    });
+    expect(Object.keys(form.annotations.value)).toEqual(["title"]);
+    expect(magic.selected.value).toEqual([]);
+  });
+
+  it("starts a new value of a later answer at the same path from the preview's own tick", async () => {
+    const unfound = (value: string) => ({
+      status: "filled",
+      value,
+      verified: false,
+      quotes: [{ quote: value, where: "", found: false }],
+    });
+    let answer = answered({ summary: unfound("A summary") });
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answer,
+    });
+    const fields: AnyFieldDescriptor[] = [
+      { key: "summary", type: "text", label: "Summary" },
+    ];
+    const form = detail({ fields: computed(() => fields) });
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "A summary";
+    await magic.extract();
+    magic.select("summary", false);
+    expect(magic.isSelected("summary")).toBe(false);
+    answer = answered({ summary: unfound("Another summary") });
+
+    await magic.extract();
+
+    expect(magic.summary.value?.toFill).toMatchObject([
+      { path: "summary", value: "Another summary" },
+    ]);
+    expect(magic.isSelected("summary")).toBe(true);
+  });
+
+  it("never applies a ticked value whose field another field's onChange filled meanwhile", async () => {
+    const unfound = (value: string) => ({
+      status: "filled",
+      value,
+      verified: false,
+      quotes: [{ quote: value, where: "", found: false }],
+    });
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () =>
+        answered({ title: unfound("About us"), summary: unfound("A summary") }),
+    });
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "title",
+        type: "text",
+        label: "Title",
+        onChange: ({ model }) => {
+          model.summary = "From the title";
+        },
+      },
+      { key: "summary", type: "text", label: "Summary" },
+    ];
+    const form = detail({ fields: computed(() => fields) });
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "About us";
+    await magic.extract();
+    // Both for empty fields: ticked, the summary by the operator too.
+    magic.select("summary", true);
+    expect(magic.selected.value).toEqual(["title", "summary"]);
+
+    magic.applySelected();
+
+    // The title's onChange filled the summary: the AI's would replace it now.
+    expect(form.model.value).toEqual({
+      title: "About us",
+      summary: "From the title",
+    });
+    expect(magic.summary.value?.toReplace).toMatchObject([
+      { path: "summary", current: "From the title" },
+    ]);
+    expect(magic.isSelected("summary")).toBe(false);
+  });
+
+  it("starts a value restored, or a new value at the same path, from the preview's own tick", async () => {
+    const { magic } = await previewed();
+    magic.select("summary", false);
+    magic.select("title", true);
+    magic.applySelected();
+
+    // Restore puts the old title back: its value waits again, unticked.
+    magic.fill.restore("title");
+
+    expect(magic.summary.value?.toReplace).toMatchObject([{ path: "title" }]);
+    expect(magic.isSelected("title")).toBe(false);
+    // The operator's untick of the summary still holds for that value.
+    expect(magic.isSelected("summary")).toBe(false);
   });
 });
 

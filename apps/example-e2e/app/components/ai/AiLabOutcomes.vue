@@ -20,6 +20,7 @@ const ACTIONS: Record<
   apply: { label: "verified", color: "success" },
   confirm: { label: "to confirm", color: "warning" },
   manual: { label: "by hand", color: "info" },
+  unchanged: { label: "already held", color: "neutral" },
   discard: { label: "discarded", color: "error" },
   empty: { label: "not given", color: "neutral" },
 };

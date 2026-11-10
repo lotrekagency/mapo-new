@@ -702,7 +702,9 @@ The components use Nuxt UI and Tailwind utilities. Tailwind generates only the c
 
 ### What goes in by itself
 
-For each field of the answer, `planMapoAiFill()` decides one action: `apply` for a verified value on an empty field, `confirm` for a value no quote proves or one that would replace what the field holds, `manual` for a related record, `discard` for a value the gateway discarded, `empty` for what the source does not give. Only `apply` writes by itself: a verified value cannot be worse than an empty field, while a value that replaces one asks the operator to compare, and a related record is a name the form cannot take before someone finds it (an id the AI picked from `relationChoices` waits too). A field is empty when it holds nothing, a blank text, an empty paragraph of the editor or an empty list; `false` and `0` are values, so a switch the backend sets to `false` keeps it until the operator applies. A field the form hides (`show`, `visible`) waits too: the operator would not see a value go in. A part of a field whose accessor converts the whole value (`seo.title` of such a field) is `manual`: it cannot be written alone. A related record is looked for anywhere in a value, not only in what a list's items say, and a list of items whose answer lacks the outcome of each item is not read at all. A list goes in whole, by its own `verified`, which holds only when every item is verified, none was taken out and the list is long enough.
+For each field of the answer, `planMapoAiFill()` decides one action: `apply` for a verified value on an empty field, `confirm` for a value no quote proves or one that would replace what the field holds, `manual` for a related record, `unchanged` for a value the field already holds as its own, `discard` for a value the gateway discarded, `empty` for what the source does not give. Only `apply` writes by itself: a verified value cannot be worse than an empty field, while a value that replaces one asks the operator to compare, and a related record is a name the form cannot take before someone finds it (an id the AI picked from `relationChoices` waits too). A field is empty when it holds nothing, a blank text, an empty paragraph of the editor or an empty list; `false` and `0` are values, so a switch the backend sets to `false` keeps it until the operator applies. A field the form hides (`show`, `visible`) waits too: the operator would not see a value go in. A part of a field whose accessor converts the whole value (`seo.title` of such a field) is `manual`: it cannot be written alone. A related record is looked for anywhere in a value, not only in what a list's items say, and a list of items whose answer lacks the outcome of each item is not read at all. A list goes in whole, by its own `verified`, which holds only when every item is verified, none was taken out and the list is long enough.
+
+`unchanged` (R128) comes from the form, not from the answer: the plan asks `holds(key, value)` of the form, which the composable answers with the same data, as JSON, at every path the write would reach, every language of a `synci18n` field included. A field holding a value the AI wrote in the session never says so: that value is still the AI's, to review (P4). A field whose type converts its whole value as it stores it (an accessor's `set`) is not compared either, since the composable would have to call `set` to know, and a value it cannot compare is a replacement, as before. An `unchanged` field writes nothing, marks nothing, is not followed for the operator's changes and is not ignored by `dismiss()`: the summary counts it, as already in the record. Since it was no proposal, it is no decision either: once the field holds something else, a later answer's same value is news (`isNews()`), and the rule applies to it as to any value. A form without `holds()`, as a tool's, gets no `unchanged`.
 
 ### Why the page builds the request
 
@@ -722,7 +724,7 @@ Each write remembers what the path held, whether the key was there and which obj
 
 ### The marks
 
-The marks go to the detail's `annotations` channel, at the path the form looks at: the field's value path. A field with parts gets one mark for all of them (the form shows no mark at `seo.title`), which tells each part and applies or restores them together. The proof of a list comes from the quotes of its items, and its mark says when values were taken out or the list is too short. The composable keeps the marks it set and removes only those: a mark of another extension at another field stays, and one at the same field is replaced: it does not come back when the AI's goes. A mark of the page's `annotations` prop wins over the channel at the same path, so it hides the AI's. Each mark carries the actions of its field: Keep and Restore for a value that went in, Apply and Ignore for one that waits, Ignore alone for a related record or a discarded value. The labels come from the app's `$i18n` (`mapo.ai.fill.*`, and the shared `mapo.apply` and `mapo.restore`), read without a dependency on `@mapomodule/i18n`: without it, a label is its key.
+The marks go to the detail's `annotations` channel, at the path the form looks at: the field's value path. A field with parts gets one mark for all of them (the form shows no mark at `seo.title`), which tells each part and applies or restores them together. The proof of a list comes from the quotes of its items, and its mark says when values were taken out or the list is too short. The composable keeps the marks it set and removes only those: a mark of another extension at another field stays, and one at the same field is replaced: it does not come back when the AI's goes. A mark of the page's `annotations` prop wins over the channel at the same path, so it hides the AI's. Each mark carries the actions of its field: Keep and Restore for a value that went in, Apply and Ignore for one that waits, Ignore alone for a related record or a discarded value. The mark of a value that would replace one says what it replaces (R126): `replaced(path)` gives the field's value now, read at its path, and, for a value written into every language (`synci18n`), each other language's value that is not empty and differs from both, so `en: …` follows the value of the language the form edits; plain words stay for a field whose path and languages show nothing. So wherever a replacement is applied, the mark or Magic Fill's preview, the operator sees before and after. The labels come from the app's `$i18n` (`mapo.ai.fill.*`, and the shared `mapo.apply` and `mapo.restore`), read without a dependency on `@mapomodule/i18n`: without it, a label is its key.
 
 ### One session across answers
 
@@ -765,11 +767,11 @@ Magic Fill is the browser's part that an operator uses: a button and a banner on
 | File                                                | Role                                                                                                  |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `src/module.ts`                                     | The option `magicFill`, the components by name, the page's key typed, the plugin generated in the app |
-| `src/runtime/shared/magicFill.ts`                   | Pure: `status` read, the models to pick, the source and its check, the preview, the summary           |
-| `src/runtime/composables/useMapoAiMagicFill.ts`     | One state per detail: source, files, model, the call and its phases, the preview, the summary         |
+| `src/runtime/shared/magicFill.ts`                   | Pure: `status` read, the models, the source, What I send, the summary and the preview's ticks         |
+| `src/runtime/composables/useMapoAiMagicFill.ts`     | One state per detail: source, files, model, the call and its phases, the summary, the ticks           |
 | `src/runtime/composables/useMapoAiStatus.ts`        | What `status` answers, read once per app and asked again on every detail                              |
 | `src/runtime/components/MapoAiMagicFillAction.vue`  | The button in the sidebar card (`actions`)                                                            |
-| `src/runtime/components/MapoAiMagicFillBanner.vue`  | The banner above the form (`body-top`): the call, its errors, the summary, Undo all                   |
+| `src/runtime/components/MapoAiMagicFillBanner.vue`  | The banner above the form (`body-top`): the call, its errors, the summary, the preview, Undo all      |
 | `src/runtime/components/MapoAiMagicFillPanel.vue`   | The panel: text, files, instructions, What I send, the model, Extract                                 |
 | `src/runtime/components/MapoAiMagicFillPreview.vue` | What I send to the AI, from `run/preview`                                                             |
 
@@ -785,6 +787,12 @@ The button and the banner are rendered apart, and the slideover unmounts its con
 
 `extract()` awaits the detail's `metadata()` first, which `MapoDetail` asks once and shares, so the phase "describing" is honest and `useMapoAiFill()` finds the answer ready; then "waiting", with the time it takes. `cancel()` aborts the request, and the gateway stops the provider's call when it sees the request close ([The run route](#the-run-route)). "What I send" posts the same body to `run/preview`, built from the same descriptions, with an empty part when the operator has written nothing yet: `run` takes one part at least. The preview keeps what it was asked with (the parts, the instructions, the choice, the form's fields, its language and the record), compared by identity: a change marks it `stale`, and the section, opened again, asks only when it has nothing current to show, so typing and reopening spend nothing against the previews' limit.
 
+### The preview of the values that wait
+
+The banner lists the values that wait in three groups (R125): to fill, to replace and without proof. `summarizeMapoAiFill()` puts each value in one: `toReplace` when its field holds a value, proven or not, since what matters first is that a value of the record would go; else `unproven` when the AI quoted nothing for it (R115); else `toFill`. Each value carries what the field holds now (`current`, from `replaced()`), read on the model when the summary is computed, with the other languages a `synci18n` value would replace (`languages`), and the words that prove it when it is verified. `mapoAiPreselected()` says which are ticked from the start (R127): the values for empty fields the form shows, which take no value away. The operator's ticks live in Magic Fill's state, keyed by the value they were given for, its path and its data: a value that stops waiting, applied, ignored or changed by the operator, takes its tick with it at once (a synchronous watcher of the session's fields), so a value restored or proposed anew starts from the preview's own tick. A tick is also keyed by whether the value would replace one, so a tick given to fill an empty field never carries over to a replacement. `applySelected()` looks at each ticked path again just before it calls `apply()`: a write may change what waits, as another field's `onChange` filling a field ticked as empty, whose value would then replace what the `onChange` wrote. `ignoreWaiting()` calls `dismiss()` for each value that waits: the same operations as the marks, so the rule of [Filling a form](#filling-a-form) still decides, and a hidden field is never written. The values left unticked keep waiting (R129): an empty box is no decision, so they stay marked until the operator decides or saves (P4).
+
+The preview is in the banner, not in the panel the design first drew it in: the panel is a modal slideover, which keeps the form inert and closes when the answer arrives (R105), while the banner sits above the form, stays while something waits, and comes back with the draft.
+
 ### Strengths and weaknesses
 
 - **One rule for every page**: Magic Fill writes through `useMapoAiFill()`, so what goes in by itself is decided in one place.
@@ -795,7 +803,10 @@ The button and the banner are rendered apart, and the slideover unmounts its con
 - **The plugin is generated, so it is typed only in the app**: the package's typecheck does not see it; `module.test.ts` checks its text.
 - **The session follows the page's draft**: with drafts on, a reload and Restore bring back the marks, the summary with the model that answered, and Undo all; without them, a reload forgets the session, as it forgets the values. The quotes are pieces of the source, kept in clear in the browser's storage, under the user, for the draft's 24 hours.
 - **A session per record**: a second extraction keeps the first one's marks, and Undo all reaches every extraction, newest first; the summary counts the session, and says when the last extraction found nothing new.
-- **A hidden field waits**: the summary does not apply into it; a field the answer's own writes reveal takes its verified value by itself (R116).
+- **A hidden field waits**: the preview never ticks it; a field the answer's own writes reveal takes its verified value by itself (R116).
+- **A value of the record changes only where the operator sees both**: the preview shows a replacement before and after, never ticked from the start, and so does its mark; a value the record already holds is no replacement at all.
+- **The preview grows with the answer**: on a large record, many values that wait make a long banner above the form.
+- **A list goes in whole**: the preview says how many of its items are verified, and choosing items one by one, with how they join the items a record already has, is still to come.
 - **An override of a part must say so**: one that does not pass `part` is unknown to the others, so the banner shows its own button beside an override of the button.
 
 ## Testing
@@ -925,7 +936,7 @@ Change it in `prompts/base.ts` and raise `MAPO_AI_PROMPT_VERSION`, so every answ
 
 ### Change what goes into the form by itself
 
-The rule is `actionOf()` in `fill.ts`, with `isEmptyFormValue()` for what counts as empty. Change it there, with a row in the tests of `planMapoAiFill()`, the table of [Fill a detail form](/modules/ai#fill-a-detail-form), and a message under `mapo.ai.fill` in both catalogs of `@mapomodule/i18n` when a mark changes. The rule decides what reaches a form without the operator: a value that goes in by itself must stay one a quote verifies.
+The rule is `actionOf()` in `fill.ts`, with `isEmptyFormValue()` for what counts as empty and the form's `holds()` for a value it already has. Change it there, with a row in the tests of `planMapoAiFill()`, the table of [Fill a detail form](/modules/ai#fill-a-detail-form), and a message under `mapo.ai.fill` in both catalogs of `@mapomodule/i18n` when a mark changes. The rule decides what reaches a form without the operator: a value that goes in by itself must stay one a quote verifies.
 
 ### Add a tag of rich text
 
@@ -941,7 +952,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Who may use the gateway                          | The gateway's authentication                                     |
 | Ask the AI                                       | The `run` route                                                  |
 | Fill a detail form                               | `useMapoAiFill()`                                                |
-| Magic Fill                                       | The panel and the call of Magic Fill                             |
+| Magic Fill                                       | The panel, the call, the review and the preview of Magic Fill    |
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
@@ -968,7 +979,7 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Magic Fill**, after its panel and its call: what the operator's review does to the values (a kept value, an edited one, several extractions in a row, the save), the provenance kept with the form's draft, the preview of the values that wait, related records found by their name, an evaluation set run on real providers, and how a list's items join the items a record already has.
+1. **Magic Fill**, after its panel, its call, the review of its values, its session in the form's draft and its preview: a list's items chosen one by one, and how they join the items a record already has; related records found by their name, with where each value comes from; an evaluation set run on real providers.
 2. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
 3. **Import AI**, with a check for duplicates between new items and existing records.
 

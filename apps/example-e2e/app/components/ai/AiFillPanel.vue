@@ -68,6 +68,7 @@ const ACTIONS: Record<
   apply: { label: "verified", color: "success" },
   confirm: { label: "to confirm", color: "warning" },
   manual: { label: "to choose", color: "info" },
+  unchanged: { label: "already held", color: "neutral" },
   discard: { label: "discarded", color: "error" },
   empty: { label: "not given", color: "neutral" },
 };
@@ -81,6 +82,7 @@ const summary = computed(() => {
     `${applied} in the form`,
     `${count("confirm")} to confirm`,
     `${count("manual")} to choose`,
+    `${count("unchanged")} already held`,
     `${count("discard")} discarded`,
     `${count("empty")} not given`,
   ].join(" · ");

@@ -120,6 +120,52 @@ const UAlert: Component = {
   },
 };
 
+/** Each `UCheckbox` mounted: its label, its state, and a click as a person makes it. */
+interface CheckboxStub {
+  readonly label: string;
+  readonly checked: boolean;
+  readonly disabled: boolean;
+  click(): void;
+}
+const checkboxes: CheckboxStub[] = [];
+
+/** As Nuxt UI's: its label, then its description slot. */
+const UCheckbox: Component = {
+  name: "UCheckbox",
+  props: {
+    label: String,
+    modelValue: { type: [Boolean, String], default: false },
+    disabled: Boolean,
+  },
+  emits: ["update:modelValue"],
+  setup(
+    props: {
+      label?: string;
+      modelValue?: boolean | string;
+      disabled?: boolean;
+    },
+    { emit, slots }: SetupContext<["update:modelValue"]>,
+  ) {
+    const stub: CheckboxStub = {
+      get label() {
+        return props.label ?? "";
+      },
+      get checked() {
+        return props.modelValue === true;
+      },
+      get disabled() {
+        return props.disabled === true;
+      },
+      click() {
+        if (!stub.disabled) emit("update:modelValue", !stub.checked);
+      },
+    };
+    checkboxes.push(stub);
+    onUnmounted(() => checkboxes.splice(checkboxes.indexOf(stub), 1));
+    return () => h("div", null, [props.label ?? "", slots.description?.()]);
+  },
+};
+
 /** Each slideover mounted, and whether it is open. */
 const slideovers: Array<{ readonly open: boolean }> = [];
 
@@ -184,6 +230,7 @@ const UCollapsible: Component = {
 
 const STUBS: Record<string, Component> = {
   UButton,
+  UCheckbox,
   USlideover,
   UCollapsible,
   UAlert,
@@ -222,12 +269,23 @@ const PREVIEW = {
   entities: [{ label: "Article", fields: [{ key: "title" }], skipped: [] }],
 };
 
+/** A value: verified by its quote, or with no quote at all. */
 function filled(value: string, verified: boolean) {
   return {
     status: "filled",
     value,
     verified,
     quotes: verified ? [{ quote: value, where: "", found: true }] : [],
+  };
+}
+
+/** A value whose quote the source does not have: it waits, marked. */
+function unfound(value: string) {
+  return {
+    status: "filled",
+    value,
+    verified: false,
+    quotes: [{ quote: value, where: "", found: false }],
   };
 }
 
@@ -313,9 +371,13 @@ function mountDetail(
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 const button = (label: string) => buttons.find((one) => one.label === label);
+const checkbox = (label: string) =>
+  checkboxes.find((one) => one.label === label);
+const APPLY_SELECTED = "mapo.ai.magicFill.summary.applySelected";
 
 beforeEach(() => {
   buttons.splice(0);
+  checkboxes.splice(0);
   alerts.splice(0);
   slideovers.splice(0);
   collapsibles.splice(0);
@@ -384,13 +446,13 @@ describe("Magic Fill's parts on a detail", () => {
     expect(slideovers).toEqual([]);
   });
 
-  it("sum up an answer: Undo all, and Apply for a value that waits", async () => {
+  it("sum up an answer: Undo all, and a value that waits for an empty field, ticked to apply", async () => {
     gateway(STATUS, {
       title: filled("About us", true),
-      excerpt: filled("A summary", false),
+      excerpt: unfound("A summary"),
     });
     const form = detail(FIELDS);
-    mountDetail(form);
+    const root = mountDetail(form);
     await useMapoAiStatus().refresh();
     await settle();
     const magic = useMapoAiMagicFill(form);
@@ -401,10 +463,102 @@ describe("Magic Fill's parts on a detail", () => {
 
     expect(form.model.value.title).toBe("About us");
     expect(button("mapo.ai.magicFill.summary.undoAll")).toBeDefined();
-    const apply = button("mapo.apply");
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.toFillTitle");
+    expect(checkbox("Excerpt")?.checked).toBe(true);
+    const apply = button(APPLY_SELECTED);
     expect(apply?.disabled).toBe(false);
     apply?.click();
     expect(form.model.value.excerpt).toBe("A summary");
+  });
+
+  it("list a value with no quote at all apart, unticked", async () => {
+    gateway(STATUS, { excerpt: filled("A summary", false) });
+    const form = detail(FIELDS);
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Title: About us";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.unprovenTitle");
+    expect(checkbox("Excerpt")?.checked).toBe(false);
+    expect(button(APPLY_SELECTED)?.disabled).toBe(true);
+    expect(form.annotations.value).toEqual({});
+  });
+
+  it("show a replacement before and after, unticked, and apply it once ticked", async () => {
+    gateway(STATUS, { title: filled("About us", true) });
+    const form = { ...detail(FIELDS), isNew: computed(() => false) };
+    form.model.value = { title: "Home" };
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Title: About us";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.toReplaceTitle");
+    expect(textOf(root)).toMatch(
+      /Home .*mapo\.ai\.magicFill\.summary\.replacedBy About us/,
+    );
+    expect(checkbox("Title")?.checked).toBe(false);
+    expect(button(APPLY_SELECTED)?.disabled).toBe(true);
+    checkbox("Title")?.click();
+    await settle();
+    expect(checkbox("Title")?.checked).toBe(true);
+    button(APPLY_SELECTED)?.click();
+    await settle();
+    expect(form.model.value.title).toBe("About us");
+    expect(checkbox("Title")).toBeUndefined();
+  });
+
+  it("ignore every value that waits, and keep what is in the form", async () => {
+    gateway(STATUS, {
+      title: filled("About us", true),
+      excerpt: unfound("A summary"),
+    });
+    const form = detail(FIELDS);
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Title: About us";
+    await magic.extract();
+    await settle();
+
+    button("mapo.ai.magicFill.summary.ignoreAll")?.click();
+    await settle();
+
+    expect(form.model.value).toEqual({ title: "About us" });
+    expect(checkboxes).toEqual([]);
+    expect(button(APPLY_SELECTED)).toBeUndefined();
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.applied");
+    expect(Object.keys(form.annotations.value)).toEqual(["title"]);
+  });
+
+  it("count what the record already holds, with nothing to tick", async () => {
+    gateway(STATUS, { title: filled("Home", true) });
+    const form = { ...detail(FIELDS), isNew: computed(() => false) };
+    form.model.value = { title: "Home" };
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Title: Home";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.unchanged");
+    // Nothing the record did not hold: the answer found nothing new.
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.nothing");
+    expect(checkboxes).toEqual([]);
+    expect(form.annotations.value).toEqual({});
   });
 
   /** Mounts the parts on a detail, lets status answer, and gives the panel a source. */
@@ -573,7 +727,12 @@ describe("Magic Fill's parts on a detail", () => {
     await magic.extract();
     await settle();
 
-    const apply = button("mapo.apply");
+    const notes = checkbox("Notes");
+    expect(notes?.disabled).toBe(true);
+    expect(notes?.checked).toBe(false);
+    notes?.click();
+    await settle();
+    const apply = button(APPLY_SELECTED);
     expect(apply?.disabled).toBe(true);
     apply?.click();
     expect(form.model.value.notes).toBeUndefined();

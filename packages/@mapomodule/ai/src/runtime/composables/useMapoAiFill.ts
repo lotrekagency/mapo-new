@@ -24,6 +24,7 @@ import {
   MapoAiFillAnswerError,
   dataOf,
   declaredKeys,
+  foundQuoteOf,
   holdsRelation,
   isEmptyFormValue,
   isUnprovenValue,
@@ -52,7 +53,6 @@ import type {
   MapoAiFillSession,
   MapoAiFillSessionField,
 } from "../shared/fillSession";
-import type { AiFieldOutcome } from "../shared/sanitize";
 import { gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
 import type { Translate } from "./translate";
@@ -147,6 +147,18 @@ export interface MapoAiFillField extends MapoAiFillEntry {
   round: number;
 }
 
+/** What a value of the session would replace in the form. */
+export interface MapoAiFillReplaced {
+  /** What the field holds at the value's path: in the language the form edits, for a translatable field. */
+  value: unknown;
+  /**
+   * For a value written into every language (`synci18n`): what each other
+   * language holds, by language, where it is a value that differs from
+   * `value` and from the AI's. The write replaces those too.
+   */
+  languages?: Record<string, unknown>;
+}
+
 /** Why the last `fill()` got no answer. */
 export interface MapoAiFillError {
   /** The gateway's status code; `0` when no answer arrived, or none could be read. */
@@ -162,7 +174,8 @@ export interface MapoAiFill {
   /**
    * Sends the source to the AI with the record's two descriptions, then
    * writes into the form each value a quote verifies on an empty field it
-   * shows, and marks the fields the answer gives. Once those writes are
+   * shows, and marks the fields the answer gives; a value a field already
+   * holds as its own is `unchanged`, with no mark. Once those writes are
    * done, a verified value on an empty field they revealed goes in too.
    * The answer joins the session: it takes a field's place only where it
    * gives a value, so the marks and the memory of the earlier answers stay
@@ -218,6 +231,13 @@ export interface MapoAiFill {
    * `apply()` writes only into a field the operator sees.
    */
   isShown(path: string): boolean;
+  /**
+   * What a value of the session would replace, by its path: what the field
+   * holds there, and, for a value written into every language, each other
+   * language's value it would replace. `undefined` for a path the session
+   * does not have.
+   */
+  replaced(path: string): MapoAiFillReplaced | undefined;
   /** A call is waiting for its answer. */
   pending: Readonly<Ref<boolean>>;
   /** Why the last call got no answer. */
@@ -425,6 +445,7 @@ export function useMapoAiFill<T extends object>(
             },
             isShown: (key) => isShown(locate(key)),
             canTake: (key) => canTake(locate(key)),
+            holds: (key, value) => holdsSame(locate(key), value),
           },
           signal: own.signal,
         },
@@ -623,6 +644,33 @@ export function useMapoAiFill<T extends object>(
     return dataOf(paths.map((path) => readModelValue(model, path)));
   }
 
+  /**
+   * The form already holds a value of the answer as its own: the same data
+   * at every path a write would reach, where the session wrote nothing. An
+   * AI value still in the field is the AI's, and stays to review. A field
+   * whose type converts its whole value as it stores it (an accessor's
+   * `set`) is never compared: its value would replace.
+   */
+  function holdsSame(
+    located: KeyTarget<T> | undefined,
+    value: unknown,
+  ): boolean {
+    if (!located || memory.has(located.path)) return false;
+    try {
+      const isWhole = located.rest === "";
+      if (isWhole && accessorOf(located.descriptor).set) return false;
+    } catch {
+      // A type the registry cannot resolve: nothing tells how it stores.
+      return false;
+    }
+    const data = dataOf(value);
+    if (data === undefined) return false;
+    const model = target.model.value;
+    return writePaths(located).every(
+      (path) => dataOf(readModelValue(model, path)) === data,
+    );
+  }
+
   /** The field holds a value at any path its value would be written to. */
   function holdsValue(field: MapoAiFillField): boolean {
     const located = targets.get(field.key);
@@ -677,9 +725,14 @@ export function useMapoAiFill<T extends object>(
 
   /**
    * An answer's field says something the session's did not: a value it
-   * did not have, or a value discarded where it had found nothing.
+   * did not have, a value discarded where it had found nothing, or a value
+   * the field held before and no longer holds.
    */
   function isNews(earlier: MapoAiFillField, entry: MapoAiFillEntry): boolean {
+    // A value the field held as its own was no proposal: once the field
+    // holds something else, the same value is one, as for any field.
+    const wasHeld = earlier.action === "unchanged";
+    if (wasHeld && entry.action !== "unchanged") return true;
     const now = entry.outcome;
     const before = earlier.outcome;
     if (now.status === "filled") {
@@ -704,6 +757,7 @@ export function useMapoAiFill<T extends object>(
       const isWaiting =
         !field.applied &&
         field.review === undefined &&
+        field.action !== "unchanged" &&
         field.outcome.status !== "empty";
       if (!isWaiting) continue;
       held.set(field.path, snapshotOf(field));
@@ -804,9 +858,10 @@ export function useMapoAiFill<T extends object>(
         path === undefined || field.path === path || markPathOf(field) === path,
     );
     for (const field of chosen) {
-      if (field.review === undefined) {
-        setField(field.path, { review: "ignored" });
-      }
+      // A value the field already holds has nothing to ignore.
+      const isUndecided =
+        field.review === undefined && field.action !== "unchanged";
+      if (isUndecided) setField(field.path, { review: "ignored" });
     }
     const paths =
       path === undefined
@@ -1002,8 +1057,11 @@ export function useMapoAiFill<T extends object>(
   const changedPaths = computed(() =>
     fields.value
       .filter((field) => {
+        // A value the field already held is no proposal to lose.
         const isTracked =
-          field.review === undefined && field.outcome.status !== "empty";
+          field.review === undefined &&
+          field.action !== "unchanged" &&
+          field.outcome.status !== "empty";
         if (!isTracked) return false;
         if (!field.applied) return snapshotOf(field) !== held.get(field.path);
         const last = memory.get(field.path)?.at(-1);
@@ -1046,12 +1104,14 @@ export function useMapoAiFill<T extends object>(
    * gets one mark, at the field, that tells each part.
    */
   function markOf(markPath: string): FieldAnnotation | undefined {
-    // A field the operator decided has no mark, and neither does a value
-    // with no quote at all while it waits: it is listed apart.
+    // A field the operator decided has no mark, nor one that already held
+    // the value, and neither does a value with no quote at all while it
+    // waits: it is listed apart.
     const group = fields.value.filter(
       (field) =>
         markPathOf(field) === markPath &&
         field.outcome.status !== "empty" &&
+        field.action !== "unchanged" &&
         field.review === undefined &&
         (field.applied || !isUnprovenValue(field.outcome)),
     );
@@ -1154,7 +1214,7 @@ export function useMapoAiFill<T extends object>(
         : "mapo.ai.fill.manualField";
       return t(message, { value });
     }
-    const quote = quoteOf(outcome);
+    const quote = foundQuoteOf(outcome);
     const isProven = outcome.verified && quote !== undefined;
     const proof = isProven
       ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(quote, 200) })
@@ -1167,9 +1227,56 @@ export function useMapoAiFill<T extends object>(
     ];
     if (field.applied) return [proof, ...notes].join(" ");
     const proposal = field.replaces
-      ? t("mapo.ai.fill.proposesInstead", { value })
+      ? replacementOf(field, value)
       : t("mapo.ai.fill.proposes", { value });
     return [proposal, proof, ...notes].join(" ");
+  }
+
+  /**
+   * A value that would replace one, as its mark says it: before and after,
+   * the field's value now and, for a `synci18n` field, each other
+   * language's value the write would replace (`en: …`). When that shows
+   * nothing, the plain words say it replaces a value.
+   */
+  function replacementOf(field: MapoAiFillField, value: string): string {
+    const before = replaced(field.path);
+    const own =
+      before && !isEmptyFormValue(before.value)
+        ? shown(field, before.value)
+        : "";
+    const others = Object.entries(before?.languages ?? {}).map(
+      ([language, held]) => `${language}: ${shown(field, held)}`,
+    );
+    const current = [own, ...others].filter(Boolean).join(" · ");
+    return current
+      ? t("mapo.ai.fill.proposesInsteadOf", { value, current })
+      : t("mapo.ai.fill.proposesInstead", { value });
+  }
+
+  function replaced(path: string): MapoAiFillReplaced | undefined {
+    const field = fieldAt(path);
+    const located = field ? targets.get(field.key) : undefined;
+    if (!field || !located) return undefined;
+    const model = target.model.value;
+    const value = readModelValue(model, field.path);
+    const own = dataOf(value);
+    const { outcome } = field;
+    const proposed =
+      outcome.status === "filled" ? dataOf(outcome.value) : undefined;
+    // The other paths a write reaches: every language of a `synci18n`
+    // field, `translations.<language>.<key>`.
+    const lost = writePaths(located).flatMap((at) => {
+      if (at === field.path) return [];
+      const held = readModelValue(model, at);
+      const data = dataOf(held);
+      const isLost =
+        !isEmptyFormValue(held) && data !== own && data !== proposed;
+      const language = at.split(".")[1];
+      return isLost && language ? [[language, held] as const] : [];
+    });
+    return lost.length
+      ? { value, languages: Object.fromEntries(lost) }
+      : { value };
   }
 
   /** The part of a field a key names: `title` for `seo.title`. */
@@ -1217,6 +1324,7 @@ export function useMapoAiFill<T extends object>(
     close,
     cancel,
     isShown: shownNow,
+    replaced,
     pending,
     error,
     response,
@@ -1260,20 +1368,6 @@ function keyTarget<T extends object>(
   const isTranslated = Boolean(found.translatable) && language !== "";
   const base = isTranslated ? `translations.${language}.${own}` : own;
   return { descriptor: found, path: `${base}${rest}`, markPath: base, rest };
-}
-
-/** The first quote found in the source, the items' included. */
-function quoteOf(outcome: AiFieldOutcome): string | undefined {
-  if (outcome.status !== "filled") return undefined;
-  const own = outcome.quotes.find((one) => one.found)?.quote;
-  if (own !== undefined) return own;
-  for (const item of outcome.items ?? []) {
-    for (const inner of Object.values(item.fields)) {
-      const quote = quoteOf(inner);
-      if (quote !== undefined) return quote;
-    }
-  }
-  return undefined;
 }
 
 /**

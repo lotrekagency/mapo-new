@@ -419,6 +419,8 @@ function isAiValue(value: unknown, depth: number): value is AiValue {
  *   replace the value the form holds;
  * - `manual`: the form cannot take it as it is: a related record, which
  *   someone has to find;
+ * - `unchanged`: the form already holds it, the record's value or the
+ *   operator's: there is nothing to write, and nothing to review;
  * - `discard`: it broke a rule of its field, and is never written;
  * - `empty`: the source does not give it.
  */
@@ -426,6 +428,7 @@ export type MapoAiFillAction =
   | "apply"
   | "confirm"
   | "manual"
+  | "unchanged"
   | "discard"
   | "empty";
 
@@ -443,7 +446,10 @@ export interface MapoAiFillEntry {
   /** The path of its value in the model: `translations.it.title` for a translatable field. */
   path: string;
   action: MapoAiFillAction;
-  /** The form holds a value at the path, which this one would replace. */
+  /**
+   * The form holds a value at the path, which this one would replace: a
+   * different one, since a value the field already holds is `unchanged`.
+   */
   replaces: boolean;
   /** The form shows the field; a hidden one never takes a value by itself. */
   shown: boolean;
@@ -471,6 +477,13 @@ export interface MapoAiFillForm {
    * of a field that converts its value (an accessor's `set`) cannot.
    */
   canTake?(key: string): boolean;
+  /**
+   * The form already holds this value of a key, as its own and not as one
+   * the AI wrote: the same data at every path a write of the key would
+   * reach. Default: it never does, so a value of a field that holds one
+   * would replace it.
+   */
+  holds?(key: string, value: unknown): boolean;
 }
 
 /**
@@ -478,7 +491,8 @@ export interface MapoAiFillForm {
  * A field the form does not have, or whose path could reach an object's
  * prototype, is left out. A list goes in whole, with its own `verified`. A
  * field the form hides waits, and so does a part of a field the form
- * cannot take as it is (`manual`).
+ * cannot take as it is (`manual`). A value the field already holds, as
+ * `form.holds()` tells, changes nothing (`unchanged`).
  *
  * @param fields The `fields` of a fill result.
  * @param form   Where each field's value is, and what it holds now.
@@ -493,16 +507,20 @@ export function planMapoAiFill(
     if (path === undefined || !isSafePath(path)) continue;
     // A value that goes into every language replaces any of them.
     const written = (form.pathsOf?.(key) ?? []).filter(isSafePath);
-    const replaces = [path, ...written].some(
+    const holdsValue = [path, ...written].some(
       (at) => !isEmptyFormValue(form.read(at)),
     );
+    const isFilled = outcome.status === "filled";
+    const isSame =
+      isFilled && holdsValue && form.holds?.(key, outcome.value) === true;
+    const replaces = isFilled && holdsValue && !isSame;
     const shown = form.isShown?.(key) ?? true;
     const takes = form.canTake?.(key) ?? true;
     entries.push({
       key,
       path,
-      action: actionOf(outcome, { replaces, shown, takes }),
-      replaces: outcome.status === "filled" && replaces,
+      action: actionOf(outcome, { replaces, shown, takes, isSame }),
+      replaces,
       shown,
       outcome,
     });
@@ -512,10 +530,12 @@ export function planMapoAiFill(
 
 function actionOf(
   outcome: AiFieldOutcome,
-  field: { replaces: boolean; shown: boolean; takes: boolean },
+  field: { replaces: boolean; shown: boolean; takes: boolean; isSame: boolean },
 ): MapoAiFillAction {
   if (outcome.status === "empty") return "empty";
   if (outcome.status === "discarded") return "discard";
+  // Nothing to write, nor to find: the field holds the value already.
+  if (field.isSame) return "unchanged";
   const isManual = holdsRelation(outcome) || !field.takes;
   if (isManual) return "manual";
   const isDirect = outcome.verified && !field.replaces && field.shown;
@@ -543,6 +563,23 @@ export function holdsRelation(outcome: AiFieldOutcome): boolean {
 export function isUnprovenValue(outcome: AiFieldOutcome): boolean {
   if (outcome.status !== "filled" || outcome.verified) return false;
   return !quotesSomething(outcome);
+}
+
+/**
+ * The first quote of a value that was found in the source, on itself or
+ * on one of its items; `undefined` when none was.
+ */
+export function foundQuoteOf(outcome: AiFieldOutcome): string | undefined {
+  if (outcome.status !== "filled") return undefined;
+  const own = outcome.quotes.find((one) => one.found)?.quote;
+  if (own !== undefined) return own;
+  for (const item of outcome.items ?? []) {
+    for (const inner of Object.values(item.fields)) {
+      const quote = foundQuoteOf(inner);
+      if (quote !== undefined) return quote;
+    }
+  }
+  return undefined;
 }
 
 function quotesSomething(outcome: AiFieldOutcome): boolean {

@@ -11,6 +11,7 @@ import { useNuxtApp } from "nuxt/app";
 import { metadataToJsonSchema } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
+import { dataOf } from "../shared/fill";
 import type { MapoAiFillEntity } from "../shared/fill";
 import type {
   MapoAiRunPreviewResponse,
@@ -20,6 +21,7 @@ import type {
 import {
   checkMapoAiSource,
   defaultMapoAiChoice,
+  mapoAiPreselected,
   mapoAiProviderChoices,
   mapoAiSourceParts,
   previewMapoAiFill,
@@ -29,6 +31,7 @@ import type {
   MapoAiFillSummary,
   MapoAiProviderChoice,
   MapoAiSourceProblem,
+  MapoAiToConfirm,
 } from "../shared/magicFill";
 import { readMapoAiFile } from "../shared/read";
 import { gatewayPoster } from "./poster";
@@ -186,8 +189,35 @@ export interface MapoAiMagicFill {
   loadPreview(): Promise<void>;
   /** The fill underneath: its answer, its error, the fields and their marks. */
   fill: MapoAiFill;
-  /** What became of the last answer; `undefined` before one, and for a refusal. */
+  /**
+   * What became of the session's answers, with the values that wait in the
+   * preview's groups (to fill, to replace, without proof); `undefined`
+   * before an answer joins it.
+   */
   summary: ComputedRef<MapoAiFillSummary | undefined>;
+  /**
+   * Whether the preview ticks a value that waits, by its path: the
+   * operator's tick, else the preview's own, which ticks the values for
+   * empty fields the form shows. A hidden field is never ticked.
+   */
+  isSelected(path: string): boolean;
+  /**
+   * Ticks or unticks a value that waits, by its path. The tick holds for
+   * that value: a new value at the path starts from the preview's own.
+   */
+  select(path: string, selected: boolean): void;
+  /** The paths of the values that wait and are ticked now. */
+  selected: ComputedRef<string[]>;
+  /**
+   * Applies every ticked value, as Apply on its field does: into a field
+   * the form shows now, never a hidden one. The others keep waiting.
+   */
+  applySelected(): void;
+  /**
+   * Ignores every value that waits, as Ignore on its field does: their
+   * marks go. The values in the form stay.
+   */
+  ignoreWaiting(): void;
   /** A field's label, by its key, as the form names it. */
   labelOf(key: string): string;
   /** Translates a key of the `mapo.*` messages, as the app does. */
@@ -689,15 +719,100 @@ function magicFillState<T extends object>(
   // was when the answer came: the operator may have changed what hides it.
   // The session's, once an answer joined it: a later refusal or failure
   // leaves it, with Undo all, beside its message.
+  // What a field holds is read now too: the "before" of a replacement, in
+  // every language a `synci18n` value would go to.
   const summary = computed(() => {
     if (fill.rounds.value === 0) return undefined;
     return summarizeMapoAiFill(
-      fill.fields.value.map((field) => ({
-        ...field,
-        shown: fill.isShown(field.path),
-      })),
+      fill.fields.value.map((field) => {
+        const before = fill.replaced(field.path);
+        return {
+          ...field,
+          shown: fill.isShown(field.path),
+          current: before?.value,
+          ...(before?.languages ? { languages: before.languages } : {}),
+        };
+      }),
     );
   });
+
+  // ─── The preview's ticks ──────────────────────────────────────────────────
+
+  /** The values that wait, as the preview lists them. */
+  const waiting = computed(() => {
+    const found = summary.value;
+    return found
+      ? [...found.toFill, ...found.toReplace, ...found.unproven]
+      : [];
+  });
+  const preselected = computed(
+    () => new Set(summary.value ? mapoAiPreselected(summary.value) : []),
+  );
+  /**
+   * The operator's ticks, by the value they were given for: its path, its
+   * data and whether it would replace a value. A value that stops waiting
+   * takes its tick with it, at once, so a value restored or proposed anew
+   * starts from the preview's own; and a tick given to fill an empty field
+   * never replaces what an `onChange` has written there since.
+   */
+  const ticks = shallowRef<ReadonlyMap<string, boolean>>(new Map());
+  const tickOf = (path: string, value: unknown, replaces: boolean) =>
+    `${path}\u0000${replaces ? "replaces" : "fills"}\u0000${dataOf(value) ?? ""}`;
+  const tickOfItem = (item: MapoAiToConfirm) =>
+    tickOf(item.path, item.value, item.reasons.includes("replaces"));
+  watch(
+    fill.fields,
+    (list) => {
+      if (ticks.value.size === 0) return;
+      const waitingNow = new Set(
+        list.flatMap((field) => {
+          const { outcome } = field;
+          const isWaiting = !field.applied && field.review === undefined;
+          return isWaiting && outcome.status === "filled"
+            ? [tickOf(field.path, outcome.value, field.replaces)]
+            : [];
+        }),
+      );
+      const kept = [...ticks.value].filter(([tick]) => waitingNow.has(tick));
+      if (kept.length !== ticks.value.size) ticks.value = new Map(kept);
+    },
+    { flush: "sync" },
+  );
+
+  function waitingAt(path: string): MapoAiToConfirm | undefined {
+    const item = waiting.value.find((one) => one.path === path);
+    return item && !item.reasons.includes("hidden") ? item : undefined;
+  }
+
+  function isSelected(path: string): boolean {
+    const item = waitingAt(path);
+    if (!item) return false;
+    const tick = ticks.value.get(tickOfItem(item));
+    return tick ?? preselected.value.has(path);
+  }
+
+  function select(path: string, on: boolean): void {
+    const item = waitingAt(path);
+    if (!item) return;
+    ticks.value = new Map([...ticks.value, [tickOfItem(item), on]]);
+  }
+
+  const selected = computed(() =>
+    waiting.value.map((item) => item.path).filter((path) => isSelected(path)),
+  );
+
+  function applySelected(): void {
+    // A write may change what waits: another field's `onChange` can fill a
+    // field ticked as empty, whose value would now replace it. Each path is
+    // looked at again before it is applied.
+    for (const path of [...selected.value]) {
+      if (isSelected(path)) fill.apply(path);
+    }
+  }
+
+  function ignoreWaiting(): void {
+    for (const item of [...waiting.value]) fill.dismiss(item.path);
+  }
 
   function labelOf(key: string): string {
     return fieldLabel(descriptorsOf(detail), key);
@@ -725,6 +840,11 @@ function magicFillState<T extends object>(
     loadPreview,
     fill,
     summary,
+    isSelected,
+    select,
+    selected,
+    applySelected,
+    ignoreWaiting,
     labelOf,
     t,
   };

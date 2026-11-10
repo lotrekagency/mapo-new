@@ -75,13 +75,17 @@ export interface MapoAiFillSession {
   fields: MapoAiFillSessionField[];
 }
 
-const ACTIONS: ReadonlySet<string> = new Set<MapoAiFillAction>([
-  "apply",
-  "confirm",
-  "manual",
-  "discard",
-  "empty",
-]);
+/** Every action, as a record: a new one does not compile until it is named here. */
+const ACTION_NAMES: Record<MapoAiFillAction, true> = {
+  apply: true,
+  confirm: true,
+  manual: true,
+  unchanged: true,
+  discard: true,
+  empty: true,
+};
+
+const ACTIONS: ReadonlySet<string> = new Set(Object.keys(ACTION_NAMES));
 
 const REVIEWS: ReadonlySet<string> = new Set<MapoAiFillReview>([
   "kept",

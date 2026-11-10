@@ -12,6 +12,7 @@ import {
   checkMapoAiSource,
   defaultMapoAiChoice,
   isCallableProvider,
+  mapoAiPreselected,
   mapoAiProviderChoices,
   mapoAiSkipReasonKey,
   mapoAiSourceParts,
@@ -20,6 +21,10 @@ import {
   readMapoAiStatus,
   sourceChars,
   summarizeMapoAiFill,
+} from "../runtime/shared/magicFill";
+import type {
+  MapoAiFillSummary,
+  MapoAiWaitReason,
 } from "../runtime/shared/magicFill";
 import type { AiFieldOutcome } from "../runtime/shared/sanitize";
 
@@ -327,9 +332,19 @@ describe("summarizeMapoAiFill", () => {
     action: MapoAiFillEntry["action"],
     outcome: AiFieldOutcome,
     extra: Partial<
-      MapoAiFillEntry & { applied: boolean; review: MapoAiFillReview }
+      MapoAiFillEntry & {
+        applied: boolean;
+        review: MapoAiFillReview;
+        current: unknown;
+        languages: Record<string, unknown>;
+      }
     > = {},
-  ): MapoAiFillEntry & { applied: boolean; review?: MapoAiFillReview } {
+  ): MapoAiFillEntry & {
+    applied: boolean;
+    review?: MapoAiFillReview;
+    current?: unknown;
+    languages?: Record<string, unknown>;
+  } {
     return {
       key,
       path: key,
@@ -373,14 +388,13 @@ describe("summarizeMapoAiFill", () => {
       applied: 1,
       kept: 0,
       edited: 0,
-      toConfirm: [
+      toFill: [
         {
           key: "summary",
           path: "summary",
           value: "A summary",
           reasons: ["not-proven"],
         },
-        { key: "slug", path: "slug", value: "about-us", reasons: ["replaces"] },
         {
           key: "notes",
           path: "notes",
@@ -388,14 +402,24 @@ describe("summarizeMapoAiFill", () => {
           reasons: ["not-proven", "hidden"],
         },
       ],
+      toReplace: [
+        {
+          key: "slug",
+          path: "slug",
+          value: "about-us",
+          reasons: ["replaces"],
+          quote: "about-us",
+        },
+      ],
       unproven: [],
+      unchanged: 0,
       manual: 1,
       discarded: 1,
       notFound: 1,
     });
   });
 
-  it("lists a value with no quote at all apart, without repeating that nothing proves it", () => {
+  it("lists a value with no quote at all in a group of its own", () => {
     const summary = summarizeMapoAiFill([
       entry("status", "confirm", filled("review", false, false)),
       entry("notes", "confirm", filled("Read twice", false, false), {
@@ -403,11 +427,103 @@ describe("summarizeMapoAiFill", () => {
       }),
     ]);
 
-    expect(summary.toConfirm).toEqual([]);
+    expect(summary.toFill).toEqual([]);
     expect(summary.unproven).toEqual([
-      { key: "status", path: "status", value: "review", reasons: [] },
-      { key: "notes", path: "notes", value: "Read twice", reasons: ["hidden"] },
+      {
+        key: "status",
+        path: "status",
+        value: "review",
+        reasons: ["not-proven"],
+      },
+      {
+        key: "notes",
+        path: "notes",
+        value: "Read twice",
+        reasons: ["not-proven", "hidden"],
+      },
     ]);
+  });
+
+  it("lists a value that would replace one with what the field holds now, proven or not", () => {
+    const summary = summarizeMapoAiFill([
+      entry("title", "confirm", filled("Open data at ten", true), {
+        replaces: true,
+        current: "Building Admin UIs",
+      }),
+      // Nothing quoted: still a replacement first, never one apart.
+      entry("reading_time", "confirm", filled("10", false, false), {
+        replaces: true,
+        current: 8,
+      }),
+    ]);
+
+    expect(summary.toReplace).toEqual([
+      {
+        key: "title",
+        path: "title",
+        value: "Open data at ten",
+        reasons: ["replaces"],
+        quote: "Open data at ten",
+        current: "Building Admin UIs",
+      },
+      {
+        key: "reading_time",
+        path: "reading_time",
+        value: "10",
+        reasons: ["not-proven", "replaces"],
+        current: 8,
+      },
+    ]);
+    expect(summary.unproven).toEqual([]);
+  });
+
+  it("gives the other languages a synci18n value would replace, for a replacement only", () => {
+    const languages = { en: "who-we-are" };
+    const summary = summarizeMapoAiFill([
+      entry("slug", "confirm", filled("about-us", true), {
+        replaces: true,
+        current: "chi-siamo",
+        languages,
+      }),
+      entry("title", "confirm", filled("About us", false), { languages }),
+    ]);
+
+    expect(summary.toReplace[0]).toMatchObject({
+      current: "chi-siamo",
+      languages: { en: "who-we-are" },
+    });
+    expect(summary.toFill[0]).not.toHaveProperty("languages");
+  });
+
+  it("gives what a field holds only for a value that would replace it", () => {
+    const summary = summarizeMapoAiFill([
+      entry("summary", "confirm", filled("A summary", false), { current: "" }),
+    ]);
+
+    expect(summary.toFill).toEqual([
+      {
+        key: "summary",
+        path: "summary",
+        value: "A summary",
+        reasons: ["not-proven"],
+      },
+    ]);
+  });
+
+  it("counts a value the field already holds as unchanged, never as one that waits", () => {
+    const summary = summarizeMapoAiFill([
+      entry("slug", "unchanged", filled("about-us", true), {
+        current: "about-us",
+      }),
+      entry("featured", "unchanged", filled("true", false, false)),
+    ]);
+
+    expect(summary).toMatchObject({
+      unchanged: 2,
+      toFill: [],
+      toReplace: [],
+      unproven: [],
+    });
   });
 
   it("counts what the operator kept or changed as theirs, and leaves out what they ignored", () => {
@@ -433,7 +549,8 @@ describe("summarizeMapoAiFill", () => {
       applied: 1,
       kept: 1,
       edited: 1,
-      toConfirm: [],
+      toFill: [],
+      toReplace: [],
       unproven: [],
     });
   });
@@ -464,7 +581,7 @@ describe("summarizeMapoAiFill", () => {
     };
 
     expect(
-      summarizeMapoAiFill([entry("speakers", "confirm", list)]).toConfirm,
+      summarizeMapoAiFill([entry("speakers", "confirm", list)]).toFill,
     ).toEqual([
       {
         key: "speakers",
@@ -474,5 +591,35 @@ describe("summarizeMapoAiFill", () => {
         items: { total: 2, verified: 1 },
       },
     ]);
+  });
+});
+
+describe("mapoAiPreselected", () => {
+  it("ticks the values for empty fields the form shows, proven or not, and never a replacement, a value with no quote at all or a hidden field", () => {
+    const value = (path: string, reasons: MapoAiWaitReason[]) => ({
+      key: path,
+      path,
+      value: path,
+      reasons,
+    });
+    const summary: MapoAiFillSummary = {
+      applied: 0,
+      kept: 0,
+      edited: 0,
+      toFill: [
+        value("summary", ["not-proven"]),
+        value("notes", ["not-proven", "hidden"]),
+        // The form was busy as the answer came: no reason, still to fill.
+        value("excerpt", []),
+      ],
+      toReplace: [value("title", ["replaces"])],
+      unproven: [value("slug", ["not-proven"])],
+      unchanged: 0,
+      manual: 0,
+      discarded: 0,
+      notFound: 0,
+    };
+
+    expect(mapoAiPreselected(summary)).toEqual(["summary", "excerpt"]);
   });
 });

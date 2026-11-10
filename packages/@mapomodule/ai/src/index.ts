@@ -130,6 +130,7 @@ export type {
   MapoAiFillError,
   MapoAiFillField,
   MapoAiFillOptions,
+  MapoAiFillReplaced,
   MapoAiFillTarget,
 } from "./runtime/composables/useMapoAiFill";
 export type {

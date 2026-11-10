@@ -482,6 +482,60 @@ describe("planMapoAiFill", () => {
     ]);
   });
 
+  it("leaves a value the form says it already holds unchanged: nothing to write, nor to replace", () => {
+    const form: MapoAiFillForm = {
+      ...formOf({ title: "About us", slug: "home" }),
+      holds: (key, value) => key === "title" && value === "About us",
+    };
+
+    const entries = planMapoAiFill(
+      { title: filled("About us", false), slug: filled("about-us") },
+      form,
+    );
+
+    expect(entries.map((entry) => [entry.action, entry.replaces])).toEqual([
+      ["unchanged", false],
+      ["confirm", true],
+    ]);
+  });
+
+  it("asks whether the form holds a value only of a field that holds one, for a value given", () => {
+    const holds = vi.fn(() => true);
+    const form: MapoAiFillForm = { ...formOf({ status: "draft" }), holds };
+
+    const entries = planMapoAiFill(
+      {
+        title: filled("About us"),
+        status: {
+          status: "discarded",
+          reason: "not-listed",
+          proposed: "x",
+          quotes: [],
+        },
+        excerpt: { status: "empty" },
+      },
+      form,
+    );
+
+    expect(entries.map((entry) => entry.action)).toEqual([
+      "apply",
+      "discard",
+      "empty",
+    ]);
+    expect(holds).not.toHaveBeenCalled();
+  });
+
+  it("counts a related record the field already holds as unchanged, with nothing to find", () => {
+    const form: MapoAiFillForm = {
+      ...formOf({ category: { id: 3 } }),
+      holds: () => true,
+    };
+
+    const [entry] = planMapoAiFill({ category: filled({ id: 3 }) }, form);
+
+    expect(entry).toMatchObject({ action: "unchanged", replaces: false });
+  });
+
   it("leaves out a field the form does not have, or whose path leads to a prototype", () => {
     const form: MapoAiFillForm = {
       pathOf: (key) =>

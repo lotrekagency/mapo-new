@@ -3,11 +3,14 @@
  * Magic Fill above the detail's form: where a call is, with Cancel; why it
  * failed, or that the model refused; and the summary of the session, in
  * view until it ends, beside a later failure or refusal: what went into
- * the form, what the operator kept or changed, what waits for them, what
- * to set by hand, what the gateway discarded and what the AI did not find,
- * with Undo all. On a phone, where the sidebar card comes after the form,
- * and on a page that leaves out the sidebar's button, it also opens the
- * panel. The module adds it to every `MapoDetail`, with the button.
+ * the form, what the operator kept or changed, what the record already
+ * held, what to set by hand, what the gateway discarded and what the AI
+ * did not find, with Undo all. Below it, the preview of the values that
+ * wait: to fill, to replace (before and after), without proof, each with
+ * a tick, and Apply for the ticked ones. On a phone, where the sidebar
+ * card comes after the form, and on a page that leaves out the sidebar's
+ * button, it also opens the panel. The module adds it to every
+ * `MapoDetail`, with the button.
  */
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
 import {
@@ -16,7 +19,7 @@ import {
 } from "../composables/useMapoAiMagicFill";
 import type { MapoAiMagicFillDetail } from "../composables/useMapoAiMagicFill";
 import { mapoAiValueText } from "../shared/fill";
-import type { MapoAiToConfirm } from "../shared/magicFill";
+import type { MapoAiToConfirm, MapoAiWaitReason } from "../shared/magicFill";
 
 const props = defineProps<{
   /** The detail it fills: the context of `MapoDetail`, from `useMapoDetail()`. */
@@ -27,7 +30,8 @@ const props = defineProps<{
 const SLOW_AFTER_SECONDS = 20;
 
 const magic = useMapoAiMagicFill(props.detail);
-const { t, available, choices, phase, startedAt, summary, open } = magic;
+const { t, available, choices, phase, startedAt, summary, open, selected } =
+  magic;
 const { error, response, fields, rounds, answers } = magic.fill;
 const presence = joinMagicFill(magic, "banner");
 onBeforeUnmount(presence.leave);
@@ -91,46 +95,48 @@ const answeredBy = computed(() => answers.value.at(-1)?.provider);
 // Something of the AI's in the form that Undo all would put back.
 const hasApplied = computed(() => fields.value.some((field) => field.undoable));
 // The last answer joined the session and gave no field a new value, the
-// first answer included: it says so, while the session's summary stays.
+// first answer included: it says so, while the session's summary stays. A
+// value the record already held is nothing new.
 const isNothingNew = computed(() => {
   const last = rounds.value;
   const reply = response.value;
   const isJoined = reply?.status === "answered" && reply.result.readable;
   if (last === 0 || !isJoined) return false;
   const isNew = (field: (typeof fields.value)[number]) =>
-    field.round === last && field.outcome.status === "filled";
+    field.round === last &&
+    field.outcome.status === "filled" &&
+    field.action !== "unchanged";
   return !fields.value.some(isNew);
 });
-/**
- * The values that wait, in two lists: those with a quote of the source,
- * marked on their fields, and those without any (R115), listed only here.
- */
-const waiting = computed(() => {
+/** A group of the preview, and the reasons its title already says. */
+interface PreviewGroup {
+  key: "toFill" | "toReplace" | "unproven";
+  items: MapoAiToConfirm[];
+  said: MapoAiWaitReason[];
+}
+
+/** The values that wait, by the group of the preview that lists them. */
+const groups = computed<PreviewGroup[]>(() => {
   const found = summary.value;
   if (!found) return [];
-  return [
-    {
-      key: "toConfirm",
-      title: "mapo.ai.magicFill.summary.toConfirmTitle",
-      hint: "mapo.ai.magicFill.summary.toConfirmHint",
-      items: found.toConfirm,
-    },
-    {
-      key: "unproven",
-      title: "mapo.ai.magicFill.summary.unprovenTitle",
-      hint: "mapo.ai.magicFill.summary.unprovenHint",
-      items: found.unproven,
-    },
-  ].filter((group) => group.items.length > 0);
+  const all: PreviewGroup[] = [
+    { key: "toFill", items: found.toFill, said: [] },
+    { key: "toReplace", items: found.toReplace, said: ["replaces"] },
+    { key: "unproven", items: found.unproven, said: ["not-proven"] },
+  ];
+  return all.filter((group) => group.items.length > 0);
 });
 const counts = computed(() => {
   const found = summary.value;
   if (!found) return [];
+  const waiting =
+    found.toFill.length + found.toReplace.length + found.unproven.length;
   return [
     { key: "applied", n: found.applied },
     { key: "kept", n: found.kept },
     { key: "edited", n: found.edited },
-    { key: "toConfirm", n: found.toConfirm.length },
+    { key: "toConfirm", n: waiting },
+    { key: "unchanged", n: found.unchanged },
     { key: "manual", n: found.manual },
     { key: "discarded", n: found.discarded },
     { key: "notFound", n: found.notFound },
@@ -148,7 +154,7 @@ function openPanel(): void {
   open.value = true;
 }
 
-/** A value that waits, as the summary shows it: its text, or its items. */
+/** A value that waits, as the preview shows it: its text, or its items. */
 function valueText(item: MapoAiToConfirm): string {
   if (item.items) {
     return t("mapo.ai.magicFill.summary.items", {
@@ -159,15 +165,50 @@ function valueText(item: MapoAiToConfirm): string {
   return mapoAiValueText(item.value, 80);
 }
 
-function reasonsText(item: MapoAiToConfirm): string {
+/**
+ * What a replacement takes away, as the preview shows it: the field's
+ * value now, and each other language's value a `synci18n` write would
+ * replace (`en: …`). Empty when that shows nothing.
+ */
+function currentText(item: MapoAiToConfirm): string {
+  const others = Object.entries(item.languages ?? {}).map(
+    ([language, held]) => `${language}: ${heldText(held)}`,
+  );
+  return [heldText(item.current), ...others].filter(Boolean).join(" · ");
+}
+
+/** A value a field holds, as the preview shows it: its text, or how many items its list has. */
+function heldText(value: unknown): string {
+  if (!Array.isArray(value)) return mapoAiValueText(value, 80);
+  if (value.length === 0) return "";
+  const text = mapoAiValueText(value, 80);
+  return text || t("mapo.ai.fill.items", { n: value.length });
+}
+
+/** Why a value waits, but what its group's title already says. */
+function reasonsText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
   return item.reasons
+    .filter((reason) => !said.includes(reason))
     .map((reason) => t(`mapo.ai.magicFill.summary.reasons.${reason}`))
     .join(" · ");
 }
 
-/** A hidden field is never written from here: the operator would not see it go in. */
+/** What the preview says under a value: the words that prove it, and why it waits. */
+function notesText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
+  const proof = item.quote
+    ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(item.quote, 80) })
+    : "";
+  return [proof, reasonsText(item, said)].filter(Boolean).join(" · ");
+}
+
+/** A hidden field is never ticked nor written: the operator would not see it go in. */
 function canApply(item: MapoAiToConfirm): boolean {
   return !item.reasons.includes("hidden");
+}
+
+/** A tick of the checkbox: `true` when ticked, never "indeterminate" here. */
+function onTick(path: string, value: unknown): void {
+  magic.select(path, value === true);
 }
 </script>
 
@@ -279,38 +320,75 @@ function canApply(item: MapoAiToConfirm): boolean {
           {{ t(`mapo.ai.magicFill.summary.${count.key}`, { n: count.n }) }}
         </li>
       </ul>
-      <!-- TEMP(ai-magicfill-preview): the values that wait, with Apply one
-           by one; step 15's preview of the values replaces these lists. -->
-      <div v-for="group in waiting" :key="group.key" class="space-y-1">
-        <p class="font-medium">
-          {{ t(group.title) }}
-        </p>
-        <p class="text-xs text-muted">
-          {{ t(group.hint) }}
-        </p>
-        <ul class="divide-y divide-default">
-          <li
-            v-for="item in group.items"
-            :key="item.path"
-            class="flex flex-wrap items-center gap-x-2 gap-y-1 py-1"
-          >
-            <span class="font-medium">{{ magic.labelOf(item.key) }}</span>
-            <span class="min-w-0 truncate text-muted">{{
-              valueText(item)
-            }}</span>
-            <span v-if="item.reasons.length" class="text-xs text-muted">
-              {{ reasonsText(item) }}
-            </span>
-            <UButton
-              class="ms-auto"
-              size="xs"
-              variant="soft"
-              :label="t('mapo.apply')"
-              :disabled="!canApply(item)"
-              @click="magic.fill.apply(item.path)"
-            />
-          </li>
-        </ul>
+      <!-- The preview: the values that wait, by group, each with a tick.
+           Apply writes the ticked ones; the others keep waiting. -->
+      <div v-if="groups.length" class="space-y-3 border-t border-default pt-3">
+        <fieldset v-for="group in groups" :key="group.key" class="space-y-1">
+          <legend class="font-medium">
+            {{ t(`mapo.ai.magicFill.summary.${group.key}Title`) }}
+          </legend>
+          <p class="text-xs text-muted">
+            {{ t(`mapo.ai.magicFill.summary.${group.key}Hint`) }}
+          </p>
+          <ul class="divide-y divide-default">
+            <li v-for="item in group.items" :key="item.path" class="py-1.5">
+              <UCheckbox
+                :model-value="magic.isSelected(item.path)"
+                :disabled="!canApply(item)"
+                :label="magic.labelOf(item.key)"
+                :ui="{ label: 'font-medium', description: 'text-default' }"
+                @update:model-value="onTick(item.path, $event)"
+              >
+                <template #description>
+                  <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <template
+                      v-if="group.key === 'toReplace' && currentText(item)"
+                    >
+                      <span class="min-w-0 truncate text-muted line-through">{{
+                        currentText(item)
+                      }}</span>
+                      <UIcon
+                        name="i-lucide-arrow-right"
+                        class="size-3.5 shrink-0 text-muted"
+                        aria-hidden="true"
+                      />
+                      <span class="sr-only">{{
+                        t("mapo.ai.magicFill.summary.replacedBy")
+                      }}</span>
+                    </template>
+                    <span class="min-w-0 truncate">{{ valueText(item) }}</span>
+                  </span>
+                  <span
+                    v-if="notesText(item, group.said)"
+                    class="block text-xs text-muted"
+                  >
+                    {{ notesText(item, group.said) }}
+                  </span>
+                </template>
+              </UCheckbox>
+            </li>
+          </ul>
+        </fieldset>
+        <div class="flex flex-wrap justify-end gap-2">
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="outline"
+            :label="t('mapo.ai.magicFill.summary.ignoreAll')"
+            @click="magic.ignoreWaiting()"
+          />
+          <UButton
+            size="xs"
+            icon="i-lucide-check"
+            :label="
+              t('mapo.ai.magicFill.summary.applySelected', {
+                n: selected.length,
+              })
+            "
+            :disabled="selected.length === 0"
+            @click="magic.applySelected()"
+          />
+        </div>
       </div>
     </section>
 

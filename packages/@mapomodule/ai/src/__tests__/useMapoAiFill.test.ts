@@ -266,7 +266,7 @@ describe("useMapoAiFill — the answer in the form", () => {
     });
   });
 
-  it("never writes a verified value over one the form holds", async () => {
+  it("never writes a verified value over one the form holds, and says which it would replace", async () => {
     serve(answered({ title: filled("About us") }));
     const form = target({ title: "Home" });
     const ai = useMapoAiFill(form);
@@ -275,7 +275,7 @@ describe("useMapoAiFill — the answer in the form", () => {
 
     expect(form.model.value.title).toBe("Home");
     expect(form.annotations.value.title?.description).toBe(
-      'mapo.ai.fill.proposesInstead {"value":"About us"} mapo.ai.fill.proven {"quote":"Quote of About us"}',
+      'mapo.ai.fill.proposesInsteadOf {"value":"About us","current":"Home"} mapo.ai.fill.proven {"quote":"Quote of About us"}',
     );
   });
 
@@ -419,6 +419,213 @@ describe("useMapoAiFill — the answer in the form", () => {
     await useMapoAiFill(form).fill("x");
 
     expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+  });
+});
+
+describe("useMapoAiFill — a value the record already holds", () => {
+  it("leaves a value the field already holds as it is: no write, no mark, nothing to undo", async () => {
+    serve(
+      answered({
+        title: filled("About us"),
+        excerpt: filled("Ours", false),
+        subtitle: filled("Chi siamo"),
+      }),
+    );
+    const model = {
+      title: "About us",
+      excerpt: "Ours",
+      translations: { it: { subtitle: "Chi siamo" } },
+    };
+    const form = target(structuredClone(model));
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(
+      ai.fields.value.map((field) => [field.key, field.action, field.replaces]),
+    ).toEqual([
+      ["title", "unchanged", false],
+      ["excerpt", "unchanged", false],
+      ["subtitle", "unchanged", false],
+    ]);
+    expect(form.annotations.value).toEqual({});
+    ai.apply("title");
+    ai.undo();
+    expect(form.model.value).toEqual(model);
+  });
+
+  it("compares every language a synci18n value goes to", async () => {
+    const fields: AnyFieldDescriptor[] = [
+      { key: "slug", type: "text", label: "Slug", synci18n: true },
+    ];
+    const formWith = (
+      translations: Record<string, Record<string, string>>,
+    ) => ({
+      ...target({ translations }),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+      languages: computed(() => ["en", "it"]),
+    });
+    serve(answered({ slug: filled("about-us") }));
+    const everywhere = useMapoAiFill(
+      formWith({ en: { slug: "about-us" }, it: { slug: "about-us" } }),
+    );
+    const inOne = formWith({ en: { slug: "about-us" }, it: {} });
+    const once = useMapoAiFill(inOne);
+
+    await everywhere.fill("x");
+    await once.fill("x");
+
+    expect(everywhere.fields.value[0]?.action).toBe("unchanged");
+    // The write would fill the Italian slug: it waits, as a replacement
+    // the field shows nothing of in this language.
+    expect(once.fields.value[0]).toMatchObject({
+      action: "confirm",
+      replaces: true,
+    });
+    expect(inOne.annotations.value.slug?.description).toContain(
+      'mapo.ai.fill.proposesInstead {"value":"about-us"}',
+    );
+  });
+
+  it("says what a synci18n value would replace in every language", async () => {
+    serve(answered({ slug: filled("about-us") }));
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "slug",
+        type: "text",
+        label: "Slug",
+        translatable: true,
+        synci18n: true,
+      },
+    ];
+    const form = {
+      ...target({
+        translations: {
+          it: { slug: "chi-siamo" },
+          en: { slug: "who-we-are" },
+          // The AI's own value, and no value: nothing of theirs is lost.
+          fr: { slug: "about-us" },
+          de: { slug: "" },
+        },
+      }),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+      languages: computed(() => ["en", "it", "fr", "de"]),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(ai.replaced("translations.it.slug")).toEqual({
+      value: "chi-siamo",
+      languages: { en: "who-we-are" },
+    });
+    expect(form.annotations.value["translations.it.slug"]?.description).toBe(
+      'mapo.ai.fill.proposesInsteadOf {"value":"about-us","current":"chi-siamo · en: who-we-are"} mapo.ai.fill.proven {"quote":"Quote of about-us"}',
+    );
+    expect(ai.replaced("nowhere")).toBeUndefined();
+  });
+
+  it("never compares a field whose type converts its value as it stores it", async () => {
+    serve(answered({ tags: filled(["a", "b"]) }));
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "tags",
+        type: "text",
+        label: "Tags",
+        accessor: {
+          set: ({ val }) => (Array.isArray(val) ? val.join(",") : val),
+        },
+      },
+    ];
+    const form = {
+      ...target({ tags: ["a", "b"] }),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(ai.fields.value[0]).toMatchObject({
+      action: "confirm",
+      replaces: true,
+    });
+  });
+
+  it("keeps a value the AI wrote in the session to review, when a later answer gives it again", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    post.mockResolvedValueOnce(answered({ title: filled("Ten years") }));
+    await ai.fill("a file");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("another file");
+
+    expect(form.model.value.title).toBe("About us");
+    expect(ai.fields.value[0]).toMatchObject({
+      action: "confirm",
+      replaces: true,
+      undoable: true,
+      round: 3,
+    });
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.confirm");
+  });
+
+  it("counts a value the operator kept, then given again after another, as theirs", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target();
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    ai.keep("title");
+    post.mockResolvedValueOnce(answered({ title: filled("Ten years") }));
+    await ai.fill("a file");
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("another file");
+
+    expect(ai.fields.value[0]).toMatchObject({ action: "unchanged", round: 3 });
+    expect(form.annotations.value.title).toBeUndefined();
+  });
+
+  it("takes the same value again as news once the field no longer holds it", async () => {
+    const post = serve(answered({ title: filled("About us") }));
+    const form = target({ title: "About us" });
+    const ai = useMapoAiFill(form);
+    await ai.fill("a text");
+    expect(ai.fields.value[0]?.action).toBe("unchanged");
+    form.model.value.title = "";
+    await nextTick();
+    post.mockResolvedValueOnce(answered({ title: filled("About us") }));
+
+    await ai.fill("the same text");
+
+    // Verified, and the field is empty now: it goes in by itself.
+    expect(form.model.value.title).toBe("About us");
+    expect(ai.fields.value[0]).toMatchObject({
+      action: "apply",
+      applied: true,
+      round: 2,
+    });
+    expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+  });
+
+  it("follows no change of a field that already held the value, and ignores nothing there", async () => {
+    serve(answered({ title: filled("About us") }));
+    const form = target({ title: "About us" });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    form.model.value.title = "Ours";
+    await nextTick();
+    ai.dismiss();
+
+    expect(ai.fields.value[0]).toMatchObject({ action: "unchanged" });
+    expect(ai.fields.value[0]?.review).toBeUndefined();
+    expect(form.annotations.value).toEqual({});
   });
 });
 
@@ -1443,6 +1650,30 @@ describe("useMapoAiFill — the session in a draft", () => {
     again.undo();
     expect(after.model.value).toEqual({ excerpt: "Old" });
     expect(after.annotations.value).toEqual({});
+  });
+
+  it("takes back a value the field already held as such: no mark, nothing to undo", async () => {
+    serve(
+      answered({ title: filled("About us"), excerpt: filled("Ours", false) }),
+    );
+    const before = target({ title: "About us" });
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    const kept = stored(ai.snapshot());
+    expect(
+      kept.fields.find((field: { key: string }) => field.key === "title"),
+    ).toMatchObject({ action: "unchanged", replaces: false, applied: false });
+
+    const after = target();
+    Object.assign(after.model.value, stored(before.model.value));
+    const again = useMapoAiFill(after);
+    expect(again.resume(kept)).toBe(true);
+    await nextTick();
+
+    expect(again.fields.value).toEqual(ai.fields.value);
+    expect(after.annotations.value.title).toBeUndefined();
+    again.undo();
+    expect(after.model.value).toEqual({ title: "About us" });
   });
 
   it("gives the operator a value the restored form no longer holds as written", async () => {

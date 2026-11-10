@@ -12,6 +12,7 @@ import type { AiOmittedField } from "./contract";
 import type { AiSkipReason } from "./entity";
 import {
   MapoAiFillAnswerError,
+  foundQuoteOf,
   isUnprovenValue,
   mapoAiFillRequest,
 } from "./fill";
@@ -529,6 +530,19 @@ export interface MapoAiToConfirm {
   reasons: MapoAiWaitReason[];
   /** For a list: its items, and how many of them are verified. */
   items?: { total: number; verified: number };
+  /** For a verified value: the words of the source that prove it. */
+  quote?: string;
+  /**
+   * For a value that would replace one: what the field holds now, at its
+   * path, as the summary was given it. The "before" of the preview.
+   */
+  current?: unknown;
+  /**
+   * For a value written into every language (`synci18n`) that would
+   * replace one: what the other languages hold, by language, where the
+   * write would replace a different value.
+   */
+  languages?: Record<string, unknown>;
 }
 
 /** What became of the answers of a session, as the operator reads it. */
@@ -539,13 +553,24 @@ export interface MapoAiFillSummary {
   kept: number;
   /** Values the operator changed in their field: theirs now. */
   edited: number;
-  /** Values that wait for the operator's Apply, each with a quote of the source, and why they wait. */
-  toConfirm: MapoAiToConfirm[];
   /**
-   * Values the AI gave without any quote: no mark on their fields, listed
-   * apart until the operator applies one.
+   * Values for empty fields that wait for the operator: a quote of the
+   * source does not prove them, or the form hides the field. Their fields
+   * are marked.
+   */
+  toFill: MapoAiToConfirm[];
+  /**
+   * Values that would replace what their field holds, which `current`
+   * gives: the before and after of the preview. Proven or not.
+   */
+  toReplace: MapoAiToConfirm[];
+  /**
+   * Values for empty fields that the AI gave without any quote: no mark on
+   * their fields, listed apart until the operator applies one.
    */
   unproven: MapoAiToConfirm[];
+  /** Values a field already held as its own: nothing to write, nor to review. */
+  unchanged: number;
   /** Values the operator sets by hand: related records, fields that convert their values. */
   manual: number;
   /** Values the gateway discarded, never written. */
@@ -555,24 +580,33 @@ export interface MapoAiFillSummary {
 }
 
 /**
- * The summary of a session's fields, as `useMapoAiFill()` lists them. A
- * value that waits and that the operator ignored is left out, and one in
- * the form still counts as the AI's; a kept or changed value is theirs.
- * Only a value the AI gave counts as changed: a discarded one the operator
- * then wrote over stays discarded.
+ * The summary of a session's fields, as `useMapoAiFill()` lists them, each
+ * with what it holds now at its path (`current`) and in the other languages
+ * a `synci18n` value goes to (`languages`), for the values that would
+ * replace one. A value that waits and that the operator ignored is
+ * left out, and one in the form still counts as the AI's; a kept or
+ * changed value is theirs. Only a value the AI gave counts as changed: a
+ * discarded one the operator then wrote over stays discarded. A value that
+ * waits goes to one group of the preview: `toReplace` when the field holds
+ * a value, else `unproven` when the AI quoted nothing for it, else
+ * `toFill`.
  */
 export function summarizeMapoAiFill(
   fields: readonly (MapoAiFillEntry & {
     applied: boolean;
     review?: MapoAiFillReview;
+    current?: unknown;
+    languages?: Record<string, unknown>;
   })[],
 ): MapoAiFillSummary {
   const summary: MapoAiFillSummary = {
     applied: 0,
     kept: 0,
     edited: 0,
-    toConfirm: [],
+    toFill: [],
+    toReplace: [],
     unproven: [],
+    unchanged: 0,
     manual: 0,
     discarded: 0,
     notFound: 0,
@@ -584,18 +618,19 @@ export function summarizeMapoAiFill(
     else if (isChanged) summary.edited += 1;
     else if (field.applied) summary.applied += 1;
     else if (review === "ignored") continue;
+    else if (action === "unchanged") summary.unchanged += 1;
     else if (action === "manual") summary.manual += 1;
     else if (action === "discard") summary.discarded += 1;
     else if (action === "empty") summary.notFound += 1;
     else if (outcome.status === "filled") {
-      const isUnproven = isUnprovenValue(outcome);
+      const quote = outcome.verified ? foundQuoteOf(outcome) : undefined;
+      const hasCurrent = field.replaces && field.current !== undefined;
       const waiting: MapoAiToConfirm = {
         key: field.key,
         path: field.path,
         value: outcome.value,
         reasons: [
-          // A value without proof is listed as one: no reason to repeat.
-          ...(outcome.verified || isUnproven ? [] : ["not-proven" as const]),
+          ...(outcome.verified ? [] : ["not-proven" as const]),
           ...(field.replaces ? ["replaces" as const] : []),
           ...(field.shown ? [] : ["hidden" as const]),
         ],
@@ -607,9 +642,29 @@ export function summarizeMapoAiFill(
               },
             }
           : {}),
+        ...(quote !== undefined ? { quote } : {}),
+        ...(hasCurrent ? { current: field.current } : {}),
+        ...(field.replaces && field.languages
+          ? { languages: field.languages }
+          : {}),
       };
-      (isUnproven ? summary.unproven : summary.toConfirm).push(waiting);
+      if (field.replaces) summary.toReplace.push(waiting);
+      else if (isUnprovenValue(outcome)) summary.unproven.push(waiting);
+      else summary.toFill.push(waiting);
     }
   }
   return summary;
+}
+
+/**
+ * The paths of the values the preview ticks as it lists them: those for
+ * empty fields the form shows, which take no value away. A value that
+ * would replace one, or that the AI quoted nothing for, waits for the
+ * operator's own tick; a field the form hides is never ticked, nor
+ * written.
+ */
+export function mapoAiPreselected(summary: MapoAiFillSummary): string[] {
+  return summary.toFill
+    .filter((item) => !item.reasons.includes("hidden"))
+    .map((item) => item.path);
 }
