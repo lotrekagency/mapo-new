@@ -113,6 +113,11 @@ const sections = [
         desc: "The same article on a page with definePageMeta({ magicFill: false }): no button, no banner",
       },
       {
+        label: "Magic Fill, a field revealed",
+        to: "/ai/magic-fill-reveal/new",
+        desc: "The excerpt shows once the article has a status: its verified value goes in after the status",
+      },
+      {
         label: "Fill a new article",
         to: "/ai/fill/new",
         desc: "useMapoAiFill through run with the mock: verified values, marks, Apply, Undo, failures",
