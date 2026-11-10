@@ -10,16 +10,23 @@
  * @example
  * <MapoFormAnnotation :annotation="{ label: 'Imported', icon: 'i-lucide-download' }" />
  */
-import { computed } from "vue";
-import type { FieldAnnotation } from "../types/index.js";
+import { computed, nextTick } from "vue";
+import type { FieldAnnotation, FieldAnnotationAction } from "../types/index.js";
 import {
   DEFAULT_ANNOTATION_COLOR,
   DEFAULT_ANNOTATION_ICON,
 } from "../utils/annotations.js";
+import { refocusField } from "../utils/fieldFocus.js";
 
 const props = defineProps<{
   /** The mark to show: icon and color on the button, texts and actions in the popover. */
   annotation: FieldAnnotation;
+  /**
+   * The id of the field's control. After an action, a focus left on nothing
+   * goes back to the field: an action that takes the mark away, or changes
+   * the buttons, would drop it on the page. `MapoFormField` passes it.
+   */
+  field?: string;
 }>();
 
 defineSlots<{
@@ -37,6 +44,18 @@ const color = computed(
 // popper wrapper copies the z-index of its content; the dialog takes its name
 // from the label.
 const popoverUi = { content: "z-[10000]" };
+/**
+ * Runs an action, then gives the focus back to the field when the action
+ * left it on nothing: once Vue has updated, the button pressed may be gone.
+ */
+async function run(action: FieldAnnotationAction): Promise<void> {
+  const id = props.field;
+  action.onClick();
+  if (id === undefined) return;
+  await nextTick();
+  refocusField(id);
+}
+
 const popoverContent = computed(() => ({
   side: "bottom" as const,
   align: "start" as const,
@@ -74,15 +93,18 @@ const popoverContent = computed(() => ({
           </p>
         </slot>
         <div v-if="annotation.actions?.length" class="flex flex-wrap gap-2">
+          <!-- Keyed by label: when an action changes the buttons, the one
+               under the focus is never reused for another action. The index
+               keeps two actions with one label apart. -->
           <UButton
             v-for="(action, index) in annotation.actions"
-            :key="index"
+            :key="`${action.label}-${index}`"
             :label="action.label"
             :icon="action.icon"
             :color="action.color ?? 'neutral'"
             variant="soft"
             size="xs"
-            @click="action.onClick()"
+            @click="run(action)"
           />
         </div>
       </div>

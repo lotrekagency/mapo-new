@@ -97,10 +97,12 @@ const editor = useEditor({
   },
 });
 
-// Sync readonly prop → editor editable
+// Sync readonly prop → editor editable. Without an update: Tiptap's default
+// would emit the editor's own HTML, and a value only made read-only, as while
+// the record saves, would count as changed by the operator.
 watch(
   () => [props.readonly, props.disabled],
-  ([ro, dis]) => editor.value?.setEditable(!ro && !dis),
+  ([ro, dis]) => editor.value?.setEditable(!ro && !dis, false),
 );
 
 // Sync modelValue esterno → editor (es. reset dopo save)

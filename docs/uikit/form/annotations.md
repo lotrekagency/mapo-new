@@ -74,7 +74,7 @@ interface FieldAnnotationAction {
 
 `color` is a Nuxt UI color: `primary`, `secondary`, `success`, `info`, `warning`, `error`, `neutral`, or one the app adds. To give your marks a color of their own, register it in `nuxt.config.ts` (`ui.theme.colors`, keeping the default ones) and assign it in `app.config.ts` (`ui.colors`), as the [Nuxt UI design system](https://ui.nuxt.com/docs/getting-started/theme/design-system#extend-colors) explains.
 
-An action runs only its own `onClick`: to remove the mark, remove its entry from the map.
+An action runs only its own `onClick`: to remove the mark, remove its entry from the map. When the action leaves the focus on nothing, as when it takes its mark away with the button pressed, the focus goes back to the field's control; a focus the action moves elsewhere, as into a dialog it opens, stays there.
 
 ## Badges on tabs and repeater items
 
@@ -104,14 +104,18 @@ The slot `field.<key>.annotation` replaces the description, between the title an
 
 ## Custom labels
 
-The slot `field.<key>.label` replaces the whole label, mark included. It receives `annotation`, so a custom label can show the same mark with `<MapoFormAnnotation>`:
+The slot `field.<key>.label` replaces the whole label, mark included. It receives `annotation`, so a custom label can show the same mark with `<MapoFormAnnotation>`. Pass `field`, the id of the field's control (`field-<key>`), so the focus goes back to the field after an action:
 
 ```vue
 <template #field.slug.label="{ label, annotation }">
   <span class="flex items-center gap-1 text-sm font-medium">
     <UIcon name="i-lucide-link" />
     {{ label }}
-    <MapoFormAnnotation v-if="annotation" :annotation="annotation" />
+    <MapoFormAnnotation
+      v-if="annotation"
+      :annotation="annotation"
+      field="field-slug"
+    />
   </span>
 </template>
 ```

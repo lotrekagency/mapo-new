@@ -132,6 +132,7 @@ The mark of an annotated field: a small button with the annotation's icon and co
 | Prop         | Type              | Default        | Description                                                                       |
 | ------------ | ----------------- | -------------- | --------------------------------------------------------------------------------- |
 | `annotation` | `FieldAnnotation` | — **required** | The mark to show: icon and color on the button, texts and actions in the popover. |
+| `field`      | `string`          | —              | The id of the field's control, where an action that drops the focus returns it.   |
 
 ### Slots
 

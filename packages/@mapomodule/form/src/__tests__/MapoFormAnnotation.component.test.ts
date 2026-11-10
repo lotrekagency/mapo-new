@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { h, onUnmounted } from "vue";
+import { h, nextTick, onUnmounted, shallowRef } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoFormAnnotation from "../runtime/components/MapoFormAnnotation.vue";
 import type { FieldAnnotation } from "../runtime/types/index.js";
+import { refocusField } from "../runtime/utils/fieldFocus.js";
+
+// The focus is the browser's: the test sees when the mark gives it back.
+vi.mock("../runtime/utils/fieldFocus.js", () => ({
+  refocusField: vi.fn(() => true),
+}));
 import {
   createApp,
   findAll,
@@ -79,10 +85,11 @@ let app: App<HeadlessNode> | undefined;
 function mountAnnotation(
   annotation: FieldAnnotation,
   slots: Record<string, (bindings: never) => VNode[]> = {},
+  extra: { field?: string } = {},
 ) {
   const root = headlessNode();
   const host: Component = {
-    render: () => h(MapoFormAnnotation, { annotation }, slots),
+    render: () => h(MapoFormAnnotation, { annotation, ...extra }, slots),
   };
   app = createApp(host);
   app.component("UPopover", UPopover);
@@ -98,6 +105,7 @@ const dots = (root: HeadlessNode) =>
 afterEach(() => {
   app?.unmount();
   app = undefined;
+  vi.mocked(refocusField).mockClear();
 });
 
 describe("MapoFormAnnotation", () => {
@@ -147,6 +155,75 @@ describe("MapoFormAnnotation", () => {
     ]);
     actions[0]?.click();
     expect(confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the focus back to its field once an action ran and Vue updated", async () => {
+    // Keep takes the mark away with the button pressed: the browser would
+    // drop the focus on the page.
+    const steps: string[] = [];
+    vi.mocked(refocusField).mockImplementation((id) => {
+      steps.push(`refocus ${id}`);
+      return true;
+    });
+    mountAnnotation(
+      {
+        label: "Filled by the AI",
+        actions: [{ label: "Keep", onClick: () => steps.push("keep") }],
+      },
+      {},
+      { field: "field-title" },
+    );
+
+    buttons.find((button) => button.label === "Keep")?.click();
+    expect(steps).toEqual(["keep"]);
+    await nextTick();
+
+    expect(steps).toEqual(["keep", "refocus field-title"]);
+  });
+
+  it("leaves the focus alone when it knows no field", async () => {
+    mountAnnotation({
+      label: "Note",
+      actions: [{ label: "Done", onClick: vi.fn() }],
+    });
+
+    buttons.find((button) => button.label === "Done")?.click();
+    await nextTick();
+
+    expect(refocusField).not.toHaveBeenCalled();
+  });
+
+  it("keeps two actions with one label apart when the actions change", async () => {
+    // An app's own mark may repeat a label: Vue warns about duplicate keys
+    // when it patches the buttons, and may reuse one for another action.
+    const action = (label: string) => ({ label, onClick: vi.fn() });
+    const annotation = shallowRef<FieldAnnotation>({
+      label: "Note",
+      actions: ["Apply", "Open", "Open", "Ignore"].map(action),
+    });
+    const warnings: string[] = [];
+    const host: Component = {
+      render: () => h(MapoFormAnnotation, { annotation: annotation.value }),
+    };
+    app = createApp(host);
+    app.config.warnHandler = (message) => {
+      warnings.push(message);
+    };
+    app.component("UPopover", UPopover);
+    app.component("UButton", UButton);
+    app.mount(headlessNode());
+
+    const actions = ["Restore", "Open", "Open", "Done"].map(action);
+    annotation.value = { label: "Note", actions };
+    await nextTick();
+
+    expect(warnings.filter((one) => one.includes("Duplicate keys"))).toEqual(
+      [],
+    );
+    const labels = buttons.flatMap((button) =>
+      typeof button.label === "string" ? [button.label] : [],
+    );
+    expect(labels.sort()).toEqual(["Done", "Open", "Open", "Restore"]);
   });
 
   it("names the popover and lifts it above the expand panel and the focus portal", () => {

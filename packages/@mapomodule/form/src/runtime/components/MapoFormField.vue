@@ -260,7 +260,11 @@ function toggleExpand() {
         <span v-if="descriptor.required" class="text-red-500" aria-hidden="true"
           >*</span
         >
-        <MapoFormAnnotation v-if="annotation" :annotation="annotation">
+        <MapoFormAnnotation
+          v-if="annotation"
+          :annotation="annotation"
+          :field="fieldId"
+        >
           <template
             v-if="$slots[`field.${descriptor.key as string}.annotation`]"
             #body
