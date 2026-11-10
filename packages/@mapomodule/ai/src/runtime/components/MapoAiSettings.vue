@@ -12,6 +12,7 @@
 import { onMounted, shallowRef } from "vue";
 import { useSettingsClient } from "../composables/settingsClient";
 import type { MapoAiStatus } from "../shared/gateway";
+import { readMapoAiStatus } from "../shared/magicFill";
 import MapoAiSettingsActions from "./MapoAiSettingsActions.vue";
 import MapoAiSettingsBehaviour from "./MapoAiSettingsBehaviour.vue";
 import MapoAiSettingsKeys from "./MapoAiSettingsKeys.vue";
@@ -24,11 +25,22 @@ const status = shallowRef<MapoAiStatus>();
 const failure = shallowRef<string>();
 const loading = shallowRef(true);
 
-/** Asks `status` again: after a change, what the user gets may change too. */
+/**
+ * Asks `status` again: after a change, what the user gets may change too.
+ * The answer is outside data, read as Magic Fill reads it: one that cannot
+ * be read fails like a request that fails.
+ */
 async function load(): Promise<void> {
   loading.value = true;
   try {
-    status.value = await client.call<MapoAiStatus>("/_mapo/ai/status");
+    const read = readMapoAiStatus(
+      await client.call<unknown>("/_mapo/ai/status"),
+    );
+    if (!read) {
+      failure.value = t("mapo.ai.errors.badAnswer");
+      return;
+    }
+    status.value = read;
     failure.value = undefined;
   } catch (error) {
     failure.value = client.failureOf(error);
