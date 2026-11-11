@@ -1456,6 +1456,42 @@ describe("useMapoAiFill — the session across answers", () => {
     expect(ai.fields.value[0]).toMatchObject({ undoable: false });
   });
 
+  it("lets a verified value wait, as a replacement, when another field's onChange filled its field first", async () => {
+    serve(answered({ title: filled("About us"), slug: filled("about") }));
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "title",
+        type: "text",
+        label: "Title",
+        onChange: ({ model, val }) => {
+          model.slug = String(val).toLowerCase().replace(/\s+/g, "-");
+        },
+      },
+      { key: "slug", type: "text", label: "Slug" },
+    ];
+    const form = {
+      ...target(),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+    await nextTick();
+
+    // The slug the title's onChange made stays until the operator applies.
+    expect(form.model.value).toEqual({ title: "About us", slug: "about-us" });
+    const slug = ai.fields.value.find((one) => one.key === "slug");
+    expect(slug).toMatchObject({ applied: false, replaces: true });
+    expect(form.annotations.value.slug?.description).toContain(
+      "mapo.ai.fill.proposesInsteadOf",
+    );
+    ai.apply("slug");
+    expect(form.model.value.slug).toBe("about");
+    ai.restore("slug");
+    expect(form.model.value.slug).toBe("about-us");
+  });
+
   it("keeps waiting a field another field's onChange writes into: no change of the operator's", async () => {
     serve(
       answered({ title: filled("About us"), slug: filled("about", false) }),

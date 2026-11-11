@@ -489,7 +489,15 @@ export function useMapoAiFill<T extends object>(
       for (const [key, found] of located) targets.set(key, found);
       const { joined, renewed } = join(answer.entries, rounds.value);
       for (const path of joined) {
-        if (fieldAt(path)?.action === "apply") write(path);
+        const field = fieldAt(path);
+        if (field?.action !== "apply") continue;
+        // An earlier write's onChange may have filled the field since the
+        // plan found it empty: its value then waits, as a replacement the
+        // operator sees before and after. A list's items go after what the
+        // onChange put there.
+        const isFilledSince = !isItemList(field.outcome) && holdsValue(field);
+        if (isFilledSince) setField(path, { action: "confirm" });
+        else write(path);
       }
       promoteRevealed(rounds.value);
       const reworded = retakeWaiting();
