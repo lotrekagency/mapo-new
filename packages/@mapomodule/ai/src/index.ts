@@ -37,6 +37,7 @@ export type {
   MapoAiProviderStatus,
   MapoAiReaderStatus,
   MapoAiReadResponse,
+  MapoAiRefusalReason,
   MapoAiRunEntity,
   MapoAiRunPreviewResponse,
   MapoAiRunRequest,

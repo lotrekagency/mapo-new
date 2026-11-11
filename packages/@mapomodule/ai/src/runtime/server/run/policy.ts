@@ -15,6 +15,7 @@ import type {
   MapoAiKeyStatus,
   MapoAiPreference,
   MapoAiProviderStatus,
+  MapoAiRefusalReason,
   MapoAiRunRequest,
 } from "../../shared/gateway";
 import type { MapoAiProvider } from "../providers/types";
@@ -154,7 +155,8 @@ function preferredOf(
  * The provider and model a request gets.
  * @throws H3Error 503 when no provider is usable, or the one asked needs a
  *   key and no level has one; 403 when the request names a provider or a
- *   model the app does not enable for the user
+ *   model the app does not enable for the user. `data.reason` says which
+ *   ({@link MapoAiRefusalReason}).
  */
 export function chooseProvider(
   policy: MapoAiPolicy,
@@ -166,6 +168,7 @@ export function chooseProvider(
     throw createError({
       statusCode: 503,
       statusMessage: "No AI provider is enabled",
+      data: { reason: "no-provider" satisfies MapoAiRefusalReason },
     });
   }
   const id = requested?.id ?? defaults.provider;
@@ -174,6 +177,7 @@ export function chooseProvider(
     throw createError({
       statusCode: 403,
       statusMessage: "This AI provider is not enabled",
+      data: { reason: "provider-off" satisfies MapoAiRefusalReason },
     });
   }
   const isDefaultProvider = id === defaults.provider;
@@ -184,12 +188,14 @@ export function chooseProvider(
     throw createError({
       statusCode: 403,
       statusMessage: "This AI model is not enabled",
+      data: { reason: "model-off" satisfies MapoAiRefusalReason },
     });
   }
   if (!canCall(usable)) {
     throw createError({
       statusCode: 503,
       statusMessage: "This AI provider has no key",
+      data: { reason: "no-key" satisfies MapoAiRefusalReason },
     });
   }
   return { usable, model };

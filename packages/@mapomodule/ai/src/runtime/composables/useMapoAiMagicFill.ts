@@ -75,6 +75,12 @@ export interface MapoAiMagicFillDetail<
     ): () => void;
     touch(): void;
   };
+  /**
+   * Takes the operator to a field, as the context of `MapoDetail` does:
+   * its tab, group and item open, and its control takes the focus. Without
+   * it, Magic Fill offers no "Next to check".
+   */
+  revealField?: (path: string) => Promise<boolean>;
 }
 
 /** The part of the page's draft that holds Magic Fill's session. */
@@ -186,6 +192,20 @@ export interface MapoAiMagicFill {
    * kept or changed stay.
    */
   undoAll(): void;
+  /**
+   * The paths of the marks that wait for the operator, in the order of the
+   * form: what "Next to check" goes through.
+   */
+  toCheck: Readonly<Ref<readonly string[]>>;
+  /** The page can take the operator to a field: "Next to check" works. */
+  canReveal: boolean;
+  /**
+   * Takes the operator to the next mark that waits for them, after the one
+   * it took them to last, in the order of the form, and from the first
+   * again after the last: its tab, group and item open, and its field
+   * takes the focus. Resolves whether a field took it.
+   */
+  nextToCheck(): Promise<boolean>;
   /** What "What I send to the AI" shows, after `loadPreview()`, and whether it is stale. */
   preview: Readonly<Ref<MapoAiMagicFillPreview>>;
   /** Asks the gateway what a call would send now: `run/preview`, which calls no provider. */
@@ -638,6 +658,9 @@ function magicFillState<T extends object>(
       // An answer or a refusal: the banner shows it, the panel closes.
       const isAnswered = fill.error.value === undefined;
       if (isAnswered) open.value = false;
+      // A key or a model taken away meanwhile: the panel lists what the
+      // user may call now.
+      if (fill.error.value?.reason) void refresh();
     } finally {
       if (own === call) {
         phase.value = "idle";
@@ -651,6 +674,19 @@ function magicFillState<T extends object>(
     fill.cancel();
     phase.value = "idle";
     startedAt.value = undefined;
+  }
+
+  // ─── Next to check ────────────────────────────────────────────────────────
+
+  /** The mark the operator was taken to last: the next one follows it. */
+  let lastChecked: string | undefined;
+
+  async function nextToCheck(): Promise<boolean> {
+    const path = fill.nextToCheck(lastChecked);
+    const reveal = detail.revealField;
+    if (path === undefined || !reveal) return false;
+    lastChecked = path;
+    return reveal(path);
   }
 
   // ─── What I send to the AI ────────────────────────────────────────────────
@@ -723,10 +759,9 @@ function magicFillState<T extends object>(
       asked.value = { state: "ready", answer };
     } catch (error) {
       if (previewing !== own) return;
-      asked.value = {
-        state: "failed",
-        error: mapoAiFillErrorOf(error, t).message,
-      };
+      const failure = mapoAiFillErrorOf(error, t);
+      asked.value = { state: "failed", error: failure.message };
+      if (failure.reason) void refresh();
     }
   }
 
@@ -754,11 +789,13 @@ function magicFillState<T extends object>(
     return summarizeMapoAiFill(
       fill.fields.value.map((field) => {
         const before = fill.replaced(field.path);
+        const adds = fill.recordsToAdd(field.path);
         return {
           ...field,
           shown: fill.isShown(field.path),
           current: before?.value,
           ...(before?.languages ? { languages: before.languages } : {}),
+          ...(adds ? { adds } : {}),
         };
       }),
       { evidence: entityOf().evidence !== false },
@@ -937,6 +974,9 @@ function magicFillState<T extends object>(
     extract,
     cancel,
     undoAll: () => fill.undo(),
+    toCheck: fill.toCheck,
+    canReveal: detail.revealField !== undefined,
+    nextToCheck,
     preview,
     loadPreview,
     fill,

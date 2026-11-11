@@ -595,6 +595,12 @@ export interface MapoAiToConfirm {
    * write would replace a different value.
    */
   languages?: Record<string, unknown>;
+  /**
+   * For a list of related records that joins the field's own: the records
+   * it would add, as the field saves them, those the field holds left out.
+   * The preview names these, and counts the others as already in.
+   */
+  adds?: unknown[];
 }
 
 /** What became of the answers of a session, as the operator reads it. */
@@ -644,7 +650,9 @@ export interface MapoAiFillSummary {
  * waits goes to one group of the preview: `toReplace` when the field holds
  * a value it would replace (never a list of items), else `unproven` when
  * the AI quoted nothing for it, else `toFill`. With `evidence: false`, the
- * page asked for no quotes: no value is `unproven`.
+ * page asked for no quotes: no value is `unproven`. A list of related
+ * records names in `adds` the records it would add (`recordsToAdd()` of
+ * `useMapoAiFill()`), when the field holds some.
  */
 export function summarizeMapoAiFill(
   fields: readonly (MapoAiFillEntry & {
@@ -652,6 +660,7 @@ export function summarizeMapoAiFill(
     review?: MapoAiFillReview;
     current?: unknown;
     languages?: Record<string, unknown>;
+    adds?: unknown[];
   })[],
   options: { evidence?: boolean } = {},
 ): MapoAiFillSummary {
@@ -720,6 +729,7 @@ export function summarizeMapoAiFill(
         ...(field.replaces && field.languages
           ? { languages: field.languages }
           : {}),
+        ...(isRecordList(outcome) && field.adds ? { adds: field.adds } : {}),
       };
       // Without quotes asked, a value without any is no proposal without
       // proof: it waits to fill, as any value no quote proves.

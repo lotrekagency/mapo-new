@@ -541,6 +541,20 @@ export interface MapoAiDefaults {
   models: { fill: string; extract: string };
 }
 
+/**
+ * Why `run` refuses a request before it calls a provider, in `data.reason`
+ * of its answer: no provider is enabled (503, `no-provider`), the provider
+ * or the model asked is not given to the user (403, `provider-off`,
+ * `model-off`), or no level has a key for the provider (503, `no-key`).
+ * What the user may call has changed since the page asked `status`: a
+ * page asks it again.
+ */
+export type MapoAiRefusalReason =
+  | "no-provider"
+  | "provider-off"
+  | "model-off"
+  | "no-key";
+
 /** The limits of `run` and `read`, from `mapo.ai.limits`. */
 export interface MapoAiLimits {
   /** Calls to `run` one user may make in a minute, in one server process. */

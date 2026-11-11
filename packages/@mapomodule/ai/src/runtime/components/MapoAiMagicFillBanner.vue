@@ -99,6 +99,8 @@ const isUnreadable = computed(
 const answeredBy = computed(() => answers.value.at(-1)?.provider);
 // Something of the AI's in the form that Undo all would put back.
 const hasApplied = computed(() => fields.value.some((field) => field.undoable));
+// The marks that wait for the operator: "Next to check" takes them there.
+const toCheckCount = computed(() => magic.toCheck.value.length);
 // The last answer joined the session and gave no field a new value, the
 // first answer included: it says so, while the session's summary stays. A
 // value the record already held is nothing new.
@@ -170,7 +172,15 @@ function valueText(item: MapoAiToConfirm): string {
       total: item.items.total,
     });
   }
-  return mapoAiValueText(magic.fill.textOf(item.path, item.value), 80);
+  // A list of records names those it adds, not those the field holds.
+  const shown = item.adds ?? item.value;
+  return mapoAiValueText(magic.fill.textOf(item.path, shown), 80);
+}
+
+/** How many records of the AI's list the field holds already. */
+function heldRecords(item: MapoAiToConfirm): number {
+  const proposed = Array.isArray(item.value) ? item.value.length : 0;
+  return item.adds ? Math.max(proposed - item.adds.length, 0) : 0;
 }
 
 /**
@@ -220,13 +230,17 @@ function notesText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
   const joins = isJoining
     ? t("mapo.ai.magicFill.summary.addsTo", { n: own })
     : "";
+  const held = heldRecords(item);
+  const alreadyIn = held
+    ? t("mapo.ai.magicFill.summary.recordsHeld", { n: held })
+    : "";
   const records = recordNotes(item);
   const told: MapoAiWaitReason[] = item.list ? [...said, "not-proven"] : said;
   // The records' own notes say what these reasons would.
   const quiet: MapoAiWaitReason[] = records.length
     ? [...told, "renamed", "to-pick"]
     : told;
-  return [proof, joins, ...records, reasonsText(item, quiet)]
+  return [proof, joins, alreadyIn, ...records, reasonsText(item, quiet)]
     .filter(Boolean)
     .join(" · ");
 }
@@ -316,7 +330,7 @@ function onItemTick(path: string, index: number, value: unknown): void {
     >
       <UIcon
         name="i-lucide-loader-circle"
-        class="size-4 animate-spin text-primary"
+        class="size-4 animate-spin text-primary motion-reduce:animate-none"
         aria-hidden="true"
       />
       <span class="flex-1">{{ phaseText }}</span>
@@ -387,6 +401,17 @@ function onItemTick(path: string, index: number, value: unknown): void {
           </span>
         </div>
         <div class="flex flex-wrap gap-2">
+          <UButton
+            v-if="magic.canReveal && toCheckCount > 0"
+            size="xs"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-locate-fixed"
+            :label="
+              t('mapo.ai.magicFill.summary.nextToCheck', { n: toCheckCount })
+            "
+            @click="magic.nextToCheck()"
+          />
           <UButton
             v-if="hasApplied"
             size="xs"

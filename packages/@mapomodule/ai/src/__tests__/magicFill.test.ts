@@ -815,6 +815,45 @@ describe("the preview of related records", () => {
     ]).toFill;
 
     expect(tags).toMatchObject({ value: [3], current: [9], reasons: [] });
+    expect(tags).not.toHaveProperty("adds");
+  });
+
+  it("names, for a list of records, the records it would add, those the field holds left out", () => {
+    const [tags] = summarizeMapoAiFill([
+      {
+        ...waiting(
+          "tags",
+          {
+            status: "filled",
+            value: [{ search: "City" }, { search: "Culture" }],
+            verified: true,
+            quotes: [],
+          },
+          [
+            {
+              at: "0",
+              name: "City",
+              status: "found",
+              id: 3,
+              value: 3,
+              label: "City",
+            },
+            {
+              at: "1",
+              name: "Culture",
+              status: "found",
+              id: 2,
+              value: 2,
+              label: "Culture",
+            },
+          ],
+        ),
+        current: [3],
+        adds: [2],
+      },
+    ]).toFill;
+
+    expect(tags).toMatchObject({ value: [3, 2], current: [3], adds: [2] });
   });
 
   it("ticks an item of a list only when every record it names was found with the AI's name", () => {

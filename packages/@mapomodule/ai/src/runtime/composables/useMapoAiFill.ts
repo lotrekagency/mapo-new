@@ -48,7 +48,7 @@ import type {
   MapoAiFillReview,
   MapoAiModelWrite,
 } from "../shared/fill";
-import type { MapoAiSourcePart } from "../shared/gateway";
+import type { MapoAiRefusalReason, MapoAiSourcePart } from "../shared/gateway";
 import { isRecord } from "../shared/guards";
 import {
   MAPO_AI_FILL_SESSION_FORMAT,
@@ -197,6 +197,12 @@ export interface MapoAiFillError {
   message: string;
   /** Seconds to wait before trying again, when the gateway says. */
   retryAfter?: number;
+  /**
+   * Why the gateway refused before calling a provider, when it says: what
+   * the user may call changed since the page asked `status`, which a page
+   * asks again.
+   */
+  reason?: MapoAiRefusalReason;
 }
 
 /** What `useMapoAiFill()` returns. */
@@ -286,6 +292,28 @@ export interface MapoAiFill {
    * a rich text's words, a list's values, or how many items a list has.
    */
   textOf(path: string, value: unknown): string;
+  /**
+   * For a list of related records of the session, by its path: the
+   * records a write would add after the field's own, as the field saves
+   * them, those it holds left out; `[]` when it holds them all.
+   * `undefined` for a path that is no such list.
+   */
+  recordsToAdd(path: string): unknown[] | undefined;
+  /**
+   * The paths of the marks that wait for the operator, in the order of the
+   * form (the body's fields, then the sidebar's, the items of a list by
+   * their place): a value to apply, a record to pick, a value to set by
+   * hand, inside an item too. Not a value already in the form, unless a
+   * record of it is still to pick, nor a discarded one.
+   */
+  toCheck: Readonly<Ref<readonly string[]>>;
+  /**
+   * The next mark to check after `after`, in the order of `toCheck`, for a
+   * button that takes the operator from one to the next: the first one
+   * when none follows, or without `after`; `undefined` when none waits.
+   * `after` may have stopped waiting meanwhile.
+   */
+  nextToCheck(after?: string): string | undefined;
   /** A call is waiting for its answer. */
   pending: Readonly<Ref<boolean>>;
   /** Why the last call got no answer. */
@@ -390,6 +418,20 @@ const ERROR_MESSAGES: Readonly<Record<number, string>> = {
 const FAILURE_MESSAGES: ReadonlyMap<string, string> = new Map([
   ["truncated", "cutOff"],
   ["too-long", "tooLongForModel"],
+  // A refusal of the provider's own rules: trying again changes nothing.
+  ["refused-request", "providerRefused"],
+]);
+
+/**
+ * The message of a refusal of the gateway before any call, by its
+ * `data.reason`: a key or a model taken away while the page was open is no
+ * reason to try again later, as a plain 503 or 403 would say.
+ */
+const REFUSAL_MESSAGES: ReadonlyMap<MapoAiRefusalReason, string> = new Map([
+  ["no-provider", "noProvider"],
+  ["no-key", "noKey"],
+  ["provider-off", "modelOff"],
+  ["model-off", "modelOff"],
 ]);
 
 /** Messages that can say how long to wait, as `<message>In`. */
@@ -1190,6 +1232,14 @@ export function useMapoAiFill<T extends object>(
     };
   }
 
+  function recordsToAdd(path: string): unknown[] | undefined {
+    const field = fieldAt(path);
+    if (!field || !isRecordList(field.outcome)) return undefined;
+    const planned = recordsWith(field);
+    const records = Array.isArray(planned?.value) ? planned.value : [];
+    return records.slice(planned?.own ?? records.length);
+  }
+
   /** The form shows a field of the answer now: its predicates on the model as it is. */
   function shownNow(path: string): boolean {
     const field = fieldAt(path);
@@ -1596,15 +1646,18 @@ export function useMapoAiFill<T extends object>(
   }
 
   /**
-   * The mark of a field: what the AI proposed for it, and what the operator
-   * can do. A field whose value has parts (`seo.title`, `seo.description`)
-   * gets one mark, at the field, that tells each part.
+   * The fields a mark tells of, and how they stand. A field the operator
+   * decided has no mark, nor one that already held the value, and neither
+   * does a value with no quote at all while it waits: it is listed apart.
+   * A record to pick or to set by hand keeps its mark, the only place that
+   * says so.
    */
-  function markOf(markPath: string): FieldAnnotation | undefined {
-    // A field the operator decided has no mark, nor one that already held
-    // the value, and neither does a value with no quote at all while it
-    // waits: it is listed apart. A record to pick or to set by hand keeps
-    // its mark, the only place that says so.
+  function markGroupOf(markPath: string): {
+    group: MapoAiFillField[];
+    waiting: MapoAiFillField[];
+    applied: MapoAiFillField[];
+    manual: MapoAiFillField[];
+  } {
     const group = fields.value.filter(
       (field) =>
         markPathOf(field) === markPath &&
@@ -1616,15 +1669,93 @@ export function useMapoAiFill<T extends object>(
           isWithoutProofs() ||
           relationLines(field).length > 0),
     );
-    if (!group.length) return undefined;
-    const waiting = group.filter(
-      (field) =>
-        !field.applied &&
-        (field.action === "apply" || field.action === "confirm"),
+    return {
+      group,
+      waiting: group.filter(
+        (field) =>
+          !field.applied &&
+          (field.action === "apply" || field.action === "confirm"),
+      ),
+      applied: group.filter((field) => field.applied),
+      manual: group.filter((field) => field.action === "manual"),
+    };
+  }
+
+  /**
+   * Whether a mark waits for the operator: a value to apply, a record to
+   * pick, a value to set by hand, inside an item too. Not a value in the
+   * form, unless a record of it is still to pick, nor a discarded one.
+   */
+  function asksOperator(markPath: string): boolean {
+    if (nestedAt(markPath)) return relationMarkOf(markPath) !== undefined;
+    const { group, waiting, applied, manual } = markGroupOf(markPath);
+    if (!group.length) return false;
+    // In the order of `markOf()`: a value in the form wins over the record
+    // to pick it came from, once picked.
+    if (waiting.length > 0) return true;
+    if (applied.length > 0) return pickAt(markPath) !== undefined;
+    return manual.length > 0;
+  }
+
+  /**
+   * Where a path sits in the form, to sort marks as the operator meets
+   * them: its field's place among the body's and the sidebar's fields,
+   * then the item's place in a list, then the path itself.
+   */
+  function formPlaceOf(markPath: string): [number, number, string] {
+    const descriptors: readonly AnyFieldDescriptor<T>[] = [
+      ...target.fields.value,
+      ...(target.sidebarFields?.value ?? []),
+    ];
+    // The field of the session the mark tells of: its own, or the list
+    // that holds the item a record to pick is in.
+    const owner =
+      nestedAt(markPath)?.field ??
+      fields.value.find((field) => markPathOf(field) === markPath);
+    const descriptor = owner ? targets.get(owner.key)?.descriptor : undefined;
+    const place = descriptor ? descriptors.indexOf(descriptor) : -1;
+    const isInside =
+      owner !== undefined && markPath.startsWith(`${owner.path}.`);
+    const rest = isInside ? markPath.slice(owner.path.length + 1) : "";
+    const item = Number.parseInt(rest, 10);
+    return [
+      place >= 0 ? place : descriptors.length,
+      Number.isNaN(item) ? -1 : item,
+      markPath,
+    ];
+  }
+
+  function compareFormPlaces(a: string, b: string): number {
+    const [fieldA, itemA, pathA] = formPlaceOf(a);
+    const [fieldB, itemB, pathB] = formPlaceOf(b);
+    if (fieldA !== fieldB) return fieldA - fieldB;
+    if (itemA !== itemB) return itemA - itemB;
+    return pathA.localeCompare(pathB);
+  }
+
+  const toCheck = computed<string[]>(() => {
+    const paths = new Set(fields.value.flatMap(markPathsOf));
+    return [...paths].filter(asksOperator).sort(compareFormPlaces);
+  });
+
+  function nextToCheck(after?: string): string | undefined {
+    const paths = toCheck.value;
+    if (after === undefined) return paths[0];
+    const next = paths.find(
+      (path) => path !== after && compareFormPlaces(path, after) > 0,
     );
-    const applied = group.filter((field) => field.applied);
+    return next ?? paths.find((path) => path !== after) ?? paths[0];
+  }
+
+  /**
+   * The mark of a field: what the AI proposed for it, and what the operator
+   * can do. A field whose value has parts (`seo.title`, `seo.description`)
+   * gets one mark, at the field, that tells each part.
+   */
+  function markOf(markPath: string): FieldAnnotation | undefined {
+    const { group, waiting, applied, manual } = markGroupOf(markPath);
+    if (!group.length) return undefined;
     const undoable = group.filter((field) => field.undoable);
-    const manual = group.filter((field) => field.action === "manual");
     const isWaiting = waiting.length > 0;
     const isApplied = applied.length > 0;
     const isManual = manual.length > 0;
@@ -2092,6 +2223,9 @@ export function useMapoAiFill<T extends object>(
     isShown: shownNow,
     replaced,
     textOf,
+    recordsToAdd,
+    toCheck,
+    nextToCheck,
     pending,
     error,
     response,
@@ -2248,19 +2382,37 @@ export function mapoAiFillErrorOf(
   }
   const status = statusOf(failure);
   const retryAfter = retryAfterOf(failure);
+  const reason = refusalReasonOf(failure);
   // `$fetch` rejects with a `FetchError`; one without a status got no answer.
   const isFetchFailure = isRecord(failure) && failure.name === "FetchError";
   const unanswered = isFetchFailure ? "network" : "failed";
   const known =
-    FAILURE_MESSAGES.get(failureNameOf(failure)) ?? ERROR_MESSAGES[status];
+    FAILURE_MESSAGES.get(failureNameOf(failure)) ??
+    (reason ? REFUSAL_MESSAGES.get(reason) : undefined) ??
+    ERROR_MESSAGES[status];
   const name = status === 0 ? unanswered : (known ?? "failed");
   const saysWhen = retryAfter !== undefined && WAITING_MESSAGES.has(name);
   const message = t(`mapo.ai.errors.${saysWhen ? `${name}In` : name}`, {
     seconds: retryAfter,
   });
-  return retryAfter === undefined
-    ? { status, message }
-    : { status, message, retryAfter };
+  return {
+    status,
+    message,
+    ...(retryAfter !== undefined ? { retryAfter } : {}),
+    ...(reason ? { reason } : {}),
+  };
+}
+
+/** The reason the gateway gives a refusal before any call, in the answer's `data`. */
+function refusalReasonOf(failure: unknown): MapoAiRefusalReason | undefined {
+  const body = isRecord(failure) ? failure.data : undefined;
+  const data = isRecord(body) ? body.data : undefined;
+  const reason = isRecord(data) ? data.reason : undefined;
+  return isRefusalReason(reason) ? reason : undefined;
+}
+
+function isRefusalReason(value: unknown): value is MapoAiRefusalReason {
+  return [...REFUSAL_MESSAGES.keys()].some((reason) => reason === value);
 }
 
 /** The status code of a failed call, as `$fetch` rejects it; `0` without one. */

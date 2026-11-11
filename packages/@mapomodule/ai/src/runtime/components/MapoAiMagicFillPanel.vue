@@ -197,7 +197,11 @@ function close(): void {
               <UIcon
                 :name="fileIcon(file)"
                 class="size-4 shrink-0"
-                :class="file.state === 'reading' ? 'animate-spin' : ''"
+                :class="
+                  file.state === 'reading'
+                    ? 'animate-spin motion-reduce:animate-none'
+                    : ''
+                "
                 aria-hidden="true"
               />
               <span class="min-w-0 flex-1 truncate">{{ file.name }}</span>

@@ -11,6 +11,7 @@ import {
   policyOf,
   providerStatuses,
 } from "../runtime/server/run/policy";
+import type { MapoAiPolicy } from "../runtime/server/run/policy";
 
 function provider(id: string, models?: string[]): MapoAiProvider {
   return {
@@ -183,7 +184,49 @@ describe("chooseProvider", () => {
 
     expect(refusal(() => chooseProvider(none, "fill", undefined))).toBe(503);
   });
+
+  it("names the reason of each refusal in its data, for the page to tell", () => {
+    const { policy: none } = policy({});
+    // A provider that needs a key, and no level gives the user one.
+    const keyless: MapoAiPolicy = {
+      ...read,
+      providers: read.providers.map((usable) => ({
+        ...usable,
+        key: {
+          level: "none",
+          required: true,
+          personal: { allowed: false, saved: false },
+        },
+      })),
+    };
+
+    expect(reasonOf(() => chooseProvider(none, "fill", undefined))).toBe(
+      "no-provider",
+    );
+    expect(reasonOf(() => chooseProvider(read, "fill", { id: "bare" }))).toBe(
+      "provider-off",
+    );
+    expect(
+      reasonOf(() =>
+        chooseProvider(read, "fill", { id: "mock", model: "acme-1" }),
+      ),
+    ).toBe("model-off");
+    expect(reasonOf(() => chooseProvider(keyless, "fill", undefined))).toBe(
+      "no-key",
+    );
+  });
 });
+
+/** The reason a refusal names in its data. */
+function reasonOf(run: () => unknown): unknown {
+  try {
+    run();
+    return undefined;
+  } catch (error) {
+    const data = (error as { data?: { reason?: unknown } }).data;
+    return data?.reason;
+  }
+}
 
 describe("the providers that call a server", () => {
   it("read their server from the runtime config, never their key", () => {

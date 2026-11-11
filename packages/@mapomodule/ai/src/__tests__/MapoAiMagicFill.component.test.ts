@@ -924,3 +924,75 @@ describe("Magic Fill's parts on a detail", () => {
     expect(form.model.value.notes).toBeUndefined();
   });
 });
+
+describe("Magic Fill's banner: what waits", () => {
+  const TAGS: AnyFieldDescriptor[] = [
+    {
+      key: "tags",
+      type: "m2m",
+      label: "Tags",
+      attrs: { endpoint: "/api/tags", returnObject: false },
+    },
+  ];
+  const RECORDS = [
+    { id: 1, name: "Technology" },
+    { id: 3, name: "City" },
+  ];
+
+  it("names only the records a list adds, and counts those its field holds", async () => {
+    gateway(
+      STATUS,
+      {
+        tags: {
+          status: "filled",
+          value: [{ id: 1 }, { id: 3 }],
+          verified: true,
+          quotes: [{ quote: "Technology, City", where: "", found: true }],
+        },
+      },
+      { "/api/tags": RECORDS },
+    );
+    const form = { ...detail(TAGS), isNew: computed(() => false) };
+    form.model.value = { tags: [1] };
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Technology, City";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("City");
+    expect(textOf(root)).not.toContain("Technology");
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.recordsHeld");
+  });
+
+  it("takes the operator to the next mark that waits", async () => {
+    gateway(STATUS, {
+      title: {
+        status: "filled",
+        value: "About us",
+        verified: false,
+        quotes: [{ quote: "About us", where: "", found: false }],
+      },
+    });
+    const revealField = vi.fn(async (_path: string) => true);
+    const form = {
+      ...detail([{ key: "title", type: "text", label: "Title" }]),
+      revealField,
+    };
+    mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "About us";
+
+    await magic.extract();
+    await settle();
+    button("mapo.ai.magicFill.summary.nextToCheck")?.click();
+    await settle();
+
+    expect(revealField).toHaveBeenCalledWith("title");
+  });
+});

@@ -1368,3 +1368,84 @@ describe("useMapoAiMagicFill — the page's options", () => {
     expect(body.entity).not.toHaveProperty("evidence");
   });
 });
+
+describe("useMapoAiMagicFill — next to check", () => {
+  const WAITING = {
+    title: {
+      status: "filled",
+      value: "About us",
+      verified: false,
+      quotes: [{ quote: "About us", where: "", found: false }],
+    },
+    "seo.title": {
+      status: "filled",
+      value: "About us, the company",
+      verified: false,
+      quotes: [{ quote: "About us, the company", where: "", found: false }],
+    },
+  };
+
+  it("takes the operator to each mark that waits, in the form's order, and around again", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(WAITING),
+    });
+    const revealField = vi.fn(async (_path: string) => true);
+    const { magic } = mounted(detail({ revealField }));
+    await useMapoAiStatus().refresh();
+    magic.text.value = "x";
+
+    await magic.extract();
+
+    expect(magic.canReveal).toBe(true);
+    expect(magic.toCheck.value).toEqual(["title", "seo.title"]);
+    await expect(magic.nextToCheck()).resolves.toBe(true);
+    await magic.nextToCheck();
+    await magic.nextToCheck();
+    expect(revealField.mock.calls.map(([path]) => path)).toEqual([
+      "title",
+      "seo.title",
+      "title",
+    ]);
+  });
+
+  it("offers nothing on a page that cannot take the operator to a field", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(WAITING),
+    });
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+    magic.text.value = "x";
+
+    await magic.extract();
+
+    expect(magic.canReveal).toBe(false);
+    await expect(magic.nextToCheck()).resolves.toBe(false);
+  });
+});
+
+describe("useMapoAiMagicFill — a refusal before any call", () => {
+  it("asks status again when the gateway says the key or the model went away", async () => {
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => {
+        throw Object.assign(fetchError(503), {
+          data: { statusCode: 503, data: { reason: "no-key" } },
+        });
+      },
+    });
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+    const asked = () =>
+      calls.filter((call) => call.path === "/_mapo/ai/status").length;
+    const before = asked();
+    magic.text.value = "x";
+
+    await magic.extract();
+    await flush();
+
+    expect(magic.fill.error.value?.message).toBe("mapo.ai.errors.noKey");
+    expect(asked()).toBe(before + 1);
+  });
+});

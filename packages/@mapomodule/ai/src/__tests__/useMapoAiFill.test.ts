@@ -1040,6 +1040,24 @@ describe("useMapoAiFill — waiting and failing", () => {
       ],
       [fetchError(422), "mapo.ai.errors.nothingToFill"],
       [fetchError(403), "mapo.ai.errors.forbidden"],
+      [
+        fetchError(502, {}, { failure: "refused-request" }),
+        "mapo.ai.errors.providerRefused",
+      ],
+      [fetchError(503, {}, { reason: "no-key" }), "mapo.ai.errors.noKey"],
+      [
+        fetchError(503, {}, { reason: "no-provider" }),
+        "mapo.ai.errors.noProvider",
+      ],
+      [fetchError(403, {}, { reason: "model-off" }), "mapo.ai.errors.modelOff"],
+      [
+        fetchError(403, {}, { reason: "provider-off" }),
+        "mapo.ai.errors.modelOff",
+      ],
+      [
+        fetchError(503, {}, { reason: "constructor" }),
+        "mapo.ai.errors.unavailable",
+      ],
       [fetchError(500), "mapo.ai.errors.failed"],
       [
         Object.assign(new Error("fetch failed"), { name: "FetchError" }),
@@ -1055,6 +1073,19 @@ describe("useMapoAiFill — waiting and failing", () => {
 
       expect(ai.error.value?.message).toBe(message);
     }
+  });
+
+  it("says why the gateway refused before any call, for the page to ask status again", async () => {
+    serve(fetchError(503, {}, { reason: "no-key" }));
+    const ai = useMapoAiFill(target());
+
+    await ai.fill("x");
+
+    expect(ai.error.value).toEqual({
+      status: 503,
+      message: "mapo.ai.errors.noKey",
+      reason: "no-key",
+    });
   });
 
   it("says when the server's answer cannot be read", async () => {
@@ -2328,6 +2359,24 @@ describe("useMapoAiFill — related records", () => {
     expect(form.model.value).toEqual({ category: 5 });
   });
 
+  it("counts a record to pick among the marks to check until it is picked", async () => {
+    serveWith(answered({ category: filled({ search: "Open" }) }), {
+      "/api/categories": PAGED,
+      "/api/categories?search=Open": [
+        { id: 1, name: "Open data" },
+        { id: 2, name: "Open source" },
+      ],
+    });
+    const form = formWith([category()]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+    expect(ai.toCheck.value).toEqual(["category"]);
+
+    click(form, "category", "Open source");
+    expect(ai.toCheck.value).toEqual([]);
+  });
+
   it("offers the candidates of a name several records match on the field's mark, and Restore offers them again", async () => {
     serveWith(answered({ category: filled({ search: "Open" }) }), {
       "/api/categories": PAGED,
@@ -2448,8 +2497,12 @@ describe("useMapoAiFill — related records", () => {
       action: "confirm",
       replaces: false,
     });
+    // The preview names only the record a write would add.
+    expect(ai.recordsToAdd("tags")).toEqual([3]);
+    expect(ai.recordsToAdd("missing")).toBeUndefined();
     ai.apply("tags");
     expect(held.model.value.tags).toEqual([1, 3]);
+    expect(ai.recordsToAdd("tags")).toEqual([]);
     ai.restore("tags");
     expect(held.model.value.tags).toEqual([1]);
 
@@ -2927,5 +2980,46 @@ describe("useMapoAiFill — related records", () => {
     expect(ai.textOf("status", "draft")).toBe("Draft");
     expect(ai.textOf("status", "other")).toBe("other");
     expect(ai.textOf("missing", "<p>Text</p>")).toBe("Text");
+  });
+});
+
+describe("useMapoAiFill — the marks to check", () => {
+  it("lists the marks that wait for the operator in the form's order, sidebar last", async () => {
+    serve(
+      answered({
+        status: {
+          status: "discarded",
+          reason: "not-listed",
+          proposed: "archived",
+          quotes: [],
+        },
+        subtitle: filled("Una storia"),
+        excerpt: filled("Unproven", false),
+        title: filled("About us"),
+      }),
+    );
+    const form = target({ translations: { it: { subtitle: "Old" } } });
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    // The title went in, the status was discarded: neither waits.
+    expect(ai.toCheck.value).toEqual(["excerpt", "translations.it.subtitle"]);
+    expect(ai.nextToCheck()).toBe("excerpt");
+    expect(ai.nextToCheck("excerpt")).toBe("translations.it.subtitle");
+    expect(ai.nextToCheck("translations.it.subtitle")).toBe("excerpt");
+    // After a mark that no longer waits, the one after it in the form.
+    expect(ai.nextToCheck("title")).toBe("excerpt");
+    expect(ai.nextToCheck("status")).toBe("excerpt");
+
+    ai.apply("excerpt");
+    expect(ai.toCheck.value).toEqual(["translations.it.subtitle"]);
+    expect(ai.nextToCheck("translations.it.subtitle")).toBe(
+      "translations.it.subtitle",
+    );
+
+    ai.dismiss("translations.it.subtitle");
+    expect(ai.toCheck.value).toEqual([]);
+    expect(ai.nextToCheck()).toBeUndefined();
   });
 });
