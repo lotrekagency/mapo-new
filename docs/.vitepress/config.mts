@@ -45,6 +45,7 @@ export default defineConfig({
           { text: 'Advanced form patterns', link: '/howto/form-advanced' },
           { text: 'Custom backend integration', link: '/howto/backend-integration' },
           { text: 'AI assistant (MCP)', link: '/howto/ai-assistant' },
+          { text: 'Magic Fill (AI)', link: '/howto/magic-fill' },
         ],
       },
       {

@@ -360,7 +360,7 @@ A page chooses the extensions it shows with the `extensions` prop:
 - `defineDetailExtension()` returns a function that removes the extension: a page can register one while it is open and remove it in `onUnmounted`.
 - The `side-buttons` slot replaces the card the `actions` extensions render in. To keep them in your own card, place `<MapoDetailExtensions placement="actions" />` in it.
 - An extension is a plain component: it gets no props, and everything it needs comes from `useMapoDetail()`.
-- With `mapo.ai`, [Magic Fill](/modules/ai#magic-fill) registers two extensions, `mapo-ai-magic-fill` in `actions` and `mapo-ai-magic-fill-summary` in `body-top`. A page that lists keys in `extensions` does not show them unless it lists them; `definePageMeta({ magicFill: false })` hides them on a page, and `definePageMeta({ magicFill: { evidence: false } })` asks the AI for no quotes there ([Ask for no quotes](/modules/ai#ask-for-no-quotes)).
+- With `mapo.ai`, [Magic Fill](/modules/ai#magic-fill) registers two extensions, `mapo-ai-magic-fill` in `actions` and `mapo-ai-magic-fill-summary` in `body-top`. A page that lists keys in `extensions` does not show them unless it lists them; `definePageMeta({ magicFill: false })` hides them on a page, and `definePageMeta({ magicFill: { evidence: false } })` asks the AI for no quotes there ([Ask for no quotes](/howto/magic-fill#ask-for-no-quotes)).
 
 ## How to: pass field-level slots through
 

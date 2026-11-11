@@ -974,7 +974,8 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Who may use the gateway                          | The gateway's authentication                                     |
 | Ask the AI                                       | The `run` route                                                  |
 | Fill a detail form                               | `useMapoAiFill()`                                                |
-| Magic Fill                                       | The panel, the call, the review and the preview of Magic Fill    |
+| Fill a detail form: Guide a field                | The `ai` options of the descriptors, `list: false` (B63)         |
+| Magic Fill                                       | A summary; the how-to page tells the rest                        |
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
@@ -985,13 +986,13 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 
 Still to write, each with the work that fills it:
 
-| Section                       | Filled by                                                |
-| ----------------------------- | -------------------------------------------------------- |
-| Read a file (PDFs, images)    | The readers for PDFs and images                          |
-| Verified and to check         | Magic Fill, from the verification described on this page |
-| Keep a field away from the AI | Magic Fill: `x-mapo-ai`, `noDraft`, the names of secrets |
-| Import several records        | Import AI                                                |
-| Guarantees and limits         | Every change                                             |
+| Section                    | Filled by                       |
+| -------------------------- | ------------------------------- |
+| Read a file (PDFs, images) | The readers for PDFs and images |
+| Import several records     | Import AI                       |
+| Guarantees and limits      | Every change                    |
+
+Magic Fill has a page of its own, [How-to: fill records with Magic Fill](/howto/magic-fill), for the developer who turns it on: what the operator does step by step, how to prepare the fields, the page keys, what each error means, the limits, the accessibility and how to replace the parts. It holds what the review and the preview of Magic Fill were before (R150), and the section of AI-assisted entry sums it up.
 
 This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text; the last reread closed the foundations.
 

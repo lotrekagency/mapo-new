@@ -381,69 +381,11 @@ Its answer holds the rules as the model reads them: Mapo's, the app's, those the
 
 ## Magic Fill
 
-Magic Fill is the AI on every detail page: the operator gives it a text or files, and it fills the empty fields of the record, each value marked for review. It runs [`useMapoAiFill()`](#fill-a-detail-form), so the same rule decides what goes in by itself: a value a quote of the source verifies, on an empty field the form shows. The rest waits for the operator, on its field and in [the preview](#the-preview), and a value of the record changes only where the operator sees it before and after. Nothing is saved until the operator saves.
+Magic Fill is the AI on every detail page: the operator gives it a text or files, and it fills the empty fields of the record, each value marked for review. It runs [`useMapoAiFill()`](#fill-a-detail-form), so the same rule decides what goes in by itself: a value a quote of the source verifies, on an empty field the form shows. The rest waits for the operator, on its field and in the banner's preview, and a value of the record changes only where the operator sees it before and after. Nothing is saved until the operator saves.
 
-With `mapo.ai` set and `@mapomodule/uikit` installed, as the meta-module installs it, every `MapoDetail` gets two parts, for a user the app lets use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai)) on a record they may edit:
+With `mapo.ai` set and `@mapomodule/uikit` installed, as the meta-module installs it, every `MapoDetail` gets two parts, for a user the app lets use the AI ([Restrict who uses the AI](#restrict-who-uses-the-ai)) on a record they may edit: **Fill with AI**, a button in the sidebar card above Save, which opens the panel, and a banner above the form, which follows the call, sums up the session, lists the values that wait and takes the operator to each of them (Next to check). `magicFill: false` in `mapo.ai`, or `definePageMeta({ magicFill: false })` on a page, turns them off.
 
-- **Fill with AI**, a button in the sidebar card above Save, opens the panel. When no model can be called for the user, as without a key, it is off and says why.
-- **A banner above the form** says where a call is, with the time it takes and Cancel; why it failed, or that the model refused; and after an answer, the summary of the session. It counts what went into the form, what you kept and what you changed, what waits, what the record already held, what to set by hand or to pick, what the gateway discarded and what the AI did not find, offers Undo all, and lists the values that wait in [the preview](#the-preview). Next to check takes the operator to each mark that waits, one after the other, in the order of the form: the tab, the group or the list item that holds the field opens, and the field takes the focus. On a phone, where the sidebar card comes after the form, the banner opens the panel too.
-
-When the operator's system asks for reduced motion, the spinners of Magic Fill stand still, and the scroll to a field is not animated.
-
-### The panel
-
-The panel slides in from the right, and closing it neither stops nor loses a call:
-
-- **Text**: what the operator pastes, with a count of the characters against `maxSourceChars`.
-- **Files**: each one is read through [`read`](#read-a-file) as it is attached, and its text joins the source after the pasted text. The formats and the largest file come from `status`; a file larger than `maxFileBytes` is refused before it is sent.
-- **Instructions for this extraction**, closed by default: what the operator wants, such as "only the first event", below the app's and the admins' rules. Hidden when `maxInstructionsChars` is `0`.
-- **What I send to the AI**, closed by default: what a call would send now, as the gateway composes it ([Preview a call](#preview-a-call)): the model, the rules and instructions the model reads, the operator's instructions, the source by part and length, the fields the AI may fill and those kept away from it, with why. Never a key. It is composed when it opens with nothing current to show; when the panel changes after, it says so, and Compose again composes it anew, so typing spends nothing.
-- **The provider and the model**: those the user may call, from their default; a select when there are several. It says where what is sent goes.
-- **Extract**, off while a file is read, the source is empty or longer than the limits, or the record is busy, and the panel says why.
-
-Extract reads the record's description first (the detail's `OPTIONS`), then asks the model; the panel closes when the answer arrives. The banner shows the time it takes, and after twenty seconds says that a model can take minutes. Cancel closes the request, and the gateway stops the provider's call ([What the gateway checks](#what-the-gateway-checks)). Errors and refusals show in the banner, and an error in the panel too, which stays open.
-
-**A session per record.** A second extraction, of a file after a text, joins the first: the first one's marks stay, a field changes only where the new answer gives it a new value, and Undo all puts back every extraction's values, newest first, then ends the session. Keep makes a value yours, and so does a change in its field: its mark goes, and Undo all leaves it; the same value in a later extraction does not bring it back, nor a value you restored or ignored. Save ends the session: a call under way stops, the marks go, and the values stay in the record. When an extraction finds nothing new, the banner says so and keeps the summary of the earlier ones; a refusal, or an answer that cannot be read, shows its message beside that summary, with Undo all.
-
-**The session in the draft.** On a page that keeps drafts (`draft` or `draftKey` of `MapoDetail`, [Detail page](/uikit/detail#how-to-enable-draft-auto-save)), the session goes into the draft with the record's values, while Magic Fill is on the page. After a reload, Restore in the draft's banner brings back the values, the marks with their quotes, the summary with the model that answered, and Undo all; Discard drops them with the values. The draft keeps, for each field, the AI's value with its quotes and what became of it, and what Restore and Undo all would put back; and for each answer, the provider and the model that gave it, and when. Never the text, the files or the instructions. The quotes are pieces of the source, kept in clear in the browser's storage, under the user, for 24 hours at most, and gone on Save. A field the form no longer has is left out, and a draft restored while a call runs takes its place. When the form's fields come from the record's description, the session comes back once `OPTIONS` answers. Without drafts, a reload loses the session, as it loses the values.
-
-### The preview
-
-Below the summary, the banner lists the values that wait for the operator, in three groups, each value with a tick:
-
-- **To fill**: values for empty fields that a quote of the source does not prove, or for a field the form hides. Ticked from the start, but a hidden field cannot be ticked: the operator would not see its value go in. A related record shows by its name; one found under another name than the AI's waits unticked, with both names ([Related records](#related-records)), and the records still to pick are named too.
-- **To replace**: values that would take the place of what their field holds, shown before and after, with the words of the source that prove them or a note that none does. Never ticked from the start: a value of the record changes only when the operator ticks it. A value that goes into every language, as a `synci18n` field's, shows before it each other language's value it would replace.
-- **Proposals without proof**: values the AI gave for empty fields without quoting the source at all, which mark no field. Never ticked from the start.
-
-Apply selected writes the ticked values, as Apply on each field does: each gets its mark, with Keep and Restore, and Undo all puts it back. A value whose field another field's `onChange` filled meanwhile is not written: it waits again, as a replacement, unticked. The values left unticked keep waiting, in the preview and on their fields, until the operator applies them, ignores them or saves; Ignore all ignores every value that waits, and the values in the form stay. On its field, the mark of a value that waits has Apply too, and the mark of a replacement says what it would replace.
-
-A list of items, as a repeater's, is chosen item by item. The preview lists each item under the list, with its template's label and its first values, and says whether a quote proves it or the field holds it already. The chosen items go after the items the field holds, which never change or go, whatever the AI does not fill in them, as an image; an item the field holds already, with every value the AI gives at any depth, is never added again, nor an item the AI gives twice. Ticked from the start are the verified items whose related records were all found with the AI's names: no quote proves a template, so a block of a list with templates waits for the operator's tick, and so does an item with a record to pick, which says so. The list's own tick ticks or unticks all its items. Apply selected uses the list's proposal: the items left unticked go with it, and Restore on the list takes the added items back and brings the proposal back. The mark of a list that waits says how many items it proposes, how many are verified and how many the field holds already, and its Apply adds only the verified items the field does not hold; with none, it has no Apply and says to choose them. Once applied, the mark counts the items the AI added, and quotes the source when every one of them is verified. A list whose every item the field holds counts as already in the record. A list never waits in To replace, even on a field that holds items: it replaces nothing, and shows what the field holds as its before. A list of single values, as tags, goes in whole.
-
-A list of related records, as an `m2m` field's, joins the field's own as a list of items does: the preview names the records it would add, and says how many of the AI's the field holds already.
-
-A value the record already holds, the same data the AI gives, is no replacement: nothing waits for it, no mark appears, and the summary counts it as already in the record. An extraction that gives nothing else found nothing new, and the banner says so.
-
-### Turn it off
-
-| Where          | How                                                                    |
-| -------------- | ---------------------------------------------------------------------- |
-| The whole app  | `magicFill: false` in `mapo.ai`                                        |
-| A page         | `definePageMeta({ magicFill: false })`                                 |
-| A `MapoDetail` | The `extensions` prop, listing the keys it shows: not Magic Fill's two |
-
-The two parts are [detail extensions](/uikit/detail#how-to-add-an-action-to-every-detail-page) that a plugin the module adds to the app registers: the button, `mapo-ai-magic-fill` in `actions`, and the banner, `mapo-ai-magic-fill-summary` in `body-top`. A page that registers an AI panel of its own, as the pages of the reference app's AI lab do, lists its own key in `extensions`, or the detail shows both.
-
-### Ask for no quotes
-
-```ts
-definePageMeta({ magicFill: { evidence: false } });
-```
-
-On such a page Magic Fill asks the AI for no quotes of the source, as `evidence: false` of [the body of run](#send-the-record-and-the-source) does: for a record whose values the source does not write word for word, such as a summary of a long text. No value is then verified, so none goes in by itself: each waits on its field, whose mark says that the page asks for no quotes, and in the preview's To fill or To replace; none is a proposal without proof. As for any value no quote proves, those for empty fields are ticked from the start: Apply selected writes them, each with its mark.
-
-### Customize it
-
-The components are registered by name, so an app replaces one with a file of the same name in `app/mapooverride/` ([MapoOverride](/uikit/mapoverride)): `MapoAiMagicFillAction`, `MapoAiMagicFillBanner`, `MapoAiMagicFillPanel` and `MapoAiMagicFillPreview`, each with the prop `detail`, the detail's context. A part of your own says which part it is with `useMapoAiMagicFill(detail, { part: "action" })` (or `banner`, `panel`), so the others know it is there: beside a button of your own that says so, the banner shows no button of its own. Their state is `useMapoAiMagicFill(detail)`, auto-imported: one state per detail, which the parts share, with the source, the files, the instructions, the model, where the call is, `extract()`, `cancel()`, `undoAll()`, `loadPreview()` and the summary. `useMapoAiStatus()` gives what `status` answers, read once per app and asked again on every detail page. Labels come from the `mapo.ai.magicFill.*` messages of `@mapomodule/i18n`, in English and Italian.
+→ [How-to: fill records with Magic Fill](/howto/magic-fill): what the operator does step by step, how to prepare the fields, the page keys, what each error means, the limits and how to replace the parts.
 
 ## Fill a detail form
 
