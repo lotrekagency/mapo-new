@@ -139,6 +139,7 @@ attrs: {
       icon: "i-lucide-image",
       category: "Layout",
       image: "/previews/hero.png", // wins over `wireframe`, which wins over `icon`
+      imageFit: "cover", // fill the card and crop the edges; the default `contain` shows the whole image
       fields: [
         { key: "title", type: "text", label: "Title" },
         { key: "image_url", type: "file", label: "Image" },
@@ -155,18 +156,21 @@ attrs: {
 }
 ```
 
+A preview `image` is shown whole (`object-fit: contain`) on the card. Set `imageFit` on a template, or `templateImageFit` on the repeater for all of them, to `"cover"` (fill the card, crop the edges), `"fill"`, `"none"` or `"scale-down"`.
+
 Holding Shift while choosing a block keeps the modal open, so several blocks can be added in a row. Items show a badge with the template label and icon in their header (not in the compressed mini-card). Bare field arrays and `RepeaterTemplate` objects can be mixed.
 
 ### Repeater attrs reference
 
-| Attr             | Type                                                    | Description                                                   |
-| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| `fields`         | `FieldDescriptor[]`                                     | Fields for every item (simple mode)                           |
-| `templates`      | `Record<string, FieldDescriptor[] \| RepeaterTemplate>` | Per-type fields or template with metadata (block editor mode) |
-| `picker`         | `'auto' \| 'select' \| 'modal'`                         | Template chooser; `auto` = modal above 3 templates (default)  |
-| `previewLabel`   | `(item) => string`                                      | Label shown in the collapsed item header                      |
-| `confirmDelete`  | `boolean`                                               | Show confirm dialog before removal                            |
-| `allowDuplicate` | `boolean`                                               | Show a "clone" button per item                                |
+| Attr               | Type                                                       | Description                                                   |
+| ------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| `fields`           | `FieldDescriptor[]`                                        | Fields for every item (simple mode)                           |
+| `templates`        | `Record<string, FieldDescriptor[] \| RepeaterTemplate>`    | Per-type fields or template with metadata (block editor mode) |
+| `picker`           | `'auto' \| 'select' \| 'modal'`                            | Template chooser; `auto` = modal above 3 templates (default)  |
+| `templateImageFit` | `'contain' \| 'cover' \| 'fill' \| 'none' \| 'scale-down'` | How preview images fit the picker cards; `contain` by default |
+| `previewLabel`     | `(item) => string`                                         | Label shown in the collapsed item header                      |
+| `confirmDelete`    | `boolean`                                                  | Show confirm dialog before removal                            |
+| `allowDuplicate`   | `boolean`                                                  | Show a "clone" button per item                                |
 
 ## Client-side validation
 

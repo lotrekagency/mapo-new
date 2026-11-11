@@ -167,6 +167,7 @@ attrs: {
       icon: 'i-lucide-image',
       category: 'Layout',
       wireframe: true, // schematic preview; `image: '/previews/hero.png'` wins over it
+      // imageFit: 'cover', // how `image` fits the card; `contain` (whole image) by default
       fields: [{ key: 'title', type: 'text' }, { key: 'image_url', type: 'text' }],
     },
     quote: [{ key: 'text', type: 'textarea' }], // bare arrays still work
