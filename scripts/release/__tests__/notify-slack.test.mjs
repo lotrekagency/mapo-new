@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildSlackMessage,
+  CHANNEL_SUMMARIES,
   parseChannels,
   parseNotes,
   run,
@@ -159,6 +160,48 @@ describe("buildSlackMessage", () => {
 
     expect(textOf(block).length).toBeLessThanOrEqual(3000);
     expect(textOf(block)).toMatch(/…and \d+ more in the release notes$/);
+  });
+});
+
+describe("buildSlackMessage on a channel with a summary", () => {
+  const onChannel = (channel) =>
+    releases.map((release) => ({
+      ...release,
+      version: release.version.replace("beta", channel),
+      channel,
+    }));
+
+  it("announces the experimental channel with its summary instead of the changes", () => {
+    const message = buildSlackMessage(onChannel("experimental"), {
+      repoUrl: "https://github.com/lotrekagency/mapo-new",
+    });
+
+    expect(message.text).toBe("Mapo 2.0.0-experimental.17 released");
+    const sections = message.blocks.filter((block) => block.type === "section");
+    expect(sections).toHaveLength(1);
+    expect(textOf(sections[0])).toBe(
+      toMrkdwn(CHANNEL_SUMMARIES.get("experimental")),
+    );
+    expect(textOf(sections[0])).toContain("*Magic Fill*");
+    expect(textOf(sections[0])).toContain("`pnpm add mapomodule@experimental`");
+
+    const json = JSON.stringify(message);
+    expect(json).not.toContain("BREAKING CHANGES");
+    expect(json).not.toContain("describe Mapo through a shared overview");
+    expect(textOf(message.blocks.at(-1))).toContain(
+      "mapomodule 2.0.0-experimental.17",
+    );
+  });
+
+  it("keeps the changes on every other channel", () => {
+    const sections = buildSlackMessage(onChannel("next")).blocks.filter(
+      (block) => block.type === "section",
+    );
+    expect(sections.map((block) => textOf(block).split("\n")[0])).toEqual([
+      "*BREAKING CHANGES*",
+      "*Features*",
+      "*Bug Fixes*",
+    ]);
   });
 });
 

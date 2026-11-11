@@ -138,6 +138,7 @@ When a real release finishes, the `CD` workflow posts one message on Slack:
 
 - **Title**: `Mapo <version> released`, with the version of `mapomodule`, the package apps install. When a run does not release `mapomodule`, the title is `Mapo packages released`.
 - **Body**: only the changes of this release — breaking changes, features and bug fixes — merged across every package released in the run. A commit that touches several packages is listed once. The `Dependencies` sections that multi-semantic-release adds (version bumps between Mapo packages) are left out, and so is every older entry of the changelogs.
+- **On the `experimental` channel** the body is not the changes, which since a package's last stable release run to hundreds of lines, but a summary of a few lines of what the channel offers, today Magic Fill, with the install command. It is `CHANNEL_SUMMARIES` in `scripts/release/notify-slack.mjs`: update it when the offer changes.
 - **Footer**: the released packages and their versions, each linked to its GitHub release.
 
 How it works:

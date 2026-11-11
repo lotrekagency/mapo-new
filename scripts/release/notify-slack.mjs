@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Announces a finished release on Slack: "Mapo <version> released", followed by
-// the breaking changes, features and fixes of every package released in the run.
+// the breaking changes, features and fixes of every package released in the run,
+// or, for a channel in CHANNEL_SUMMARIES, by that channel's short summary.
 //
 // Input: $RELEASE_SUMMARY_FILE, one JSON line per published package, written by
 // summary-plugin.cjs during `pnpm release`. The notes are merged across packages
@@ -32,6 +33,22 @@ const SECTION_ORDER = [
 ];
 
 const SKIPPED_SECTIONS = new Set(["Dependencies"]);
+
+/**
+ * Channels announced with a summary of what they offer instead of the changes:
+ * their releases list every change since a package's last stable version, far
+ * too many for a message. Markdown, a few lines; update it when the offer changes.
+ */
+export const CHANNEL_SUMMARIES = new Map([
+  [
+    "experimental",
+    [
+      "**Magic Fill**, on every detail page: paste a text or attach files and the AI fills the record's empty fields, with OpenAI, Anthropic or a model on your own servers.",
+      "A value goes in by itself only when a quote of the source proves it; the others wait for the operator, and nothing is saved until they save.",
+      "Install: `pnpm add mapomodule@experimental`, then set `mapo.ai` in `nuxt.config.ts`.",
+    ].join("\n"),
+  ],
+]);
 
 /**
  * Splits semantic-release notes into `section → bullets`. Level 1-2 headings
@@ -123,6 +140,40 @@ function packagesBlock(releases, repoUrl) {
   };
 }
 
+function textBlock(text) {
+  return { type: "section", text: { type: "mrkdwn", text } };
+}
+
+/** The channel of a run: one branch releases every package of it. */
+function channelOf(releases) {
+  return releases.find((release) => release.channel)?.channel ?? null;
+}
+
+/** The changes of the run, merged across its packages, breaking changes first. */
+function changeBlocks(releases) {
+  const merged = new Map();
+  for (const release of releases) {
+    for (const [name, items] of parseNotes(release.notes ?? "")) {
+      if (SKIPPED_SECTIONS.has(name)) continue;
+      const set = merged.get(name) ?? new Set();
+      for (const item of items) set.add(item);
+      merged.set(name, set);
+    }
+  }
+  const sections = [...merged]
+    .filter(([, items]) => items.size)
+    .sort(([a], [b]) => sectionRank(a) - sectionRank(b));
+
+  if (!sections.length) {
+    return [
+      textBlock(
+        "No breaking changes, features or fixes: this release only updates dependencies.",
+      ),
+    ];
+  }
+  return sections.map(([name, items]) => sectionBlock(name, [...items]));
+}
+
 /** The chat.postMessage payload, without the channel. */
 export function buildSlackMessage(releases, { repoUrl } = {}) {
   const unique = [
@@ -138,30 +189,10 @@ export function buildSlackMessage(releases, { repoUrl } = {}) {
     ? `Mapo ${main.version} released`
     : "Mapo packages released";
 
-  const merged = new Map();
-  for (const release of unique) {
-    for (const [name, items] of parseNotes(release.notes ?? "")) {
-      if (SKIPPED_SECTIONS.has(name)) continue;
-      const set = merged.get(name) ?? new Set();
-      for (const item of items) set.add(item);
-      merged.set(name, set);
-    }
-  }
-  const sections = [...merged]
-    .filter(([, items]) => items.size)
-    .sort(([a], [b]) => sectionRank(a) - sectionRank(b));
-
-  const changes = sections.length
-    ? sections.map(([name, items]) => sectionBlock(name, [...items]))
-    : [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: "No breaking changes, features or fixes: this release only updates dependencies.",
-          },
-        },
-      ];
+  const summary = CHANNEL_SUMMARIES.get(channelOf(unique));
+  const changes = summary
+    ? [textBlock(toMrkdwn(summary))]
+    : changeBlocks(unique);
 
   const header = {
     type: "header",
