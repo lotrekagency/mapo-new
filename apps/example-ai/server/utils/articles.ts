@@ -165,8 +165,9 @@ function checked(
     max: number,
   ) => {
     if (!has(key)) return;
-    const value = data[key] ?? "";
-    if (typeof value !== "string") errors[key] = ["Not a valid string."];
+    const value = data[key];
+    if (value === null) errors[key] = ["This field may not be null."];
+    else if (typeof value !== "string") errors[key] = ["Not a valid string."];
     else if (value.length > max) {
       errors[key] = [`Ensure this field has no more than ${max} characters.`];
     } else values[key] = value;

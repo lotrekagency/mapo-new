@@ -156,8 +156,9 @@ function checked(
 
   const text = (key: "title" | "slug" | "summary", max: number) => {
     if (!has(key)) return;
-    const value = data[key] ?? "";
-    if (typeof value !== "string") errors[key] = ["Not a valid string."];
+    const value = data[key];
+    if (value === null) errors[key] = ["This field may not be null."];
+    else if (typeof value !== "string") errors[key] = ["Not a valid string."];
     else if (value.length > max) {
       errors[key] = [`Ensure this field has no more than ${max} characters.`];
     } else values[key] = value;
@@ -177,10 +178,13 @@ function checked(
   text("summary", 500);
 
   if (has("blocks")) {
-    const blocks: unknown = data.blocks ?? [];
-    if (Array.isArray(blocks) && blocks.every(isBlock)) values.blocks = blocks;
-    else
+    const blocks: unknown = data.blocks;
+    if (blocks === null) errors.blocks = ["This field may not be null."];
+    else if (Array.isArray(blocks) && blocks.every(isBlock)) {
+      values.blocks = blocks;
+    } else {
       errors.blocks = ["Enter a list of blocks, each with a known template."];
+    }
   }
   if (has("status")) {
     const status = STATUSES.find((one) => one === data.status);
