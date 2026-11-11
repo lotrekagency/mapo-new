@@ -691,6 +691,28 @@ export const RECIPES: Recipe[] = [
       "Experimental: in a detail extension, useMapoAiFill(detail), with the context of useMapoDetail(), sends the form's fields and the backend schema from OPTIONS with a source to run, writes each value a quote verifies into an empty field it shows and marks the others to apply, pick, set by hand or ignore, each mark with the words of the source that prove it; the mark of a replacement says what it replaces, and a value the field already holds is unchanged. Related records (fks and m2m fields with an endpoint) are looked up with the operator's session: the AI picks from the records of a relation that has 50 at most, or writes a name searched with ?search=; a record found with the AI's very name goes in as a verified value, one under another name waits with Apply, several are candidates to pick on the field's mark (choose()), and an m2m adds the records found after the field's own. The answers of a session add up: keep() or a change in the field makes a value the operator's, undo() puts back every answer's values, newest first, and a save of the record ends the session. snapshot() and resume() keep the session in a draft and take it back, read as outside data.",
   },
   {
+    id: "ai-field-options",
+    task: "Guide the AI on one field, keep a field from it, or keep a relation's records from the provider",
+    keywords: [
+      "x-mapo-ai",
+      "ai.hint",
+      "hint",
+      "ai.exclude",
+      "list: false",
+      "keep a field from the ai",
+      "relation names",
+      "relationChoices",
+      "mapoAiFieldsSchema",
+      "privacy",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Guide a field",
+    seeAlso: ["howto/magic-fill.md", "uikit/form/custom-fields.md"],
+    summary:
+      "Experimental: with @mapomodule/ai installed, a field descriptor takes ai (declared on FieldExtensions): { hint } tells the model what to take and how, { exclude: true } keeps the field away from the AI, { list: false } keeps a relation's records from the provider (they are never listed, even when 50 or fewer; the AI writes the name it reads and Magic Fill searches it with ?search= after the answer). A backend's schema says the same with x-mapo-ai; what either side says holds, inside a repeater's items too, and the gateway leaves out the records of an unlisted relation even from a request that lists them. Magic Fill and useMapoAiFill() send them; a page that calls POST /_mapo/ai/run itself sends its fields with mapoAiFieldsSchema(fields), auto-imported, since fieldsToJsonSchema(fields) leaves them out.",
+  },
+  {
     id: "ai-magic-fill",
     task: "Use Magic Fill, the AI panel of detail pages",
     keywords: [
@@ -711,13 +733,14 @@ export const RECIPES: Recipe[] = [
       "related records",
       "no quotes",
       "evidence",
+      "next to check",
+      "magic fill error",
       "experimental",
     ],
-    doc: "modules/ai.md",
-    heading: "Magic Fill",
-    seeAlso: ["uikit/detail.md", "uikit/mapoverride.md"],
+    doc: "howto/magic-fill.md",
+    seeAlso: ["modules/ai.md", "uikit/detail.md", "uikit/mapoverride.md"],
     summary:
-      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, and Save ends the session. Below the summary, the preview lists the values that wait, each with a tick: to fill (empty fields, ticked), to replace (shown before and after, never ticked from the start) and proposals without proof; Apply selected writes the ticked ones, the others keep waiting, and Ignore all ignores them. A value the record already holds is no replacement: the summary counts it. A list of items, as a repeater's, is chosen item by item, its verified items ticked from the start; the chosen items go after the record's own, never one it holds already. Related records show by their names: one found under another name waits unticked, and a record to pick inside an item gets its own mark once the item is in. definePageMeta({ magicFill: { evidence: false } }) asks the AI for no quotes on a page: every value then waits, marked. On a page with drafts, the session goes into MapoDetail's draft: after a reload, Restore brings back the marks with their quotes, the summary and Undo all, never the source. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
+      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, and Save ends the session. Below the summary, the preview lists the values that wait, each with a tick: to fill (empty fields, ticked), to replace (shown before and after, never ticked from the start) and proposals without proof; Apply selected writes the ticked ones, the others keep waiting, and Ignore all ignores them. A value the record already holds is no replacement: the summary counts it. A list of items, as a repeater's, is chosen item by item, its verified items ticked from the start; the chosen items go after the record's own, never one it holds already. Related records show by their names: one found under another name waits unticked, and a record to pick inside an item gets its own mark once the item is in. definePageMeta({ magicFill: { evidence: false } }) asks the AI for no quotes on a page: every value then waits, marked. On a page with drafts, the session goes into MapoDetail's draft: after a reload, Restore brings back the marks with their quotes, the summary and Undo all, never the source. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. Next to check, in the banner, takes the operator to each mark that waits, in the order of the form: the tab, group or list item that holds the field opens and the field takes the focus (revealField of the detail's context). The banner's errors say what to do: a key or a model taken away while the page was open (run answers data.reason) makes Magic Fill ask status again. Fields are prepared with their labels, help texts and ai on the descriptor: hint, exclude, and list: false for a relation whose names must not reach the provider. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
   },
   {
     id: "ai-read-files",

@@ -11,10 +11,30 @@ import { join, relative } from "node:path";
 import { createChecker } from "vue-component-meta";
 import type { ApiMember, ComponentApi } from "../runtime/core/types.js";
 
-/** Packages whose `runtime/components` tree is scanned. */
-const COMPONENT_PACKAGES = [
+/**
+ * Packages whose `runtime/components` tree is scanned. `only` lists the
+ * components a package registers for apps, when it has internal ones too:
+ * `@mapomodule/ai` registers the settings page and Magic Fill's four parts
+ * (its `module.ts`), the parts of the settings page stay inside it.
+ */
+const COMPONENT_PACKAGES: {
+  pkg: string;
+  dir: string;
+  only?: readonly string[];
+}[] = [
   { pkg: "@mapomodule/uikit", dir: "packages/@mapomodule/uikit" },
   { pkg: "@mapomodule/form", dir: "packages/@mapomodule/form" },
+  {
+    pkg: "@mapomodule/ai",
+    dir: "packages/@mapomodule/ai",
+    only: [
+      "MapoAiSettings",
+      "MapoAiMagicFillAction",
+      "MapoAiMagicFillBanner",
+      "MapoAiMagicFillPanel",
+      "MapoAiMagicFillPreview",
+    ],
+  },
 ];
 
 /** Union types can be enormous; keep them readable in a tool response. */
@@ -85,12 +105,20 @@ export function extractComponents(
 ): ComponentApi[] {
   const components: ComponentApi[] = [];
 
-  for (const { pkg, dir } of COMPONENT_PACKAGES) {
+  for (const { pkg, dir, only } of COMPONENT_PACKAGES) {
     const packageRoot = join(repoRoot, dir);
     const tsconfig = join(packageRoot, "tsconfig.json");
     const componentsRoot = join(packageRoot, "src", "runtime", "components");
-    const files = collectVueFiles(componentsRoot).filter((file) =>
-      /\/Mapo[A-Z][^/]*\.vue$/.test(file),
+    const isListed = (file: string) =>
+      !only ||
+      only.includes(
+        file
+          .split("/")
+          .pop()!
+          .replace(/\.vue$/, ""),
+      );
+    const files = collectVueFiles(componentsRoot).filter(
+      (file) => /\/Mapo[A-Z][^/]*\.vue$/.test(file) && isListed(file),
     );
     if (!files.length || !existsSync(tsconfig)) continue;
 

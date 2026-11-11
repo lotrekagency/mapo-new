@@ -7,7 +7,7 @@ How to keep `@mapomodule/mcp` accurate as Mapo changes, and how to extend it wit
 | Part           | Source                                                          | Kept in sync by                                    |
 | -------------- | --------------------------------------------------------------- | -------------------------------------------------- |
 | Docs search    | `docs/**/*.md`, indexed into `dist/knowledge/docs.json`         | Rebuilding the package after a docs change         |
-| Component APIs | `uikit` and `form` `.vue` files, read with `vue-component-meta` | Rebuilding; JSDoc on props and events              |
+| Component APIs | `uikit`, `form` and `ai` `.vue` files, via `vue-component-meta` | Rebuilding; JSDoc on props and events              |
 | Field types    | `form` registry and descriptor interfaces                       | Rebuilding; JSDoc on `attrs`                       |
 | Composables    | Every module's `addImports([...])` calls                        | Rebuilding                                         |
 | Overview       | `docs/guide/concepts.md` and `src/runtime/core/instructions.ts` | Editing them by hand when the architecture changes |

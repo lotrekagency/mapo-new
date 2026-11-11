@@ -113,6 +113,20 @@ describeBuilt("generated API surface", () => {
     expect(api.components.length).toBeGreaterThan(30);
   });
 
+  it("extracts the components @mapomodule/ai registers for apps, not the parts of its settings page", () => {
+    const ai = api.components
+      .filter((component) => component.pkg === "@mapomodule/ai")
+      .map((component) => component.name);
+
+    expect(ai).toEqual([
+      "MapoAiMagicFillAction",
+      "MapoAiMagicFillBanner",
+      "MapoAiMagicFillPanel",
+      "MapoAiMagicFillPreview",
+      "MapoAiSettings",
+    ]);
+  });
+
   it("reports real prop types and JSDoc, not documentation prose", () => {
     const list = api.components.find(
       (component) => component.name === "MapoList",

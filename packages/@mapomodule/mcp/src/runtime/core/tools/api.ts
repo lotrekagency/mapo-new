@@ -82,6 +82,12 @@ interface ComponentApiArgs {
   include?: Array<"props" | "events" | "slots" | "exposed">;
 }
 
+/** What an app needs before it has the components of an opt-in package. */
+const OPT_IN_PACKAGES: Record<string, string> = {
+  "@mapomodule/ai":
+    "Experimental and opt-in: it exists only in an app that sets `mapo.ai` (the meta-module then installs `@mapomodule/ai`).",
+};
+
 function renderComponent(
   component: ComponentApi,
   include?: ComponentApiArgs["include"],
@@ -99,9 +105,11 @@ function renderComponent(
     sections.push(renderMembers("Exposed", component.exposed));
   }
 
+  const optIn = OPT_IN_PACKAGES[component.pkg];
   return (
     `# ${component.name}\n` +
     `package: \`${component.pkg}\` · source: \`${component.file}\`\n` +
+    (optIn ? `\n${optIn}\n` : "") +
     (component.description ? `\n${component.description}\n` : "") +
     `\n${sections.join("\n")}` +
     renderDocs(component.docs)

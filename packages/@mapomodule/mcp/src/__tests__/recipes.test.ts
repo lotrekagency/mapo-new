@@ -57,6 +57,17 @@ describe("matchRecipes", () => {
     ["apply selected values of Magic Fill before and after", "ai-magic-fill"],
     ["choose the items of a list Magic Fill proposes", "ai-magic-fill"],
     ["bring back Magic Fill's marks after a reload", "ai-magic-fill"],
+    ["go to the next field Magic Fill left to check", "ai-magic-fill"],
+    ["what does a Magic Fill error mean and what to do", "ai-magic-fill"],
+    ["give the AI a hint about one field of the form", "ai-field-options"],
+    [
+      "which function writes the ai hints of my fields for the run route",
+      "ai-field-options",
+    ],
+    [
+      "keep the names of a relation's records away from the AI provider",
+      "ai-field-options",
+    ],
     ["keep my detail extension's state in the draft", "detail-context"],
     ["leave a password field out of the saved draft", "form-draft"],
     ["apply the values the AI proposed to the form", "ai-fill"],

@@ -9,7 +9,7 @@ One set of transport-agnostic tool specs, served two ways:
 - a **dev-only Nuxt module** that registers a named handler of `@nuxtjs/mcp-toolkit` at `POST /mcp/mapo` (it also knows the running app's configuration);
 - the **`mapo-mcp` stdio CLI**, which serves the same static tools without a dev server and forwards `mapo_inspect_app` and `mapo_doctor` to the app when it is up.
 
-The knowledge base (`dist/knowledge/docs.json` and `api.json`) is generated at build time from `docs/**/*.md` and from the `uikit` and `form` sources. It is the package's data: **what assistants are told is only as good as the docs, the recipes, the JSDoc and the instructions.**
+The knowledge base (`dist/knowledge/docs.json` and `api.json`) is generated at build time from `docs/**/*.md` and from the `uikit` and `form` sources and from the components `@mapomodule/ai` registers for apps. It is the package's data: **what assistants are told is only as good as the docs, the recipes, the JSDoc and the instructions.**
 
 ## Layout
 
@@ -63,4 +63,4 @@ The knowledge tests are skipped when the package is not built: build first. For 
 - **"Mapo knowledge base not found"** → the package is not built.
 - **A search returns prop tables instead of a how-to** → phrase the query as a task, or add a recipe for it.
 - **A scaffolded page 404s** → restart the dev server; Nuxt's server router keeps its route table.
-- **A component is missing from `mapo_component_api`** → the build logs `skipped <Name>` when `vue-component-meta` cannot resolve it; only `Mapo*` components in `uikit` and `form` are extracted.
+- **A component is missing from `mapo_component_api`** → the build logs `skipped <Name>` when `vue-component-meta` cannot resolve it; only `Mapo*` components in `uikit` and `form` are extracted, and those `@mapomodule/ai` registers for apps (`only` in `extract-components.ts`).

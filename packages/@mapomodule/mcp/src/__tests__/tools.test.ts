@@ -15,7 +15,7 @@ import {
   getDocTool,
   searchDocsTool,
 } from "../runtime/core/tools/docs.js";
-import { makeContext, makeManifest } from "./fixtures.js";
+import { makeApi, makeContext, makeManifest } from "./fixtures.js";
 
 const context = makeContext();
 const allTools = [...docsTools, ...apiTools, ...appTools];
@@ -103,6 +103,32 @@ describe("mapo_component_api", () => {
     const output = await componentApiTool.run({ name: "MapoNope" }, context);
     expect(output).toContain("No Mapo component matches");
     expect(output).toContain("MapoList");
+  });
+
+  it("says that a component of an opt-in package needs it turned on", async () => {
+    const api = makeApi();
+    api.components.push({
+      name: "MapoAiMagicFillBanner",
+      pkg: "@mapomodule/ai",
+      file: "packages/@mapomodule/ai/src/runtime/components/MapoAiMagicFillBanner.vue",
+      props: [
+        { name: "detail", type: "MapoAiMagicFillDetail", required: true },
+      ],
+      events: [],
+      slots: [],
+      exposed: [],
+      docs: [],
+    });
+    const withAi = makeContext(undefined, undefined, { api: () => api });
+
+    const banner = await componentApiTool.run(
+      { name: "MapoAiMagicFillBanner" },
+      withAi,
+    );
+    const list = await componentApiTool.run({ name: "MapoList" }, withAi);
+
+    expect(banner).toContain("it exists only in an app that sets `mapo.ai`");
+    expect(list).not.toContain("mapo.ai");
   });
 });
 

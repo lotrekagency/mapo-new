@@ -496,7 +496,7 @@ rule ("always check Mapo docs with the mapo\_\* tools") does the job.
 
 **A component is missing from `mapo_component_api`**
 The build logs `skipped <Name>` when `vue-component-meta` cannot resolve a component. Only `Mapo*`
-components under `src/runtime/components/` of `uikit` and `form` are extracted.
+components under `src/runtime/components/` of `uikit` and `form` are extracted, and the ones `@mapomodule/ai` registers for apps (its settings page and Magic Fill's parts).
 
 ---
 
