@@ -16,6 +16,12 @@
 //   of three among sixty, waits on its mark with the three to pick from;
 // - /ai/magic-fill/1 with "Update": the author Bianchi waits with both
 //   names, since the only author found is Marco Bianchi;
+// - /ai/magic-fill/new with "Press release": the reviewer goes in, found by
+//   her email, which the AI wrote without seeing the six reviewers: the
+//   field says `ai: { list: false }`, and "What I send to the AI" shows
+//   the excerpt's `ai.hint`;
+// - "Next to check", in the banner: each press takes you to the next field
+//   that waits, opening its tab, and puts the focus on it;
 // - "What I send to the AI": the prompt the gateway composes, with the
 //   app's rules (nuxt.config.ts and server/plugins/mapo-ai-rules.ts);
 // - the sample "Slow": the phases, the time it takes, and Cancel, which

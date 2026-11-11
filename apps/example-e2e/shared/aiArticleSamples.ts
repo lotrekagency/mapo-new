@@ -13,6 +13,11 @@ export const RELEASE = {
   reading: "Reading time: about 6 minutes.",
   /** An author found by this very name among the magazine's sixty. */
   byline: "By Anna Rossi.",
+  /**
+   * A reviewer by her email: the AI writes it, never sees the list of the
+   * six (`ai: { list: false }`), and Magic Fill finds her by it.
+   */
+  reviewed: "Reviewed by sara.conti@example.org.",
 };
 
 /** Words of a council note, quoted by the fixture `article-mixed`. */
@@ -66,7 +71,7 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
   {
     label: "Press release",
     description:
-      "Fixture article-verified: every value is quoted word for word, so each one is verified; the author is found by her very name among the magazine's sixty, and goes in.",
+      "Fixture article-verified: every value is quoted word for word, so each one is verified; the author is found by her very name among the magazine's sixty, and goes in, and so does the reviewer, found by her email, which the AI wrote without the list of reviewers.",
     text: [
       "#mock:fixture=article-verified",
       "",
@@ -77,6 +82,7 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
       "",
       RELEASE.reading,
       RELEASE.byline,
+      RELEASE.reviewed,
     ].join("\n"),
   },
   {

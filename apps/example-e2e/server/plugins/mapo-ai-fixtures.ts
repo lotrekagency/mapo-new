@@ -25,6 +25,7 @@ const EMPTY = {
   published_at: "",
   category: "",
   author: "",
+  reviewer: "",
 };
 
 function quote(field: string, words: string) {
@@ -47,6 +48,8 @@ export default defineNitroPlugin(() => {
           body: `${RELEASE.excerpt} ${RELEASE.more}`,
           reading_time: "6",
           author: "Anna Rossi",
+          // Searched, never listed: the form says `ai: { list: false }`.
+          reviewer: "sara.conti@example.org",
         },
         evidence: [
           quote("title", RELEASE.title),
@@ -55,6 +58,7 @@ export default defineNitroPlugin(() => {
           quote("body", `${RELEASE.excerpt} ${RELEASE.more}`),
           quote("reading_time", RELEASE.reading),
           quote("author", RELEASE.byline),
+          quote("reviewer", RELEASE.reviewed),
         ],
       },
     },

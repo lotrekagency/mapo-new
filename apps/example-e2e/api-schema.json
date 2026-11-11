@@ -171,6 +171,27 @@
         }
       }
     },
+    "/api/reviewers": {
+      "get": {
+        "operationId": "reviewers_list",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bare array, searched by email and name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Reviewer" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "operationId": "categories_list",
@@ -613,6 +634,14 @@
         "type": "object",
         "properties": {
           "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 100 }
+        }
+      },
+      "Reviewer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
           "name": { "type": "string", "maxLength": 100 }
         }
       },

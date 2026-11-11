@@ -10,7 +10,14 @@ export const AI_ARTICLE_FIELDS: AnyFieldDescriptor[] = [
   { key: "title", type: "text", label: "Title", required: true },
   { key: "slug", type: "text", label: "Slug" },
   { key: "subtitle", type: "text", label: "Subtitle", translatable: true },
-  { key: "excerpt", type: "textarea", label: "Excerpt" },
+  {
+    key: "excerpt",
+    type: "textarea",
+    label: "Excerpt",
+    // What the AI reads beside the label: the field's description in the
+    // schema of the answer, which the model gets with the prompt.
+    ai: { hint: "One or two sentences, in the source's own words." },
+  },
   { key: "body", type: "editor", label: "Body", translatable: true },
 ];
 
@@ -49,5 +56,20 @@ export const AI_ARTICLE_SIDEBAR_FIELDS: AnyFieldDescriptor[] = [
     type: "fks",
     label: "Author",
     attrs: { endpoint: "/api/authors", itemText: "name", itemValue: "id" },
+  },
+  // Six reviewers, listed by email: few enough to list for the AI, but an
+  // email must not reach the provider. `list: false` keeps the list away:
+  // the AI writes the email it reads, which Magic Fill searches.
+  {
+    key: "reviewer",
+    type: "fks",
+    label: "Reviewer",
+    attrs: {
+      endpoint: "/api/reviewers",
+      itemText: "email",
+      itemValue: "id",
+      returnObject: false,
+    },
+    ai: { list: false },
   },
 ];
