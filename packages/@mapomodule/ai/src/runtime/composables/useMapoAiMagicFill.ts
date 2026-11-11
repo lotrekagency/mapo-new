@@ -678,8 +678,14 @@ function magicFillState<T extends object>(
 
   // ─── Next to check ────────────────────────────────────────────────────────
 
-  /** The mark the operator was taken to last: the next one follows it. */
+  /**
+   * The mark the operator was taken to last: the next one follows it. A
+   * new answer, or the end of the session, starts again from the first.
+   */
   let lastChecked: string | undefined;
+  watch(fill.rounds, () => {
+    lastChecked = undefined;
+  });
 
   async function nextToCheck(): Promise<boolean> {
     const path = fill.nextToCheck(lastChecked);
@@ -790,12 +796,14 @@ function magicFillState<T extends object>(
       fill.fields.value.map((field) => {
         const before = fill.replaced(field.path);
         const adds = fill.recordsToAdd(field.path);
+        const held = fill.recordsHeld(field.path);
         return {
           ...field,
           shown: fill.isShown(field.path),
           current: before?.value,
           ...(before?.languages ? { languages: before.languages } : {}),
           ...(adds ? { adds } : {}),
+          ...(held ? { held } : {}),
         };
       }),
       { evidence: entityOf().evidence !== false },

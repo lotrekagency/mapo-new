@@ -598,9 +598,15 @@ export interface MapoAiToConfirm {
   /**
    * For a list of related records that joins the field's own: the records
    * it would add, as the field saves them, those the field holds left out.
-   * The preview names these, and counts the others as already in.
+   * The preview names these.
    */
   adds?: unknown[];
+  /**
+   * For a list of related records that joins the field's own: how many
+   * records of the AI's list the field holds already, each counted once.
+   * The preview says so.
+   */
+  held?: number;
 }
 
 /** What became of the answers of a session, as the operator reads it. */
@@ -652,7 +658,8 @@ export interface MapoAiFillSummary {
  * the AI quoted nothing for it, else `toFill`. With `evidence: false`, the
  * page asked for no quotes: no value is `unproven`. A list of related
  * records names in `adds` the records it would add (`recordsToAdd()` of
- * `useMapoAiFill()`), when the field holds some.
+ * `useMapoAiFill()`), and counts in `held` those its field holds already
+ * (`recordsHeld()`), when it holds some.
  */
 export function summarizeMapoAiFill(
   fields: readonly (MapoAiFillEntry & {
@@ -661,6 +668,7 @@ export function summarizeMapoAiFill(
     current?: unknown;
     languages?: Record<string, unknown>;
     adds?: unknown[];
+    held?: number;
   })[],
   options: { evidence?: boolean } = {},
 ): MapoAiFillSummary {
@@ -730,6 +738,7 @@ export function summarizeMapoAiFill(
           ? { languages: field.languages }
           : {}),
         ...(isRecordList(outcome) && field.adds ? { adds: field.adds } : {}),
+        ...(isRecordList(outcome) && field.held ? { held: field.held } : {}),
       };
       // Without quotes asked, a value without any is no proposal without
       // proof: it waits to fill, as any value no quote proves.

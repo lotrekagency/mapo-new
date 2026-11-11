@@ -2511,6 +2511,41 @@ describe("useMapoAiFill — related records", () => {
     expect(empty.model.value.tags).toEqual([1, 3]);
   });
 
+  it("counts the records of the AI's list its field holds, once each", async () => {
+    serveWith(answered({ tags: filled([{ id: 1 }, { id: 3 }, { id: 3 }]) }), {
+      "/api/tags": CATEGORIES,
+    });
+    const tags: AnyFieldDescriptor = {
+      key: "tags",
+      type: "m2m",
+      label: "Tags",
+      attrs: { endpoint: "/api/tags", returnObject: false },
+    };
+    const held = formWith([tags], { tags: [1] });
+    const ai = useMapoAiFill(held);
+
+    await ai.fill("x");
+
+    // City, named twice, is added once and held by none: one record held.
+    expect(ai.recordsToAdd("tags")).toEqual([3]);
+    expect(ai.recordsHeld("tags")).toBe(1);
+    expect(ai.recordsHeld("missing")).toBeUndefined();
+  });
+
+  it("knows nothing of the records of a list it cannot look up", async () => {
+    serveWith(answered({ tags: filled([{ id: 1 }]) }), {});
+    // No endpoint: nothing says which records the field holds.
+    const form = formWith([{ key: "tags", type: "m2m", label: "Tags" }], {
+      tags: [2],
+    });
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(ai.recordsToAdd("tags")).toBeUndefined();
+    expect(ai.recordsHeld("tags")).toBeUndefined();
+  });
+
   it("picks, in a list of records already in, the record several match, and Restore takes it away with the rest", async () => {
     serveWith(
       answered({ tags: filled([{ search: "City" }, { search: "Open" }]) }),

@@ -295,10 +295,18 @@ export interface MapoAiFill {
   /**
    * For a list of related records of the session, by its path: the
    * records a write would add after the field's own, as the field saves
-   * them, those it holds left out; `[]` when it holds them all.
-   * `undefined` for a path that is no such list.
+   * them, those it holds left out; `[]` when a write adds none, because
+   * the field holds every record found or none is found yet. `undefined`
+   * for a path that is no such list, or whose records the field cannot
+   * look up.
    */
   recordsToAdd(path: string): unknown[] | undefined;
+  /**
+   * For a list of related records of the session, by its path: how many
+   * records of the AI's list the field holds already, each counted once,
+   * a record the AI names twice too. `undefined` as for `recordsToAdd()`.
+   */
+  recordsHeld(path: string): number | undefined;
   /**
    * The paths of the marks that wait for the operator, in the order of the
    * form (the body's fields, then the sidebar's, the items of a list by
@@ -1232,12 +1240,37 @@ export function useMapoAiFill<T extends object>(
     };
   }
 
-  function recordsToAdd(path: string): unknown[] | undefined {
+  /** A list of related records of the session whose records can be looked up. */
+  function recordListAt(path: string): MapoAiFillField | undefined {
     const field = fieldAt(path);
     if (!field || !isRecordList(field.outcome)) return undefined;
+    const isKnown = relationFieldOf(field) !== undefined && !!field.relations;
+    return isKnown ? field : undefined;
+  }
+
+  function recordsToAdd(path: string): unknown[] | undefined {
+    const field = recordListAt(path);
+    if (!field) return undefined;
     const planned = recordsWith(field);
     const records = Array.isArray(planned?.value) ? planned.value : [];
     return records.slice(planned?.own ?? records.length);
+  }
+
+  function recordsHeld(path: string): number | undefined {
+    const field = recordListAt(path);
+    const relation = field ? relationFieldOf(field) : undefined;
+    if (!field || !relation) return undefined;
+    const value = readModelValue(target.model.value, field.path);
+    const own: readonly unknown[] = Array.isArray(value) ? toRaw(value) : [];
+    const held: unknown[] = [];
+    for (const match of (field.relations ?? []).map(effectiveMatch)) {
+      const { id } = match;
+      if (match.status !== "found" || id === undefined) continue;
+      if (!holdsRelationId(own, id, relation.itemValue)) continue;
+      // A record the AI names twice is one record of the field.
+      if (!held.some((one) => sameId(one, id))) held.push(id);
+    }
+    return held.length;
   }
 
   /** The form shows a field of the answer now: its predicates on the model as it is. */
@@ -2224,6 +2257,7 @@ export function useMapoAiFill<T extends object>(
     replaced,
     textOf,
     recordsToAdd,
+    recordsHeld,
     toCheck,
     nextToCheck,
     pending,

@@ -184,7 +184,7 @@ export interface MapoAiFieldOptions {
    * for a relation with many records. For records whose names must not
    * reach the provider, as people listed by their email.
    */
-  list?: boolean;
+  list?: false;
 }
 
 declare module "@mapomodule/form/types" {

@@ -968,6 +968,34 @@ describe("Magic Fill's banner: what waits", () => {
     expect(textOf(root)).toContain("mapo.ai.magicFill.summary.recordsHeld");
   });
 
+  it("counts as already in only a record its field holds, not one the AI names twice", async () => {
+    gateway(
+      STATUS,
+      {
+        tags: {
+          status: "filled",
+          value: [{ id: 3 }, { id: 3 }],
+          verified: true,
+          quotes: [{ quote: "City", where: "", found: true }],
+        },
+      },
+      { "/api/tags": RECORDS },
+    );
+    const form = { ...detail(TAGS), isNew: computed(() => false) };
+    form.model.value = { tags: [1] };
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "City";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("City");
+    expect(textOf(root)).not.toContain("mapo.ai.magicFill.summary.recordsHeld");
+  });
+
   it("takes the operator to the next mark that waits", async () => {
     gateway(STATUS, {
       title: {

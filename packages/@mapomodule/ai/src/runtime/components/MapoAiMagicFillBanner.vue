@@ -179,8 +179,7 @@ function valueText(item: MapoAiToConfirm): string {
 
 /** How many records of the AI's list the field holds already. */
 function heldRecords(item: MapoAiToConfirm): number {
-  const proposed = Array.isArray(item.value) ? item.value.length : 0;
-  return item.adds ? Math.max(proposed - item.adds.length, 0) : 0;
+  return item.held ?? 0;
 }
 
 /**

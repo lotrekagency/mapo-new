@@ -1409,6 +1409,28 @@ describe("useMapoAiMagicFill — next to check", () => {
     ]);
   });
 
+  it("starts from the first mark again after Undo all and a new answer", async () => {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered(WAITING),
+    });
+    const revealField = vi.fn(async (_path: string) => true);
+    const { magic } = mounted(detail({ revealField }));
+    await useMapoAiStatus().refresh();
+    magic.text.value = "x";
+
+    await magic.extract();
+    await magic.nextToCheck();
+    magic.undoAll();
+    await magic.extract();
+    await magic.nextToCheck();
+
+    expect(revealField.mock.calls.map(([path]) => path)).toEqual([
+      "title",
+      "title",
+    ]);
+  });
+
   it("offers nothing on a page that cannot take the operator to a field", async () => {
     gateway({
       "/_mapo/ai/status": () => STATUS,
