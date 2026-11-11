@@ -2,15 +2,18 @@
 // landing page of the city magazine with every field type of Mapo, the app's
 // two custom ones (`stars` and `country`, plugins/form-fields.ts) and
 // repeaters of three kinds:
-// - `blocks`, nine templates, two with a repeater inside (`faq`, `stats`)
-//   and one with blocks inside (`columns`); the backend keeps them as JSON,
-//   so only these templates describe them to the AI;
+// - `blocks`, ten templates, two with a repeater inside (`faq`, `stats`),
+//   one with blocks inside (`columns`) and one with a relation inside
+//   (`credits`, an author searched by name); the backend keeps them as
+//   JSON, so only these templates describe them to the AI;
 // - `reviews` and `locations`, described by the backend too (the OPTIONS of
 //   /api/pages/), which gives the custom fields inside them their type;
 //   `locations` has a repeater inside, `opening_hours`.
 // What the AI leaves alone, and why, shows in the panel: media and files
-// (`media`), the relations it only names (`category`, `tags`), the secret
-// (`webhook_secret`), the read-only date (`created_at`).
+// (`media`), the secret (`webhook_secret`), the read-only date
+// (`created_at`). Its related records (`category`, `tags`, a credit's
+// author) Magic Fill finds on the backend: the AI picks a category or a tag
+// from their lists, and writes an author's name, which is searched.
 import type { AnyFieldDescriptor } from "mapomodule/types";
 
 /** The detail's languages: Title, Summary and Intro are translatable. */
@@ -37,7 +40,7 @@ function previewOf(item: unknown): string {
   return "Untitled";
 }
 
-/** The blocks of a page: nine templates, three of them with items inside. */
+/** The blocks of a page: ten templates, three of them with items inside. */
 const BLOCK_TEMPLATES = {
   hero: {
     label: "Hero",
@@ -163,6 +166,22 @@ const BLOCK_TEMPLATES = {
     fields: [
       { key: "title", type: "text", label: "Title" },
       { key: "images", type: "media-m2m", label: "Images" },
+    ],
+  },
+  credits: {
+    label: "Credits",
+    description:
+      "Who made the page: an author of the magazine, and their part.",
+    icon: "i-lucide-user-round",
+    fields: [
+      {
+        key: "author",
+        type: "fks",
+        label: "Author",
+        cols: 6,
+        attrs: { endpoint: "/api/authors", itemText: "name", itemValue: "id" },
+      },
+      { key: "role", type: "text", label: "Role", cols: 6 },
     ],
   },
   contact: {

@@ -3,8 +3,9 @@
 // source picks one by writing "#mock:fixture=<name>", or by being its very
 // text (`source`). An answer is what a model writes for the article's
 // contract: every field of the form, as text, "" for what the source does
-// not give (a category too: in a fill, a related record is the name to
-// search for), and a quote of the source for each value. It goes through the
+// not give, and a quote of the source for each value. A related record is
+// the id of one Magic Fill lists for the AI (a category: Culture is 4), or
+// a name that it searches (an author). It goes through the
 // gateway's checks like any answer: a value whose quote is not in the
 // source comes back to check, one that breaks a rule of its field comes
 // back discarded. The sources are in shared/aiArticleSamples.ts.
@@ -23,6 +24,7 @@ const EMPTY = {
   reading_time: "",
   published_at: "",
   category: "",
+  author: "",
 };
 
 function quote(field: string, words: string) {
@@ -44,6 +46,7 @@ export default defineNitroPlugin(() => {
           excerpt: RELEASE.excerpt,
           body: `${RELEASE.excerpt} ${RELEASE.more}`,
           reading_time: "6",
+          author: "Anna Rossi",
         },
         evidence: [
           quote("title", RELEASE.title),
@@ -51,14 +54,16 @@ export default defineNitroPlugin(() => {
           quote("excerpt", RELEASE.excerpt),
           quote("body", `${RELEASE.excerpt} ${RELEASE.more}`),
           quote("reading_time", RELEASE.reading),
+          quote("author", RELEASE.byline),
         ],
       },
     },
     {
       // A model that guesses: a slug and a date no quote proves, a featured
       // flag quoted from words the source does not have, a status the form
-      // does not list and a reading time above the backend's maximum (120),
-      // and a category, which the operator chooses.
+      // does not list and a reading time above the backend's maximum (120);
+      // the category it picks from the list, which goes in, and an author
+      // three records match, which the operator picks.
       name: "article-mixed",
       answer: {
         values: {
@@ -70,7 +75,8 @@ export default defineNitroPlugin(() => {
           featured: "true",
           reading_time: "300",
           published_at: "2028-01-01T00:00:00",
-          category: "Culture",
+          category: "4",
+          author: "Rossi",
         },
         evidence: [
           quote("title", NOTE.title),
@@ -79,6 +85,7 @@ export default defineNitroPlugin(() => {
           quote("reading_time", "a 300 minutes read"),
           quote("published_at", "to be built by 2028"),
           quote("category", NOTE.category),
+          quote("author", NOTE.signed),
         ],
       },
     },
@@ -89,7 +96,8 @@ export default defineNitroPlugin(() => {
       // would replace the article's; its own slug, and `featured` as it is.
       // The first three wait in the preview, before and after; the last
       // two are already in the record. On a new article, the title and the
-      // slug go in by themselves.
+      // slug go in by themselves. The only author a search for Bianchi gives
+      // is Marco Bianchi: found under another name, he waits.
       name: "article-update",
       answer: {
         values: {
@@ -99,20 +107,24 @@ export default defineNitroPlugin(() => {
           subtitle: "A shorter guide to the form engine",
           featured: "true",
           reading_time: "10",
+          author: "Bianchi",
         },
         evidence: [
           quote("title", UPDATE.title),
           quote("slug", UPDATE.slug),
           quote("subtitle", "A shorter guide to the form engine"),
+          quote("author", UPDATE.editor),
         ],
       },
     },
     {
       // An update of the city library (/ai/magic-fill-blocks/1), for the
-      // items of a list: three blocks, each with its template, so none is
-      // verified, the hero being the page's own; three reviews, the first
-      // the page's own too, the third quoted with words the source does not
-      // have. Only the lists are given: every other field comes back empty.
+      // items of a list: five blocks, each with its template, so none is
+      // verified, the hero being the page's own, two of them credits with
+      // an author by name (Anna Rossi, found; Rossi, three authors to pick
+      // from once the block is in); three reviews, the first the page's own
+      // too, the third quoted with words the source does not have. Only the
+      // lists are given: every other field comes back empty.
       name: "page-update",
       answer: {
         values: {
@@ -148,6 +160,25 @@ export default defineNitroPlugin(() => {
                 },
               ],
               evidence: [quote("faq_heading", "Questions")],
+            },
+            // Credits by name: Anna Rossi is found; Rossi, three authors.
+            {
+              _template: "credits",
+              credits_author: "Anna Rossi",
+              credits_role: "Text",
+              evidence: [
+                quote("credits_author", LIBRARY.credits.text),
+                quote("credits_role", LIBRARY.credits.text),
+              ],
+            },
+            {
+              _template: "credits",
+              credits_author: "Rossi",
+              credits_role: "Photos",
+              evidence: [
+                quote("credits_author", LIBRARY.credits.photos),
+                quote("credits_role", LIBRARY.credits.photos),
+              ],
             },
           ],
           reviews: [

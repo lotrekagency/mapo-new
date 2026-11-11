@@ -136,6 +136,41 @@
         }
       }
     },
+    "/api/authors": {
+      "get": {
+        "operationId": "authors_list",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list, 20 a page, searched by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "next": { "type": "string", "nullable": true },
+                    "previous": { "type": "string", "nullable": true },
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Author" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/categories": {
       "get": {
         "operationId": "categories_list",
@@ -483,7 +518,7 @@
       },
       "PageBlock": {
         "type": "object",
-        "description": "One block of a page: `_template` names it (hero, text, quote, faq, stats, event, columns, gallery, contact), the other properties are its fields.",
+        "description": "One block of a page: `_template` names it (hero, text, quote, faq, stats, event, columns, gallery, credits, contact), the other properties are its fields.",
         "required": ["_template"],
         "properties": {
           "_template": {
@@ -572,6 +607,13 @@
           "closed": {
             "type": "boolean"
           }
+        }
+      },
+      "Author": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "readOnly": true },
+          "name": { "type": "string", "maxLength": 100 }
         }
       },
       "Category": {

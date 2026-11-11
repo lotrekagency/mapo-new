@@ -105,12 +105,12 @@ const sections = [
       {
         label: "Magic Fill",
         to: "/ai/magic-fill/new",
-        desc: "The panel on every detail page: a text or files, What I send, the model, the summary, Cancel and Undo all",
+        desc: "The panel on every detail page: a text or files, What I send, the model, the summary, Cancel and Undo all; a category picked from a list, an author searched by name",
       },
       {
         label: "Magic Fill, the items of a list",
         to: "/ai/magic-fill-blocks/1",
-        desc: "A page of blocks and reviews: each list's items chosen one by one, added after the page's own",
+        desc: "A page of blocks and reviews: each list's items chosen one by one, added after the page's own; an author to pick inside a block",
       },
       {
         label: "Magic Fill off",
@@ -121,6 +121,11 @@ const sections = [
         label: "Magic Fill, a field revealed",
         to: "/ai/magic-fill-reveal/new",
         desc: "The excerpt shows once the article has a status: its verified value goes in after the status",
+      },
+      {
+        label: "Magic Fill, no quotes",
+        to: "/ai/magic-fill-no-quotes/new",
+        desc: "The same article on a page with definePageMeta({ magicFill: { evidence: false } }): every value waits",
       },
       {
         label: "Fill a new article",

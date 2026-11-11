@@ -42,4 +42,12 @@ export const AI_ARTICLE_SIDEBAR_FIELDS: AnyFieldDescriptor[] = [
       returnObject: false,
     },
   },
+  // Sixty authors, a page at a time: too many to list for the AI, which
+  // writes a name that Magic Fill searches. The field keeps the record.
+  {
+    key: "author",
+    type: "fks",
+    label: "Author",
+    attrs: { endpoint: "/api/authors", itemText: "name", itemValue: "id" },
+  },
 ];

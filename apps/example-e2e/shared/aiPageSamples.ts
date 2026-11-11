@@ -122,6 +122,11 @@ export const LIBRARY = {
     author: "Marco Riva",
     quote: "Too few seats in the reading room.",
   },
+  /** Credits by name: three authors are Rossi, one is Anna Rossi. */
+  credits: {
+    photos: "Photos: Rossi.",
+    text: "Text: Anna Rossi.",
+  },
 };
 
 /**
@@ -132,7 +137,7 @@ export const AI_PAGE_MOCK_SAMPLES: AiSample[] = [
   {
     label: "Library update",
     description:
-      "Fixture page-update, for /ai/magic-fill-blocks/1: three blocks, one the page has already, and three reviews, one the page has, one whose quote the source does not have. In the preview each list gives its items one by one: the blocks unticked, since no quote proves a template; the verified review ticked; what the page holds already, not added again.",
+      "Fixture page-update, for /ai/magic-fill-blocks/1: five blocks, one the page has already, two credits with an author by name, and three reviews, one the page has, one whose quote the source does not have. In the preview each list gives its items one by one: the blocks unticked, since no quote proves a template; the verified review ticked; what the page holds already, not added again. The credit of Anna Rossi goes in with her; the one of Rossi, whom three authors match, is marked inside the block once it is in, to pick.",
     text: [
       "#mock:fixture=page-update",
       "",
@@ -148,6 +153,9 @@ export const AI_PAGE_MOCK_SAMPLES: AiSample[] = [
       "What readers say",
       ...LIBRARY.reviews.map(({ author, quote }) => `${author}: "${quote}"`),
       `${LIBRARY.unproven.author}: "${LIBRARY.unproven.quote}"`,
+      "",
+      LIBRARY.credits.photos,
+      LIBRARY.credits.text,
     ].join("\n"),
   },
 ];

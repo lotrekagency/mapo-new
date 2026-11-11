@@ -11,6 +11,11 @@
 //   the values that would replace the article's, before and after and
 //   unticked, and counts those it already holds; tick one and Apply
 //   selected, or Apply on its field, whose mark says what it replaces;
+// - /ai/magic-fill/new with "Council note": the category goes in by itself,
+//   picked from the five Magic Fill lists for the AI; the author Rossi, one
+//   of three among sixty, waits on its mark with the three to pick from;
+// - /ai/magic-fill/1 with "Update": the author Bianchi waits with both
+//   names, since the only author found is Marco Bianchi;
 // - "What I send to the AI": the prompt the gateway composes, with the
 //   app's rules (nuxt.config.ts and server/plugins/mapo-ai-rules.ts);
 // - the sample "Slow": the phases, the time it takes, and Cancel, which

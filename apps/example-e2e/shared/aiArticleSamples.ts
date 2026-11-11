@@ -11,6 +11,8 @@ export const RELEASE = {
   excerpt: "The city council published its first open dataset in 2016.",
   more: "Ten years later, more than 400 datasets are online, from bus timetables to air quality.",
   reading: "Reading time: about 6 minutes.",
+  /** An author found by this very name among the magazine's sixty. */
+  byline: "By Anna Rossi.",
 };
 
 /** Words of a council note, quoted by the fixture `article-mixed`. */
@@ -18,6 +20,8 @@ export const NOTE = {
   title: "Bike lanes: the new plan",
   excerpt: "The council approved 40 km of new bike lanes, to be built by 2028.",
   category: "Category: Culture",
+  /** A name three authors have: Magic Fill offers them to pick. */
+  signed: "Signed: Rossi, transport office.",
 };
 
 /**
@@ -27,6 +31,8 @@ export const NOTE = {
 export const UPDATE = {
   title: "Building admin UIs with Mapo v2, second edition",
   slug: "building-admin-uis-mapo-v2",
+  /** The only author a search for Bianchi finds is Marco Bianchi: it waits. */
+  editor: "Edited by Bianchi.",
 };
 
 /** A source the mock answers by its very text, with no mark: a refusal. */
@@ -54,12 +60,13 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
       "Featured: yes",
       "Reading time: 7",
       "Category: Technology",
+      "Author: Anna Rossi",
     ].join("\n"),
   },
   {
     label: "Press release",
     description:
-      "Fixture article-verified: every value is quoted word for word, so each one is verified.",
+      "Fixture article-verified: every value is quoted word for word, so each one is verified; the author is found by her very name among the magazine's sixty, and goes in.",
     text: [
       "#mock:fixture=article-verified",
       "",
@@ -69,29 +76,32 @@ export const AI_ARTICLE_SAMPLES: AiSample[] = [
       `Milan, 4 November 2026. ${RELEASE.excerpt} ${RELEASE.more}`,
       "",
       RELEASE.reading,
+      RELEASE.byline,
     ].join("\n"),
   },
   {
     label: "Council note",
     description:
-      "Fixture article-mixed: values no quote proves, a status and a reading time discarded, a category to choose.",
+      "Fixture article-mixed: values no quote proves, a status and a reading time discarded, a category the AI picks from the list, which goes in, and an author three records match, to pick on the field's mark.",
     text: [
       "#mock:fixture=article-mixed",
       "",
       NOTE.title,
       `${NOTE.excerpt} Works start in the spring.`,
       NOTE.category,
+      NOTE.signed,
     ].join("\n"),
   },
   {
     label: "Update",
     description:
-      "Fixture article-update, for the existing article (/ai/magic-fill/1): a new title, a subtitle no quote proves and a reading time with no quote would replace the article's, so they wait before and after; the slug and Featured are what it already holds.",
+      "Fixture article-update, for the existing article (/ai/magic-fill/1): a new title, a subtitle no quote proves and a reading time with no quote would replace the article's, so they wait before and after; the slug and Featured are what it already holds; the only author a search for Bianchi finds, Marco Bianchi, waits with both names.",
     text: [
       "#mock:fixture=article-update",
       "",
       UPDATE.title,
       `The article keeps its address: ${UPDATE.slug}.`,
+      UPDATE.editor,
     ].join("\n"),
   },
   {
@@ -170,7 +180,7 @@ export const AI_REAL_SAMPLES: AiSample[] = [
   {
     label: "Council note",
     description:
-      "A category by its name, which waits to be chosen by hand; a year alone, which is no date; nothing about the slug or the status.",
+      "A category by its name, which the AI picks from the five the form lists; a year alone, which is no date; nothing about the slug or the status.",
     text: [
       NOTE.title,
       `${NOTE.excerpt} Works start in the spring.`,
