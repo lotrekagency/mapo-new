@@ -8,6 +8,7 @@ definePageMeta({
   layout: "mapo-default",
   label: "Pages",
   icon: "i-lucide-layout-template",
+  sidebarOrder: 4,
   middleware: ["auth"],
 });
 

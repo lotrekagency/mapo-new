@@ -1,0 +1,24 @@
+{
+  "event": {
+    "name": "Jazz night at Teatro Verdi",
+    "date": "2026-12-12",
+    "doors": "20:30",
+    "end": "23:00",
+    "venue": "Teatro Verdi",
+    "price_eur": 18,
+    "capacity": 450,
+    "online": true,
+    "stream": {
+      "url": "https://stream.example.org/jazz-night",
+      "password": "verdi-2026"
+    },
+    "performers": [
+      { "name": "Marco Rossi", "role": "Piano" },
+      { "name": "Laura Bianchi", "role": "Voice" },
+      { "name": "Tom Baker", "role": "Double bass" }
+    ],
+    "contact": "editor@example.com",
+    "description": "Three musicians of the city play the standards of the fifties, with a guest from London.",
+    "booking": "https://tickets.example.org/jazz-night"
+  }
+}

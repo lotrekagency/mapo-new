@@ -12,6 +12,7 @@ definePageMeta({
   layout: "mapo-default",
   label: "AI status",
   icon: "i-lucide-activity",
+  sidebarOrder: 2,
   middleware: ["auth"],
 });
 
@@ -102,7 +103,7 @@ function bytes(value: number): string {
       variant="subtle"
       icon="i-lucide-sparkles"
       title="What the AI offers you"
-      description="GET /_mapo/ai/status, read as it is. Choose your provider and model, save your own token and check the connection on the AI settings page; the AI's admins (the admin account) assign keys and models there. Sign in as admin, editor, writer or viewer to compare."
+      description="GET /_mapo/ai/status, read as it is. Choose your provider and model, save your own token and check the connection on the AI settings page; the AI's admins (the admin account) assign keys and models there. Sign in as admin, editor, writer, viewer or contractor to compare: the app keeps viewer and contractor out of the AI."
     >
       <template #actions>
         <UButton to="/ai-settings" size="sm" icon="i-lucide-settings">

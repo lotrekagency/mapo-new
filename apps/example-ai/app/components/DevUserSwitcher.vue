@@ -7,7 +7,7 @@
 // A real backend never lets anyone in by a name: this belongs to a demo.
 
 /** The mock's accounts (server/utils/session.ts). */
-const ACCOUNTS = ["admin", "editor", "writer", "viewer"];
+const ACCOUNTS = ["admin", "editor", "writer", "viewer", "contractor"];
 
 const isDev = import.meta.dev;
 const auth = useAuthStore();

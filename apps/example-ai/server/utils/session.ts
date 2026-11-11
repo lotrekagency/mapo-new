@@ -9,66 +9,81 @@ interface MockUser {
   username: string;
   email: string;
   is_superuser: boolean;
+  /**
+   * A field of this backend the gateway does not read: an account of
+   * someone outside the company, such as a contractor. The app's
+   * `mapo-ai:user` hook reads it from the payload and keeps them out of the
+   * AI (server/plugins/mapo-ai-rules.ts).
+   */
+  is_external: boolean;
   all_permissions: string[];
   user_permissions: string[];
   groups: string[];
 }
 
 // The accounts, password equal to the username. The groups give the AI's
-// admins something to assign keys to; the permissions decide who adds,
-// changes and deletes the articles and the pages (server/api/articles,
-// server/api/pages), and so who gets Magic Fill on them:
-// admin   → superuser, so an admin of the AI; group "admin"
-// editor  → group "editors"; every action on articles and pages
-// writer  → groups "editors" and "reporters": a key assigned to both goes
-//           by the order the admins give the groups; adds and changes
-//           articles and pages
-// viewer  → no group; reads articles and pages only, so no Magic Fill
+// admins something to assign keys to, and `mapo.ai.users` in nuxt.config.ts
+// lets only the groups "editors" and "reporters" use the AI (superusers
+// always may); the permissions decide who adds, changes and deletes the
+// articles, the pages and the events (server/api/articles, server/api/pages,
+// server/api/events), and so who gets Magic Fill on them:
+// admin      → superuser, so an admin of the AI; group "admin"
+// editor     → group "editors"; every action on articles, pages and events
+// writer     → groups "editors" and "reporters": a key assigned to both goes
+//              by the order the admins give the groups; adds and changes
+//              articles, pages and events
+// viewer     → no group; reads articles, pages and events only, so no Magic
+//              Fill, and no group `mapo.ai.users` names: `status` answers it
+//              `allowed: false`
+// contractor → group "editors", adds and changes articles, pages and events
+//              as writer does, but the backend marks the account external,
+//              and the app's `mapo-ai:user` hook keeps it out of the AI:
+//              Save works, Magic Fill does not show
 const MOCK_USERS: Record<string, MockUser> = {
-  admin: account(1, "admin", ["admin"], [], true),
+  admin: account(1, "admin", ["admin"], [], { superuser: true }),
   editor: account(
     2,
     "editor",
     ["editors"],
-    [
-      "view_article",
-      "add_article",
-      "change_article",
-      "delete_article",
-      "view_page",
-      "add_page",
-      "change_page",
-      "delete_page",
-    ],
+    can(["view", "add", "change", "delete"]),
   ),
   writer: account(
     3,
     "writer",
     ["editors", "reporters"],
-    [
-      "view_article",
-      "add_article",
-      "change_article",
-      "view_page",
-      "add_page",
-      "change_page",
-    ],
+    can(["view", "add", "change"]),
   ),
-  viewer: account(4, "viewer", [], ["view_article", "view_page"]),
+  viewer: account(4, "viewer", [], can(["view"])),
+  contractor: account(
+    5,
+    "contractor",
+    ["editors"],
+    can(["view", "add", "change"]),
+    { external: true },
+  ),
 };
+
+/** The codenames of `actions` on the app's three models. */
+function can(actions: string[]): string[] {
+  const models = ["article", "page", "event"];
+  return models.flatMap((model) =>
+    actions.map((action) => `${action}_${model}`),
+  );
+}
 
 function account(
   id: number,
   username: string,
   groups: string[],
   permissions: string[],
-  superuser = false,
+  { superuser = false, external = false } = {},
 ): MockUser {
   return {
     id,
     username,
     email: `${username}@example.com`,
     is_superuser: superuser,
+    is_external: external,
     all_permissions: permissions,
     user_permissions: permissions,
     groups,
@@ -115,6 +130,11 @@ export function listUsers(search = "") {
       (user) =>
         !query || user.username.includes(query) || user.email.includes(query),
     );
+}
+
+/** A user with this id exists: an event's contact is one of them. */
+export function isUser(id: number): boolean {
+  return Object.values(MOCK_USERS).some((user) => user.id === id);
 }
 
 /** The groups of the accounts as a DRF backend lists them: id, name; by `search`. */
