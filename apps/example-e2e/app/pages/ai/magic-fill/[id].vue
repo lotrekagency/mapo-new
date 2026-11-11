@@ -18,8 +18,10 @@
 //   names, since the only author found is Marco Bianchi;
 // - /ai/magic-fill/new with "Press release": the reviewer goes in, found by
 //   her email, which the AI wrote without seeing the six reviewers: the
-//   field says `ai: { list: false }`, and "What I send to the AI" shows
-//   the excerpt's `ai.hint`;
+//   field says `ai: { list: false }`. The excerpt's `ai.hint` reaches the
+//   model as the field's description in the answer's schema: the request
+//   to `run` carries it, as `x-mapo-ai`, and "What I send to the AI" does
+//   not show it;
 // - "Next to check", in the banner: each press takes you to the next field
 //   that waits, opening its tab, and puts the focus on it;
 // - "What I send to the AI": the prompt the gateway composes, with the

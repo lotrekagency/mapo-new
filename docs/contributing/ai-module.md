@@ -11,9 +11,9 @@ The module is meant to help an operator enter data with a language model, in two
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-The foundations are in place; neither feature has its interface yet. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: they are the first pieces of Magic Fill, without its panel, and the AI settings page calls the routes of the keys. Under them is the shared core both features will run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Magic Fill is complete; Import AI is not started. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: Magic Fill is built on them, with its panel, banner and preview on every detail page, and the AI settings page calls the routes of the keys. Under them is the shared core both features run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
-What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): Magic Fill, readers for PDFs and images, then Import AI.
+What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): readers for PDFs and images, then the import of several records.
 
 ## How a value travels
 
@@ -692,7 +692,7 @@ The components use Nuxt UI and Tailwind utilities. Tailwind generates only the c
 
 ## Filling a form
 
-`useMapoAiFill()` is the browser's half of `run`, and the first piece of Magic Fill: it fills the form of a `MapoDetail` from a source, without a panel of its own. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
+`useMapoAiFill()` is the browser's half of `run`, and what Magic Fill is built on: it fills the form of a `MapoDetail` from a source, without a panel of its own; an app can use it alone. A page gives it the detail's context, and calls `fill()` with what the operator pasted.
 
 | File                                       | Role                                                                                                      |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -762,13 +762,13 @@ The call goes through `$mapoFetch` when the app has it, so a session that ended 
 
 ### Strengths and weaknesses
 
-- **One rule decides what goes in by itself**, in a pure function with its tests: the same rule will serve Magic Fill's panel.
+- **One rule decides what goes in by itself**, in a pure function with its tests: Magic Fill's panel runs on the same rule.
 - **The browser trusts no answer**: it reads it as outside data, and writes only at the paths it sent.
 - **The operator's work is never undone**: `restore()` and `undo()` put back only what the AI wrote and the field still holds, and a value the operator kept or changed leaves the memory of `undo()` at once.
 - **The operator decides once**: Keep, a change in the field and Ignore end the AI's claim on it; a save ends the session.
 - **A related record goes in only once found**: picked from a closed list, or found by its very name, and proved by a quote of that name; a record under another name, several or none wait for the operator, who picks among the candidates on the mark.
 - **The relations cost requests**: before each Extract, one per relation's endpoint, and after it one per name to search, 25 at most, four at a time. Composing "What I send to the AI" lists the records again.
-- **The names of a short list go to the provider**: up to 50 per relation, in the schema of the answer, which "What I send to the AI" does not show. A relation whose names must not leave, as people by their email, is kept from the AI as a whole; a way to search it instead of listing it is not there yet. A search relies on the endpoint's `?search=`, as the form's own field does: an endpoint without `search_fields` answers its first page, where the AI's very name may still be found, and otherwise gives candidates that do not match. An exact name is looked for in the first page of results only.
+- **The names of a short list go to the provider**: up to 50 per relation, in the schema of the answer, which "What I send to the AI" does not show. A relation whose names must not leave, as people by their email, is kept from the AI as a whole with `ai: { exclude: true }`, or, to keep only its records from the provider, with `ai: { list: false }`: the AI then writes the name it reads and Magic Fill searches it after the answer. A search relies on the endpoint's `?search=`, as the form's own field does: an endpoint without `search_fields` answers its first page, where the AI's very name may still be found, and otherwise gives candidates that do not match. An exact name is looked for in the first page of results only.
 - **A record of the page's own `relationChoices`** is written as `{ itemValue, itemText }` where the field saves records: the page lists no more of it.
 - **A list adds, never replaces**: the chosen items go after the field's own, which never change; an item the field holds is not added twice. To take items out, the operator removes them in the form.
 - **The marks and the memory of `undo()` live in the page, and in its draft**: a page without drafts forgets them at a reload; with drafts, `snapshot()` and `resume()` carry them, the quotes included, in clear in the browser's storage.
@@ -1019,9 +1019,9 @@ Still to write, each with the work that fills it:
 | Import several records     | Import AI                       |
 | Guarantees and limits      | Every change                    |
 
-Magic Fill has a page of its own, [How-to: fill records with Magic Fill](/howto/magic-fill), for the developer who turns it on: what the operator does step by step, how to prepare the fields, the page keys, what each error means, the limits, the accessibility and how to replace the parts. It holds what the review and the preview of Magic Fill were before (R150), and the section of AI-assisted entry sums it up.
+Magic Fill is complete, and has a page of its own, [How-to: fill records with Magic Fill](/howto/magic-fill), for the developer who turns it on: what the operator does step by step, how to prepare the fields, the page keys, what each error means, the limits, the accessibility and how to replace the parts. It holds what the review and the preview of Magic Fill were before (R150), and the section of AI-assisted entry sums it up.
 
-This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text; the last reread closed the foundations.
+This page, for people who work on Mapo, follows every change to the source. At the end of each milestone both pages are read again and rewritten as one text; the last reread closed Magic Fill.
 
 ## Next and nice to have
 
@@ -1029,9 +1029,8 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Magic Fill**, after its panel, its call, the review of its values, its session in the form's draft, its preview, its related records and its quotes: an evaluation set run on real providers.
-2. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
-3. **Import AI**, with a check for duplicates between new items and existing records.
+1. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
+2. **Import of several records** (Import AI), with a check for duplicates between new items and existing records.
 
 ### Nice to have
 

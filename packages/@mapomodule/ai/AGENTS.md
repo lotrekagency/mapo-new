@@ -200,6 +200,7 @@ pnpm --filter "@mapomodule/ai..." build   # ai and what it depends on: the tests
 pnpm --filter @mapomodule/ai test
 pnpm --filter @mapomodule/ai typecheck
 pnpm --filter @mapomodule/ai lint
+pnpm --filter @mapomodule/ai eval   # opt-in: the evaluation set against a real model (a cloud one costs money); see docs/contributing/ai-module.md
 ```
 
 Live: `apps/example-e2e` sets `mapo.ai`, so the gateway answers while `pnpm dev:example-e2e` runs: `curl http://localhost:3000/_mapo/ai/status` gets a 401, and with the mock API's session cookie, `-H 'cookie: __mapo_session=admin'` (a superuser) or `__mapo_session=editor`, the user's status. `run` calls the mock, which the app enables: post `{"task":"fill","entity":{"fields":{…}},"parts":[{"kind":"text","text":"Title: About us"}]}` with `content-type: application/json` and the same cookie, and add `#mock:refusal` or `#mock:rate-limit` to the text for its failures. Without `NUXT_MAPO_AI_SECRET` the dev server warns that it seals with a temporary secret, and the state, the audit records of `run` included, goes to `apps/example-e2e/.data/mapo-ai`. Stop the dev server afterwards. The AI settings page is off in `apps/example-e2e`: check it in `apps/example-ai` (`pnpm dev:example-ai`, port 3002), which enables `openai` and `anthropic` with no mock.

@@ -6,14 +6,15 @@ What to run before a change is handed over, how unit tests are written, and how 
 
 Run them from the repository root. All of them must pass, with no new errors and no new warnings.
 
-| Command                | What it checks                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm build`           | Every package and app builds; the MCP knowledge base is regenerated.                      |
-| `pnpm lint`            | ESLint over every package's `src/`.                                                       |
-| `pnpm typecheck`       | `tsc --noEmit` for TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`.        |
-| `pnpm test`            | Vitest in the packages that declare a `test` script: `utils`, `form`, `mcp`, `ai`.        |
-| `pnpm exec vitest run` | Every test file in the repository, including `core`, `store` and `uikit`.                 |
-| `pnpm docs:build`      | The VitePress site builds. Broken markup fails it; dead links do not (`ignoreDeadLinks`). |
+| Command                             | What it checks                                                                                                                    |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                        | Every package and app builds; the MCP knowledge base is regenerated.                                                              |
+| `pnpm lint`                         | ESLint over every package's `src/`, and `ai`'s `eval/`.                                                                           |
+| `pnpm typecheck`                    | `tsc --noEmit` for TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`.                                                |
+| `pnpm test`                         | Vitest in the packages that declare a `test` script: `utils`, `form`, `mcp`, `ai`.                                                |
+| `pnpm exec vitest run`              | Every test file in the repository, including `core`, `store` and `uikit`.                                                         |
+| `pnpm --filter @mapomodule/ai eval` | The AI module's evaluation set against a real model: opt-in, and a cloud model costs money. With the mock it runs in `pnpm test`. |
+| `pnpm docs:build`                   | The VitePress site builds. Broken markup fails it; dead links do not (`ignoreDeadLinks`).                                         |
 
 `pnpm test` runs after a build (`turbo` makes `test` depend on `build`), because the MCP tests read the generated knowledge base.
 
