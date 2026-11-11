@@ -59,7 +59,7 @@ Three GitHub Actions workflows are involved:
 The release itself:
 
 ```
-CD (manual dispatch, from beta or another release branch)
+CD (manual dispatch, from beta, experimental or another release branch)
   │
   └── release    release_mode: normal (dry-run runs pnpm release:dry instead)
         │
@@ -80,9 +80,25 @@ CD (manual dispatch, from beta or another release branch)
         └── node scripts/release/notify-slack.mjs   (Slack: "Mapo <version> released" + the new changes)
 ```
 
-`.releaserc.cjs` releases from `main` and from `beta`, where versions are prereleases published on the `next` dist-tag. Pull requests never release.
+Pull requests never release: `.releaserc.cjs` releases only from the branches listed under Channels, below.
 
 TODO: extend the validation stage in the future with a test matrix across multiple supported Node.js versions, Nuxt versions, and other compatibility dimensions so releases are validated against more than one environment.
+
+### 5. Channels
+
+`.releaserc.cjs` releases from three branches, each on its own npm dist-tag:
+
+| Branch         | Versions               | npm dist-tag   |
+| -------------- | ---------------------- | -------------- |
+| `main`         | stable, `X.Y.Z`        | `latest`       |
+| `beta`         | `2.0.0-beta.N`         | `next`         |
+| `experimental` | `2.0.0-experimental.N` | `experimental` |
+
+An app picks a channel by its tag: `pnpm add mapomodule@next`, `pnpm add mapomodule@experimental` ([Getting Started](/guide/getting-started#the-next-channel)). `experimental` carries the AI module ahead of `beta`: it takes in `beta` with a merge and adds the work on the AI module. A release from it never moves `next`.
+
+Each prerelease channel counts its own versions from a package's last stable release, the last version without a suffix. The first release from `experimental` is therefore `2.0.0-experimental.1` for the packages released as `1.0.0`, since the commits after it hold the breaking change that opened v2, and `1.0.0-experimental.1` for `@mapomodule/ai` and `@mapomodule/mcp`, which have no stable release.
+
+Semver puts `experimental` after `beta`, so a range such as `^2.0.0-beta.21` also accepts `2.0.0-experimental.1`: an app on `next` upgrades with `pnpm add mapomodule@next`, never with `pnpm update`.
 
 ---
 
@@ -93,6 +109,8 @@ TODO: extend the validation stage in the future with a test matrix across multip
 | `pnpm release`          | Full release: build all packages then run multi-semantic-release. Used by CI.                                                                          |
 | `pnpm release:dry`      | Dry-run: simulates the full release without writing tags, changelogs, or publishing to npm. Use this locally to preview what would be released.        |
 | `pnpm publish:packages` | Emergency manual publish: publishes all packages under `packages/` directly via pnpm without going through semantic-release. Use only if CI is broken. |
+
+`pnpm publish:packages` publishes on the dist-tag of each package's `publishConfig`, `next`: never run it from `experimental`. A release always passes its channel's tag to npm, which takes it over `publishConfig`.
 
 ---
 
@@ -152,6 +170,8 @@ Configure these in the GitHub repository (`Settings → Secrets and variables �
 | `NPM_TOKEN`             | Secret               | An npm automation token with publish rights. Generate at [npmjs.com](https://www.npmjs.com) → `Access Tokens → Generate New Token → Automation`. |
 | `SLACK_BOT_TOKEN`       | Secret               | The bot token (`xoxb-…`) of the Slack app that announces releases. See [Slack announcement](#slack-announcement).                                |
 | `SLACK_RELEASE_CHANNEL` | Variable (or secret) | The ID of the Slack channel to post in (for example `C0123456789`), or several IDs separated by commas.                                          |
+
+The `CD` workflow publishes through npm's trusted publishing (OIDC) and falls back to `NPM_TOKEN` for a package without a Trusted Publisher, which npm lets you configure only on a package that already exists. The first release from `experimental` publishes `@mapomodule/ai` for the first time, so it needs `NPM_TOKEN`; then register the Trusted Publisher on the new package.
 
 ---
 

@@ -58,7 +58,16 @@ const publishPlugins = [
 ];
 
 module.exports = {
-  branches: ["main", { name: "beta", prerelease: true, channel: "next" }],
+  // A prerelease branch names its versions (`prerelease: true` takes the
+  // branch name: 2.0.0-beta.N, 2.0.0-experimental.N) and publishes them on the
+  // npm dist-tag of its channel. Each channel counts its own prereleases from
+  // the package's last stable version, so `experimental`, which carries the
+  // AI module ahead of `beta`, never moves the `next` tag.
+  branches: [
+    "main",
+    { name: "beta", prerelease: true, channel: "next" },
+    { name: "experimental", prerelease: true, channel: "experimental" },
+  ],
   plugins: isDryRun
     ? analysisPlugins
     : [...analysisPlugins, ...publishPlugins],

@@ -31,6 +31,12 @@ How the module is built, what its shared core already does and what comes next a
 
 ## Enable the module
 
+The module is published on the [`experimental` channel](/guide/getting-started#the-experimental-channel) only: the `next` channel does not carry it yet. Install the meta-package from that tag:
+
+```bash
+pnpm add mapomodule@experimental @nuxt/ui
+```
+
 With the meta-package, set the `mapo.ai` key. An empty block is enough:
 
 ```ts
@@ -49,7 +55,7 @@ Without the key, or with `ai: false`, the meta-module skips the package entirely
 On its own, install the package and register it; it then reads the `mapoAi` key:
 
 ```bash
-pnpm add @mapomodule/ai@next   # @next: Mapo v2 is in beta
+pnpm add @mapomodule/ai@experimental   # the AI module is on the experimental channel only
 ```
 
 ```ts

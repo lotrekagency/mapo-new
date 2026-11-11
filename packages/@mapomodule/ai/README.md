@@ -4,7 +4,11 @@ AI-assisted data entry for Mapo backoffices. **Experimental**: the module instal
 
 ## Installation
 
-Installed by the meta-package [`mapomodule`](https://www.npmjs.com/package/mapomodule) when the app sets the `mapo.ai` key; without it, nothing of this package is loaded:
+Published on npm's `experimental` dist-tag only, with the meta-package [`mapomodule`](https://www.npmjs.com/package/mapomodule), which installs it when the app sets the `mapo.ai` key; without it, nothing of this package is loaded:
+
+```bash
+pnpm add mapomodule@experimental @nuxt/ui
+```
 
 ```ts
 // nuxt.config.ts
@@ -20,10 +24,10 @@ export default defineNuxtConfig({
 On its own it reads the `mapoAi` key:
 
 ```bash
-pnpm add @mapomodule/ai@next
+pnpm add @mapomodule/ai@experimental
 ```
 
-The gateway knows the user from the backend session, through `userInfoApi`; the options `admin` and `users` say who administers the AI and who may use it, and `providers` which providers `run` may call. Its state is sealed with a secret of at least 32 characters, set at runtime in the server's environment: `NUXT_MAPO_AI_SECRET` (for example `openssl rand -base64 32`). Mapo v2 is published on the `next` dist-tag while it is in beta.
+The gateway knows the user from the backend session, through `userInfoApi`; the options `admin` and `users` say who administers the AI and who may use it, and `providers` which providers `run` may call. Its state is sealed with a secret of at least 32 characters, set at runtime in the server's environment: `NUXT_MAPO_AI_SECRET` (for example `openssl rand -base64 32`). The `next` dist-tag, where Mapo v2 is in beta, does not carry this package yet.
 
 ## Documentation
 

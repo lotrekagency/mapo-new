@@ -21,13 +21,23 @@ The `mapomodule` meta-package transparently installs `@mapomodule/store`, `@mapo
 
 ### The `next` channel
 
-Mapo v2 is in beta, and every v2 package is published on npm under the `next` dist-tag. For `mapomodule` and most `@mapomodule/*` packages the `latest` tag still points to Mapo v1 (Nuxt 2, Vue 2, Vuex, Axios), so a command without `@next` installs v1: `pnpm add mapomodule` writes `"mapomodule": "^1.0.0"` into your `package.json`.
+Mapo v2 is in beta, and every v2 package is published on npm under the `next` dist-tag, except the AI module, which is on [`experimental`](#the-experimental-channel). For `mapomodule` and most `@mapomodule/*` packages the `latest` tag still points to Mapo v1 (Nuxt 2, Vue 2, Vuex, Axios), so a command without `@next` installs v1: `pnpm add mapomodule` writes `"mapomodule": "^1.0.0"` into your `package.json`.
 
 - Install every Mapo package you add yourself with `@next`: `mapomodule`, `@mapomodule/mapo-integrations-camomilla`, `@mapomodule/mcp`, `@mapomodule/utils`. The packages that `mapomodule` installs for you are pinned by it to matching versions.
-- To upgrade, run the same command again, listing every Mapo package your app declares so they move together: `pnpm add mapomodule@next @mapomodule/mapo-integrations-camomilla@next`.
+- To upgrade, run the same command again, listing every Mapo package your app declares so they move together: `pnpm add mapomodule@next @mapomodule/mapo-integrations-camomilla@next`. Not with `pnpm update`: a range such as `^2.0.0-beta.21` also accepts the prereleases of the [`experimental` channel](#the-experimental-channel), which semver puts after every beta, so an update can move the app onto it. To stay on `next` whatever runs, save the exact version: `pnpm add -E mapomodule@next`.
 - To see where each tag points: `npm view mapomodule dist-tags`.
 
 With npm or yarn the tag works the same way: `npm install mapomodule@next`, `yarn add mapomodule@next`. Once v2 is published as `latest`, the suffix is no longer needed.
+
+### The `experimental` channel
+
+The [AI module](/modules/ai), with [Magic Fill](/howto/magic-fill), is published on a dist-tag of its own, `experimental`, before it reaches `next`. Its versions are prereleases such as `2.0.0-experimental.1`, built from the `experimental` branch, which takes in `beta` and adds the work on the AI module, whose routes and options can change in any release.
+
+```bash
+pnpm add mapomodule@experimental @nuxt/ui
+```
+
+Then enable the module with the `mapo.ai` key ([Enable the module](/modules/ai#enable-the-module)). Add any other Mapo package you declare from the same tag, as `@mapomodule/mcp@experimental`, so the versions match.
 
 ## Configure
 

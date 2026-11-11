@@ -165,7 +165,7 @@ UI translations for every Mapo component, extensible by the consuming app. See [
 
 ### AI-assisted entry (`@mapomodule/ai`, experimental)
 
-New in v2, opt-in with `mapo.ai`. See [AI-assisted entry](/modules/ai).
+New in v2, opt-in with `mapo.ai`, and published on the [`experimental` channel](/guide/getting-started#the-experimental-channel) only. See [AI-assisted entry](/modules/ai).
 
 | Feature                     | Status | Notes                                                                                                                                                                                                            |
 | --------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

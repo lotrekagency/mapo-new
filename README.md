@@ -124,7 +124,7 @@ What to run before handing a change over, and how to check it in the reference a
 
 ### Releases
 
-Releases are cut by maintainers. The `CD` workflow is dispatched by hand from `beta` or another release branch, never from `main`, and runs [multi-semantic-release](https://github.com/qiwi/multi-semantic-release): each package is versioned from its [Conventional Commits](https://www.conventionalcommits.org/), published to npm (prereleases from `beta` on the `next` dist-tag) and announced on Slack.
+Releases are cut by maintainers. The `CD` workflow is dispatched by hand from `beta`, `experimental` or another release branch, never from `main`, and runs [multi-semantic-release](https://github.com/qiwi/multi-semantic-release): each package is versioned from its [Conventional Commits](https://www.conventionalcommits.org/), published to npm (prereleases from `beta` on the `next` dist-tag, from `experimental`, which carries the AI module, on the `experimental` one) and announced on Slack.
 
 | Script                  | What it does                                                             |
 | ----------------------- | ------------------------------------------------------------------------ |
