@@ -17,6 +17,9 @@
 import { fieldsToJsonSchema } from "@mapomodule/form/runtime/utils/fieldsToJsonSchema";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
 import type { JSONSchema } from "@mapomodule/utils";
+import { AI_KEYWORD, aiOptionsFrom } from "./dialect";
+import { buildAiEntity } from "./entity";
+import type { AiField } from "./entity";
 import { MAPO_AI_GATEWAY_PATH } from "./gateway";
 import type {
   MapoAiFillRequest,
@@ -82,9 +85,41 @@ export interface MapoAiFillInput<T = Record<string, unknown>> {
 }
 
 /**
+ * The form's fields as `run` reads them: as `fieldsToJsonSchema()` writes
+ * them, with the `ai` options of each descriptor, a repeater's items
+ * included, as `x-mapo-ai`. `useMapoAiFill()` and Magic Fill send a form's
+ * fields this way; a page that calls `run` itself sends `fields` with it
+ * too, or the descriptors' `hint`, `exclude` and `list: false` never reach
+ * the gateway. Auto-imported in the app's components.
+ *
+ * @example
+ * const answer = await useMapoFetch().fetch<MapoAiRunResponse>("/_mapo/ai/run", {
+ *   method: "POST",
+ *   body: {
+ *     task: "extract",
+ *     entities: [{ type: "event", fields: mapoAiFieldsSchema(fields), model: "event" }],
+ *     parts: [{ kind: "text", text: programme }],
+ *   },
+ * });
+ */
+export function mapoAiFieldsSchema<T>(
+  fields: readonly AnyFieldDescriptor<T>[],
+): JSONSchema {
+  return fieldsToJsonSchema(fields, { property: withAiOptions });
+}
+
+/** A field's schema with its descriptor's `ai` options; what is not one is left out. */
+function withAiOptions(schema: JSONSchema, field: object): JSONSchema {
+  // The descriptor is the app's: its `ai` is read as data of unknown shape.
+  const options = aiOptionsFrom(Reflect.get(field, "ai"));
+  const hasOptions = Object.keys(options).length > 0;
+  return hasOptions ? { ...schema, [AI_KEYWORD]: options } : schema;
+}
+
+/**
  * The body of `run` that fills the record the input describes: the form's
- * fields as `fieldsToJsonSchema()` writes them, and the backend's schema
- * when there is one. Blank instructions are left out.
+ * fields as {@link mapoAiFieldsSchema} writes them, and the backend's
+ * schema when there is one. Blank instructions are left out.
  */
 export function mapoAiFillRequest<T>(
   input: MapoAiFillInput<T>,
@@ -96,7 +131,7 @@ export function mapoAiFillRequest<T>(
   const instructions = input.instructions?.trim();
   const entity: MapoAiRunEntity = {
     ...entityFacts(input.entity),
-    fields: fieldsToJsonSchema(input.fields),
+    fields: mapoAiFieldsSchema(input.fields),
   };
   if (input.schema) entity.schema = input.schema;
   const request: MapoAiFillRequest = {
@@ -1047,6 +1082,17 @@ export async function withRelationLists<T>(
   const { get } = dependencies;
   const relationFields = get ? mapoAiRelationFields(input.fields) : [];
   const pageChoices = input.entity?.relationChoices;
+  // Only the relations the AI may fill, and may see the records of, are
+  // asked: the page's own lists are kept as they are.
+  const listable = relationFields.length
+    ? listableRelations(input)
+    : new Set<string>();
+  const skip = new Set([
+    ...Object.keys(pageChoices ?? {}),
+    ...relationFields
+      .map((field) => field.path)
+      .filter((path) => !listable.has(path)),
+  ]);
   const lists: MapoAiRelationLists =
     get && relationFields.length
       ? await listMapoAiRelations(
@@ -1054,7 +1100,7 @@ export async function withRelationLists<T>(
           { get },
           {
             ...(input.signal ? { signal: input.signal } : {}),
-            skip: new Set(Object.keys(pageChoices ?? {})),
+            skip,
           },
         )
       : { choices: {}, records: {} };
@@ -1066,6 +1112,39 @@ export async function withRelationLists<T>(
       }
     : input.entity;
   return { entity, lists };
+}
+
+/**
+ * The paths of the relations whose records may go to the AI as a list, as
+ * the gateway reads the form: a relation it may fill, without `list: false`
+ * on either side; inside a list's items by `speakers.*.organisation`. The
+ * app's and the admins' words of secrets are the gateway's alone: it may
+ * keep out one more, and ignores its list then.
+ */
+function listableRelations<T>(input: MapoAiFillInput<T>): Set<string> {
+  const exclude = input.entity?.exclude;
+  const entity = buildAiEntity(
+    {
+      fields: mapoAiFieldsSchema(input.fields),
+      ...(input.schema ? { schema: input.schema } : {}),
+    },
+    exclude ? { exclude } : {},
+  );
+  const paths = new Set<string>();
+  const visit = (fields: readonly AiField[], prefix: string): void => {
+    for (const field of fields) {
+      const path = prefix ? `${prefix}.${field.key}` : field.key;
+      const isListable = field.kind === "relation" && !field.unlisted;
+      if (isListable) paths.add(path);
+      if (!field.items) continue;
+      visit(field.items.fields, `${path}.*`);
+      for (const template of field.items.templates ?? []) {
+        visit(template.fields, `${path}.*`);
+      }
+    }
+  };
+  visit(entity.fields, "");
+  return paths;
 }
 
 /**

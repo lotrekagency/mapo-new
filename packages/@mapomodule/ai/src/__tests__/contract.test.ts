@@ -339,6 +339,26 @@ describe("compileFillContract — relations", () => {
     expect(fieldOf(contract, "author").choices).toBeUndefined();
   });
 
+  it("searches a relation whose records stay away from the AI, even when they are listed", () => {
+    const unlisted = buildAiEntity({
+      fields: fieldsToJsonSchema(
+        [{ key: "place", type: "fks", attrs: { endpoint: "/api/places/" } }],
+        {
+          property: (schema) => ({ ...schema, "x-mapo-ai": { list: false } }),
+        },
+      ),
+    });
+
+    const contract = compileFillContract({
+      entity: unlisted,
+      relationChoices: { place: [{ value: 12, label: "Rome" }] },
+    });
+
+    expect(fieldOf(contract, "place").relationMode).toBe("search");
+    expect(fieldOf(contract, "place").choices).toBeUndefined();
+    expect(JSON.stringify(contract.schema)).not.toContain("Rome");
+  });
+
   it("searches when the listed records have no answerable id", () => {
     const contract = compileFillContract({
       entity,

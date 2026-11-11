@@ -393,7 +393,7 @@ describe("the module", () => {
     ]);
   });
 
-  it("gives the app's pages the composables that fill a detail form, read a file, run Magic Fill and ask the status", async () => {
+  it("gives the app's pages the composables that fill a detail form, read a file, run Magic Fill and ask the status, and the writer of a form's fields for run", async () => {
     await setup({ public: {} });
 
     expect(kit.appImports).toEqual([
@@ -412,6 +412,10 @@ describe("the module", () => {
       {
         name: "useMapoAiStatus",
         from: "resolved:./runtime/composables/useMapoAiStatus",
+      },
+      {
+        name: "mapoAiFieldsSchema",
+        from: "resolved:./runtime/shared/fill",
       },
     ]);
   });

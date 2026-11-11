@@ -155,6 +155,45 @@ export type {
 } from "./runtime/shared/sanitize";
 
 /**
+ * How the AI treats a field of a form: `ai` on its descriptor, once
+ * `@mapomodule/ai` is installed. A backend's schema gives the same options
+ * with `x-mapo-ai`; what either side says holds.
+ *
+ * @example
+ * const fields: FieldDescriptor<Article>[] = [
+ *   { key: "summary", type: "textarea", ai: { hint: "Two sentences at most." } },
+ *   { key: "internal_notes", type: "textarea", ai: { exclude: true } },
+ *   {
+ *     key: "reviewer",
+ *     type: "fks",
+ *     attrs: { endpoint: "/api/people/", itemText: "email" },
+ *     ai: { list: false },
+ *   },
+ * ];
+ */
+export interface MapoAiFieldOptions {
+  /** Guidance for the model about this field, beside its label: what to take, and how to write it. */
+  hint?: string;
+  /** `true`: the AI never fills the field, which is left out of what it is sent. */
+  exclude?: boolean;
+  /**
+   * `false`, for a relation: its records never go to the AI as a list,
+   * even when they are few. The AI writes the name it reads in the
+   * source, and Magic Fill searches for it afterwards in the browser, as
+   * for a relation with many records. For records whose names must not
+   * reach the provider, as people listed by their email.
+   */
+  list?: boolean;
+}
+
+declare module "@mapomodule/form/types" {
+  interface FieldExtensions {
+    /** How the AI fills this field (`@mapomodule/ai`). */
+    ai?: MapoAiFieldOptions;
+  }
+}
+
+/**
  * Options of `@mapomodule/ai`: the `mapo.ai` key through the meta-module, or
  * `mapoAi` when the module is registered on its own.
  *

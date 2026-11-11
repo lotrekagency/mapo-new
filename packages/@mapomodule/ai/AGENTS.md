@@ -13,16 +13,17 @@ src/
   module.ts                  Nuxt module: the gateway routes (addServerHandler), the plugins, the settings page
                              (extendPages) and MapoAiSettings (addComponent), the server's auto-imports
                              (registerMapoAiProvider, MapoAiProviderError, registerMapoAiMockFixtures, registerMapoAiReader),
-                             the app's (useMapoAiFill, useMapoAiRead), the secret and the options in private runtime config,
+                             the app's (useMapoAiFill, useMapoAiRead, useMapoAiMagicFill, useMapoAiStatus,
+                             mapoAiFieldsSchema), the secret and the options in private runtime config,
                              every reader of Mapo's place in it, the default mount at `ready`, the hooks' types
   storage.ts                 build time: the file-system default of the `mapo-ai` mount, as Nitro does for `data`
   access.ts                  build time: the `admin` and `users` options, read with a warning for what cannot be read
   settings.ts                build time: the `settings` option (the page's path and label, the users' and groups' endpoints)
   index.ts                   public types (MapoAiOptions, MapoAiStatus, MapoAiUserContext…), also re-exported by
-                             mapomodule/types
+                             mapomodule/types; the `ai` of the form's descriptors, declared on FieldExtensions
   runtime/shared/            pure TypeScript shared by the module, the server and the browser:
                                gateway.ts  route prefix, contract version, the routes' bodies and responses
-                               dialect.ts  the `x-mapo-ai` keyword (hint, exclude) of the JSON Schema dialect
+                               dialect.ts  the `x-mapo-ai` keyword (hint, exclude, list: false) of the JSON Schema dialect, and a descriptor's `ai`
                                entity.ts   the entity model: what the AI may fill, built from the backend schema
                                            and the form's fields, with skipped fields and warnings; objects as
                                            dotted fields, repeaters as lists of items read as entities of their own

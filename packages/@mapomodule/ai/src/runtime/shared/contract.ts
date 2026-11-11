@@ -180,7 +180,8 @@ export interface AiContractSource {
    * The records a relation field may point to, by field key, when they are
    * few: the AI then picks an id instead of writing text to search for. A
    * field inside a list's items goes by its path, `*` standing for the item:
-   * `speakers.*.organisation`.
+   * `speakers.*.organisation`. A field with `x-mapo-ai` `list: false` never
+   * gets them: its records stay away from the AI.
    */
   relationChoices?: Readonly<Record<string, readonly AiChoice[]>>;
   /** Ask for quotes from the source. Default `true`. */
@@ -843,7 +844,11 @@ function contractField(
   const target = value.endpoint
     ? linkTargetOf(targets, value.endpoint)
     : undefined;
-  const records = relationRecords(source, pathIn(at, value.key));
+  // `list: false` keeps the records from the AI, whoever lists them: the
+  // page, or the browser before the call.
+  const records = value.unlisted
+    ? []
+    : relationRecords(source, pathIn(at, value.key));
   const asChoice: AiContractField = {
     ...value,
     wire: wireName(wireKey, taken),

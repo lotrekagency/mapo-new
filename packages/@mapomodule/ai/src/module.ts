@@ -327,7 +327,8 @@ export default defineNuxtModule<MapoAiOptions>({
 
     // What the app's pages use, without an import: the composables that
     // fill a detail form and read a file through the gateway, Magic Fill's
-    // state of a detail, and what the gateway offers the user.
+    // state of a detail, what the gateway offers the user, and a form's
+    // fields as `run` reads them, for a page that calls `run` itself.
     addImports([
       {
         name: "useMapoAiFill",
@@ -344,6 +345,10 @@ export default defineNuxtModule<MapoAiOptions>({
       {
         name: "useMapoAiStatus",
         from: resolver.resolve("./runtime/composables/useMapoAiStatus"),
+      },
+      {
+        name: "mapoAiFieldsSchema",
+        from: resolver.resolve("./runtime/shared/fill"),
       },
     ]);
 

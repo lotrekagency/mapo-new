@@ -223,10 +223,10 @@ A hook only narrows: a user `users` refuses never reaches it, and the rules of t
 
 The page describes the record with its two descriptions, in Mapo's JSON Schema dialect:
 
-- `fields`, the form's fields, as `fieldsToJsonSchema(fields)` writes them ([From form to JSON Schema](/uikit/form/schema-to-form#from-form-to-json-schema));
+- `fields`, the form's fields, as `mapoAiFieldsSchema(fields)` writes them: `fieldsToJsonSchema(fields)` with each descriptor's `ai` ([From form to JSON Schema](/uikit/form/schema-to-form#from-form-to-json-schema));
 - `schema`, the backend's schema, from `OPTIONS`, DRF metadata or an OpenAPI document, normalized by `@mapomodule/utils` ([From DRF metadata and OpenAPI](/uikit/form/schema-to-form#from-drf-metadata-and-openapi)).
 
-One of the two is enough. With both, the form's fields decide which fields exist and of which type, and the stricter limit of the two wins. From them the gateway builds what the AI may fill and the JSON Schema of its answer, with the same code a page can run: a field kept away from the AI (a password, a read-only value, a media, a key named like a secret, a token or credentials, or with one of the app's or the admins' words of secrets, `x-mapo-ai` with `exclude`) is never asked.
+One of the two is enough. With both, the form's fields decide which fields exist and of which type, and the stricter limit of the two wins. From them the gateway builds what the AI may fill and the JSON Schema of its answer, with the same code a page can run: a field kept away from the AI (a password, a read-only value, a media, a key named like a secret, a token or credentials, or with one of the app's or the admins' words of secrets, `x-mapo-ai` with `exclude`) is never asked. `x-mapo-ai` also gives the model a `hint` about a field, and keeps a relation's records from it with `list: false`; a page's descriptors give the same options with `ai`, which `mapoAiFieldsSchema(fields)` writes as `x-mapo-ai` ([Guide a field](#guide-a-field)).
 
 ```ts
 import type { MapoAiRunResponse } from "mapomodule/types";
@@ -237,7 +237,7 @@ const answer = await fetch<MapoAiRunResponse>("/_mapo/ai/run", {
   body: {
     task: "fill",
     entity: {
-      fields: fieldsToJsonSchema(fields),
+      fields: mapoAiFieldsSchema(fields),
       label: "Article",
       model: "article", // the permission asked: change_article here, add_article for a new record
     },
@@ -460,11 +460,36 @@ The components are registered by name, so an app replaces one with a file of the
 
 A field is empty when it holds nothing, a blank text, an empty paragraph or an empty list; `false` and `0` are values. A field the form hides (its `show` or `visible` says so) never takes a value by itself: it waits. Once the answer's own writes are done, a verified value of that answer goes into an empty field they revealed, as when a status of `published` shows the date of publication; a value of an earlier answer keeps waiting. A verified value whose field another field's `onChange` filled while the answer was written waits too, as a replacement: the operator sees before and after. A list of items goes in by itself only into an empty field, and only when every item is verified and none was taken out; for a field that holds items, the operator chooses which to add after them (`apply(path, { items })`), and the field's own items never change. A list of single values goes in whole. A value goes in as the form writes one: through the field's accessor, in every language for a `synci18n` field, then its `onChange`. So a `synci18n` field is empty only when every language is: a value in another language makes the AI's wait, since it would replace it; a part of a field whose accessor converts its value, such as `seo.title` of such a field, waits to be set by hand. Nothing is saved: the operator reviews the form and saves it with the detail's own Save.
 
+### Guide a field
+
+A field's descriptor says how the AI treats it with `ai`, typed once `@mapomodule/ai` is installed. A backend's schema says the same with `x-mapo-ai`, and what either side says holds:
+
+| Option          | What it does                                                                                                                                                                 |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hint`          | Guidance for the model about the field, beside its label: what to take, and how to write it                                                                                  |
+| `exclude: true` | The AI never fills the field, which is left out of what it is sent                                                                                                           |
+| `list: false`   | For a relation: its records never go to the AI as a list, even when few; the AI writes the name it reads, which is searched afterwards ([Related records](#related-records)) |
+
+```ts
+const fields: FieldDescriptor<Article>[] = [
+  { key: "summary", type: "textarea", ai: { hint: "Two sentences at most." } },
+  { key: "internal_notes", type: "textarea", ai: { exclude: true } },
+  {
+    key: "reviewer",
+    type: "fks",
+    attrs: { endpoint: "/api/people/", itemText: "email" },
+    ai: { list: false },
+  },
+];
+```
+
+They count inside a repeater's items too. Anything else in `ai`, such as `list: true` or a blank `hint`, is ignored. Magic Fill and `useMapoAiFill()` send them; a page that calls `run` itself sends its fields with `mapoAiFieldsSchema(fields)`, auto-imported in the app's components, since `fieldsToJsonSchema(fields)` leaves them out.
+
 ### Related records
 
 A relation of the form, an `fks` or `m2m` field with an `endpoint`, has its records looked up as its own field looks them up, with the operator's session:
 
-- **Before the call**, each relation's endpoint is asked for its records. When it gives them all in one answer, a plain list or a page of Django REST Framework with no next page, and they are 50 at most, the AI picks one by its id from that list (`relationChoices`), so no name can be misread. Their ids and names go to the model as the choices of the field, in the schema of the answer, which "What I send to the AI" does not show: it shows the rules, the source and the fields. A relation whose names must not reach the provider, as people listed by their email, is kept from the AI as any field: with a word of secrets of the app or the admins, or `x-mapo-ai` with `exclude` ([Send the record and the source](#send-the-record-and-the-source)). The page's own `relationChoices` of a field take the place of its list.
+- **Before the call**, each relation's endpoint is asked for its records. When it gives them all in one answer, a plain list or a page of Django REST Framework with no next page, and they are 50 at most, the AI picks one by its id from that list (`relationChoices`), so no name can be misread. Their ids and names go to the model as the choices of the field, in the schema of the answer, which "What I send to the AI" does not show: it shows the rules, the source and the fields. Only the relations the AI may fill are asked. A relation whose names must not reach the provider, as people listed by their email, takes `ai: { list: false }` on its descriptor, or `x-mapo-ai` with `list: false` in the backend's schema ([Guide a field](#guide-a-field)): it is never listed, even with a few records, and the names the AI writes are searched after the answer; the gateway leaves out its records even from a request that lists them. The page's own `relationChoices` of a field take the place of its list.
 - **After the answer**, a name the AI wrote instead is searched in the endpoint with `?search=`, as the field searches, 25 names of an answer at most, and four requests at a time. The record is found when the search gives one, or when one alone among several has the AI's very name, letter case, accents and spaces aside, in the first page of results.
 - **What goes in.** A record found with the AI's own name, or picked from the list, is a value like any other: verified by a quote of its name, on an empty field the form shows, it goes in by itself. The field gets what its own select gives: the record's `itemValue` with `returnObject: false`, the record as the endpoint lists it otherwise. A field that holds the same record, by its `itemValue`, is unchanged.
 - **The only record of a search, under another name** (the AI writes "Culture", the record is "Culture & Arts"), never goes in by itself, since a quote of the AI's name proves no record: it waits with Apply, and its mark shows both names.

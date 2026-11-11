@@ -133,6 +133,12 @@ export interface AiField {
   choices?: AiChoice[];
   /** Where a `relation` field looks its records up. */
   endpoint?: string;
+  /**
+   * A `relation` whose records never go to the AI as a list, even when
+   * few: `x-mapo-ai` with `list: false` on either side. The AI writes the
+   * name it reads, which is searched afterwards.
+   */
+  unlisted?: boolean;
   /** Limits the value must respect; for a `list`, the number of its items. */
   constraints: AiConstraints;
   /** What each item of a `list` holds. */
@@ -428,16 +434,21 @@ function isMediaView(view: PropertyView): boolean {
 /**
  * `x-mapo-ai` belongs to the property: the hint comes from the property and
  * the schemas on the way to its value, never from one of its choices. An
- * exclusion anywhere keeps the whole field out.
+ * exclusion anywhere keeps the whole field out, and so does `list: false`
+ * keep its records from the AI.
  */
 function aiOptionsOf(view: PropertyView): AiPropertyOptions {
   const hint = view.path.map(readAiOptions).find((option) => option.hint)?.hint;
   const isExcluded = view.variants.some(
     (schema) => readAiOptions(schema).exclude === true,
   );
+  const isUnlisted = view.variants.some(
+    (schema) => readAiOptions(schema).list === false,
+  );
   return {
     ...(hint ? { hint } : {}),
     ...(isExcluded ? { exclude: true } : {}),
+    ...(isUnlisted ? { list: false } : {}),
   };
 }
 
@@ -1632,8 +1643,16 @@ function mergeField(
     multiple: field.multiple || isBorrowedList,
     choices,
     endpoint: isRelation ? endpoint : undefined,
+    // A backend that keeps the records away is heard even when Mapo could
+    // not read the rest of its description, as an exclusion is.
+    unlisted: isRelation && isUnlisted(field, backend) ? true : undefined,
     constraints,
   });
+}
+
+/** Either side says `list: false` of the field. */
+function isUnlisted(field: Side, backend: Side | undefined): boolean {
+  return field.ai.list === false || backend?.ai.list === false;
 }
 
 // ─── Nested values ───────────────────────────────────────────────────────────

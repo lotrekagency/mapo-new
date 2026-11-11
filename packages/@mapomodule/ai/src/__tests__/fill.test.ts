@@ -134,6 +134,57 @@ describe("mapoAiFillRequest", () => {
     });
   });
 
+  it("writes the ai options of each descriptor as x-mapo-ai, inside a repeater's items too", () => {
+    const fields: AnyFieldDescriptor[] = [
+      { key: "title", type: "text", ai: { hint: " The event's name. " } },
+      { key: "notes", type: "textarea", ai: { exclude: true } },
+      {
+        key: "speakers",
+        type: "repeater",
+        fields: [
+          {
+            key: "person",
+            type: "fks",
+            attrs: { endpoint: "/api/people/" },
+            ai: { list: false },
+          },
+        ],
+      },
+      { key: "slug", type: "text" },
+    ];
+
+    const { properties } = mapoAiFillRequest({ fields, source: "x" }).entity
+      .fields as {
+      properties: Record<string, Record<string, unknown>>;
+    };
+
+    expect(properties.title?.["x-mapo-ai"]).toEqual({
+      hint: "The event's name.",
+    });
+    expect(properties.notes?.["x-mapo-ai"]).toEqual({ exclude: true });
+    expect(properties.speakers).toMatchObject({
+      items: { properties: { person: { "x-mapo-ai": { list: false } } } },
+    });
+    expect(properties.slug).not.toHaveProperty("x-mapo-ai");
+  });
+
+  it("leaves out an ai option that is not one", () => {
+    const fields = [
+      {
+        key: "title",
+        type: "text",
+        ai: { hint: " ", exclude: "yes", list: true },
+      },
+    ] as unknown as AnyFieldDescriptor[];
+
+    const { properties } = mapoAiFillRequest({ fields, source: "x" }).entity
+      .fields as {
+      properties: Record<string, Record<string, unknown>>;
+    };
+
+    expect(properties.title).not.toHaveProperty("x-mapo-ai");
+  });
+
   it("sends the parts of a source as copies", () => {
     const parts = [{ kind: "text" as const, text: "One", name: "a.txt" }];
 
@@ -1132,5 +1183,60 @@ describe("runMapoAiFill — related records", () => {
       { post },
     );
     expect(without.entries[0]?.action).toBe("manual");
+  });
+
+  it("never lists a relation with list: false, and searches the name the AI writes", async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === "/api/categories?search=Culture")
+        return [{ id: 2, name: "Culture" }];
+      throw new Error(path);
+    });
+    const post = vi.fn<PostOf>(async () =>
+      answered({ category: filled({ search: "Culture" }) }),
+    );
+    const fields: AnyFieldDescriptor[] = [
+      { ...CATEGORY_FIELDS[0]!, ai: { list: false } },
+    ];
+
+    const answer = await runMapoAiFill(
+      { fields, source: "x", form: formOf({}) },
+      { post, get },
+    );
+
+    const body = post.mock.calls[0]?.[1] as { entity: Record<string, unknown> };
+    expect(get.mock.calls.map(([path]) => path)).toEqual([
+      "/api/categories?search=Culture",
+    ]);
+    expect(body.entity).not.toHaveProperty("relationChoices");
+    expect(answer.entries[0]?.relations?.[0]).toMatchObject({
+      status: "found",
+      value: 2,
+    });
+  });
+
+  it("never lists a relation the backend's schema keeps unlisted, nor one kept from the AI", async () => {
+    const get = vi.fn(async (path: string) => {
+      throw new Error(path);
+    });
+    const post = vi.fn<PostOf>(async () => answered({}));
+    const schema = {
+      type: "object",
+      properties: {
+        category: { type: "integer", "x-mapo-ai": { list: false } },
+      },
+    };
+    const fields: AnyFieldDescriptor[] = [
+      CATEGORY_FIELDS[0]!,
+      { ...CATEGORY_FIELDS[1]!, ai: { exclude: true } },
+    ];
+
+    await runMapoAiFill(
+      { fields, schema, source: "x", form: formOf({}) },
+      { post, get },
+    );
+
+    expect(get).not.toHaveBeenCalled();
+    const body = post.mock.calls[0]?.[1] as { entity: Record<string, unknown> };
+    expect(body.entity).not.toHaveProperty("relationChoices");
   });
 });

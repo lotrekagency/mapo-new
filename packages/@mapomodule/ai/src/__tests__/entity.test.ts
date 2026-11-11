@@ -638,6 +638,48 @@ describe("buildAiEntity — merging the backend schema into the fields", () => {
 
     expect(fieldOf(entity, "place")?.endpoint).toBe("/api/places/");
   });
+
+  it("keeps a relation's records from the AI with list: false, on either side", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema(
+        [
+          { key: "place", type: "fks", attrs: { endpoint: "/api/places/" } },
+          { key: "author", type: "fks", attrs: { endpoint: "/api/people/" } },
+          { key: "tags", type: "m2m", attrs: { endpoint: "/api/tags/" } },
+          { key: "title", type: "text" },
+        ] as Fields,
+        {
+          property: (schema, field) =>
+            field.key === "place" || field.key === "title"
+              ? { ...schema, [AI_KEYWORD]: { list: false } }
+              : schema,
+        },
+      ),
+      schema: objectSchema({
+        author: { type: "integer", [AI_KEYWORD]: { list: false } },
+        tags: { type: "array", items: { type: "integer" } },
+      }),
+    });
+
+    expect(fieldOf(entity, "place")?.unlisted).toBe(true);
+    expect(fieldOf(entity, "author")?.unlisted).toBe(true);
+    expect(fieldOf(entity, "tags")?.unlisted).toBeUndefined();
+    // Only a relation has records to keep away.
+    expect(fieldOf(entity, "title")?.unlisted).toBeUndefined();
+  });
+
+  it("hears list: false from a backend description it cannot read otherwise", () => {
+    const entity = buildAiEntity({
+      fields: fieldsToJsonSchema([
+        { key: "place", type: "fks", attrs: { endpoint: "/api/places/" } },
+      ] as Fields),
+      schema: objectSchema({
+        place: { $ref: "#/$defs/missing", [AI_KEYWORD]: { list: false } },
+      }),
+    });
+
+    expect(fieldOf(entity, "place")?.unlisted).toBe(true);
+  });
 });
 
 describe("buildAiEntity — what keeps the AI out counts wherever it is written", () => {

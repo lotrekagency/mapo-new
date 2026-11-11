@@ -745,7 +745,7 @@ Adds a component to every `MapoDetail` of the app. Call it from a Nuxt plugin. S
 
 ## AI — `@mapomodule/ai`
 
-Experimental, installed with `mapo.ai`. `useMapoAiFill()`, `useMapoAiRead()`, `useMapoAiMagicFill()` and `useMapoAiStatus()` are auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
+Experimental, installed with `mapo.ai`. `useMapoAiFill()`, `useMapoAiRead()`, `useMapoAiMagicFill()`, `useMapoAiStatus()` and `mapoAiFieldsSchema()` are auto-imported in the app's components; the other functions in the app's server code, such as a Nitro plugin in `server/plugins/`, not in components or Nuxt plugins. See [AI-assisted entry](/modules/ai).
 
 ### `useMapoAiFill(target, options?)`
 
@@ -840,6 +840,14 @@ Magic Fill's state on a detail page: the source, the call and its summary. The b
 What the gateway's `status` answers the signed-in user, read as outside data: one state per app, asked again with `refresh()`. See [The gateway](/modules/ai#the-gateway).
 
 **Returns:** `MapoAiStatusState`: `status` (`Readonly<Ref<MapoAiStatus | undefined>>`, empty until it answers or when it cannot be reached), `loading`, and `refresh()`, one request at a time.
+
+---
+
+### `mapoAiFieldsSchema(fields)`
+
+A form's fields as `run` reads them: `fieldsToJsonSchema(fields)` with each descriptor's `ai` (`hint`, `exclude`, `list: false`) written as `x-mapo-ai`, a repeater's items included. `useMapoAiFill()` and Magic Fill send a form's fields this way; a page that calls `POST /_mapo/ai/run` itself sends `fields: mapoAiFieldsSchema(fields)`, or the descriptors' `ai` never reaches the gateway. See [Guide a field](/modules/ai#guide-a-field).
+
+**Returns:** `JSONSchema`, the `fields` of an entity of `run`.
 
 ---
 

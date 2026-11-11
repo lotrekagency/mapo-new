@@ -182,6 +182,8 @@ The form engine never reads these properties: whoever declares one reads it. A c
 - **Keep `export {}`**: it makes the file a module, so `declare module` adds to Mapo's types instead of replacing them.
 - **They exist for TypeScript only**: nothing checks them at runtime, and a field that does not use one ignores it.
 
+`@mapomodule/ai` declares one this way: `ai`, how the AI fills the field → [Guide a field](/modules/ai#guide-a-field).
+
 ## Tip: reusing built-in Mapo fields
 
 A custom field can compose other Mapo fields internally:
