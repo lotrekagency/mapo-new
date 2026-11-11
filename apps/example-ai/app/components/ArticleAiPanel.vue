@@ -126,8 +126,15 @@ function fill() {
 
 // "Next to check": the marks that wait for the operator, one after the
 // other, each brought into view by the detail (its tab, its group, its
-// item), as Magic Fill's banner does.
+// item), as Magic Fill's banner does. A new answer, or the end of the
+// session, starts again from the first.
 const lastChecked = ref<string>();
+watch(
+  () => ai?.rounds.value,
+  () => {
+    lastChecked.value = undefined;
+  },
+);
 async function nextToCheck() {
   const path = ai?.nextToCheck(lastChecked.value);
   if (!path || !detail?.revealField) return;
