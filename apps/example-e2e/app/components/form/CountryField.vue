@@ -23,7 +23,8 @@ const COUNTRIES: Country[] = [
 ];
 
 const props = defineProps<{
-  modelValue: string | null;
+  // A new record has no value yet: the form passes none.
+  modelValue?: string | null;
   descriptor: CustomDescriptor;
   readonly?: boolean;
   disabled?: boolean;
