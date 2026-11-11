@@ -1,6 +1,7 @@
 import type { H3Event } from "h3";
 import { createError } from "h3";
 import { isCategory } from "./categories";
+import { isTag } from "./tags";
 import { requireUser } from "./session";
 
 // The articles of the example: the record Magic Fill fills on its detail
@@ -31,8 +32,10 @@ export interface Article {
   reading_time: number | null;
   /** `YYYY-MM-DD`; the form shows it only for a published article. */
   published_on: string | null;
-  /** The id of a category (`/api/categories`): a relation, which Magic Fill never writes. */
+  /** The id of a category (`/api/categories`): five, which Magic Fill lists for the AI. */
   category: number | null;
+  /** The ids of tags (`/api/tags`): sixty, which Magic Fill searches by name. */
+  tags: number[];
   /** A list of nested objects, as a DRF ListSerializer: Magic Fill adds its items after these. */
   sources: ArticleSource[];
 }
@@ -58,6 +61,7 @@ const articles = new Map<number, Article>([
       reading_time: null,
       published_on: null,
       category: null,
+      tags: [1],
       sources: [
         { title: "The open data portal", url: "https://data.example.org" },
       ],
@@ -114,6 +118,7 @@ export function createArticle(body: unknown): Article {
     reading_time: null,
     published_on: null,
     category: null,
+    tags: [],
     sources: [],
     ...values,
   };
@@ -230,9 +235,15 @@ function checked(
   }
 
   if (has("category")) {
-    const category = relatedId(data.category);
+    const category = relatedId(data.category, isCategory);
     if (category.ok) values.category = category.id;
     else errors.category = [category.error];
+  }
+
+  if (has("tags")) {
+    const read = relatedIds(data.tags, isTag);
+    if (read.ok) values.tags = read.ids;
+    else errors.tags = [read.error];
   }
 
   if (has("sources")) {
@@ -294,11 +305,12 @@ function sourcesOf(
 }
 
 /**
- * A category's id, as DRF's PrimaryKeyRelatedField reads it: a number, or
- * a string of digits, of a category that exists; `null` clears it.
+ * A related record's id, as DRF's PrimaryKeyRelatedField reads it: a
+ * number, or a string of digits, of a record that exists; `null` clears it.
  */
 function relatedId(
   value: unknown,
+  exists: (id: number) => boolean,
 ): { ok: true; id: number | null } | { ok: false; error: string } {
   if (value === null) return { ok: true, id: null };
   const isDigits = typeof value === "string" && /^\d+$/.test(value);
@@ -310,10 +322,40 @@ function relatedId(
       error: `Incorrect type. Expected pk value, received ${type}.`,
     };
   }
-  if (!isCategory(id)) {
+  if (!exists(id)) {
     return { ok: false, error: `Invalid pk "${id}" - object does not exist.` };
   }
   return { ok: true, id };
+}
+
+/**
+ * The ids of related records, as DRF's ManyRelatedField reads them: a list,
+ * each item read as {@link relatedId} reads one, and the first error said.
+ */
+function relatedIds(
+  value: unknown,
+  exists: (id: number) => boolean,
+): { ok: true; ids: number[] } | { ok: false; error: string } {
+  if (value === null)
+    return { ok: false, error: "This field may not be null." };
+  if (!Array.isArray(value)) {
+    const type = pythonType(value);
+    return {
+      ok: false,
+      error: `Expected a list of items but got type "${type}".`,
+    };
+  }
+  const ids: number[] = [];
+  for (const item of value) {
+    // DRF looks a null item up as a pk, and finds none.
+    if (item === null) {
+      return { ok: false, error: 'Invalid pk "None" - object does not exist.' };
+    }
+    const read = relatedId(item, exists);
+    if (!read.ok) return read;
+    if (read.id !== null && !ids.includes(read.id)) ids.push(read.id);
+  }
+  return { ok: true, ids };
 }
 
 /** DRF's message for a text of a nested item, or `undefined` when it is valid. */
@@ -427,6 +469,13 @@ export function articleMetadata() {
           required: false,
           read_only: false,
           label: "Category",
+        },
+        // A relation to many: DRF names it "field" too.
+        tags: {
+          type: "field",
+          required: false,
+          read_only: false,
+          label: "Tags",
         },
         sources: {
           type: "list",

@@ -3,8 +3,8 @@ import { requireUser } from "./session";
 
 // The categories of the articles: a related model, which the article's form
 // chooses with a search (`?search=`) in its own list, as DRF lists one.
-// Magic Fill never writes a relation: the name the AI gives waits, "To set
-// by hand", for the operator to choose the category in the field.
+// They are five, so Magic Fill lists them for the AI, which picks one by its
+// id: a category the source names goes in by itself, as a verified value.
 
 /** A category, as the backend answers it. */
 export interface Category {

@@ -61,14 +61,27 @@ const sidebarFields: AnyFieldDescriptor[] = [
     label: "Published on",
     show: ({ model }) => model.status === "published",
   },
-  // A relation, chosen with a search: Magic Fill never writes it, and the
-  // name the AI gives waits on the field, "To set by hand".
+  // A relation with five records: Magic Fill lists them for the AI, which
+  // picks one by its id, and a category the source names goes in by itself.
   {
     key: "category",
     type: "fks",
     label: "Category",
     attrs: {
       endpoint: "/api/categories",
+      itemText: "name",
+      itemValue: "id",
+      returnObject: false,
+    },
+  },
+  // A relation to sixty tags, a page at a time: the AI writes their names,
+  // which Magic Fill searches; the tags found go after the article's own.
+  {
+    key: "tags",
+    type: "m2m",
+    label: "Tags",
+    attrs: {
+      endpoint: "/api/tags",
       itemText: "name",
       itemValue: "id",
       returnObject: false,
