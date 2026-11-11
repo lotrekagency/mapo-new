@@ -9,10 +9,13 @@
  */
 
 import type { AiOmittedField } from "./contract";
+import type { AiFieldOutcome } from "./sanitize";
 import type { AiSkipReason } from "./entity";
 import {
   MapoAiFillAnswerError,
   foundQuoteOf,
+  isItemHeld,
+  isItemList,
   isUnprovenValue,
   mapoAiFillRequest,
 } from "./fill";
@@ -518,6 +521,20 @@ export function mapoAiSkipReasonKey(reason: string): string | undefined {
  */
 export type MapoAiWaitReason = "not-proven" | "replaces" | "hidden";
 
+/** An item of a list that waits, as the preview lists it. */
+export interface MapoAiProposedItem {
+  /** Its place in the AI's list, as `apply()` takes it (`items`). */
+  index: number;
+  /** The item, as the form saves it. */
+  value: unknown;
+  /** The template it follows, when the items vary. */
+  template?: string;
+  /** Every value it gives is proved by a quote, and it is complete. */
+  verified: boolean;
+  /** The field holds it already: it is never added again. */
+  held: boolean;
+}
+
 /** A value of the answer that waits for the operator's Apply. */
 export interface MapoAiToConfirm {
   /** The field's key, as the answer names it. */
@@ -530,11 +547,17 @@ export interface MapoAiToConfirm {
   reasons: MapoAiWaitReason[];
   /** For a list: its items, and how many of them are verified. */
   items?: { total: number; verified: number };
+  /**
+   * For a list of items: each item, to choose one by one. They go after
+   * the items the field holds (`current`), and one it holds is not added.
+   */
+  list?: MapoAiProposedItem[];
   /** For a verified value: the words of the source that prove it. */
   quote?: string;
   /**
-   * For a value that would replace one: what the field holds now, at its
-   * path, as the summary was given it. The "before" of the preview.
+   * For a value that would replace one, or a list of items that would join
+   * the field's own: what the field holds now, at its path, as the summary
+   * was given it. The "before" of the preview.
    */
   current?: unknown;
   /**
@@ -556,12 +579,14 @@ export interface MapoAiFillSummary {
   /**
    * Values for empty fields that wait for the operator: a quote of the
    * source does not prove them, or the form hides the field. Their fields
-   * are marked.
+   * are marked. A list of items waits here too, whatever its field holds:
+   * its items join the field's own, so it replaces nothing.
    */
   toFill: MapoAiToConfirm[];
   /**
    * Values that would replace what their field holds, which `current`
-   * gives: the before and after of the preview. Proven or not.
+   * gives: the before and after of the preview. Proven or not. Never a
+   * list of items.
    */
   toReplace: MapoAiToConfirm[];
   /**
@@ -588,8 +613,8 @@ export interface MapoAiFillSummary {
  * changed value is theirs. Only a value the AI gave counts as changed: a
  * discarded one the operator then wrote over stays discarded. A value that
  * waits goes to one group of the preview: `toReplace` when the field holds
- * a value, else `unproven` when the AI quoted nothing for it, else
- * `toFill`.
+ * a value it would replace (never a list of items), else `unproven` when
+ * the AI quoted nothing for it, else `toFill`.
  */
 export function summarizeMapoAiFill(
   fields: readonly (MapoAiFillEntry & {
@@ -624,7 +649,10 @@ export function summarizeMapoAiFill(
     else if (action === "empty") summary.notFound += 1;
     else if (outcome.status === "filled") {
       const quote = outcome.verified ? foundQuoteOf(outcome) : undefined;
-      const hasCurrent = field.replaces && field.current !== undefined;
+      const isList = isItemList(outcome);
+      // What a list's items join is shown too, as what a value replaces.
+      const hasCurrent =
+        (field.replaces || isList) && field.current !== undefined;
       const waiting: MapoAiToConfirm = {
         key: field.key,
         path: field.path,
@@ -644,6 +672,7 @@ export function summarizeMapoAiFill(
           : {}),
         ...(quote !== undefined ? { quote } : {}),
         ...(hasCurrent ? { current: field.current } : {}),
+        ...(isList ? { list: proposedItems(outcome, field.current) } : {}),
         ...(field.replaces && field.languages
           ? { languages: field.languages }
           : {}),
@@ -666,5 +695,36 @@ export function summarizeMapoAiFill(
 export function mapoAiPreselected(summary: MapoAiFillSummary): string[] {
   return summary.toFill
     .filter((item) => !item.reasons.includes("hidden"))
+    .filter((item) => !item.list || mapoAiPreselectedItems(item).length > 0)
     .map((item) => item.path);
+}
+
+/**
+ * The items of a list the preview ticks as it lists them, by their place:
+ * the verified ones the field does not hold yet. A list of a field the form
+ * hides gets none.
+ */
+export function mapoAiPreselectedItems(item: MapoAiToConfirm): number[] {
+  if (!item.list || item.reasons.includes("hidden")) return [];
+  return item.list
+    .filter((one) => one.verified && !one.held)
+    .map((one) => one.index);
+}
+
+/** The items of a list's outcome, each with whether `held` holds it. */
+function proposedItems(
+  outcome: AiFieldOutcome,
+  held: unknown,
+): MapoAiProposedItem[] {
+  if (outcome.status !== "filled" || !outcome.items) return [];
+  const values: readonly unknown[] = Array.isArray(outcome.value)
+    ? outcome.value
+    : [];
+  return outcome.items.map((item, index) => ({
+    index,
+    value: values[index],
+    ...(item.template ? { template: item.template } : {}),
+    verified: item.verified,
+    held: isItemHeld(values[index], held),
+  }));
 }

@@ -6,6 +6,8 @@ import {
   declaredKeys,
   deleteModelValue,
   isEmptyFormValue,
+  isItemHeld,
+  isItemList,
   isSafePath,
   mapoAiFillRequest,
   mapoAiValueText,
@@ -14,6 +16,7 @@ import {
   readModelValue,
   runMapoAiFill,
   undoModelWrite,
+  verifiedItemsToAdd,
   writeModelValue,
 } from "../runtime/shared/fill";
 import type { MapoAiFillForm } from "../runtime/shared/fill";
@@ -536,6 +539,26 @@ describe("planMapoAiFill", () => {
     expect(entry).toMatchObject({ action: "unchanged", replaces: false });
   });
 
+  it("has the operator choose the items of a list for a field that holds some, which it never replaces", () => {
+    const list: AiFieldOutcome = {
+      status: "filled",
+      value: [{ name: "Anna" }],
+      verified: true,
+      quotes: [],
+      items: [{ fields: {}, verified: true }],
+    };
+
+    const [onItems] = planMapoAiFill(
+      { speakers: list },
+      formOf({ speakers: [{ name: "Luca" }] }),
+    );
+    const [onEmpty] = planMapoAiFill({ speakers: list }, formOf({}));
+
+    // Verified, but the field holds items: they would join them, so it waits.
+    expect(onItems).toMatchObject({ action: "confirm", replaces: false });
+    expect(onEmpty).toMatchObject({ action: "apply", replaces: false });
+  });
+
   it("leaves out a field the form does not have, or whose path leads to a prototype", () => {
     const form: MapoAiFillForm = {
       pathOf: (key) =>
@@ -791,5 +814,90 @@ describe("mapoAiValueText", () => {
   it("has no text for a list of items, and cuts a long text", () => {
     expect(mapoAiValueText([{ name: "Ada" }])).toBe("");
     expect(mapoAiValueText("x".repeat(10), 5)).toBe("xxxx…");
+  });
+});
+
+describe("the items of a list", () => {
+  it("tells a list of items from a list of single values", () => {
+    const items: AiFieldOutcome = {
+      status: "filled",
+      value: [{ name: "Anna" }],
+      verified: true,
+      quotes: [],
+      items: [{ fields: {}, verified: true }],
+    };
+
+    expect(isItemList(items)).toBe(true);
+    expect(isItemList(filled(["a", "b"]))).toBe(false);
+    expect(isItemList({ status: "empty" })).toBe(false);
+  });
+
+  it("finds an item among the field's own by every value it gives, whatever else they hold", () => {
+    const held = [
+      { name: "Anna", role: "Chair", photo: 7 },
+      { _template: "hero", title: "Welcome" },
+    ];
+
+    expect(isItemHeld({ name: "Anna", role: "Chair" }, held)).toBe(true);
+    expect(isItemHeld({ _template: "hero", title: "Welcome" }, held)).toBe(
+      true,
+    );
+    expect(isItemHeld({ name: "Anna", role: "Speaker" }, held)).toBe(false);
+    expect(isItemHeld({ _template: "text", title: "Welcome" }, held)).toBe(
+      false,
+    );
+    expect(isItemHeld({ name: "Anna" }, undefined)).toBe(false);
+    expect(isItemHeld("Anna", ["Anna"])).toBe(false);
+  });
+
+  it("finds an item by what it holds at every depth: keys in any order, ids of the record's own", () => {
+    // A block of the record, as the backend gives it back: its questions
+    // with ids, their keys in the serializer's order, one more question.
+    const held = [
+      {
+        _template: "faq",
+        heading: "Questions",
+        image: null,
+        questions: [
+          { id: 3, answer: "No, entry is free.", question: "A card?" },
+          { id: 4, answer: "Yes.", question: "On Sundays?" },
+        ],
+      },
+    ];
+    const faq = (questions: Record<string, unknown>[]) => ({
+      _template: "faq",
+      heading: "Questions",
+      questions,
+    });
+
+    expect(
+      isItemHeld(faq([{ question: "On Sundays?", answer: "Yes." }]), held),
+    ).toBe(true);
+    expect(
+      isItemHeld(
+        faq([{ question: "A card?", answer: "Yes, a free one." }]),
+        held,
+      ),
+    ).toBe(false);
+    expect(isItemHeld(faq([{ question: "Parking?" }]), held)).toBe(false);
+  });
+
+  it("adds by default the verified items the field does not hold, by their place", () => {
+    const list: AiFieldOutcome = {
+      status: "filled",
+      value: [{ name: "Anna" }, { name: "Marco" }, { name: "Paola" }],
+      verified: false,
+      quotes: [],
+      items: [
+        { fields: {}, verified: true },
+        { fields: {}, verified: false },
+        { fields: {}, verified: true },
+      ],
+    };
+
+    expect(verifiedItemsToAdd(list, [{ name: "Paola", photo: 1 }])).toEqual([
+      0,
+    ]);
+    expect(verifiedItemsToAdd(filled("x"), [])).toEqual([]);
   });
 });

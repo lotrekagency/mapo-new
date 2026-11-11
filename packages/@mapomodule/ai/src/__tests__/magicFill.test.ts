@@ -13,6 +13,7 @@ import {
   defaultMapoAiChoice,
   isCallableProvider,
   mapoAiPreselected,
+  mapoAiPreselectedItems,
   mapoAiProviderChoices,
   mapoAiSkipReasonKey,
   mapoAiSourceParts,
@@ -568,10 +569,10 @@ describe("summarizeMapoAiFill", () => {
     expect(summary).toMatchObject({ edited: 0, discarded: 1 });
   });
 
-  it("says how many items of a list waiting are verified", () => {
+  it("says how many items of a list waiting are verified, and gives each, with the ones the field holds", () => {
     const list: AiFieldOutcome = {
       status: "filled",
-      value: [{ name: "A" }, { name: "B" }],
+      value: [{ name: "A" }, { _template: "hero", name: "B" }],
       verified: false,
       quotes: [{ quote: "A and B", where: "", found: false }],
       items: [
@@ -581,16 +582,85 @@ describe("summarizeMapoAiFill", () => {
     };
 
     expect(
-      summarizeMapoAiFill([entry("speakers", "confirm", list)]).toFill,
+      summarizeMapoAiFill([
+        entry("speakers", "confirm", list, {
+          current: [{ name: "A", photo: 7 }],
+        }),
+      ]).toFill,
     ).toEqual([
       {
         key: "speakers",
         path: "speakers",
-        value: [{ name: "A" }, { name: "B" }],
+        value: [{ name: "A" }, { _template: "hero", name: "B" }],
         reasons: ["not-proven"],
         items: { total: 2, verified: 1 },
+        // What its items join: the field's own.
+        current: [{ name: "A", photo: 7 }],
+        list: [
+          { index: 0, value: { name: "A" }, verified: true, held: true },
+          {
+            index: 1,
+            value: { _template: "hero", name: "B" },
+            template: "hero",
+            verified: false,
+            held: false,
+          },
+        ],
       },
     ]);
+  });
+});
+
+describe("mapoAiPreselectedItems", () => {
+  const proposed = (index: number, verified: boolean, held: boolean) => ({
+    index,
+    value: { name: String(index) },
+    verified,
+    held,
+  });
+
+  it("ticks the verified items a list does not hold, and nothing of a hidden field", () => {
+    const item = {
+      key: "speakers",
+      path: "speakers",
+      value: [],
+      reasons: ["not-proven" as const],
+      list: [
+        proposed(0, true, false),
+        proposed(1, false, false),
+        proposed(2, true, true),
+      ],
+    };
+
+    expect(mapoAiPreselectedItems(item)).toEqual([0]);
+    expect(
+      mapoAiPreselectedItems({ ...item, reasons: ["not-proven", "hidden"] }),
+    ).toEqual([]);
+  });
+
+  it("ticks a list only when it has an item to tick", () => {
+    const list = (verified: boolean) => ({
+      key: "speakers",
+      path: "speakers",
+      value: [],
+      reasons: [] as MapoAiWaitReason[],
+      list: [proposed(0, verified, false)],
+    });
+    const summary = (verified: boolean): MapoAiFillSummary => ({
+      applied: 0,
+      kept: 0,
+      edited: 0,
+      toFill: [list(verified)],
+      toReplace: [],
+      unproven: [],
+      unchanged: 0,
+      manual: 0,
+      discarded: 0,
+      notFound: 0,
+    });
+
+    expect(mapoAiPreselected(summary(true))).toEqual(["speakers"]);
+    expect(mapoAiPreselected(summary(false))).toEqual([]);
   });
 });
 

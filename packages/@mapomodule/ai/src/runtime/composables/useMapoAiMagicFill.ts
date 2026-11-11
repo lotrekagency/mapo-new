@@ -11,7 +11,8 @@ import { useNuxtApp } from "nuxt/app";
 import { metadataToJsonSchema } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
-import { dataOf } from "../shared/fill";
+import { dataOf, mapoAiValueText } from "../shared/fill";
+import { isRecord } from "../shared/guards";
 import type { MapoAiFillEntity } from "../shared/fill";
 import type {
   MapoAiRunPreviewResponse,
@@ -29,6 +30,7 @@ import {
 } from "../shared/magicFill";
 import type {
   MapoAiFillSummary,
+  MapoAiProposedItem,
   MapoAiProviderChoice,
   MapoAiSourceProblem,
   MapoAiToConfirm,
@@ -198,19 +200,31 @@ export interface MapoAiMagicFill {
   /**
    * Whether the preview ticks a value that waits, by its path: the
    * operator's tick, else the preview's own, which ticks the values for
-   * empty fields the form shows. A hidden field is never ticked.
+   * empty fields the form shows. A hidden field is never ticked. A list is
+   * ticked while any of its items is.
    */
   isSelected(path: string): boolean;
   /**
    * Ticks or unticks a value that waits, by its path. The tick holds for
-   * that value: a new value at the path starts from the preview's own.
+   * that value: a new value at the path starts from the preview's own. For
+   * a list, every item it may add.
    */
   select(path: string, selected: boolean): void;
+  /**
+   * Whether the preview ticks an item of a list that waits, by the list's
+   * path and the item's place in the AI's list: the operator's tick, else
+   * the preview's own, which ticks the verified items. An item the field
+   * holds already, or of a hidden field, is never ticked.
+   */
+  isItemSelected(path: string, index: number): boolean;
+  /** Ticks or unticks an item of a list that waits. */
+  selectItem(path: string, index: number, selected: boolean): void;
   /** The paths of the values that wait and are ticked now. */
   selected: ComputedRef<string[]>;
   /**
    * Applies every ticked value, as Apply on its field does: into a field
-   * the form shows now, never a hidden one. The others keep waiting.
+   * the form shows now, never a hidden one. The others keep waiting. A list
+   * adds its ticked items after the field's own, and its proposal is used.
    */
   applySelected(): void;
   /**
@@ -220,6 +234,11 @@ export interface MapoAiMagicFill {
   ignoreWaiting(): void;
   /** A field's label, by its key, as the form names it. */
   labelOf(key: string): string;
+  /**
+   * An item of a list as the preview names it: its template's label, when
+   * the items vary, then its first values.
+   */
+  itemLabelOf(key: string, item: MapoAiProposedItem): string;
   /** Translates a key of the `mapo.*` messages, as the app does. */
   t: Translate;
 }
@@ -760,6 +779,9 @@ function magicFillState<T extends object>(
     `${path}\u0000${replaces ? "replaces" : "fills"}\u0000${dataOf(value) ?? ""}`;
   const tickOfItem = (item: MapoAiToConfirm) =>
     tickOf(item.path, item.value, item.reasons.includes("replaces"));
+  /** The tick of an item of a list, by the list's path, its place and its data. */
+  const tickOfListItem = (path: string, index: number, value: unknown) =>
+    `${path}\u0000item\u0000${index}\u0000${dataOf(value) ?? ""}`;
   watch(
     fill.fields,
     (list) => {
@@ -768,9 +790,16 @@ function magicFillState<T extends object>(
         list.flatMap((field) => {
           const { outcome } = field;
           const isWaiting = !field.applied && field.review === undefined;
-          return isWaiting && outcome.status === "filled"
-            ? [tickOf(field.path, outcome.value, field.replaces)]
+          if (!isWaiting || outcome.status !== "filled") return [];
+          const values: readonly unknown[] = Array.isArray(outcome.value)
+            ? outcome.value
             : [];
+          const items = outcome.items
+            ? values.map((value, index) =>
+                tickOfListItem(field.path, index, value),
+              )
+            : [];
+          return [tickOf(field.path, outcome.value, field.replaces), ...items];
         }),
       );
       const kept = [...ticks.value].filter(([tick]) => waitingNow.has(tick));
@@ -787,6 +816,8 @@ function magicFillState<T extends object>(
   function isSelected(path: string): boolean {
     const item = waitingAt(path);
     if (!item) return false;
+    // A list is ticked while any of its items is.
+    if (item.list) return selectedItems(path).length > 0;
     const tick = ticks.value.get(tickOfItem(item));
     return tick ?? preselected.value.has(path);
   }
@@ -794,7 +825,43 @@ function magicFillState<T extends object>(
   function select(path: string, on: boolean): void {
     const item = waitingAt(path);
     if (!item) return;
+    if (item.list) {
+      // Every item the list may add: one the field holds never is.
+      const added = item.list
+        .filter((one) => !one.held)
+        .map(
+          (one) => [tickOfListItem(path, one.index, one.value), on] as const,
+        );
+      ticks.value = new Map([...ticks.value, ...added]);
+      return;
+    }
     ticks.value = new Map([...ticks.value, [tickOfItem(item), on]]);
+  }
+
+  function itemAt(path: string, index: number): MapoAiProposedItem | undefined {
+    return waitingAt(path)?.list?.find((one) => one.index === index);
+  }
+
+  function isItemSelected(path: string, index: number): boolean {
+    const proposed = itemAt(path, index);
+    if (!proposed || proposed.held) return false;
+    const tick = ticks.value.get(tickOfListItem(path, index, proposed.value));
+    return tick ?? proposed.verified;
+  }
+
+  function selectItem(path: string, index: number, on: boolean): void {
+    const proposed = itemAt(path, index);
+    if (!proposed || proposed.held) return;
+    const tick = tickOfListItem(path, index, proposed.value);
+    ticks.value = new Map([...ticks.value, [tick, on]]);
+  }
+
+  /** The ticked items of a list that waits, by their place in the AI's list. */
+  function selectedItems(path: string): number[] {
+    const list = waitingAt(path)?.list ?? [];
+    return list
+      .filter((one) => isItemSelected(path, one.index))
+      .map((one) => one.index);
   }
 
   const selected = computed(() =>
@@ -806,7 +873,10 @@ function magicFillState<T extends object>(
     // field ticked as empty, whose value would now replace it. Each path is
     // looked at again before it is applied.
     for (const path of [...selected.value]) {
-      if (isSelected(path)) fill.apply(path);
+      if (!isSelected(path)) continue;
+      const isList = waitingAt(path)?.list !== undefined;
+      // A list adds its ticked items, and its proposal is used (R133).
+      fill.apply(path, isList ? { items: selectedItems(path) } : {});
     }
   }
 
@@ -816,6 +886,23 @@ function magicFillState<T extends object>(
 
   function labelOf(key: string): string {
     return fieldLabel(descriptorsOf(detail), key);
+  }
+
+  function itemLabelOf(key: string, item: MapoAiProposedItem): string {
+    const descriptor = descriptorOf(descriptorsOf(detail), key);
+    const template =
+      item.template && descriptor
+        ? templateLabel(descriptor, item.template)
+        : (item.template ?? "");
+    const values = isRecord(item.value)
+      ? Object.entries(item.value)
+          .filter(([name]) => name !== "_template")
+          .map(([, value]) => mapoAiValueText(value, 60))
+          .filter(Boolean)
+          .slice(0, 2)
+      : [];
+    const label = [template, ...values].filter(Boolean).join(" · ");
+    return label || `#${item.index + 1}`;
   }
 
   return {
@@ -842,12 +929,45 @@ function magicFillState<T extends object>(
     summary,
     isSelected,
     select,
+    isItemSelected,
+    selectItem,
     selected,
     applySelected,
     ignoreWaiting,
     labelOf,
+    itemLabelOf,
     t,
   };
+}
+
+/** The label of a repeater's template, by its key: its own `label`, else the key. */
+function templateLabel<T extends object>(
+  descriptor: AnyFieldDescriptor<T>,
+  template: string,
+): string {
+  const attrs: unknown = "attrs" in descriptor ? descriptor.attrs : undefined;
+  const templates = isRecord(attrs) ? attrs.templates : undefined;
+  const declared: unknown =
+    isRecord(templates) && Object.hasOwn(templates, template)
+      ? templates[template]
+      : undefined;
+  const label = isRecord(declared) ? declared.label : undefined;
+  return typeof label === "string" && label !== "" ? label : template;
+}
+
+/** The descriptor whose key is the longest to hold a key of the answer. */
+function descriptorOf<T extends object>(
+  descriptors: readonly AnyFieldDescriptor<T>[],
+  key: string,
+): AnyFieldDescriptor<T> | undefined {
+  let found: AnyFieldDescriptor<T> | undefined;
+  for (const descriptor of descriptors) {
+    const own = String(descriptor.key);
+    const holds = key === own || key.startsWith(`${own}.`);
+    const isLonger = !found || own.length > String(found.key).length;
+    if (holds && isLonger) found = descriptor;
+  }
+  return found;
 }
 
 /** The fields of the detail's body and sidebar. */
@@ -866,19 +986,11 @@ function fieldLabel<T extends object>(
   descriptors: readonly AnyFieldDescriptor<T>[],
   key: string,
 ): string {
-  let found: AnyFieldDescriptor<T> | undefined;
-  let length = -1;
-  for (const descriptor of descriptors) {
-    const own = String(descriptor.key);
-    const holds = key === own || key.startsWith(`${own}.`);
-    if (holds && own.length > length) {
-      found = descriptor;
-      length = own.length;
-    }
-  }
+  const found = descriptorOf(descriptors, key);
   if (!found) return readableKey(key);
-  const label = found.label ?? readableKey(String(found.key));
-  const rest = key.slice(length + 1);
+  const own = String(found.key);
+  const label = found.label ?? readableKey(own);
+  const rest = key.slice(own.length + 1);
   return rest ? `${label} · ${readableKey(rest)}` : label;
 }
 

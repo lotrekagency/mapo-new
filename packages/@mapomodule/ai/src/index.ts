@@ -107,6 +107,7 @@ export type { MapoAiFillAnswer } from "./runtime/shared/fillSession";
 export type { MapoAiRead } from "./runtime/composables/useMapoAiRead";
 export type {
   MapoAiFillSummary,
+  MapoAiProposedItem,
   MapoAiProviderChoice,
   MapoAiSourceProblem,
   MapoAiToConfirm,
@@ -126,6 +127,7 @@ export type {
 } from "./runtime/composables/useMapoAiMagicFill";
 export type {
   MapoAiFill,
+  MapoAiFillApplyOptions,
   MapoAiFillCall,
   MapoAiFillError,
   MapoAiFillField,

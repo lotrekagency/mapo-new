@@ -124,6 +124,8 @@ const UAlert: Component = {
 interface CheckboxStub {
   readonly label: string;
   readonly checked: boolean;
+  /** Its state as Nuxt UI's takes it: `true`, `false` or "indeterminate". */
+  readonly value: boolean | string;
   readonly disabled: boolean;
   click(): void;
 }
@@ -134,6 +136,7 @@ const UCheckbox: Component = {
   name: "UCheckbox",
   props: {
     label: String,
+    description: String,
     modelValue: { type: [Boolean, String], default: false },
     disabled: Boolean,
   },
@@ -141,6 +144,7 @@ const UCheckbox: Component = {
   setup(
     props: {
       label?: string;
+      description?: string;
       modelValue?: boolean | string;
       disabled?: boolean;
     },
@@ -153,6 +157,9 @@ const UCheckbox: Component = {
       get checked() {
         return props.modelValue === true;
       },
+      get value() {
+        return props.modelValue ?? false;
+      },
       get disabled() {
         return props.disabled === true;
       },
@@ -162,7 +169,12 @@ const UCheckbox: Component = {
     };
     checkboxes.push(stub);
     onUnmounted(() => checkboxes.splice(checkboxes.indexOf(stub), 1));
-    return () => h("div", null, [props.label ?? "", slots.description?.()]);
+    return () =>
+      h("div", null, [
+        props.label ?? "",
+        props.description ?? "",
+        slots.description?.(),
+      ]);
   },
 };
 
@@ -539,6 +551,117 @@ describe("Magic Fill's parts on a detail", () => {
     expect(button(APPLY_SELECTED)).toBeUndefined();
     expect(textOf(root)).toContain("mapo.ai.magicFill.summary.applied");
     expect(Object.keys(form.annotations.value)).toEqual(["title"]);
+  });
+
+  it("list a list's items with a tick each, and add the ticked ones after the field's own", async () => {
+    const SPEAKERS: AnyFieldDescriptor[] = [
+      {
+        key: "speakers",
+        type: "repeater",
+        label: "Speakers",
+        fields: [{ key: "name", type: "text", label: "Name" }],
+      },
+    ];
+    const speaker = (name: string, verified: boolean) => ({
+      fields: { name: filled(name, verified) },
+      verified,
+    });
+    gateway(STATUS, {
+      speakers: {
+        status: "filled",
+        value: [{ name: "Anna" }, { name: "Luca" }, { name: "Marco" }],
+        verified: false,
+        quotes: [],
+        items: [
+          speaker("Anna", true),
+          speaker("Luca", true),
+          speaker("Marco", false),
+        ],
+      },
+    });
+    const form = { ...detail(SPEAKERS), isNew: computed(() => false) };
+    form.model.value = { speakers: [{ name: "Luca", photo: 7 }] };
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Anna, Luca and Marco";
+
+    await magic.extract();
+    await settle();
+
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.addsTo");
+    // Each item says whether a quote proves it: the list, two of whose
+    // items are proved, does not say that none is.
+    expect(textOf(root)).not.toContain(
+      "mapo.ai.magicFill.summary.reasons.not-proven",
+    );
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.itemVerified");
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.itemToCheck");
+    expect(checkbox("Speakers")?.value).toBe("indeterminate");
+    expect(checkbox("Anna")?.checked).toBe(true);
+    expect(checkbox("Luca")?.disabled).toBe(true);
+    expect(textOf(root)).toContain("mapo.ai.magicFill.summary.itemHeld");
+    expect(checkbox("Marco")?.checked).toBe(false);
+    checkbox("Marco")?.click();
+    await settle();
+    expect(checkbox("Speakers")?.value).toBe(true);
+    button(APPLY_SELECTED)?.click();
+    await settle();
+    expect(form.model.value.speakers).toEqual([
+      { name: "Luca", photo: 7 },
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+  });
+
+  it("turn off the box of a list that has nothing to add", async () => {
+    const SPEAKERS: AnyFieldDescriptor[] = [
+      {
+        key: "speakers",
+        type: "repeater",
+        label: "Speakers",
+        fields: [{ key: "name", type: "text", label: "Name" }],
+      },
+    ];
+    const list = (...names: string[]) => ({
+      status: "filled",
+      value: names.map((name) => ({ name })),
+      verified: true,
+      quotes: [],
+      items: names.map((name) => ({
+        fields: { name: filled(name, true) },
+        verified: true,
+      })),
+    });
+    // The second answer gives the list as the field holds it after the
+    // first: the AI wrote in the field, so the list waits, all held.
+    gateway(STATUS, { speakers: list("Luca", "Anna") });
+    runs.push({
+      task: "fill",
+      status: "answered",
+      result: {
+        readable: true,
+        fields: { speakers: list("Anna") },
+        warnings: [],
+      },
+      provider: { id: "mock", model: "mock" },
+      prompt: 1,
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    const form = { ...detail(SPEAKERS), isNew: computed(() => false) };
+    form.model.value = { speakers: [{ name: "Luca", photo: 7 }] };
+    const { extract } = await ready(form);
+    await extract();
+    button(APPLY_SELECTED)?.click();
+    await settle();
+    expect(form.model.value.speakers).toHaveLength(2);
+
+    await extract();
+
+    expect(checkbox("Speakers")?.disabled).toBe(true);
+    expect(checkbox("Luca")?.disabled).toBe(true);
+    expect(checkbox("Anna")?.disabled).toBe(true);
   });
 
   it("count what the record already holds, with nothing to tick", async () => {

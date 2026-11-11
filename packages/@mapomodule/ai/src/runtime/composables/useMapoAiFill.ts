@@ -26,6 +26,9 @@ import {
   declaredKeys,
   foundQuoteOf,
   holdsRelation,
+  isItemHeld,
+  isItemList,
+  verifiedItemsToAdd,
   isEmptyFormValue,
   isUnprovenValue,
   mapoAiValueText,
@@ -53,6 +56,7 @@ import type {
   MapoAiFillSession,
   MapoAiFillSessionField,
 } from "../shared/fillSession";
+import type { AiItemOutcome } from "../shared/sanitize";
 import { gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
 import type { Translate } from "./translate";
@@ -147,6 +151,16 @@ export interface MapoAiFillField extends MapoAiFillEntry {
   round: number;
 }
 
+/** How `apply()` writes the value of a field. */
+export interface MapoAiFillApplyOptions {
+  /**
+   * For a list of items: the items to add after the field's own, by their
+   * place in the AI's list. Default: every item the field does not hold
+   * yet. An item the field already holds is never added again.
+   */
+  items?: readonly number[];
+}
+
 /** What a value of the session would replace in the form. */
 export interface MapoAiFillReplaced {
   /** What the field holds at the value's path: in the language the form edits, for a translatable field. */
@@ -190,8 +204,10 @@ export interface MapoAiFill {
   /**
    * Writes the AI's value of a field that waits for the operator, by its
    * path, when the form shows the field now: a hidden one keeps waiting.
+   * The items of a list go after the field's own: those `options.items`
+   * names, or every one the field does not hold yet.
    */
-  apply(path: string): void;
+  apply(path: string, options?: MapoAiFillApplyOptions): void;
   /**
    * Puts back what a field held before the AI's values went in, while the
    * field still holds what the AI wrote; the value waits again.
@@ -534,8 +550,14 @@ export function useMapoAiFill<T extends object>(
       : (descriptor.accessor ?? {});
   }
 
-  /** Writes the AI's value of a field; `false` when it cannot. */
-  function write(path: string): boolean {
+  /**
+   * Writes the AI's value of a field, a copy of it, or the list `value`
+   * gives as it is. A list of items goes after the field's own, never in
+   * their place (`listWith()`): an earlier write's `onChange` may have put
+   * items in the field after the plan found it empty. `false` when it
+   * cannot, or when a list has nothing left to add.
+   */
+  function write(path: string, value?: readonly unknown[]): boolean {
     const field = fieldAt(path);
     const outcome = field?.outcome;
     const located = field ? targets.get(field.key) : undefined;
@@ -543,7 +565,13 @@ export function useMapoAiFill<T extends object>(
     if (field.applied || field.review !== undefined || !canWrite()) {
       return false;
     }
-    const records = writeField(located, structuredClone(outcome.value));
+    const written =
+      value ??
+      (isItemList(outcome)
+        ? listWith(field, undefined)
+        : structuredClone(outcome.value));
+    if (written === undefined) return false;
+    const records = writeField(located, written);
     if (!records) return false;
     writes += 1;
     memory.set(path, [...(memory.get(path) ?? []), { order: writes, records }]);
@@ -663,9 +691,18 @@ export function useMapoAiFill<T extends object>(
       // A type the registry cannot resolve: nothing tells how it stores.
       return false;
     }
+    const model = target.model.value;
+    // A list of items is held when every item is, wherever it sits.
+    const isItems =
+      Array.isArray(value) && value.length > 0 && value.every(isRecord);
+    if (isItems) {
+      return writePaths(located).every((path) => {
+        const held = readModelValue(model, path);
+        return value.every((item) => isItemHeld(item, held));
+      });
+    }
     const data = dataOf(value);
     if (data === undefined) return false;
-    const model = target.model.value;
     return writePaths(located).every(
       (path) => dataOf(readModelValue(model, path)) === data,
     );
@@ -762,7 +799,8 @@ export function useMapoAiFill<T extends object>(
       if (!isWaiting) continue;
       held.set(field.path, snapshotOf(field));
       if (field.outcome.status !== "filled") continue;
-      const replaces = holdsValue(field);
+      // A list's items go after the field's own: they replace nothing.
+      const replaces = !isItemList(field.outcome) && holdsValue(field);
       if (replaces === field.replaces) continue;
       setField(field.path, { replaces });
       reworded.push(field.path);
@@ -807,16 +845,51 @@ export function useMapoAiFill<T extends object>(
     }
   }
 
-  function apply(path: string): void {
+  function apply(path: string, options: MapoAiFillApplyOptions = {}): void {
     const field = fieldAt(path);
     const isWaiting = field?.action === "apply" || field?.action === "confirm";
     if (!field || !isWaiting) return;
     // The form may have hidden the field since the answer came: a value
     // the operator would not see go in waits until it shows again.
     if (!shownNow(path)) return;
-    if (!write(path)) return;
+    const isList = isItemList(field.outcome);
+    const list = isList ? listWith(field, options.items) : undefined;
+    if (isList && !list) return;
+    if (!write(path, list)) return;
     const reworded = retakeWaiting();
     refreshMarks([markPathOf(field), ...marksAt(reworded)]);
+  }
+
+  /**
+   * The list a write of a list's items leaves in its field: the field's own
+   * items, then the chosen ones it does not hold yet, in the AI's order.
+   * `undefined` when none is left to add. The own items are those of the
+   * field's path: a `synci18n` list then goes into every language, as the
+   * form writes it.
+   */
+  function listWith(
+    field: MapoAiFillField,
+    chosen: readonly number[] | undefined,
+  ): unknown[] | undefined {
+    const { outcome } = field;
+    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) {
+      return undefined;
+    }
+    const proposed: readonly unknown[] = outcome.value;
+    const held = readModelValue(target.model.value, field.path);
+    // The field's own items stay the same objects, so the form keeps them
+    // as they are; the AI's are copies.
+    const own: readonly unknown[] = Array.isArray(held) ? toRaw(held) : [];
+    const indexes = chosen ?? proposed.map((_, index) => index);
+    // An item the AI gives twice goes in once.
+    const added: unknown[] = [];
+    for (const [index, item] of proposed.entries()) {
+      const isChosen = indexes.includes(index);
+      if (isChosen && !isItemHeld(item, [...own, ...added])) added.push(item);
+    }
+    return added.length
+      ? [...own, ...added.map((item) => structuredClone(item))]
+      : undefined;
   }
 
   /** The form shows a field of the answer now: its predicates on the model as it is. */
@@ -1139,11 +1212,22 @@ export function useMapoAiFill<T extends object>(
       icon: "i-lucide-x",
       onClick: () => dismiss(markPath),
     };
+    // A list adds by itself only its verified items it does not hold:
+    // with none, its items are the operator's to choose.
+    const applicable = waiting.filter(
+      (field) => !isItemList(field.outcome) || itemsByDefault(field).length,
+    );
     const applyAll: FieldAnnotationAction = {
       label: t("mapo.apply"),
       icon: "i-lucide-check",
       color: "primary",
-      onClick: () => waiting.forEach((field) => apply(field.path)),
+      onClick: () =>
+        applicable.forEach((field) =>
+          apply(
+            field.path,
+            isItemList(field.outcome) ? { items: itemsByDefault(field) } : {},
+          ),
+        ),
     };
     const restoreAll: FieldAnnotationAction = {
       label: t("mapo.restore"),
@@ -1163,15 +1247,15 @@ export function useMapoAiFill<T extends object>(
         dot: true,
         description,
         // An earlier answer's value in the field: Restore puts it back too.
-        actions: undoable.length
-          ? [applyAll, restoreAll, ignore]
-          : [applyAll, ignore],
+        actions: [
+          ...(applicable.length ? [applyAll] : []),
+          ...(undoable.length ? [restoreAll] : []),
+          ignore,
+        ],
       };
     }
     if (isApplied) {
-      const isVerified = applied.every(
-        (field) => field.outcome.status === "filled" && field.outcome.verified,
-      );
+      const isVerified = applied.every(isProvedWrite);
       return {
         label: t("mapo.ai.fill.applied"),
         icon: "i-lucide-sparkles",
@@ -1225,11 +1309,118 @@ export function useMapoAiFill<T extends object>(
         : []),
       ...(outcome.tooFew ? [t("mapo.ai.fill.tooFew")] : []),
     ];
+    const added =
+      field.applied && outcome.items ? itemsAdded(field) : undefined;
+    if (added && outcome.items) {
+      const { items } = outcome;
+      const verified = added.filter((at) => items[at]?.verified);
+      // A quote proves what the write added only when every item it added
+      // is verified: the first one any of them quotes.
+      const isProved = added.length > 0 && verified.length === added.length;
+      const addedQuote = isProved
+        ? added
+            .map((at) => itemQuoteOf(items[at]))
+            .find((one) => one !== undefined)
+        : undefined;
+      return [
+        t("mapo.ai.fill.itemsAdded", {
+          n: added.length,
+          verified: verified.length,
+        }),
+        ...(addedQuote !== undefined
+          ? [
+              t("mapo.ai.fill.proven", {
+                quote: mapoAiValueText(addedQuote, 200),
+              }),
+            ]
+          : []),
+        ...notes,
+      ].join(" ");
+    }
     if (field.applied) return [proof, ...notes].join(" ");
+    if (outcome.items)
+      return [itemsLineOf(field, outcome.items), ...notes].join(" ");
     const proposal = field.replaces
       ? replacementOf(field, value)
       : t("mapo.ai.fill.proposes", { value });
     return [proposal, proof, ...notes].join(" ");
+  }
+
+  /**
+   * What the mark of a list that waits says: how many items, how many
+   * verified, how many the field holds already, and, when none would go in
+   * by itself and some could be added, that the operator chooses them.
+   */
+  function itemsLineOf(
+    field: MapoAiFillField,
+    items: readonly AiItemOutcome[],
+  ): string {
+    const verified = items.filter((item) => item.verified).length;
+    const held = itemsHeld(field);
+    return [
+      t("mapo.ai.fill.proposesItems", { n: items.length, verified }),
+      ...(held ? [t("mapo.ai.fill.itemsHeld", { n: held })] : []),
+      ...(itemsByDefault(field).length || held === items.length
+        ? []
+        : [t("mapo.ai.fill.chooseItems")]),
+    ].join(" ");
+  }
+
+  /** The items of a list Apply adds on its mark: the verified ones the field does not hold. */
+  function itemsByDefault(field: MapoAiFillField): number[] {
+    return verifiedItemsToAdd(
+      field.outcome,
+      readModelValue(target.model.value, field.path),
+    );
+  }
+
+  /**
+   * The AI's items the session's writes of a list added, by their place in
+   * its list: those the field holds now and did not hold before the first
+   * of them. `undefined` when what it held then is not known, as after a
+   * draft that could not keep it.
+   */
+  function itemsAdded(field: MapoAiFillField): number[] | undefined {
+    const { outcome } = field;
+    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) return [];
+    const first = memory.get(field.path)?.at(0)?.records[0];
+    if (!first) return undefined;
+    const now = readModelValue(target.model.value, field.path);
+    const proposed: readonly unknown[] = outcome.value;
+    return proposed.flatMap((item, index) =>
+      isItemHeld(item, now) && !isItemHeld(item, first.before) ? [index] : [],
+    );
+  }
+
+  /**
+   * A value in the form is proved: a value by its quote, a list's writes
+   * by every item they added, or by the list's own `verified` when what
+   * they added is not known.
+   */
+  function isProvedWrite(field: MapoAiFillField): boolean {
+    const { outcome } = field;
+    if (outcome.status !== "filled") return false;
+    const items = outcome.items;
+    const added = items ? itemsAdded(field) : undefined;
+    if (!items || !added) return outcome.verified;
+    return added.every((at) => items[at]?.verified === true);
+  }
+
+  /** The first quote of an item found in the source, among its values. */
+  function itemQuoteOf(item: AiItemOutcome | undefined): string | undefined {
+    if (!item) return undefined;
+    return Object.values(item.fields)
+      .map(foundQuoteOf)
+      .find((one) => one !== undefined);
+  }
+
+  /** How many items of a list the field holds already. */
+  function itemsHeld(field: MapoAiFillField): number {
+    const { outcome } = field;
+    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) return 0;
+    const own = readModelValue(target.model.value, field.path);
+    const proposed: readonly unknown[] = outcome.value;
+    return proposed.filter((item) => isItemHeld(item, own)).length;
   }
 
   /**

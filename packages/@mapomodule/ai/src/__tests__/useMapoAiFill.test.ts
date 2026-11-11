@@ -629,6 +629,318 @@ describe("useMapoAiFill — a value the record already holds", () => {
   });
 });
 
+describe("useMapoAiFill — the items of a list", () => {
+  const SPEAKERS: AnyFieldDescriptor[] = [
+    {
+      key: "speakers",
+      type: "repeater",
+      label: "Speakers",
+      fields: [
+        { key: "name", type: "text", label: "Name" },
+        { key: "role", type: "text", label: "Role" },
+      ],
+    },
+  ];
+  /** A speaker as the answer gives it: its name, proved or not. */
+  const speaker = (name: string, verified: boolean) => ({
+    fields: {
+      name: {
+        status: "filled",
+        value: name,
+        verified,
+        quotes: [{ quote: name, where: "", found: verified }],
+      },
+    },
+    verified,
+  });
+  /** A list of speakers, as `run` answers it. */
+  const speakers = (...items: Array<[string, boolean]>) => ({
+    status: "filled",
+    value: items.map(([name]) => ({ name })),
+    verified: items.every(([, verified]) => verified),
+    quotes: [],
+    items: items.map(([name, verified]) => speaker(name, verified)),
+  });
+  /** A form with the speakers list, holding `model`. */
+  const formOf = (model: Record<string, unknown>) => ({
+    ...target(model),
+    fields: computed(() => SPEAKERS),
+    sidebarFields: computed((): AnyFieldDescriptor[] => []),
+  });
+  const OWN = { name: "Luca", photo: 7 };
+
+  it("adds the items after the field's own, never one it holds, and Restore takes them back", async () => {
+    serve(
+      answered({
+        speakers: speakers(["Anna", true], ["Luca", true], ["Marco", false]),
+      }),
+    );
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    // Verified items, but the field holds one: the list waits, and replaces nothing.
+    expect(ai.fields.value[0]).toMatchObject({
+      action: "confirm",
+      replaces: false,
+    });
+
+    ai.apply("speakers");
+
+    expect(form.model.value.speakers).toEqual([
+      OWN,
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+    // The mark counts what the AI added, and is orange: one is to check.
+    expect(form.annotations.value.speakers).toMatchObject({
+      color: "warning",
+      description: 'mapo.ai.fill.itemsAdded {"n":2,"verified":1}',
+    });
+    ai.restore("speakers");
+    expect(form.model.value.speakers).toEqual([OWN]);
+    expect(ai.fields.value[0]).toMatchObject({ applied: false });
+  });
+
+  it("adds only the items chosen, and nothing when every chosen one is held", async () => {
+    serve(
+      answered({
+        speakers: speakers(["Anna", true], ["Luca", true], ["Marco", false]),
+      }),
+    );
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    ai.apply("speakers", { items: [1] });
+    expect(form.model.value.speakers).toEqual([OWN]);
+    expect(ai.fields.value[0]?.applied).toBe(false);
+
+    ai.apply("speakers", { items: [2] });
+    expect(form.model.value.speakers).toEqual([OWN, { name: "Marco" }]);
+    // The list's proposal is used: what was not chosen goes with it.
+    expect(ai.fields.value[0]).toMatchObject({ applied: true });
+    expect(form.annotations.value.speakers?.label).toBe("mapo.ai.fill.applied");
+  });
+
+  it("proves a list's write by the quote of the items it added, when every one is verified", async () => {
+    serve(answered({ speakers: speakers(["Anna", true], ["Marco", false]) }));
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    ai.apply("speakers", { items: [0] });
+
+    // The list is not verified, but what it added is.
+    expect(form.annotations.value.speakers).toMatchObject({
+      color: "success",
+      description:
+        'mapo.ai.fill.itemsAdded {"n":1,"verified":1} mapo.ai.fill.proven {"quote":"Anna"}',
+    });
+  });
+
+  it("takes a list's added items back from a draft: its mark counts them, and Restore leaves the field's own", async () => {
+    serve(
+      answered({
+        speakers: speakers(["Anna", true], ["Luca", true], ["Marco", false]),
+      }),
+    );
+    const before = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    ai.apply("speakers", { items: [0] });
+    const kept = JSON.parse(JSON.stringify(ai.snapshot()));
+
+    // The page loads again, and the draft puts its values back first.
+    const after = formOf(JSON.parse(JSON.stringify(before.model.value)));
+    const again = useMapoAiFill(after);
+    expect(again.resume(kept)).toBe(true);
+    await nextTick();
+
+    expect(after.annotations.value.speakers).toMatchObject({
+      label: "mapo.ai.fill.applied",
+      color: "success",
+      description:
+        'mapo.ai.fill.itemsAdded {"n":1,"verified":1} mapo.ai.fill.proven {"quote":"Anna"}',
+    });
+    again.restore("speakers");
+    expect(after.model.value.speakers).toEqual([OWN]);
+    // The proposal is back, with what the field holds already.
+    expect(after.annotations.value.speakers?.description).toBe(
+      'mapo.ai.fill.proposesItems {"n":3,"verified":2} mapo.ai.fill.itemsHeld {"n":1}',
+    );
+  });
+
+  it("adds a verified list after the items an earlier write's onChange put in its field", async () => {
+    serve(
+      answered({
+        title: filled("About us"),
+        speakers: speakers(["Anna", true], ["Marco", true]),
+      }),
+    );
+    const fields: AnyFieldDescriptor[] = [
+      {
+        key: "title",
+        type: "text",
+        label: "Title",
+        // The app seeds the list once the record has a title.
+        onChange: ({ model }) => {
+          model.speakers = [OWN];
+        },
+      },
+      ...SPEAKERS,
+    ];
+    const form = {
+      ...target(),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value.speakers).toEqual([
+      OWN,
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+    ai.restore("speakers");
+    expect(form.model.value.speakers).toEqual([OWN]);
+  });
+
+  it("adds an item the AI gives twice once", async () => {
+    serve(
+      answered({
+        speakers: speakers(["Anna", false], ["Anna", false], ["Marco", false]),
+      }),
+    );
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    ai.apply("speakers");
+
+    expect(form.model.value.speakers).toEqual([
+      OWN,
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+  });
+
+  it("counts on the mark every item the session's answers added to a list, not the last write's only", async () => {
+    const post = serve(answered({ speakers: speakers(["Anna", true]) }));
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    ai.apply("speakers");
+    post.mockResolvedValueOnce(
+      answered({ speakers: speakers(["Anna", true], ["Marco", true]) }),
+    );
+    await ai.fill("y");
+
+    ai.apply("speakers");
+
+    expect(form.model.value.speakers).toEqual([
+      OWN,
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+    expect(form.annotations.value.speakers?.description).toBe(
+      'mapo.ai.fill.itemsAdded {"n":2,"verified":2} mapo.ai.fill.proven {"quote":"Anna"}',
+    );
+    ai.restore("speakers");
+    expect(form.model.value.speakers).toEqual([OWN]);
+  });
+
+  it("does not ask to choose the items of a list that holds them all", async () => {
+    const post = serve(answered({ speakers: speakers(["Anna", true]) }));
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    ai.apply("speakers");
+    // A later answer gives the list again, as the field holds it now: the
+    // AI wrote in the field, so the list waits, with nothing to add.
+    post.mockResolvedValueOnce(
+      answered({ speakers: speakers(["Luca", true], ["Anna", true]) }),
+    );
+    await ai.fill("y");
+
+    expect(form.annotations.value.speakers?.description).toBe(
+      'mapo.ai.fill.proposesItems {"n":2,"verified":2} mapo.ai.fill.itemsHeld {"n":2}',
+    );
+  });
+
+  it("names no count on the mark of a list a draft took back without what it held before", async () => {
+    serve(answered({ speakers: speakers(["Luca", true], ["Anna", true]) }));
+    // A date in the field's own item: the draft cannot keep what it held.
+    const before = formOf({ speakers: [{ ...OWN, met: new Date(0) }] });
+    const ai = useMapoAiFill(before);
+    await ai.fill("x");
+    ai.apply("speakers");
+    const kept = JSON.parse(JSON.stringify(ai.snapshot()));
+
+    const after = formOf(JSON.parse(JSON.stringify(before.model.value)));
+    const again = useMapoAiFill(after);
+    expect(again.resume(kept)).toBe(true);
+    await nextTick();
+
+    // Which items the AI added is not known: the mark says the list's proof.
+    expect(after.annotations.value.speakers).toMatchObject({
+      label: "mapo.ai.fill.applied",
+      description: 'mapo.ai.fill.proven {"quote":"Luca"}',
+    });
+  });
+
+  it("counts a list whose every item the field holds as already there", async () => {
+    serve(answered({ speakers: speakers(["Luca", true]) }));
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(ai.fields.value[0]).toMatchObject({ action: "unchanged" });
+    expect(form.annotations.value.speakers).toBeUndefined();
+  });
+
+  it("marks a waiting list with its items, and applies from there the verified ones it does not hold", async () => {
+    serve(
+      answered({
+        speakers: speakers(["Anna", true], ["Luca", true], ["Marco", false]),
+      }),
+    );
+    const form = formOf({ speakers: [OWN] });
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    const mark = form.annotations.value.speakers;
+    expect(mark?.description).toBe(
+      'mapo.ai.fill.proposesItems {"n":3,"verified":2} mapo.ai.fill.itemsHeld {"n":1}',
+    );
+    expect(mark?.actions?.map((action) => action.label)).toEqual([
+      "mapo.apply",
+      "mapo.ai.fill.ignore",
+    ]);
+
+    mark?.actions?.[0]?.onClick();
+
+    expect(form.model.value.speakers).toEqual([OWN, { name: "Anna" }]);
+  });
+
+  it("leaves Apply off the mark of a list with no verified item to add, and says to choose them", async () => {
+    serve(answered({ speakers: speakers(["Anna", false], ["Marco", false]) }));
+    const form = formOf({});
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+
+    const mark = form.annotations.value.speakers;
+
+    expect(mark?.description).toBe(
+      'mapo.ai.fill.proposesItems {"n":2,"verified":0} mapo.ai.fill.chooseItems',
+    );
+    expect(mark?.actions?.map((action) => action.label)).toEqual([
+      "mapo.ai.fill.ignore",
+    ]);
+  });
+});
+
 describe("useMapoAiFill — waiting and failing", () => {
   it("stops waiting when cancelled, and drops the late answer", async () => {
     let answer: (value: unknown) => void = () => {};
@@ -1481,7 +1793,8 @@ describe("useMapoAiFill — the form's own rules", () => {
 
     expect(form.annotations.value.speakers).toMatchObject({
       color: "success",
-      description: 'mapo.ai.fill.proven {"quote":"Quote of Ada"}',
+      description:
+        'mapo.ai.fill.itemsAdded {"n":1,"verified":1} mapo.ai.fill.proven {"quote":"Quote of Ada"}',
     });
     expect(form.annotations.value.guests?.description).toContain(
       'mapo.ai.fill.dropped {"n":1}',

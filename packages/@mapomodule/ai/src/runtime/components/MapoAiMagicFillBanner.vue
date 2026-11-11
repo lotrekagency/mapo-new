@@ -19,7 +19,11 @@ import {
 } from "../composables/useMapoAiMagicFill";
 import type { MapoAiMagicFillDetail } from "../composables/useMapoAiMagicFill";
 import { mapoAiValueText } from "../shared/fill";
-import type { MapoAiToConfirm, MapoAiWaitReason } from "../shared/magicFill";
+import type {
+  MapoAiProposedItem,
+  MapoAiToConfirm,
+  MapoAiWaitReason,
+} from "../shared/magicFill";
 
 const props = defineProps<{
   /** The detail it fills: the context of `MapoDetail`, from `useMapoDetail()`. */
@@ -193,12 +197,46 @@ function reasonsText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
     .join(" · ");
 }
 
-/** What the preview says under a value: the words that prove it, and why it waits. */
+/**
+ * What the preview says under a value: the words that prove it, and why it
+ * waits. A list says how many items its field holds, which its own join;
+ * its items say whether each is proved, and its value how many are, so the
+ * list itself names no quote and does not say that none proves it.
+ */
 function notesText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
-  const proof = item.quote
-    ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(item.quote, 80) })
-    : "";
-  return [proof, reasonsText(item, said)].filter(Boolean).join(" · ");
+  const proof =
+    item.quote && !item.list
+      ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(item.quote, 80) })
+      : "";
+  const own = Array.isArray(item.current) ? item.current.length : 0;
+  const joins =
+    item.list && own > 0
+      ? t("mapo.ai.magicFill.summary.addsTo", { n: own })
+      : "";
+  const told: MapoAiWaitReason[] = item.list ? [...said, "not-proven"] : said;
+  return [proof, joins, reasonsText(item, told)].filter(Boolean).join(" · ");
+}
+
+/** An item of a list as its tick says it: verified, to check, or already in the list. */
+function itemNote(one: MapoAiProposedItem): string {
+  if (one.held) return t("mapo.ai.magicFill.summary.itemHeld");
+  return one.verified
+    ? t("mapo.ai.magicFill.summary.itemVerified")
+    : t("mapo.ai.magicFill.summary.itemToCheck");
+}
+
+/**
+ * The tick of a value: for a list, ticked when every item it may add is,
+ * half when some are.
+ */
+function tickOf(item: MapoAiToConfirm): boolean | "indeterminate" {
+  if (!item.list) return magic.isSelected(item.path);
+  const addable = item.list.filter((one) => !one.held);
+  const ticked = addable.filter((one) =>
+    magic.isItemSelected(item.path, one.index),
+  );
+  if (!ticked.length) return false;
+  return ticked.length === addable.length ? true : "indeterminate";
 }
 
 /** A hidden field is never ticked nor written: the operator would not see it go in. */
@@ -206,9 +244,20 @@ function canApply(item: MapoAiToConfirm): boolean {
   return !item.reasons.includes("hidden");
 }
 
-/** A tick of the checkbox: `true` when ticked, never "indeterminate" here. */
+/** The box of a value: off for a hidden field, and for a list with nothing to add. */
+function canTick(item: MapoAiToConfirm): boolean {
+  const hasNothingToAdd = item.list?.every((one) => one.held) === true;
+  return canApply(item) && !hasNothingToAdd;
+}
+
+/** A tick of a value's checkbox: for a list, every item it may add. */
 function onTick(path: string, value: unknown): void {
   magic.select(path, value === true);
+}
+
+/** A tick of an item of a list. */
+function onItemTick(path: string, index: number, value: unknown): void {
+  magic.selectItem(path, index, value === true);
 }
 </script>
 
@@ -333,8 +382,8 @@ function onTick(path: string, value: unknown): void {
           <ul class="divide-y divide-default">
             <li v-for="item in group.items" :key="item.path" class="py-1.5">
               <UCheckbox
-                :model-value="magic.isSelected(item.path)"
-                :disabled="!canApply(item)"
+                :model-value="tickOf(item)"
+                :disabled="!canTick(item)"
                 :label="magic.labelOf(item.key)"
                 :ui="{ label: 'font-medium', description: 'text-default' }"
                 @update:model-value="onTick(item.path, $event)"
@@ -366,6 +415,22 @@ function onTick(path: string, value: unknown): void {
                   </span>
                 </template>
               </UCheckbox>
+              <!-- A list's items, each with its own tick: they go after the
+                   items the field holds, and one it holds is not added. -->
+              <ul v-if="item.list" class="mt-1 space-y-1 ps-6">
+                <li v-for="one in item.list" :key="one.index">
+                  <UCheckbox
+                    :model-value="magic.isItemSelected(item.path, one.index)"
+                    :disabled="one.held || !canApply(item)"
+                    :label="magic.itemLabelOf(item.key, one)"
+                    :description="itemNote(one)"
+                    :ui="{ description: 'text-xs text-muted' }"
+                    @update:model-value="
+                      onItemTick(item.path, one.index, $event)
+                    "
+                  />
+                </li>
+              </ul>
             </li>
           </ul>
         </fieldset>

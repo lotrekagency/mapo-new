@@ -449,6 +449,7 @@ export interface MapoAiFillEntry {
   /**
    * The form holds a value at the path, which this one would replace: a
    * different one, since a value the field already holds is `unchanged`.
+   * A list of items never replaces one: its items go after the field's own.
    */
   replaces: boolean;
   /** The form shows the field; a hidden one never takes a value by itself. */
@@ -481,7 +482,7 @@ export interface MapoAiFillForm {
    * The form already holds this value of a key, as its own and not as one
    * the AI wrote: the same data at every path a write of the key would
    * reach. Default: it never does, so a value of a field that holds one
-   * would replace it.
+   * would replace it, or, for a list of items, join the field's own.
    */
   holds?(key: string, value: unknown): boolean;
 }
@@ -489,10 +490,13 @@ export interface MapoAiFillForm {
 /**
  * What becomes of each field of an answer in the form, by the rule above.
  * A field the form does not have, or whose path could reach an object's
- * prototype, is left out. A list goes in whole, with its own `verified`. A
- * field the form hides waits, and so does a part of a field the form
- * cannot take as it is (`manual`). A value the field already holds, as
- * `form.holds()` tells, changes nothing (`unchanged`).
+ * prototype, is left out. A list of items goes in by itself only into an
+ * empty field, by its own `verified`; a list of single values is a value
+ * like any other. A field the form hides waits, and so does a part of a
+ * field the form cannot take as it is (`manual`). A value the field
+ * already holds, as `form.holds()` tells, changes nothing (`unchanged`).
+ * A list of items on a field that holds some waits too, and never
+ * `replaces`: its items would be added after the field's own.
  *
  * @param fields The `fields` of a fill result.
  * @param form   Where each field's value is, and what it holds now.
@@ -513,13 +517,13 @@ export function planMapoAiFill(
     const isFilled = outcome.status === "filled";
     const isSame =
       isFilled && holdsValue && form.holds?.(key, outcome.value) === true;
-    const replaces = isFilled && holdsValue && !isSame;
+    const replaces = isFilled && holdsValue && !isSame && !isItemList(outcome);
     const shown = form.isShown?.(key) ?? true;
     const takes = form.canTake?.(key) ?? true;
     entries.push({
       key,
       path,
-      action: actionOf(outcome, { replaces, shown, takes, isSame }),
+      action: actionOf(outcome, { holdsValue, shown, takes, isSame }),
       replaces,
       shown,
       outcome,
@@ -530,7 +534,12 @@ export function planMapoAiFill(
 
 function actionOf(
   outcome: AiFieldOutcome,
-  field: { replaces: boolean; shown: boolean; takes: boolean; isSame: boolean },
+  field: {
+    holdsValue: boolean;
+    shown: boolean;
+    takes: boolean;
+    isSame: boolean;
+  },
 ): MapoAiFillAction {
   if (outcome.status === "empty") return "empty";
   if (outcome.status === "discarded") return "discard";
@@ -538,8 +547,67 @@ function actionOf(
   if (field.isSame) return "unchanged";
   const isManual = holdsRelation(outcome) || !field.takes;
   if (isManual) return "manual";
-  const isDirect = outcome.verified && !field.replaces && field.shown;
+  // Only into an empty field: a list's items are no exception.
+  const isDirect = outcome.verified && !field.holdsValue && field.shown;
   return isDirect ? "apply" : "confirm";
+}
+
+/**
+ * A list of items (a repeater's), whose items the operator chooses one by
+ * one and which join the items a field already holds. A list of single
+ * values, as tags, goes in whole.
+ */
+export function isItemList(outcome: AiFieldOutcome): boolean {
+  return outcome.status === "filled" && outcome.items !== undefined;
+}
+
+/**
+ * The item of a list is already among `held`: one of them holds every
+ * value it gives, `_template` included, as the same data. What the AI
+ * does not fill, as an image or an id, may differ, at any depth: the keys
+ * of an object in any order, and a list inside the item holds the AI's
+ * when it has each of its items, in any order.
+ */
+export function isItemHeld(item: unknown, held: unknown): boolean {
+  if (!isRecord(item) || !Array.isArray(held)) return false;
+  return held.some((one: unknown) => holdsData(one, item));
+}
+
+/** `own` holds every value `given` gives, at every depth ({@link isItemHeld}). */
+function holdsData(own: unknown, given: unknown): boolean {
+  if (Array.isArray(given)) {
+    if (!Array.isArray(own)) return false;
+    return given.every((value: unknown) =>
+      own.some((one: unknown) => holdsData(one, value)),
+    );
+  }
+  if (isRecord(given)) {
+    if (!isRecord(own)) return false;
+    return Object.entries(given).every(([key, value]) => {
+      const there = ownValue(own, key);
+      return there !== undefined && holdsData(there, value);
+    });
+  }
+  const data = dataOf(given);
+  return data !== undefined && data === dataOf(own);
+}
+
+/**
+ * The items of a list that go in when nobody chose them one by one: the
+ * verified ones the field does not hold yet, by their place in the list.
+ * What a page ticks from the start, and what Apply on the list's mark adds.
+ */
+export function verifiedItemsToAdd(
+  outcome: AiFieldOutcome,
+  held: unknown,
+): number[] {
+  if (outcome.status !== "filled" || !outcome.items) return [];
+  const values: readonly unknown[] = Array.isArray(outcome.value)
+    ? outcome.value
+    : [];
+  return outcome.items.flatMap((item, index) =>
+    item.verified && !isItemHeld(values[index], held) ? [index] : [],
+  );
 }
 
 /**

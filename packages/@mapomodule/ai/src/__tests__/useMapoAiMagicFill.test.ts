@@ -852,6 +852,155 @@ describe("useMapoAiMagicFill — the preview's ticks", () => {
   });
 });
 
+describe("useMapoAiMagicFill — the items of a list", () => {
+  const SPEAKERS: AnyFieldDescriptor[] = [
+    {
+      key: "speakers",
+      type: "repeater",
+      label: "Speakers",
+      fields: [{ key: "name", type: "text", label: "Name" }],
+    },
+  ];
+  const speaker = (name: string, verified: boolean) => ({
+    fields: {
+      name: {
+        status: "filled",
+        value: name,
+        verified,
+        quotes: [{ quote: name, where: "", found: verified }],
+      },
+    },
+    verified,
+  });
+  const OWN = { name: "Luca", photo: 7 };
+
+  /** A form whose speakers list holds Luca, and an answer with three speakers. */
+  async function listed() {
+    gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () =>
+        answered({
+          speakers: {
+            status: "filled",
+            value: [{ name: "Anna" }, { name: "Luca" }, { name: "Marco" }],
+            verified: false,
+            quotes: [],
+            items: [
+              speaker("Anna", true),
+              speaker("Luca", true),
+              speaker("Marco", false),
+            ],
+          },
+        }),
+    });
+    const form = detail({
+      fields: computed(() => SPEAKERS),
+      isNew: computed(() => false),
+    });
+    form.model.value = { speakers: [OWN] };
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Anna, Luca and Marco";
+    await magic.extract();
+    return { form, magic };
+  }
+
+  it("lists each item, ticks the verified ones the field does not hold, and never one it holds", async () => {
+    const { magic } = await listed();
+
+    expect(magic.summary.value?.toFill[0]?.list).toMatchObject([
+      { index: 0, verified: true, held: false },
+      { index: 1, verified: true, held: true },
+      { index: 2, verified: false, held: false },
+    ]);
+    expect(
+      [0, 1, 2].map((index) => magic.isItemSelected("speakers", index)),
+    ).toEqual([true, false, false]);
+    expect(magic.selected.value).toEqual(["speakers"]);
+    magic.selectItem("speakers", 1, true);
+    expect(magic.isItemSelected("speakers", 1)).toBe(false);
+  });
+
+  it("adds the ticked items after the field's own, and uses the list's proposal", async () => {
+    const { form, magic } = await listed();
+    magic.selectItem("speakers", 2, true);
+
+    magic.applySelected();
+
+    expect(form.model.value.speakers).toEqual([
+      OWN,
+      { name: "Anna" },
+      { name: "Marco" },
+    ]);
+    expect(magic.summary.value).toMatchObject({ applied: 1, toFill: [] });
+  });
+
+  it("ticks or unticks every item a list may add with the list's own tick", async () => {
+    const { magic } = await listed();
+
+    magic.select("speakers", false);
+    expect(magic.isSelected("speakers")).toBe(false);
+    magic.select("speakers", true);
+
+    expect(
+      [0, 1, 2].map((index) => magic.isItemSelected("speakers", index)),
+    ).toEqual([true, false, true]);
+  });
+
+  it("brings the list's proposal back with Restore, from the preview's own ticks", async () => {
+    const { form, magic } = await listed();
+    magic.selectItem("speakers", 2, true);
+    magic.applySelected();
+
+    magic.fill.restore("speakers");
+
+    expect(form.model.value.speakers).toEqual([OWN]);
+    expect(magic.summary.value?.toFill).toMatchObject([{ path: "speakers" }]);
+    expect(
+      [0, 1, 2].map((index) => magic.isItemSelected("speakers", index)),
+    ).toEqual([true, false, false]);
+  });
+
+  it("names an item by its template's label and its first values", async () => {
+    const { magic } = await listed();
+    const blocks: AnyFieldDescriptor = {
+      key: "blocks",
+      type: "repeater",
+      label: "Blocks",
+      attrs: { templates: { hero: { label: "Hero", fields: [] } } },
+    };
+    const fields = [...SPEAKERS, blocks];
+    const other = detail({ fields: computed(() => fields) });
+    const { magic: again } = mounted(other);
+
+    expect(
+      magic.itemLabelOf("speakers", {
+        index: 0,
+        value: { name: "Anna" },
+        verified: true,
+        held: false,
+      }),
+    ).toBe("Anna");
+    expect(
+      again.itemLabelOf("blocks", {
+        index: 1,
+        value: { _template: "hero", title: "Welcome", subtitle: "To us" },
+        template: "hero",
+        verified: false,
+        held: false,
+      }),
+    ).toBe("Hero · Welcome · To us");
+    expect(
+      again.itemLabelOf("blocks", {
+        index: 2,
+        value: {},
+        verified: false,
+        held: false,
+      }),
+    ).toBe("#3");
+  });
+});
+
 describe("useMapoAiMagicFill — files", () => {
   it("reads each file through read, and sends its parts after the pasted text", async () => {
     const calls = gateway({
