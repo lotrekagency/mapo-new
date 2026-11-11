@@ -9,6 +9,12 @@ import { requireUser } from "./session";
 // MapoDetail asks and Magic Fill sends to the AI with the form's fields.
 // It resets when the server restarts.
 
+/** A source of an article: where its facts come from. */
+export interface ArticleSource {
+  title: string;
+  url: string;
+}
+
 /** An article as the backend answers it. */
 export interface Article {
   id: number;
@@ -24,11 +30,16 @@ export interface Article {
   reading_time: number | null;
   /** `YYYY-MM-DD`. */
   published_on: string | null;
+  /** A list of nested objects, as a DRF ListSerializer: Magic Fill adds its items after these. */
+  sources: ArticleSource[];
 }
 
 const STATUSES = ["draft", "review", "published"] as const;
 
-/** One article to start from: /articles/1, where a value replaces one. */
+/**
+ * One article to start from: /articles/1, where a value replaces one, and
+ * whose source a text may give again: Magic Fill does not add it twice.
+ */
 const articles = new Map<number, Article>([
   [
     1,
@@ -43,6 +54,9 @@ const articles = new Map<number, Article>([
       featured: false,
       reading_time: null,
       published_on: null,
+      sources: [
+        { title: "The open data portal", url: "https://data.example.org" },
+      ],
     },
   ],
 ]);
@@ -95,6 +109,7 @@ export function createArticle(body: unknown): Article {
     featured: false,
     reading_time: null,
     published_on: null,
+    sources: [],
     ...values,
   };
   if (!article.slug) article.slug = slugOf(article.title);
@@ -140,7 +155,8 @@ function checked(
   { partial }: { partial: boolean },
 ): Partial<Omit<Article, "id">> {
   const data = isRecord(body) ? body : {};
-  const errors: Record<string, string[]> = {};
+  // A field's messages; a list of nested objects has one object per item.
+  const errors: Record<string, unknown> = {};
   const values: Partial<Omit<Article, "id">> = {};
   const has = (key: string) => Object.hasOwn(data, key);
 
@@ -207,10 +223,86 @@ function checked(
     }
   }
 
+  if (has("sources")) {
+    const read = sourcesOf(data.sources);
+    if (read.ok) values.sources = read.sources;
+    else errors.sources = read.errors;
+  }
+
   if (Object.keys(errors).length) {
     throw createError({ statusCode: 400, data: errors });
   }
   return values;
+}
+
+/**
+ * The sources of a body, checked as a ListSerializer of nested objects
+ * checks them: the errors of each item at its place, an empty object for
+ * an item without any. A missing list is empty; `null` is not a list.
+ */
+function sourcesOf(
+  value: unknown,
+): { ok: true; sources: ArticleSource[] } | { ok: false; errors: unknown } {
+  if (value === undefined) return { ok: true, sources: [] };
+  if (value === null) {
+    return { ok: false, errors: ["This field may not be null."] };
+  }
+  if (!Array.isArray(value)) {
+    const type = pythonType(value);
+    return {
+      ok: false,
+      errors: [`Expected a list of items but got type "${type}".`],
+    };
+  }
+  const sources: ArticleSource[] = [];
+  const itemErrors = value.map((item: unknown) => {
+    if (!isRecord(item)) {
+      const type = pythonType(item);
+      return {
+        non_field_errors: [
+          `Invalid data. Expected a dictionary, but got ${type}.`,
+        ],
+      };
+    }
+    const errors: Record<string, string[]> = {};
+    const title = textError(item.title, 200);
+    if (title) errors.title = [title];
+    const isLink =
+      typeof item.url === "string" && /^https?:\/\/[^\s]+$/.test(item.url);
+    const url =
+      textError(item.url, 500) ?? (isLink ? undefined : "Enter a valid URL.");
+    if (url) errors.url = [url];
+    if (!Object.keys(errors).length) {
+      sources.push({ title: String(item.title), url: String(item.url) });
+    }
+    return errors;
+  });
+  const hasErrors = itemErrors.some((one) => Object.keys(one).length > 0);
+  return hasErrors ? { ok: false, errors: itemErrors } : { ok: true, sources };
+}
+
+/** DRF's message for a text of a nested item, or `undefined` when it is valid. */
+function textError(value: unknown, max: number): string | undefined {
+  if (value === undefined) return "This field is required.";
+  if (value === null) return "This field may not be null.";
+  if (typeof value !== "string") return "Not a valid string.";
+  if (value === "") return "This field may not be blank.";
+  if (value.length > max) {
+    return `Ensure this field has no more than ${max} characters.`;
+  }
+  return undefined;
+}
+
+/** The name Python gives the type of a JSON value, as DRF's messages write it. */
+function pythonType(value: unknown): string {
+  if (value === null) return "NoneType";
+  if (Array.isArray(value)) return "list";
+  if (typeof value === "string") return "str";
+  if (typeof value === "boolean") return "bool";
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? "int" : "float";
+  }
+  return "dict";
 }
 
 /**
@@ -293,6 +385,33 @@ export function articleMetadata() {
           required: false,
           read_only: false,
           label: "Published on",
+        },
+        sources: {
+          type: "list",
+          required: false,
+          read_only: false,
+          label: "Sources",
+          child: {
+            type: "nested object",
+            required: true,
+            read_only: false,
+            children: {
+              title: {
+                type: "string",
+                required: true,
+                read_only: false,
+                label: "Title",
+                max_length: 200,
+              },
+              url: {
+                type: "url",
+                required: true,
+                read_only: false,
+                label: "Link",
+                max_length: 500,
+              },
+            },
+          },
         },
       },
     },

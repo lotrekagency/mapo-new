@@ -1,6 +1,6 @@
 # @mapomodule/example-ai
 
-The AI demo of Mapo v2: an app that turns on `@mapomodule/ai` the way a real project does, and nothing else. Setting `mapo.ai` in `nuxt.config.ts` installs the module, and with it the AI settings page and Magic Fill on every detail page; the app adds the AI status and a small entity, the articles, to fill. It runs on a small in-memory mock backend, without a real one.
+The AI demo of Mapo v2: an app that turns on `@mapomodule/ai` the way a real project does, and nothing else. Setting `mapo.ai` in `nuxt.config.ts` installs the module, and with it the AI settings page and Magic Fill on every detail page; the app adds the AI status and two small entities to fill: the articles, with a list of sources, and the pages, made of blocks. It runs on a small in-memory mock backend, without a real one.
 
 ## Run
 
@@ -12,7 +12,7 @@ pnpm build                # once after cloning
 pnpm dev:example-ai       # http://localhost:3002
 ```
 
-Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`, `writer` and `viewer` accounts (password equal to the username) are plain users: `editor` is in the group `editors`, `writer` in `editors` and `reporters`, `viewer` in none (`server/utils/session.ts`). On articles, `editor` and `writer` add and change, so they get Magic Fill; `viewer` only reads. In development, the selector at the top right signs in as another account in one click (`app/components/DevUserSwitcher.vue`); to see two accounts at once, use a private window or another browser, since the session is one cookie per address.
+Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`, `writer` and `viewer` accounts (password equal to the username) are plain users: `editor` is in the group `editors`, `writer` in `editors` and `reporters`, `viewer` in none (`server/utils/session.ts`). On articles and pages, `editor` and `writer` add and change, so they get Magic Fill; `viewer` only reads. In development, the selector at the top right signs in as another account in one click (`app/components/DevUserSwitcher.vue`); to see two accounts at once, use a private window or another browser, since the session is one cookie per address.
 
 ## Pages
 
@@ -20,7 +20,8 @@ Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`            | The AI status (`GET /_mapo/ai/status`, the app's own page): the providers and models offered to the account, where each key comes from, the user's token, what a request that names nothing calls, the limits, the storage |
 | `/ai-settings` | The module's AI settings page, in the sidebar's footer: each user picks a provider and a model, saves their own token where allowed and checks the connection; the admins assign keys to everyone, a group or a user       |
-| `/articles`    | The articles of the mock backend (`server/api/articles`): open one, or a new one, and Magic Fill fills it with the providers the account may call                                                                          |
+| `/articles`    | The articles of the mock backend (`server/api/articles`), with a list of sources: open one, or a new one, and Magic Fill fills it with the providers the account may call                                                  |
+| `/pages`       | The pages of the mock backend (`server/api/pages`), made of blocks with six templates: Magic Fill gives each block to choose, and adds the chosen ones after the page's own                                                |
 
 ## The providers
 

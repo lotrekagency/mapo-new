@@ -16,28 +16,45 @@ interface MockUser {
 
 // The accounts, password equal to the username. The groups give the AI's
 // admins something to assign keys to; the permissions decide who adds,
-// changes and deletes the articles (server/api/articles), and so who gets
-// Magic Fill on them:
+// changes and deletes the articles and the pages (server/api/articles,
+// server/api/pages), and so who gets Magic Fill on them:
 // admin   → superuser, so an admin of the AI; group "admin"
-// editor  → group "editors"; every action on articles
+// editor  → group "editors"; every action on articles and pages
 // writer  → groups "editors" and "reporters": a key assigned to both goes
-//           by the order the admins give the groups; adds and changes articles
-// viewer  → no group; reads articles only, so no Magic Fill
+//           by the order the admins give the groups; adds and changes
+//           articles and pages
+// viewer  → no group; reads articles and pages only, so no Magic Fill
 const MOCK_USERS: Record<string, MockUser> = {
   admin: account(1, "admin", ["admin"], [], true),
   editor: account(
     2,
     "editor",
     ["editors"],
-    ["view_article", "add_article", "change_article", "delete_article"],
+    [
+      "view_article",
+      "add_article",
+      "change_article",
+      "delete_article",
+      "view_page",
+      "add_page",
+      "change_page",
+      "delete_page",
+    ],
   ),
   writer: account(
     3,
     "writer",
     ["editors", "reporters"],
-    ["view_article", "add_article", "change_article"],
+    [
+      "view_article",
+      "add_article",
+      "change_article",
+      "view_page",
+      "add_page",
+      "change_page",
+    ],
   ),
-  viewer: account(4, "viewer", [], ["view_article"]),
+  viewer: account(4, "viewer", [], ["view_article", "view_page"]),
 };
 
 function account(
