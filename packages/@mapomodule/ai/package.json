@@ -43,8 +43,9 @@
     "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vitest run"
+    "lint": "eslint src eval",
+    "test": "vitest run",
+    "eval": "vitest run --config eval/vitest.config.ts"
   },
   "dependencies": {
     "@mapomodule/form": "workspace:*",

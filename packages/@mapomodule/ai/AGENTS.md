@@ -121,6 +121,10 @@ src/
   runtime/server/routes/     Nitro handlers, one file per route
   __tests__/                 Vitest; gateway routes on a bare h3 app; the storage's wiring, its plugin and the
                              module with `nitropack/runtime` and `@nuxt/kit` mocked
+eval/                        the evaluation set (not published): cases.ts (the cases), forms.ts and backend.ts
+                             (the reference app's forms and records), run.ts (a case through the real chain, the
+                             run route served in the process, nitro.ts its Nitro), score.ts (the report),
+                             eval.test.ts (with the mock, in pnpm test), models.eval.ts (with a model: pnpm eval)
 ```
 
 ## Rules

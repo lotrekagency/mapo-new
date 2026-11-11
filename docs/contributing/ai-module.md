@@ -901,6 +901,33 @@ pnpm --filter "@mapomodule/ai..." build   # the tests run the form's built reade
 pnpm --filter @mapomodule/ai test
 ```
 
+## The evaluation set
+
+`packages/@mapomodule/ai/eval/` measures how well a model fills a form (R151–R153). It is outside `src/`, so it is not published. Fifteen cases, each a source, a form and what each field should end with:
+
+- **The forms** are the reference app's: the article of the Magic Fill pages and a part of the AI lab's page of blocks (`forms.ts`); the relations look their records up in a copy of its mock API (`backend.ts`): five categories, sixty authors searched by name, six reviewers by email that the article keeps from the AI with `ai: { list: false }`.
+- **The sources** are pasted texts in English and Italian, web pages and CSV sheets, read by Mapo's readers as `read` reads them. They hold the mistakes models make: values the source does not give, numbers of something else (a cooking time for a reading time), a start date for a date of publication, a name three authors have, a record under another name, an item almost the same as one the record holds (B60). PDFs and images come with their readers.
+- **Each case runs the chain a page uses** (`run.ts`): `runMapoAiFill()` with the gateway's `run` route served in the same process (`nitro.ts` stands for Nitro: the runtime config, the storage in memory, a superuser), the prompt, the provider, the sanitizer and the verification, the relations found, the plan for the record as it was.
+- **The scoring** (`score.ts`, R152) compares each field by its kind: exactly for a choice, a number, a date, a yes or no and a related record's id; letter case and spaces aside for a short text; by the phrases it must hold for a long text and for a list of items, which also counts the items a write would add. A field is `right`, `wrong`, `invented` (a value the source does not give), `missing` or `discarded` (by the gateway), with whether a quote proves it and where it goes: in by itself, waiting, by hand, already held. The report sums the cases, with the tokens, the time and the cost, and lists the fields whose status changed since an earlier report.
+
+With the mock it runs in `pnpm test` (`eval.test.ts`): the mock answers each case with an answer written in the case, some of them wrong on purpose, and a snapshot keeps the score of every field. It proves the chain and the scoring, never a model: a change to the sanitizer, the verification or the plan shows there first.
+
+With a model, on request, and after the estimate:
+
+```bash
+# prints what it would cost, and sends nothing
+MAPO_AI_EVAL_PROVIDER=anthropic MAPO_AI_EVAL_MODEL=claude-haiku-5-5 \
+MAPO_AI_EVAL_PRICE='{"input":0.1,"output":0.5}' \
+pnpm --filter @mapomodule/ai eval
+
+# runs it, with the key in NUXT_MAPO_AI_PROVIDERS_ANTHROPIC_API_KEY, and compares
+MAPO_AI_EVAL_RUN=yes MAPO_AI_EVAL_COMPARE=eval/reports/<earlier>.json … pnpm --filter @mapomodule/ai eval
+```
+
+`MAPO_AI_EVAL_PROVIDER` is `openai`, `anthropic`, `ollama` or `openai-compatible`, with `MAPO_AI_EVAL_BASE_URL` for the last two, which cost nothing; the key is the provider's, as an app reads it, and never reaches the output or the report. The estimate counts a token every four characters of Mapo's rules, the form's fields (twice: in the prompt and in the schema of the answer) and the source, and an answer as long as the mock's: a model that reasons writes more than it answers, and costs more than the estimate says. The reports go to `eval/reports/`, ignored by git, as JSON and as a page.
+
+Every change to the prompt, the contract or the verification compares with the last report of the models the apps use. A case is added for each mistake a model makes in use that the set does not hold yet.
+
 ## How to extend the core
 
 ### Add a value kind

@@ -1,0 +1,156 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the evaluation set > scores each field as the mock's answers deserve 1`] = `
+[
+  {
+    "case": "press-release",
+    "fields": {
+      "author": "right · in · quoted",
+      "body": "right · in · quoted",
+      "category": "invented · waits · not quoted",
+      "excerpt": "right · in · quoted",
+      "featured": "right · empty",
+      "published_at": "right · empty",
+      "reading_time": "right · in · quoted",
+      "reviewer": "right · in · quoted",
+      "status": "right · empty",
+      "subtitle": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "council-note",
+    "fields": {
+      "author": "right · by-hand · quoted",
+      "category": "right · in · quoted",
+      "excerpt": "right · in · quoted",
+      "published_at": "right · empty",
+      "reading_time": "right · empty",
+      "status": "discarded · discarded",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "update-existing",
+    "fields": {
+      "author": "right · waits · quoted",
+      "category": "right · empty",
+      "reading_time": "right · empty",
+      "slug": "right · held · quoted",
+      "title": "right · waits · quoted",
+    },
+  },
+  {
+    "case": "comunicato-it",
+    "fields": {
+      "body": "right · in · quoted",
+      "category": "right · waits · not quoted",
+      "excerpt": "right · in · quoted",
+      "published_at": "right · empty",
+      "reading_time": "right · in · quoted",
+      "subtitle": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "web-page",
+    "fields": {
+      "author": "right · in · quoted",
+      "excerpt": "right · in · quoted",
+      "featured": "invented · waits · not quoted",
+      "published_at": "right · in · quoted",
+      "status": "right · empty",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "csv-row",
+    "fields": {
+      "author": "right · in · quoted",
+      "category": "right · in · quoted",
+      "featured": "right · in · quoted",
+      "published_at": "right · empty",
+      "reading_time": "right · in · quoted",
+      "status": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "museum-dates",
+    "fields": {
+      "excerpt": "right · in · quoted",
+      "featured": "right · empty",
+      "published_at": "discarded · discarded",
+      "reading_time": "invented · waits · not quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "unrelated-recipe",
+    "fields": {
+      "author": "right · empty",
+      "category": "right · empty",
+      "reading_time": "invented · in · quoted",
+      "status": "right · empty",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "reviewer-by-name",
+    "fields": {
+      "author": "right · in · quoted",
+      "reviewer": "right · waits · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "two-articles",
+    "fields": {
+      "excerpt": "wrong · in · quoted",
+      "title": "wrong · in · quoted",
+    },
+  },
+  {
+    "case": "library-page",
+    "fields": {
+      "blocks": "right · waits · not quoted",
+      "published_at": "right · empty",
+      "reviews": "right · waits · not quoted",
+      "status": "right · empty",
+      "summary": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "pagina-it",
+    "fields": {
+      "reviews": "right · waits · not quoted",
+      "summary": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "near-duplicate",
+    "fields": {
+      "reviews": "wrong · waits · not quoted",
+      "title": "right · empty",
+    },
+  },
+  {
+    "case": "festival-html",
+    "fields": {
+      "blocks": "right · waits · not quoted",
+      "reviews": "right · empty",
+      "summary": "right · in · quoted",
+      "title": "right · in · quoted",
+    },
+  },
+  {
+    "case": "reviews-csv",
+    "fields": {
+      "reviews": "right · in · quoted",
+      "title": "right · empty",
+    },
+  },
+]
+`;
