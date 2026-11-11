@@ -20,7 +20,7 @@ Log in as `admin` / `admin`, a superuser and so an admin of the AI. The `editor`
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`            | The AI status (`GET /_mapo/ai/status`, the app's own page): the providers and models offered to the account, where each key comes from, the user's token, what a request that names nothing calls, the limits, the storage |
 | `/ai-settings` | The module's AI settings page, in the sidebar's footer: each user picks a provider and a model, saves their own token where allowed and checks the connection; the admins assign keys to everyone, a group or a user       |
-| `/articles`    | The articles of the mock backend (`server/api/articles`), with a list of sources: open one, or a new one, and Magic Fill fills it with the providers the account may call                                                  |
+| `/articles`    | The articles of the mock backend (`server/api/articles`), with sources, a category (`server/api/categories`) and a date shown once published: Magic Fill fills them with the providers the account may call                |
 | `/pages`       | The pages of the mock backend (`server/api/pages`), made of blocks with six templates: Magic Fill gives each block to choose, and adds the chosen ones after the page's own                                                |
 
 ## The providers

@@ -4,13 +4,14 @@
 // user may call (the keys of the AI settings page). The verified values go
 // into the empty fields; the others wait in the banner above the form and
 // on their fields. The sources are a list: the AI's go after the article's
-// own, chosen one by one in the banner. Nothing is saved until Save. The
-// page keeps drafts: after a reload, Restore brings back the values and
-// Magic Fill's session, the marks with their quotes and Undo all, without
-// calling the provider again. `permission-model` names the backend model:
-// the gateway checks add_article (change_article for an article that
-// exists), as Save does, so `viewer`, who only reads articles, gets no
-// Magic Fill.
+// own, chosen one by one in the banner. The category is a relation, which
+// the operator chooses; the date of publication shows once the article is
+// published. Nothing is saved until Save. The page keeps drafts: after a
+// reload, Restore brings back the values and Magic Fill's session, the
+// marks with their quotes and Undo all, without calling the provider again.
+// `permission-model` names the backend model: the gateway checks
+// add_article (change_article for an article that exists), as Save does,
+// so `viewer`, who only reads articles, gets no Magic Fill.
 import type { AnyFieldDescriptor } from "mapomodule/types";
 
 definePageMeta({
@@ -52,7 +53,27 @@ const sidebarFields: AnyFieldDescriptor[] = [
   },
   { key: "featured", type: "switch", label: "Featured" },
   { key: "reading_time", type: "number", label: "Reading time (minutes)" },
-  { key: "published_on", type: "date", label: "Published on" },
+  // Shown only for a published article: a status of "published" in Magic
+  // Fill's answer reveals it, and its verified date then goes in too.
+  {
+    key: "published_on",
+    type: "date",
+    label: "Published on",
+    show: ({ model }) => model.status === "published",
+  },
+  // A relation, chosen with a search: Magic Fill never writes it, and the
+  // name the AI gives waits on the field, "To set by hand".
+  {
+    key: "category",
+    type: "fks",
+    label: "Category",
+    attrs: {
+      endpoint: "/api/categories",
+      itemText: "name",
+      itemValue: "id",
+      returnObject: false,
+    },
+  },
 ];
 </script>
 

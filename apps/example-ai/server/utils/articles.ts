@@ -1,5 +1,6 @@
 import type { H3Event } from "h3";
 import { createError } from "h3";
+import { isCategory } from "./categories";
 import { requireUser } from "./session";
 
 // The articles of the example: the record Magic Fill fills on its detail
@@ -28,8 +29,10 @@ export interface Article {
   featured: boolean;
   /** Minutes, from 1 to 120. */
   reading_time: number | null;
-  /** `YYYY-MM-DD`. */
+  /** `YYYY-MM-DD`; the form shows it only for a published article. */
   published_on: string | null;
+  /** The id of a category (`/api/categories`): a relation, which Magic Fill never writes. */
+  category: number | null;
   /** A list of nested objects, as a DRF ListSerializer: Magic Fill adds its items after these. */
   sources: ArticleSource[];
 }
@@ -54,6 +57,7 @@ const articles = new Map<number, Article>([
       featured: false,
       reading_time: null,
       published_on: null,
+      category: null,
       sources: [
         { title: "The open data portal", url: "https://data.example.org" },
       ],
@@ -109,6 +113,7 @@ export function createArticle(body: unknown): Article {
     featured: false,
     reading_time: null,
     published_on: null,
+    category: null,
     sources: [],
     ...values,
   };
@@ -224,6 +229,12 @@ function checked(
     }
   }
 
+  if (has("category")) {
+    const category = relatedId(data.category);
+    if (category.ok) values.category = category.id;
+    else errors.category = [category.error];
+  }
+
   if (has("sources")) {
     const read = sourcesOf(data.sources);
     if (read.ok) values.sources = read.sources;
@@ -280,6 +291,29 @@ function sourcesOf(
   });
   const hasErrors = itemErrors.some((one) => Object.keys(one).length > 0);
   return hasErrors ? { ok: false, errors: itemErrors } : { ok: true, sources };
+}
+
+/**
+ * A category's id, as DRF's PrimaryKeyRelatedField reads it: a number, or
+ * a string of digits, of a category that exists; `null` clears it.
+ */
+function relatedId(
+  value: unknown,
+): { ok: true; id: number | null } | { ok: false; error: string } {
+  if (value === null) return { ok: true, id: null };
+  const isDigits = typeof value === "string" && /^\d+$/.test(value);
+  const id = isDigits ? Number(value) : value;
+  if (typeof id !== "number" || !Number.isInteger(id)) {
+    const type = pythonType(value);
+    return {
+      ok: false,
+      error: `Incorrect type. Expected pk value, received ${type}.`,
+    };
+  }
+  if (!isCategory(id)) {
+    return { ok: false, error: `Invalid pk "${id}" - object does not exist.` };
+  }
+  return { ok: true, id };
 }
 
 /** DRF's message for a text of a nested item, or `undefined` when it is valid. */
@@ -386,6 +420,13 @@ export function articleMetadata() {
           required: false,
           read_only: false,
           label: "Published on",
+        },
+        // A relation: DRF names it "field", with no endpoint and no choices.
+        category: {
+          type: "field",
+          required: false,
+          read_only: false,
+          label: "Category",
         },
         sources: {
           type: "list",
