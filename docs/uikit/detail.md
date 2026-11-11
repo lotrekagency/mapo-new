@@ -295,6 +295,7 @@ const detail = useMapoDetail<Article>(); // undefined outside a MapoDetail
 | `schemaFromMetadata`                                     | `ComputedRef`                                         | The prop: how the page reads a schema from `OPTIONS`, when it has its own        |
 | `onSaved(handler)`                                       | `(handler) => () => void`                             | Calls `handler(record)` after each save that succeeds, before the page moves     |
 | `draft`                                                  | `{ part(key, part), touch() }`                        | The page's draft: a component keeps a state of its own in it (below)             |
+| `revealField(path)`                                      | `(path) => Promise<boolean>`                          | Takes the operator to a field: opens its tab, group and item, and focuses it     |
 
 **Know when the record is saved.** `onSaved(handler)` calls `handler` with the record the backend returned after each save that succeeds, before the page moves to a new record's address or goes back. It returns the function that removes it, and one registered in a component's setup goes with the component; a handler that throws leaves the save done. A component that writes into the form can end its work there, as [Magic Fill](/modules/ai#magic-fill) does with its marks.
 
@@ -316,6 +317,8 @@ detail.annotations.value = {
 ```
 
 These marks show with those of the `annotations` prop; on the same path the prop wins. Replace the map to change them, as with the prop. → [Field annotations](./form/annotations)
+
+**Take the operator to a field.** `revealField(path)` asks the form that holds the field, the body's or the sidebar's, to open its tab, its group or sub-tab and its repeater item, then scrolls the field into view and puts the focus on its control, as a review's "next to check" does. The path is the one of the field's mark: `title`, `translations.it.title`, `blocks.0.title`. It resolves whether the control took the focus, and `false` for a field no form has or shows. → [Bring a field into view](./form/annotations#bring-a-field-into-view)
 
 `useMapoAiFill()` of `@mapomodule/ai` (experimental) does this with the values a language model reads from a source: → [Fill a detail form](/modules/ai#fill-a-detail-form)
 

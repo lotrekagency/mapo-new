@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRenderer, h, nextTick, onUnmounted } from "vue";
+import { createRenderer, h, inject, nextTick, onUnmounted } from "vue";
 import type { App, Component, SetupContext, VNode } from "vue";
 
 import MapoDetail from "../runtime/components/MapoDetail.vue";
@@ -163,6 +163,11 @@ interface FormProps {
 }
 const forms: FormProps[] = [];
 
+/** What the detail asked the forms to bring into view: the form's keys, the path. */
+const reveals: { form: string[]; path: string }[] = [];
+
+type RegisterReveal = (fn: (path: string) => Promise<boolean>) => () => void;
+
 const MapoForm: Component = {
   name: "MapoForm",
   inheritAttrs: false,
@@ -173,8 +178,20 @@ const MapoForm: Component = {
   },
   setup(props: FormProps, { slots }: SetupContext) {
     forms.push(props);
+    // As the real form, it lets the detail bring its fields into view: here
+    // it answers whether it has the field.
+    const register = inject<RegisterReveal | null>(
+      "mapoDetailRegisterReveal",
+      null,
+    );
+    const unregister = register?.((path) => {
+      const keys = (props.fields ?? []).map((field) => field.key);
+      reveals.push({ form: keys, path });
+      return Promise.resolve(keys.includes(path));
+    });
     onUnmounted(() => {
       forms.splice(forms.indexOf(props), 1);
+      unregister?.();
     });
     return () => h("div", null, slots.default?.());
   },
@@ -533,6 +550,28 @@ describe("MapoDetail context", () => {
     expect(removed).not.toHaveBeenCalled();
     expect(crud.partialUpdate).toHaveBeenCalledTimes(1);
     expect(detail.isSaving.value).toBe(false);
+  });
+
+  it("takes the operator to a field through the form that holds it", async () => {
+    reveals.length = 0;
+    const seen = mountWithProbe({
+      fields,
+      sidebarFields: [{ key: "status", type: "select" }],
+    });
+    await settle();
+    const detail = seen.detail!;
+
+    await expect(detail.revealField?.("status")).resolves.toBe(true);
+    await expect(detail.revealField?.("title")).resolves.toBe(true);
+    await expect(detail.revealField?.("missing")).resolves.toBe(false);
+
+    expect(reveals).toEqual([
+      { form: ["title"], path: "status" },
+      { form: ["status"], path: "status" },
+      { form: ["title"], path: "title" },
+      { form: ["title"], path: "missing" },
+      { form: ["status"], path: "missing" },
+    ]);
   });
 
   it("saves through the context as the buttons do", async () => {

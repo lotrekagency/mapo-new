@@ -235,6 +235,31 @@ provide("mapoDetailRegisterValidator", (fn: ValidateClientFn) => {
   };
 });
 
+// Each form inside, the body's and the sidebar's, a slot's own included,
+// brings its fields into view: `revealField()` asks them in turn.
+type RevealFieldFn = (path: string) => Promise<boolean>;
+const formRevealers: RevealFieldFn[] = [];
+
+provide("mapoDetailRegisterReveal", (fn: RevealFieldFn) => {
+  formRevealers.push(fn);
+  return () => {
+    const at = formRevealers.indexOf(fn);
+    if (at >= 0) formRevealers.splice(at, 1);
+  };
+});
+
+/**
+ * Brings a field into view through the form that holds it: its tab, group
+ * and repeater item open, and its control takes the focus. A form without
+ * the field answers `false` at once, so the next one is asked.
+ */
+async function revealField(path: string): Promise<boolean> {
+  for (const reveal of [...formRevealers]) {
+    if (await reveal(path)) return true;
+  }
+  return false;
+}
+
 const isNew = computed(() => String(props.id) === "new");
 // Cast keeps the generic exact: `ref<T>` would expose `UnwrapRef<T>`, which
 // TS cannot prove to extend `object` when forwarding to MapoForm.
@@ -877,6 +902,7 @@ const context: MapoDetailContext<T> = {
   schemaFromMetadata: computed(() => props.schemaFromMetadata),
   onSaved,
   draft: { part: addDraftPart, touch: () => saveDraftSoon() },
+  revealField,
 };
 provide(DETAIL_KEY, context as unknown as MapoDetailContext);
 

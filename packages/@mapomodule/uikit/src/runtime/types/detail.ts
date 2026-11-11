@@ -97,6 +97,16 @@ export interface MapoDetailContext<T extends object = Record<string, unknown>> {
    * gives it; optional, as `modelName`.
    */
   draft?: MapoDetailDraft;
+  /**
+   * Takes the operator to a field: the form that holds it, the body's or
+   * the sidebar's, opens its tab, group or sub-tab and repeater item,
+   * scrolls the field into view and puts the focus on its control. The
+   * path is the one of its mark: `title`, `translations.it.title`,
+   * `blocks.0.title`. Resolves whether the control took the focus: `false`
+   * for a field no form has or shows. `MapoDetail` always gives it;
+   * optional, as `modelName`.
+   */
+  revealField?: (path: string) => Promise<boolean>;
 }
 
 /**

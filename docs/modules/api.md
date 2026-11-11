@@ -721,7 +721,7 @@ Language context helpers for nested field components.
 
 ### `useMapoDetail()`
 
-The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, `modelName` and `permissionModel`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel, `metadata()`, the endpoint's `OPTIONS` response requested once per page, the page's `schemaFromMetadata`, `onSaved()`, called after each save that succeeds, and `draft`, where a component keeps a state of its own in the page's draft. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
+The context of the `MapoDetail` around the calling component: endpoint, id, `isNew`, `modelName` and `permissionModel`, the model (writable), the fields rendered, languages, registry, errors and state, `save()` and `back()`, the `annotations` channel, `metadata()`, the endpoint's `OPTIONS` response requested once per page, the page's `schemaFromMetadata`, `onSaved()`, called after each save that succeeds, `draft`, where a component keeps a state of its own in the page's draft, and `revealField()`, which opens the tab, group and item of a field and puts the focus on it. See [Detail page](/uikit/detail#how-to-read-the-detail-from-a-component-inside-it).
 
 **Returns:** `MapoDetailContext<T> | undefined` — `undefined` outside a `MapoDetail`.
 
