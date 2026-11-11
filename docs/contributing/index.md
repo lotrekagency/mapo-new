@@ -16,6 +16,8 @@ pnpm install
 pnpm build
 ```
 
+`pnpm install` ends with the root `postinstall`, which runs every package's `dev:prepare`: the Nuxt modules go into stub mode (below) and `@mapomodule/utils`, which has no stub, is built with `tsc`. The apps' `postinstall` then runs `nuxt prepare`, which loads the modules, and a module that imports `@mapomodule/utils` when it loads, as `store` and `ai` do, needs that build; jiti, which runs a stub, resolves it through the `default` condition of its `exports`, since it does not read `import`.
+
 `pnpm build` builds every package and app through Turborepo. Run it once after cloning: downstream packages resolve each other from `dist/`, and the MCP server needs its generated knowledge base.
 
 ## Dev setup (after the initial build)

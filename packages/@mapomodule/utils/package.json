@@ -21,11 +21,13 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./jsonSchema": {
       "types": "./dist/types/jsonSchema/index.d.ts",
-      "import": "./dist/jsonSchema/index.js"
+      "import": "./dist/jsonSchema/index.js",
+      "default": "./dist/jsonSchema/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -36,6 +38,7 @@
   "scripts": {
     "dev": "tsc -p tsconfig.json --watch",
     "build": "tsc -p tsconfig.json",
+    "dev:prepare": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run"
