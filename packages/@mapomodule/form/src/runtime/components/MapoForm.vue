@@ -120,6 +120,7 @@ defineExpose({
   getPatch: form.getPatch,
   isDirty: form.isDirty,
   isLoading: form.isLoading,
+  revealField: form.revealField,
 });
 
 type ValidateClientFn = () => {
@@ -133,6 +134,19 @@ const registerValidator = inject<RegisterFn | null>(
 );
 if (registerValidator) {
   const unregister = registerValidator(form.validateClient);
+  onUnmounted(unregister);
+}
+
+// A detail page around the form brings a field into view through every form
+// it holds, the body's and the sidebar's, as it validates them.
+type RevealFieldFn = (path: string) => Promise<boolean>;
+type RegisterRevealFn = (fn: RevealFieldFn) => () => void;
+const registerReveal = inject<RegisterRevealFn | null>(
+  "mapoDetailRegisterReveal",
+  null,
+);
+if (registerReveal) {
+  const unregister = registerReveal(form.revealField);
   onUnmounted(unregister);
 }
 

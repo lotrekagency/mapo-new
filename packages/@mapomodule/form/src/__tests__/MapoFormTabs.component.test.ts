@@ -11,7 +11,13 @@ import type {
   FieldAnnotations,
 } from "../runtime/types/index.js";
 import type { TabEntry } from "../runtime/types/layout.js";
-import { createApp, headlessNode } from "./headlessRenderer.js";
+import type { FieldRevealRequest } from "../runtime/utils/reveal.js";
+import {
+  createApp,
+  findAll,
+  headlessNode,
+  textOf,
+} from "./headlessRenderer.js";
 import type { HeadlessNode } from "./headlessRenderer.js";
 
 // `useMapoForm.ts` pulls in `nuxt/app` through `useMapoT`, which cannot resolve
@@ -95,22 +101,38 @@ const tabs = [
 
 let app: App<HeadlessNode> | undefined;
 
-function mountTabs(annotations: Ref<FieldAnnotations>) {
+function mountTabs(
+  annotations: Ref<FieldAnnotations>,
+  reveal?: Ref<FieldRevealRequest | undefined>,
+  entries: TabEntry[] = tabs,
+) {
   const context = {
     model: ref({}),
     errors: ref({}),
     currentLang: ref(""),
     annotations,
+    reveal,
   } as unknown as MapoFormContext<Record<string, unknown>>;
   const host: Component = {
     setup() {
       provide(FORM_KEY, context);
-      return () => h(MapoFormTabs, { tabs });
+      return () => h(MapoFormTabs, { tabs: entries });
     },
   };
   app = createApp(host);
   app.component("UBadge", UBadge);
-  app.mount(headlessNode());
+  const root = headlessNode();
+  app.mount(root);
+  return root;
+}
+
+/** The names of the tabs that show as open, outer tabs first. */
+function openTabs(root: HeadlessNode): string[] {
+  return findAll(root, (node) => node.tag === "button")
+    .filter((button) =>
+      String(button.props.class).includes("border-primary-500"),
+    )
+    .map(textOf);
 }
 
 afterEach(() => {
@@ -178,5 +200,55 @@ describe("MapoFormTabs annotations", () => {
     annotations.value = {};
     await nextTick();
     expect(badges).toEqual([]);
+  });
+});
+
+describe("MapoFormTabs reveal", () => {
+  /** A request of `revealField()` for the field of `key`. */
+  const request = (key: string): FieldRevealRequest => ({
+    path: key,
+    key,
+    rest: "",
+    settle: vi.fn(),
+  });
+
+  it("opens the tab that holds the field the form reveals", async () => {
+    const reveal = ref<FieldRevealRequest | undefined>();
+    const root = mountTabs(ref({}), reveal);
+    expect(openTabs(root)).toEqual(["content"]);
+
+    reveal.value = request("seo_title");
+    await nextTick();
+
+    expect(openTabs(root)).toEqual(["seo"]);
+  });
+
+  it("opens a child tab and the tab around it", async () => {
+    const more: TabEntry = {
+      name: "more",
+      groups: new Map(),
+      children: new Map([
+        ["meta", tab("meta", [{ key: "canonical", type: "text" }])],
+        ["social", tab("social", [{ key: "og_title", type: "text" }])],
+      ]),
+    };
+    const reveal = ref<FieldRevealRequest | undefined>();
+    const root = mountTabs(ref({}), reveal, [...tabs, more]);
+    expect(openTabs(root)).toEqual(["content", "meta"]);
+
+    reveal.value = request("og_title");
+    await nextTick();
+
+    expect(openTabs(root)).toEqual(["more", "social"]);
+  });
+
+  it("leaves the open tab for a field no tab holds", async () => {
+    const reveal = ref<FieldRevealRequest | undefined>();
+    const root = mountTabs(ref({}), reveal);
+
+    reveal.value = request("missing");
+    await nextTick();
+
+    expect(openTabs(root)).toEqual(["content"]);
   });
 });

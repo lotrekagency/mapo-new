@@ -133,6 +133,22 @@ watchEffect(() => {
   if (parentCtx) form.ctx.submitted.value = parentCtx.submitted.value;
 });
 
+// `revealField()` of the parent form names a field of this item: the item
+// opens, and its own form brings the field into view, as the parent asked
+// it under the item's prefix (`blocks.2.title` → `title`).
+watch(
+  () => parentCtx?.reveal?.value,
+  (request) => {
+    if (!request?.rest) return;
+    const start = `${props.errorPrefix}.`;
+    const inside = `${request.key}.${request.rest}`;
+    if (!inside.startsWith(start)) return;
+    expanded.value = true;
+    void form.revealField(inside.slice(start.length)).then(request.settle);
+  },
+  { immediate: true },
+);
+
 // An item starts collapsed: the badges on its header and mini-card tell which
 // item holds marks, as the error badge does for errors.
 const itemAnnotationGroups = computed(() =>

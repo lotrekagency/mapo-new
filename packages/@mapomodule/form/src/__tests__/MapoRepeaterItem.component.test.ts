@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { h, onUnmounted, provide, ref, unref } from "vue";
-import type { App, Component, SetupContext } from "vue";
+import type { App, Component, Ref, SetupContext } from "vue";
 
 import MapoRepeaterItem from "../runtime/components/fields/MapoRepeaterItem.vue";
 import { FORM_KEY } from "../runtime/composables/useMapoForm.js";
@@ -13,7 +13,8 @@ import type {
   FieldAnnotations,
   FieldRegistry,
 } from "../runtime/types/index.js";
-import { createApp, headlessNode } from "./headlessRenderer.js";
+import type { FieldRevealRequest } from "../runtime/utils/reveal.js";
+import { createApp, findAll, headlessNode } from "./headlessRenderer.js";
 import type { HeadlessNode } from "./headlessRenderer.js";
 
 // The item runs its own `useMapoForm`, which reads these at setup.
@@ -25,6 +26,14 @@ vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
 }));
 vi.mock("@mapomodule/store/runtime/stores/auth", () => ({
   useAuthStore: () => ({ info: null }),
+}));
+// Headless nodes cannot take the focus: the field's control always does here.
+const focus = vi.hoisted(() => ({
+  control: vi.fn((_field: unknown, _id: string) => true),
+}));
+vi.mock(import("../runtime/utils/fieldFocus.js"), async (original) => ({
+  ...(await original()),
+  focusFieldControl: focus.control,
 }));
 // The translation shows its key and its parameters, so a test can read them.
 vi.mock("vue-i18n", () => ({
@@ -128,13 +137,24 @@ function recording(name: string, list: Stub[]): Component {
 
 let app: App<HeadlessNode> | undefined;
 
-/** Mounts the first item of `blocks`, inside a form that marks `annotations`. */
-function mountItem(annotations: FieldAnnotations) {
+interface ItemOptions {
+  index?: number;
+  defaultExpanded?: boolean;
+  reveal?: Ref<FieldRevealRequest | undefined>;
+}
+
+/**
+ * Mounts an item of `blocks`, the first unless `index` says another, inside
+ * a form that marks `annotations`.
+ */
+function mountItem(annotations: FieldAnnotations, options: ItemOptions = {}) {
+  const index = options.index ?? 0;
   const context = {
     annotations: ref(annotations),
     submitted: ref(false),
     immediate: true,
     debounce: 0,
+    reveal: options.reveal,
   } as unknown as MapoFormContext<Record<string, unknown>>;
   const host: Component = {
     setup() {
@@ -143,14 +163,14 @@ function mountItem(annotations: FieldAnnotations) {
         h(MapoRepeaterItem, {
           item: { title: "La storia" },
           fields: [{ key: "title", type: "text", label: "Title" }],
-          index: 0,
-          errorPrefix: "blocks.0",
+          index,
+          errorPrefix: `blocks.${index}`,
           parentErrors: {},
           languages: [],
           currentLang: "",
           readonly: false,
           registry,
-          defaultExpanded: true,
+          defaultExpanded: options.defaultExpanded ?? true,
           repeaterDescriptor: { key: "blocks", type: "repeater" },
         });
     },
@@ -161,7 +181,9 @@ function mountItem(annotations: FieldAnnotations) {
   app.component("UPopover", UPopover);
   app.component("UButton", recording("UButton", buttons));
   app.component("UBadge", recording("UBadge", badges));
-  app.mount(headlessNode());
+  const root = headlessNode();
+  app.mount(root);
+  return root;
 }
 
 // The field component resolves its loader over a few promise jobs.
@@ -221,5 +243,44 @@ describe("MapoRepeaterItem annotations", () => {
 
     const target = useFocusMode().focusTarget.value;
     expect(unref(target?.annotations)).toEqual({ title: suggested });
+  });
+});
+
+describe("MapoRepeaterItem reveal", () => {
+  /** A request of `revealField()` for the title of the item at `index`. */
+  const titleOf = (index: number): FieldRevealRequest => ({
+    path: `blocks.${index}.title`,
+    key: "blocks",
+    rest: `${index}.title`,
+    settle: vi.fn(),
+  });
+
+  /** The controls the item renders: one per field while it is open. */
+  const controls = (root: HeadlessNode) =>
+    findAll(root, (node) => node.tag === "input");
+
+  it("opens and brings in the field the parent form reveals inside it", async () => {
+    const reveal = ref<FieldRevealRequest | undefined>();
+    const root = mountItem({}, { index: 1, defaultExpanded: false, reveal });
+    expect(controls(root)).toEqual([]);
+
+    const asked = titleOf(1);
+    reveal.value = asked;
+
+    await vi.waitFor(() => expect(asked.settle).toHaveBeenCalledWith(true));
+    expect(controls(root)).toHaveLength(1);
+    expect(focus.control.mock.calls.at(-1)?.[1]).toBe("field-title");
+  });
+
+  it("stays closed for a field of another item", async () => {
+    const reveal = ref<FieldRevealRequest | undefined>();
+    const root = mountItem({}, { index: 1, defaultExpanded: false, reveal });
+
+    const asked = titleOf(0);
+    reveal.value = asked;
+    await settle();
+
+    expect(controls(root)).toEqual([]);
+    expect(asked.settle).not.toHaveBeenCalled();
   });
 });

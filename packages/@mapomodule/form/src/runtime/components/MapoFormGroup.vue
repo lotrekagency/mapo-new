@@ -3,6 +3,7 @@ import {
   ref,
   computed,
   provide,
+  watch,
   watchEffect,
   onMounted,
   onUnmounted,
@@ -67,6 +68,23 @@ provide("mapoGroupExpand", { expandField, collapseField, expandedFieldKey });
 const form = injectMapoForm();
 const model = computed(() => form?.model.value);
 const currentLang = computed(() => form?.currentLang.value ?? "");
+
+// `revealField()` opens the group that holds the field, and its sub-tab.
+watch(
+  () => form?.reveal?.value,
+  (request) => {
+    if (!request) return;
+    const isOwnField = props.fields.some((field) => field.key === request.key);
+    const subtabs = [...(props.subtabs?.entries() ?? [])];
+    const subtab = subtabs.find(([, fields]) =>
+      fields.some((field) => field.key === request.key),
+    );
+    if (!isOwnField && !subtab) return;
+    expanded.value = true;
+    if (subtab) activeSubtab.value = subtab[0];
+  },
+  { immediate: true },
+);
 
 // ─── Col-span lookup ─────────────────────────────────────────────────────────
 

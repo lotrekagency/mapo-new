@@ -253,6 +253,32 @@ const form = useMapoForm({ model, fields, registry, annotations });
 
 A repeater item receives the marks under its own path, keyed as its fields see them: `blocks.0.title` reaches the first item as `title`. The repeater builds that path from its key, also when it is translatable. An item opened in focus mode keeps its marks.
 
+## Bring a field into view
+
+`revealField(path)` takes the operator to a field, such as the next marked one of a review: it opens the tab, the group or sub-tab and the repeater item that hold the field, scrolls the field to the middle of the screen and puts the focus on its control. The path is the one a mark uses: `title`, `translations.it.title`, `blocks.0.title`. `<MapoForm>` exposes it, and `useMapoForm()` returns it:
+
+```vue
+<script setup lang="ts">
+const form = useTemplateRef("form");
+
+async function next(path: string) {
+  const focused = await form.value?.revealField(path);
+  if (!focused) console.warn(`${path} cannot take the focus`);
+}
+</script>
+
+<template>
+  <MapoForm
+    ref="form"
+    v-model="article"
+    :fields="fields"
+    :annotations="annotations"
+  />
+</template>
+```
+
+It resolves whether the control took the focus: `false` at once for a field the form does not have or does not show, and after a few seconds for one that renders no control to focus, such as a field replaced through the `field.<key>` slot. A second call ends the first with `false`. When the operator asks for reduced motion, the scroll is not animated.
+
 ## Keep in mind
 
 - **The mark is a button named by `label`.** Color is never the only signal: write a label that says what the mark means.

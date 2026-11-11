@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { refocusField } from "../runtime/utils/fieldFocus";
+import { focusFieldControl, refocusField } from "../runtime/utils/fieldFocus";
 
 /** An element as `refocusField()` reads it: what it matches, what it holds, `focus()`. */
 interface FakeElement {
@@ -71,5 +71,108 @@ describe("refocusField", () => {
   it("does nothing on the server", () => {
     expect(typeof document).toBe("undefined");
     expect(refocusField("field-title")).toBe(false);
+  });
+});
+
+/** The page of {@link focusFieldControl}: what has the focus. */
+interface FakeDocument {
+  activeElement: unknown;
+}
+
+/** A field's control: whether it takes the focus, and the focusable inside it. */
+function control(doc: FakeDocument, focusable: boolean, inside?: unknown) {
+  const made = {
+    matches: () => focusable,
+    querySelector: () => inside ?? null,
+    focus: vi.fn(() => {
+      doc.activeElement = made;
+    }),
+  };
+  return made;
+}
+
+/** A field's element, holding `byId` and scrolled with `scrollIntoView`. */
+function fieldElement(doc: FakeDocument, byId: Record<string, unknown>) {
+  return {
+    ownerDocument: doc,
+    querySelector: vi.fn((selector: string) => {
+      const id = /^\[id="(.*)"\]$/.exec(selector)?.[1] ?? "";
+      return byId[id] ?? null;
+    }),
+    scrollIntoView: vi.fn(),
+  };
+}
+
+describe("focusFieldControl", () => {
+  it("focuses the control with the field's id inside the field, and scrolls the field to the middle", () => {
+    const doc: FakeDocument = { activeElement: null };
+    const input = control(doc, true);
+    const field = fieldElement(doc, { "field-title": input });
+
+    expect(focusFieldControl(field, "field-title")).toBe(true);
+    expect(input.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(field.scrollIntoView).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
+  });
+
+  it("focuses what takes the focus inside the control, as an editor's content", () => {
+    const doc: FakeDocument = { activeElement: null };
+    const content = control(doc, true);
+    const editor = control(doc, false, content);
+    const field = fieldElement(doc, { "field-body": editor });
+
+    expect(focusFieldControl(field, "field-body")).toBe(true);
+    expect(content.focus).toHaveBeenCalledTimes(1);
+    expect(editor.focus).not.toHaveBeenCalled();
+  });
+
+  it("does not animate the scroll when the operator asks for reduced motion", () => {
+    vi.stubGlobal("window", {
+      matchMedia: (query: string) => ({
+        matches: query === "(prefers-reduced-motion: reduce)",
+      }),
+    });
+    const doc: FakeDocument = { activeElement: null };
+    const field = fieldElement(doc, { "field-title": control(doc, true) });
+
+    focusFieldControl(field, "field-title");
+
+    expect(field.scrollIntoView).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "auto",
+    });
+  });
+
+  it("answers false when the control does not keep the focus, as a disabled one", () => {
+    const doc: FakeDocument = { activeElement: null };
+    const disabled = { ...control(doc, true), focus: vi.fn() };
+    const field = fieldElement(doc, { "field-title": disabled });
+
+    expect(focusFieldControl(field, "field-title")).toBe(false);
+  });
+
+  it("answers false before the control renders, or with nothing to focus in it", () => {
+    const doc: FakeDocument = { activeElement: null };
+    const field = fieldElement(doc, { "field-plain": control(doc, false) });
+
+    expect(focusFieldControl(field, "field-title")).toBe(false);
+    expect(focusFieldControl(field, "field-plain")).toBe(false);
+    expect(field.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("answers false for what is not an element, as a headless node", () => {
+    expect(focusFieldControl(null, "field-title")).toBe(false);
+    expect(focusFieldControl({ tag: "div" }, "field-title")).toBe(false);
+  });
+
+  it("looks the control up by an id written safely into the selector", () => {
+    const doc: FakeDocument = { activeElement: null };
+    const field = fieldElement(doc, {});
+
+    focusFieldControl(field, 'field-a"b');
+
+    expect(field.querySelector).toHaveBeenCalledWith('[id="field-a\\"b"]');
   });
 });

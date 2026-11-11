@@ -534,6 +534,7 @@ Core composable powering `MapoForm`. Provides dirty tracking, validation, and su
 | `resetDirty`     | `() => void`                                                                     | Reset the dirty-tracking baseline (call after a successful save).                                                           |
 | `getPatch`       | `() => Partial<T>`                                                               | Return only changed fields since the last `resetDirty`.                                                                     |
 | `submit`         | `(handler: (payload, isNew) => Promise<void>, isNew?: boolean) => Promise<void>` | Validate all fields, then call `handler`. On success calls `resetDirty` and clears touched state. No-op if already loading. |
+| `revealField`    | `(path: string) => Promise<boolean>`                                             | Open the tab, group and repeater item that hold the field at `path`, scroll it into view and focus its control.             |
 
 ---
 

@@ -1,9 +1,12 @@
 import {
   ref,
+  shallowRef,
   computed,
   toRaw,
   toValue,
   watch,
+  getCurrentScope,
+  onScopeDispose,
   type Ref,
   type MaybeRef,
   provide,
@@ -23,6 +26,9 @@ import type {
 import { resolveFieldAccessor } from "../types/index.js";
 import { valuePath } from "../utils/annotations.js";
 import { modelForDraft } from "../utils/draft.js";
+import { fieldAtPath } from "../utils/reveal.js";
+import type { FieldRevealRequest } from "../utils/reveal.js";
+import { isFieldShown } from "../utils/tabVisibility.js";
 import { useCurrentLang } from "./useCurrentLang.js";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
@@ -87,6 +93,12 @@ export interface MapoFormContext<T extends object> {
   submitted: Ref<boolean>;
   /** Optional, so a context built by hand without marks keeps working. */
   annotations?: Readonly<Ref<FieldAnnotations>>;
+  /**
+   * The field `revealField()` brings into view, while it does: the tab, the
+   * group and the repeater item that hold it open, and the field focuses
+   * its control. Optional, as `annotations`.
+   */
+  reveal?: Readonly<Ref<FieldRevealRequest | undefined>>;
 }
 
 function safeClone<X>(v: X): X {
@@ -105,6 +117,13 @@ function safeClone<X>(v: X): X {
 
 /** Injection key for the current Mapo form context. */
 export const FORM_KEY = Symbol("mapoForm");
+
+/**
+ * How long `revealField()` waits for the field to focus its control: a
+ * field type the registry loads lazily renders it a moment after its tab,
+ * group or item opens.
+ */
+const REVEAL_TIMEOUT_MS = 3000;
 
 /**
  * Provides the current form context to descendant field components.
@@ -414,6 +433,56 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
   });
   const findDescriptor = (key: string) => fieldIndex.value.get(key);
 
+  // ─── Bringing a field into view ─────────────────────────────────────────────
+
+  const reveal = shallowRef<FieldRevealRequest>();
+
+  /**
+   * Brings a field into view: opens the tab, the group or sub-tab and the
+   * repeater item that hold it, puts the focus on its control and scrolls
+   * it to the middle of the screen. The last call wins: one under way ends
+   * with `false`.
+   *
+   * @param path The path of the field's value, as its mark and its server
+   *   errors name it: `title`, `translations.it.title`, `blocks.0.title`.
+   * @returns Whether the field's control took the focus: `false` at once
+   *   for a field this form does not have or does not show, and after a few
+   *   seconds for one that never rendered a control to focus.
+   */
+  function revealField(path: string): Promise<boolean> {
+    reveal.value?.settle(false);
+    const located = fieldAtPath(
+      toValue(fields) as AnyFieldDescriptor[],
+      path,
+      currentLang.value,
+    );
+    const isShown = located
+      ? isFieldShown(located.field, model.value as Record<string, unknown>)
+      : false;
+    if (!located || !isShown) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      let isSettled = false;
+      const request: FieldRevealRequest = {
+        path,
+        key: located.field.key as string,
+        rest: located.rest,
+        // Called only once the request is out, after the timer below.
+        settle: (focused) => {
+          if (isSettled) return;
+          isSettled = true;
+          clearTimeout(timer);
+          if (reveal.value === request) reveal.value = undefined;
+          resolve(focused);
+        },
+      };
+      const timer = setTimeout(() => request.settle(false), REVEAL_TIMEOUT_MS);
+      reveal.value = request;
+    });
+  }
+
+  // A form that goes away ends what it was bringing into view.
+  if (getCurrentScope()) onScopeDispose(() => reveal.value?.settle(false));
+
   const ctx: MapoFormContext<T> = {
     model,
     fields,
@@ -436,6 +505,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     isTouched,
     submitted,
     annotations: computed(() => toValue(options.annotations) ?? {}),
+    reveal,
   };
 
   // Public API: accepts either a string key or a full descriptor, making it ergonomic
@@ -487,6 +557,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     resetDirty,
     getPatch,
     submit,
+    revealField,
     ctx,
     draftBanner,
     checkDraft,

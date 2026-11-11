@@ -22,7 +22,8 @@ src/
                                 useFieldAnnotation
   runtime/utils/                flattenFieldGroups, repeaterTemplates, tabVisibility, fieldComponent (one async
                                 component per registry loader), annotations (lookup by value path, tab badges),
-                                fieldsToJsonSchema (a form as JSON Schema, the reverse of useFormFromSchema)
+                                fieldsToJsonSchema (a form as JSON Schema, the reverse of useFormFromSchema),
+                                reveal and fieldFocus (what revealField() asks the form's parts, the control it focuses)
   __tests__/                    Vitest suites, with the #imports mock used by the root config
 ```
 
@@ -48,6 +49,7 @@ src/
 | `FieldExtensions`               | The section in `docs/uikit/form/custom-fields.md`; `property` of `fieldsToJsonSchema` if the schema should carry it                                        |
 | Progressive disclosure helpers  | `docs/uikit/form/progressive-disclosure.md` and the `addImports` list in `module.ts`                                                                       |
 | Field annotations               | `docs/uikit/form/annotations.md`, `docs/uikit/form/api.md`, `useFieldAnnotation` in `docs/modules/api.md`; the `annotations` prop of `MapoDetail` in uikit |
+| A part that hides fields        | It opens on the context's `reveal`, as `MapoFormTabs`, `MapoFormGroup` and `MapoRepeaterItem` do, or `revealField()` cannot reach its fields               |
 
 ## Verify
 

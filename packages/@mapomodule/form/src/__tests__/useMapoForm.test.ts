@@ -430,3 +430,106 @@ describe("draft", () => {
     }
   });
 });
+
+// ─── revealField ─────────────────────────────────────────────────────────────
+
+describe("revealField", () => {
+  interface Page {
+    title: string;
+    subtitle: string;
+    blocks: { title: string }[];
+    translations: Record<string, Partial<Page>>;
+  }
+
+  function makePage(lang = "") {
+    const model = ref<Page>({
+      title: "",
+      subtitle: "",
+      blocks: [{ title: "" }],
+      translations: {},
+    });
+    const fields = ref<FieldDescriptor<Page>[]>([
+      { key: "title", type: "text" as const, translatable: true },
+      {
+        key: "subtitle",
+        type: "text" as const,
+        show: ({ model: page }) => page.title !== "",
+      },
+      { key: "blocks", type: "repeater" as const },
+    ]);
+    const form = useMapoForm({
+      model,
+      fields,
+      registry: defaultRegistry,
+      currentLang: ref(lang),
+    });
+    return { model, form };
+  }
+
+  it("asks the form's parts for a field, by its key and the rest of the path", () => {
+    const { form } = makePage();
+
+    void form.revealField("blocks.0.title");
+
+    expect(form.ctx.reveal?.value).toMatchObject({
+      path: "blocks.0.title",
+      key: "blocks",
+      rest: "0.title",
+    });
+  });
+
+  it("names a translatable field by the path of its value or its bare key", () => {
+    const { form } = makePage("it");
+
+    void form.revealField("translations.it.title");
+    expect(form.ctx.reveal?.value).toMatchObject({ key: "title", rest: "" });
+
+    void form.revealField("title");
+    expect(form.ctx.reveal?.value).toMatchObject({ key: "title", rest: "" });
+  });
+
+  it("answers true once a field took the focus, and ends the request", async () => {
+    const { form } = makePage();
+
+    const revealed = form.revealField("title");
+    form.ctx.reveal?.value?.settle(true);
+
+    await expect(revealed).resolves.toBe(true);
+    expect(form.ctx.reveal?.value).toBeUndefined();
+  });
+
+  it("answers false at once for a field it does not have or does not show", async () => {
+    const { form } = makePage();
+
+    await expect(form.revealField("summary")).resolves.toBe(false);
+    await expect(form.revealField("subtitle")).resolves.toBe(false);
+    expect(form.ctx.reveal?.value).toBeUndefined();
+  });
+
+  it("ends a request under way with false when another one starts", async () => {
+    const { form } = makePage();
+
+    const first = form.revealField("title");
+    const second = form.revealField("blocks.0.title");
+
+    await expect(first).resolves.toBe(false);
+    expect(form.ctx.reveal?.value).toMatchObject({ key: "blocks" });
+    form.ctx.reveal?.value?.settle(true);
+    await expect(second).resolves.toBe(true);
+  });
+
+  it("gives up with false when no field focuses its control in time", async () => {
+    vi.useFakeTimers();
+    try {
+      const { form } = makePage();
+
+      const revealed = form.revealField("title");
+      await vi.advanceTimersByTimeAsync(3000);
+
+      await expect(revealed).resolves.toBe(false);
+      expect(form.ctx.reveal?.value).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

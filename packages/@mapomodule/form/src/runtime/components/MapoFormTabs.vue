@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { TabEntry } from "../types/layout.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { tabHoldsField } from "../utils/reveal.js";
 import { pickActiveTab, tabHasShownFields } from "../utils/tabVisibility.js";
 import { tabAnnotationGroups } from "../utils/annotations.js";
 import MapoFormAnnotationBadges from "./MapoFormAnnotationBadges.vue";
@@ -35,6 +36,19 @@ const shownTabs = computed(() => props.tabs.filter(tabHasContent));
 const pickedTab = ref<string | null>(null);
 const activeTab = computed(() =>
   pickActiveTab(shownTabs.value, pickedTab.value),
+);
+
+// `revealField()` opens the tab that holds the field, as a click would.
+watch(
+  () => form.reveal?.value,
+  (request) => {
+    if (!request) return;
+    const holder = shownTabs.value.find((tab) =>
+      tabHoldsField(tab, request.key),
+    );
+    if (holder) pickedTab.value = holder.name;
+  },
+  { immediate: true },
 );
 
 // Recursively check if a tab (or any of its descendants) contains errors.

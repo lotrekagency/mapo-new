@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 import type { Ref } from "vue";
 import type { AnyFieldDescriptor } from "../types/index.js";
 import {
@@ -10,6 +10,8 @@ import {
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import { toFieldComponent } from "../utils/fieldComponent.js";
 import { valuePath } from "../utils/annotations.js";
+import { focusFieldControl } from "../utils/fieldFocus.js";
+import type { FieldRevealRequest } from "../utils/reveal.js";
 import { useFieldAnnotation } from "../composables/useFieldAnnotation.js";
 import { getNestedValue, debounce } from "@mapomodule/utils";
 import MapoUnknownField from "./MapoUnknownField.vue";
@@ -232,12 +234,48 @@ function toggleExpand() {
   if (isExpanded.value) groupExpand.collapseField();
   else groupExpand.expandField(props.descriptor.key as string);
 }
+
+// ─── Bringing the field into view ────────────────────────────────────────────
+
+/** The field's element: its control is looked up inside it. */
+const fieldElement = ref<unknown>(null);
+
+/** Milliseconds between two looks for the control of a field being revealed. */
+const REVEAL_RETRY_MS = 50;
+
+// `revealField()` of the form names this field: its tab, group and item open
+// on the same request, and the control may render a moment later, as a field
+// type loaded lazily does. The request ends when the control has the focus,
+// or when the form gives up on it.
+watch(
+  () => form.reveal?.value,
+  (request) => {
+    const isThisField =
+      request !== undefined &&
+      request.rest === "" &&
+      request.key === (props.descriptor.key as string);
+    if (isThisField) void focusWhenRendered(request);
+  },
+  { immediate: true },
+);
+
+async function focusWhenRendered(request: FieldRevealRequest): Promise<void> {
+  await nextTick();
+  while (form.reveal?.value === request) {
+    if (focusFieldControl(fieldElement.value, fieldId.value)) {
+      request.settle(true);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, REVEAL_RETRY_MS));
+  }
+}
 </script>
 
 <template>
   <div
     v-if="isVisible"
     v-show="showField"
+    ref="fieldElement"
     class="mapo-form-field group flex flex-col gap-1"
     :class="[
       descriptor.class,

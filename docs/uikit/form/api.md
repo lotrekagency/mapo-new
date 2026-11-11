@@ -51,6 +51,7 @@ Descriptor typing guidance:
 | `getPatch`       | `() => Partial<T>`                                                               | Return only the fields changed since the last `resetDirty`.                                                         |
 | `isDirty`        | `Ref<boolean>`                                                                   | Reactive flag — `true` when any field has changed since the last baseline.                                          |
 | `isLoading`      | `Ref<boolean>`                                                                   | Reactive flag — `true` while the `submit` handler is executing.                                                     |
+| `revealField`    | `(path: string) => Promise<boolean>`                                             | Open the tab, group and repeater item that hold a field, then focus its control. Resolves whether it took focus.    |
 
 ---
 

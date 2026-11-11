@@ -12,6 +12,7 @@ import type {
   FieldAnnotations,
   FieldRegistry,
 } from "../runtime/types/index.js";
+import type { FieldRevealRequest } from "../runtime/utils/reveal.js";
 import { createApp, headlessNode } from "./headlessRenderer.js";
 import type { HeadlessNode } from "./headlessRenderer.js";
 
@@ -19,6 +20,14 @@ import type { HeadlessNode } from "./headlessRenderer.js";
 // outside a Nuxt build. The field only injects the form context.
 vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
   useMapoT: () => (key: string) => key,
+}));
+// Headless nodes cannot take the focus: a test says whether the control did.
+const focus = vi.hoisted(() => ({
+  control: vi.fn((_field: unknown, _id: string) => true),
+}));
+vi.mock(import("../runtime/utils/fieldFocus.js"), async (original) => ({
+  ...(await original()),
+  focusFieldControl: focus.control,
 }));
 
 /** What a test observes of a field component: its lifecycle and what it renders. */
@@ -75,6 +84,7 @@ const registryOf = (mapping: FieldRegistry["mapping"]): FieldRegistry => ({
 interface FormOptions {
   annotations?: Ref<FieldAnnotations>;
   currentLang?: string;
+  reveal?: Ref<FieldRevealRequest | undefined>;
 }
 
 function formContext(
@@ -97,6 +107,7 @@ function formContext(
     isTouched: () => false,
     submitted: ref(false),
     annotations: options.annotations ?? ref({}),
+    ...(options.reveal ? { reveal: options.reveal } : {}),
   };
 }
 
@@ -408,5 +419,90 @@ describe("useFieldAnnotation", () => {
     apps.push(app);
 
     expect(read).toBeUndefined();
+  });
+});
+
+describe("MapoFormField reveal", () => {
+  /** A request of `revealField()` for the field of `key`, its end recorded. */
+  function request(key: string, rest = ""): FieldRevealRequest {
+    const path = rest ? `${key}.${rest}` : key;
+    return { path, key, rest, settle: vi.fn() };
+  }
+
+  const wait = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  afterEach(() => {
+    focus.control.mockReset();
+    focus.control.mockImplementation(() => true);
+  });
+
+  it("focuses its control when the form reveals it, and ends the request", async () => {
+    const text = fieldType("TextField");
+    const asked = request("title");
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef<AnyFieldDescriptor>({ key: "title", type: "text" }),
+      { reveal: shallowRef<FieldRevealRequest | undefined>(asked) },
+    );
+
+    await vi.waitFor(() => expect(asked.settle).toHaveBeenCalledWith(true));
+    const [element, id] = focus.control.mock.calls[0] ?? [];
+    expect(id).toBe("field-title");
+    expect(String((element as HeadlessNode).props.class)).toContain(
+      "mapo-form-field",
+    );
+  });
+
+  it("looks again until its control renders, as a field loaded lazily does", async () => {
+    focus.control.mockReturnValueOnce(false).mockReturnValueOnce(false);
+    const text = fieldType("TextField");
+    const asked = request("title");
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef<AnyFieldDescriptor>({ key: "title", type: "text" }),
+      { reveal: shallowRef<FieldRevealRequest | undefined>(asked) },
+    );
+
+    await vi.waitFor(() => expect(asked.settle).toHaveBeenCalledWith(true));
+    expect(focus.control).toHaveBeenCalledTimes(3);
+  });
+
+  it("leaves a request for another field, or for a value inside its own", async () => {
+    const text = fieldType("TextField");
+    const reveal = shallowRef<FieldRevealRequest | undefined>(
+      request("subtitle"),
+    );
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef<AnyFieldDescriptor>({ key: "title", type: "text" }),
+      { reveal },
+    );
+    await wait(60);
+    reveal.value = request("title", "0.name");
+    await wait(60);
+
+    expect(focus.control).not.toHaveBeenCalled();
+  });
+
+  it("stops looking once the request ends", async () => {
+    focus.control.mockImplementation(() => false);
+    const text = fieldType("TextField");
+    const asked = request("title");
+    const reveal = shallowRef<FieldRevealRequest | undefined>(asked);
+    mountField(
+      registryOf({ text: text.loader }),
+      shallowRef<AnyFieldDescriptor>({ key: "title", type: "text" }),
+      { reveal },
+    );
+    await wait(120);
+
+    reveal.value = undefined;
+    const looks = focus.control.mock.calls.length;
+    await wait(120);
+
+    expect(looks).toBeGreaterThan(1);
+    expect(focus.control).toHaveBeenCalledTimes(looks);
+    expect(asked.settle).not.toHaveBeenCalled();
   });
 });

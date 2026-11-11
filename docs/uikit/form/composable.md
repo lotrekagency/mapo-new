@@ -38,6 +38,7 @@ const form = useMapoForm<T>({
 | `resetDirty()`              | `void`                                                          | Clears the backup (after a successful save)                                  |
 | `getPatch()`                | `Partial<T>`                                                    | Diff model vs backup — for differential PATCH                                |
 | `submit(handler, isNew?)`   | `Promise<void>`                                                 | Validate, call handler, manage loading state, clear draft on success         |
+| `revealField(path)`         | `Promise<boolean>`                                              | Opens the tab, group and item that hold a field, then focuses its control    |
 | `ctx`                       | `MapoFormContext<T>`                                            | The reactive context object provided to descendant fields                    |
 | `draftBanner`               | `Ref<{ savedAt, restore, discard } \| null>`                    | Populated after `checkDraft()` when a pending draft is found in localStorage |
 | `checkDraft()`              | `void`                                                          | Read localStorage for a pending draft; call after the model is fetched       |
