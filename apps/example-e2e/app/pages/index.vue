@@ -108,6 +108,11 @@ const sections = [
         desc: "The panel on every detail page: a text or files, What I send, the model, the summary, Cancel and Undo all",
       },
       {
+        label: "Magic Fill, the items of a list",
+        to: "/ai/magic-fill-blocks/1",
+        desc: "A page of blocks and reviews: each list's items chosen one by one, added after the page's own",
+      },
+      {
         label: "Magic Fill off",
         to: "/ai/magic-fill-off/new",
         desc: "The same article on a page with definePageMeta({ magicFill: false }): no button, no banner",

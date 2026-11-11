@@ -9,6 +9,7 @@
 // source comes back to check, one that breaks a rule of its field comes
 // back discarded. The sources are in shared/aiArticleSamples.ts.
 import { NO_SOURCE, NOTE, RELEASE, UPDATE } from "#shared/aiArticleSamples";
+import { LIBRARY } from "#shared/aiPageSamples";
 
 /** Every field of the article form (app/utils/aiArticleForm.ts), empty. */
 const EMPTY = {
@@ -104,6 +105,67 @@ export default defineNitroPlugin(() => {
           quote("slug", UPDATE.slug),
           quote("subtitle", "A shorter guide to the form engine"),
         ],
+      },
+    },
+    {
+      // An update of the city library (/ai/magic-fill-blocks/1), for the
+      // items of a list: three blocks, each with its template, so none is
+      // verified, the hero being the page's own; three reviews, the first
+      // the page's own too, the third quoted with words the source does not
+      // have. Only the lists are given: every other field comes back empty.
+      name: "page-update",
+      answer: {
+        values: {
+          // A block's fields carry its template's name in the answer
+          // (`hero_title`), as the contract names them, and so do their
+          // quotes; the list inside the FAQ names its own fields plainly.
+          blocks: [
+            {
+              _template: "hero",
+              hero_title: LIBRARY.hero,
+              evidence: [quote("hero_title", LIBRARY.hero)],
+            },
+            {
+              _template: "text",
+              text_heading: LIBRARY.heading,
+              text_body: LIBRARY.body,
+              evidence: [
+                quote("text_heading", LIBRARY.heading),
+                quote("text_body", LIBRARY.body),
+              ],
+            },
+            {
+              _template: "faq",
+              faq_heading: "Questions",
+              faq_questions: [
+                {
+                  question: LIBRARY.question,
+                  answer: LIBRARY.answer,
+                  evidence: [
+                    quote("question", LIBRARY.question),
+                    quote("answer", LIBRARY.answer),
+                  ],
+                },
+              ],
+              evidence: [quote("faq_heading", "Questions")],
+            },
+          ],
+          reviews: [
+            ...LIBRARY.reviews.map(({ author, quote: words }) => ({
+              author,
+              quote: words,
+              evidence: [quote("author", author), quote("quote", words)],
+            })),
+            {
+              ...LIBRARY.unproven,
+              evidence: [
+                quote("author", LIBRARY.unproven.author),
+                quote("quote", "Not enough seats in the reading room."),
+              ],
+            },
+          ],
+        },
+        evidence: [],
       },
     },
     {

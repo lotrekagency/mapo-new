@@ -101,3 +101,53 @@ export const AI_PAGE_SAMPLES: AiSample[] = [
     ].join("\n"),
   },
 ];
+
+/**
+ * Words of an update of the city library (page 1), quoted by the mock's
+ * fixture `page-update`: a hero the page has already, two blocks and three
+ * reviews, one of which the page has too.
+ */
+export const LIBRARY = {
+  hero: "A library for everyone",
+  heading: "Open on Sundays",
+  body: "From November the library opens on Sundays, from 10 to 18.",
+  question: "Do I need a library card?",
+  answer: "No, entry is free.",
+  reviews: [
+    { author: "Luca Bassi", quote: "Quiet rooms and kind staff." },
+    { author: "Anna Neri", quote: "The Sunday opening is a gift." },
+  ],
+  /** A review the source gives, with words the source does not have as its quote. */
+  unproven: {
+    author: "Marco Riva",
+    quote: "Too few seats in the reading room.",
+  },
+};
+
+/**
+ * The sources the Magic Fill page of blocks offers the mock
+ * (app/pages/ai/magic-fill-blocks/[id].vue).
+ */
+export const AI_PAGE_MOCK_SAMPLES: AiSample[] = [
+  {
+    label: "Library update",
+    description:
+      "Fixture page-update, for /ai/magic-fill-blocks/1: three blocks, one the page has already, and three reviews, one the page has, one whose quote the source does not have. In the preview each list gives its items one by one: the blocks unticked, since no quote proves a template; the verified review ticked; what the page holds already, not added again.",
+    text: [
+      "#mock:fixture=page-update",
+      "",
+      "The city library",
+      LIBRARY.hero,
+      "",
+      LIBRARY.heading,
+      LIBRARY.body,
+      "",
+      "Questions",
+      `${LIBRARY.question} ${LIBRARY.answer}`,
+      "",
+      "What readers say",
+      ...LIBRARY.reviews.map(({ author, quote }) => `${author}: "${quote}"`),
+      `${LIBRARY.unproven.author}: "${LIBRARY.unproven.quote}"`,
+    ].join("\n"),
+  },
+];

@@ -110,7 +110,8 @@ export function emptyPage(): Omit<Page, "id" | "created_at" | "updated_at"> {
 const CREATED = "2026-10-01T09:00:00Z";
 
 // Page 1 holds some values already: a fill proposes to replace them, and
-// waits for Apply.
+// waits for Apply. Its hero and its review are those the mock's fixture
+// `page-update` gives again: Magic Fill does not add them a second time.
 const pages: Page[] = [
   {
     ...emptyPage(),
@@ -127,6 +128,14 @@ const pages: Page[] = [
         cta_url: "",
         background: "",
         image: null,
+      },
+    ],
+    reviews: [
+      {
+        author: "Luca Bassi",
+        quote: "Quiet rooms and kind staff.",
+        stars: 4,
+        date: "2026-09-12",
       },
     ],
     status: "draft",
