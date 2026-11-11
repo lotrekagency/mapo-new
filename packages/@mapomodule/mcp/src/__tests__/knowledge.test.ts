@@ -15,6 +15,11 @@ import {
   resolveKnowledgeDir,
 } from "../runtime/core/knowledge.js";
 import { overviewSummary } from "../runtime/core/overview.js";
+import {
+  AI_NEEDS,
+  AI_TOPICS,
+  aiTopic,
+} from "../runtime/core/ai-setup/index.js";
 import { RECIPES } from "../runtime/core/recipes.js";
 import { getDoc, searchDocs } from "../runtime/core/search.js";
 
@@ -91,6 +96,35 @@ describeBuilt("generated knowledge base", () => {
           pages.has(related),
           `recipe "${recipe.id}" → missing seeAlso ${related}`,
         ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every topic of the AI setup pointing at a real page and section", () => {
+    const pages = new Map(
+      knowledge.chunks.map((chunk) => [chunk.path, new Set<string>()] as const),
+    );
+    for (const chunk of knowledge.chunks)
+      pages.get(chunk.path)!.add(chunk.heading);
+
+    for (const topic of AI_TOPICS) {
+      expect(
+        pages.has(topic.doc),
+        `topic "${topic.id}" → missing doc ${topic.doc}`,
+      ).toBe(true);
+      if (topic.heading) {
+        expect(
+          [...pages.get(topic.doc)!],
+          `topic "${topic.id}" → missing heading in ${topic.doc}`,
+        ).toContain(topic.heading);
+      }
+    }
+    for (const need of AI_NEEDS) {
+      for (const id of need.topics) {
+        expect(
+          aiTopic(id),
+          `need "${need.id}" → unknown topic ${id}`,
+        ).toBeDefined();
       }
     }
   });

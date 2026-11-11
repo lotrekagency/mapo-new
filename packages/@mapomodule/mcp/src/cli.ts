@@ -35,6 +35,7 @@ import { appTools } from "./runtime/core/tools/app.js";
 import { docsTools } from "./runtime/core/tools/docs.js";
 import { scaffoldTools } from "./runtime/core/tools/scaffold.js";
 import { backendTools } from "./runtime/core/tools/backend.js";
+import { aiTools } from "./runtime/core/tools/ai.js";
 import { PROMPTS } from "./runtime/core/prompts.js";
 import {
   loadApiKnowledge,
@@ -63,7 +64,13 @@ export const DEFAULT_APP_URL = mcpEndpointUrl("http://localhost:3000");
 
 /** All tools that run without the Nuxt dev server. */
 function staticTools(): AnyMapoToolSpec[] {
-  return [...docsTools, ...apiTools, ...scaffoldTools, ...backendTools];
+  return [
+    ...docsTools,
+    ...apiTools,
+    ...scaffoldTools,
+    ...backendTools,
+    ...aiTools,
+  ];
 }
 
 function createToolContext(

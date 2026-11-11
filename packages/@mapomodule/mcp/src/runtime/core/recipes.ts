@@ -653,6 +653,26 @@ export const RECIPES: Recipe[] = [
       "The Mapo Forms tab: the module config and the live field registry your forms read.",
   },
   {
+    id: "ai-setup",
+    task: "Turn on the AI module and Magic Fill with a guided setup",
+    keywords: [
+      "set up the ai",
+      "configure the ai",
+      "enable the ai module",
+      "guided setup",
+      "what can the ai do",
+      "mapo_ai_setup",
+      "mapo-ai-setup",
+      "ai tokens",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Enable the module",
+    seeAlso: ["modules/mcp.md", "howto/magic-fill.md"],
+    summary:
+      "Experimental: setting mapo.ai in nuxt.config.ts installs @mapomodule/ai, and a provider turns Magic Fill on in every MapoDetail. The mapo_ai_setup tool, or the mapo-ai-setup prompt, asks the developer what the AI is for, says what the module can and cannot do for it, and proposes the configuration, the environment variables (names only), the keys and tokens, and the server plugins.",
+  },
+  {
     id: "ai-run",
     task: "Ask the AI to fill a record from a source",
     keywords: [

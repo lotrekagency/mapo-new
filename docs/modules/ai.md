@@ -1319,11 +1319,20 @@ When the driver's settings come from the environment, such as a password, mount 
 import redisDriver from "unstorage/drivers/redis";
 
 export default defineNitroPlugin(async () => {
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    if (import.meta.dev) return; // the module's file system, in development
+    throw new Error(
+      "REDIS_URL is not set: the AI's state needs the shared store",
+    );
+  }
   const storage = useStorage();
   await storage.unmount("mapo-ai"); // the module's file-system default, if any
-  storage.mount("mapo-ai", redisDriver({ url: process.env.REDIS_URL }));
+  storage.mount("mapo-ai", redisDriver({ url }));
 });
 ```
+
+Without `REDIS_URL` the plugin leaves the module's file system in development, where the redis driver would otherwise try a server on `localhost`, and stops the server in production, where each instance would otherwise keep a state of its own. The redis driver of unstorage needs `ioredis` in the app; an edge runtime, which cannot open the connection Redis needs, takes a driver that works over HTTP instead, mounted the same way.
 
 The module checks the storage right after the app's plugins have run, so it finds the driver this plugin mounts. A plugin that mounts only after a network call, such as fetching a password, comes too late for that check: the startup log may report the storage as closed, and the first sweep waits for the next hourly round.
 

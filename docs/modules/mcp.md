@@ -106,8 +106,8 @@ The long form is the [Concepts](/guide/concepts) page. The server serves it whol
 ## Tools
 
 All tools are prefixed `mapo_` so they stay unambiguous when several MCP servers
-are connected. Every one is annotated read-only except `mapo_scaffold`, which
-can create files and declares it.
+are connected. Every one is annotated read-only except `mapo_scaffold` and
+`mapo_ai_setup`, which can create files and declare it.
 
 | Tool                    | Purpose                                                                                                                                                                                               |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,7 +138,8 @@ declared 17. Ask them whenever you are unsure about a prop, a slot or an
 
 ## Scaffolding
 
-`mapo_scaffold` is the only tool that writes. Nine kinds: `list-page`,
+`mapo_scaffold` writes pages and fields; besides it, only `mapo_ai_setup`
+writes, the AI's server plugins. Nine kinds: `list-page`,
 `detail-page`, `standalone-form`, `custom-field`, `login-page`,
 `theme-override`, `backend-proxy`, `menu-page`, `media-page`.
 
@@ -201,17 +202,39 @@ schema and work offline. drf-spectacular serves YAML by default — the tool
 detects it and reminds you to add `?format=json`.
 :::
 
+## Setting up the AI
+
+`mapo_ai_setup` walks a developer through turning on `@mapomodule/ai`, which is experimental, and Magic Fill. Called with nothing, or with the developer's need in their words, it returns the questions to ask them, in three rounds: what the AI is for and what the operators start from, whether the data may go to a cloud provider, which models, who holds the keys, who may use the AI, how to keep the tokens and their cost in check, where Magic Fill shows and where the server runs. With them come every need the module can meet and everything it offers, each with the page that documents it.
+
+Called with the answers, it returns the plan:
+
+- whether the module can do each need: out of the box, with code of the app, not yet, or not at all;
+- the `mapo.ai` block for `nuxt.config.ts`, which the tool never edits;
+- the environment variables, by name only;
+- where each call's key comes from (the project's, the admins' assignments, the users' own tokens) and what a call spends: the usage, the prices, the limits, the prompt cache;
+- the forms' `ai` options, the server plugins the answers call for (a `mapo-ai:user` hook, a reader of a format, the storage of several instances) and the checks.
+
+```
+mapo_ai_setup({ need: "editors fill events from press releases" })
+→ the questions, the needs the module meets, everything it offers
+mapo_ai_setup({ wants: ["fill-record", "team-keys"], providers: ["openai"], keys: ["project", "assigned"] })
+→ the plan
+```
+
+The plugins are a dry run unless `write: true`, through the same guard as `mapo_scaffold`. No key, token or secret is ever written: the plan names the variables, and the developer sets their values. The `mapo-ai-setup` prompt runs the whole interview.
+
 ## Prompts
 
 Clients that support MCP prompts expose these as slash-commands:
 
-| Prompt              | What it drives                                                              |
-| ------------------- | --------------------------------------------------------------------------- |
-| `mapo-crud-page`    | inspect the app → pick field types → scaffold list + detail → check APIs    |
-| `mapo-custom-field` | rule out built-in types → read the registry contract → scaffold → implement |
-| `mapo-debug-form`   | doctor → inspect registered types → compare `attrs` → search the docs       |
-| `mapo-migrate-v1`   | read the migration page, then verify every symbol against installed source  |
-| `mapo-theme`        | pick the lightest layer: tokens → override file → slots → MapoOverride      |
+| Prompt              | What it drives                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| `mapo-crud-page`    | inspect the app → pick field types → scaffold list + detail → check APIs            |
+| `mapo-custom-field` | rule out built-in types → read the registry contract → scaffold → implement         |
+| `mapo-debug-form`   | doctor → inspect registered types → compare `attrs` → search the docs               |
+| `mapo-migrate-v1`   | read the migration page, then verify every symbol against installed source          |
+| `mapo-theme`        | pick the lightest layer: tokens → override file → slots → MapoOverride              |
+| `mapo-ai-setup`     | inspect the app → ask in rounds → what the module can do → plan → write the plugins |
 
 ## Resources
 
@@ -255,7 +278,7 @@ Still to come — `mapo-mcp install`, the Agent Skill and the MCP App inspector.
 - Backend credentials are read from the environment **per request** — only the
   name of the variable reaches the build output — and never appear in a tool
   response.
-- Every tool is read-only except `mapo_scaffold`, whose writing is opt-in,
+- Every tool is read-only except `mapo_scaffold` and `mapo_ai_setup`, whose writing is opt-in,
   development-only, confined to the project root and unable to replace an
   existing file without `overwrite: true`.
 

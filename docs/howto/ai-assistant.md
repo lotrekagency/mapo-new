@@ -178,8 +178,8 @@ design something Mapo ships out of the box. Clients that attach MCP resources
 can add `mapo://overview`, the whole [Concepts](/guide/concepts) page.
 
 **Use the slash-commands.** If your client supports MCP prompts, `/mapo-crud-page`,
-`/mapo-custom-field`, `/mapo-debug-form`, `/mapo-migrate-v1` and `/mapo-theme`
-drive the assistant through the right sequence of tools instead of letting it
+`/mapo-custom-field`, `/mapo-debug-form`, `/mapo-migrate-v1`, `/mapo-theme` and
+`/mapo-ai-setup` drive the assistant through the right sequence of tools instead of letting it
 improvise one.
 
 **Let it scaffold.** `mapo_scaffold` writes code that matches the framework's

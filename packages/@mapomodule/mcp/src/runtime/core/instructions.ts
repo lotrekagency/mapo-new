@@ -15,4 +15,5 @@ Workflow:
 4. Use mapo_search_docs for anything the recipes do not cover, then mapo_get_doc to read the exact section. Prefer these over recalling Mapo APIs from memory.
 5. Never invent component props, slots or field types: look them up with mapo_component_api, mapo_list_field_types and mapo_composable_api, which read the installed source.
 6. mapo_backend_schema maps the backend's OpenAPI schema to field descriptors, and mapo_scaffold generates pages, fields and overrides in Mapo's own patterns (a dry run unless asked to write).
-7. Cite the doc path you relied on when you produce code.`;
+7. To turn on the AI module or Magic Fill, call mapo_ai_setup: it asks the developer what the AI is for, says what the module can and cannot do, and proposes the configuration, the keys and tokens, and the files.
+8. Cite the doc path you relied on when you produce code.`;

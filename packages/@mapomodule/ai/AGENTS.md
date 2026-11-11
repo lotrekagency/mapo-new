@@ -155,43 +155,43 @@ eval/                        the evaluation set (not published): cases.ts (the c
 
 ## Change together
 
-| You change                       | Also change                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A route or its response          | `runtime/shared/gateway.ts` (types, `MAPO_AI_CONTRACT_VERSION`), routes in `docs/modules/ai.md`                                      |
-| An option                        | Its default in `module.ts`, `docs/modules/ai.md`, `README.md` if the installation changes                                            |
-| Who may call the gateway         | `runtime/server/auth/`, `access.ts` for the options; `status.test.ts`, `user.test.ts`; the hook's docs                               |
-| How a user's permissions read    | `userPermissions()` in `@mapomodule/utils`, which the auth store shares: both change together                                        |
-| How the meta-module installs it  | `packages/mapomodule/src/module.ts`, `docs/guide/concepts.md`, `packages/mapomodule/README.md`                                       |
-| What the package does, in a line | `docs/guide/concepts.md`, `docs/guide/feature-status.md`, `mcp/src/runtime/core/instructions.ts`                                     |
-| A value kind or a skip reason    | `entity.ts`; `contract.ts` (`KIND_RULES`, `PROSE_KINDS`); `convert()` in `sanitize.ts`; the tables of the tests                      |
-| The contract's shape             | `AI_CONTRACT_FORMAT_VERSION`, `expectPortable()`, `sanitize.ts`, the mock (it reads `request.contract`)                              |
-| A tag of rich text               | `markdown.ts` and the extensions of `MapoWygEditor`: the editor must accept every tag the AI's HTML has                              |
-| A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests                             |
-| A storage purpose                | `STORAGE_PURPOSES` in `storage/sealed.ts`; never rename one that has records: its key comes from the name                            |
-| The chain of keys                | `keys/chain.ts`, `keys.test.ts`, `keys-routes.test.ts`, the Keys sections of the module's two docs pages                             |
-| The preference or the check      | `server/settings/`, `policyForUser()` in `policy.ts`, `settings.test.ts`, `keys-routes.test.ts`, the docs                            |
-| A part of the settings page      | `mapo.ai.settings.*` in both catalogs; uikit `main.css` if the folder moves; the check in `apps/example-ai`                          |
-| A setting of the admins          | `settings/admin.ts`, `shared/gateway.ts`, its block of the page, `mapo.ai.settings.behaviour.*`, the docs                            |
-| A name of a secret               | `SECRET_WORDS`, `SECRET_ENDINGS`, `SECRET_PAIRS` and `MAPO_SECRET_NAMES` in `entity.ts`; `entity.test.ts`                            |
-| The audit record's format        | `AUDIT_RECORD_VERSION` (from the first release on), `usage/report.ts`, `usage.test.ts`, the docs' Usage                              |
-| An option of `run`               | `run/options.ts` and its warnings, `MapoAiOptions` in `index.ts`, `module.test.ts`, the docs' options                                |
-| The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), the reader in `shared/fill.ts`, `run.test.ts`, the docs                         |
-| A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                                                    |
-| A failure of a provider          | `MapoAiProviderFailure`, `FAILURES` in `run/run.ts`, the audit's validator, the docs, `useMapoAiFill.ts`                             |
-| A provider of Mapo               | `MAPO_PROVIDERS`, reserved ids; `SERVER_PROVIDERS` in `run/options.ts`; `__tests__/recorded/` or `documented/`                       |
-| A reader of Mapo                 | `MAPO_READERS` in `readers/registry.ts`; its format in `docs/modules/ai.md`; `status.test.ts`, `module.test.ts`                      |
-| The answer of `read`             | `MapoAiReadResponse` in `shared/gateway.ts`, `readMapoAiReadResponse()` in `shared/read.ts`, `read.test.ts`                          |
-| The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests                                   |
-| What goes into a form by itself  | `actionOf()` and `isEmptyFormValue()` in `fill.ts`, `fill.test.ts`, the table of the docs' "Fill a detail form"                      |
-| How a related record is found    | `relations.ts`, the plan in `fill.ts`, `relations.test.ts`, the "Related records" sections of both docs pages                        |
-| The session of a form            | `join()`, `review` and `undo()` of `useMapoAiFill.ts`; `summarizeMapoAiFill()`; the docs' sessions                                   |
-| The preview of Magic Fill        | `summarizeMapoAiFill()`, `mapoAiPreselected()`; the ticks of `useMapoAiMagicFill.ts`; the banner; the docs                           |
-| The session in a draft           | `snapshot()` and `resume()` of `useMapoAiFill.ts`; `fillSession.ts` and its format (raise it, read the older); `fillSession.test.ts` |
-| A mark or a message of the fill  | `mapo.ai.fill.*`, `mapo.ai.errors.*` in both `mapo.{en,it}.json` of `@mapomodule/i18n`; `useMapoAiFill.test.ts`                      |
-| How the form writes a value      | `writeField()` of `useMapoAiFill.ts`, which repeats `setFieldValue()` of the form's `useMapoForm.ts`                                 |
-| A part of Magic Fill             | `MAGIC_FILL_COMPONENTS` and the plugin in `module.ts`; `mapo.ai.magicFill.*`; the docs' "Magic Fill"                                 |
-| What the panel checks            | `checkMapoAiSource()` in `magicFill.ts`, in step with `run/request.ts`; `magicFill.test.ts`                                          |
-| The answer of `status`           | `readMapoAiStatus()` in `magicFill.ts`, `magicFill.test.ts`                                                                          |
+| You change                       | Also change                                                                                                                                                                                                           |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A route or its response          | `runtime/shared/gateway.ts` (types, `MAPO_AI_CONTRACT_VERSION`), routes in `docs/modules/ai.md`                                                                                                                       |
+| An option                        | Its default in `module.ts`, `docs/modules/ai.md`, `README.md` if the installation changes; the plan of `mapo_ai_setup` (`mcp/src/runtime/core/ai-setup/`)                                                             |
+| Who may call the gateway         | `runtime/server/auth/`, `access.ts` for the options; `status.test.ts`, `user.test.ts`; the hook's docs                                                                                                                |
+| How a user's permissions read    | `userPermissions()` in `@mapomodule/utils`, which the auth store shares: both change together                                                                                                                         |
+| How the meta-module installs it  | `packages/mapomodule/src/module.ts`, `docs/guide/concepts.md`, `packages/mapomodule/README.md`                                                                                                                        |
+| What the package does, in a line | `docs/guide/concepts.md`, `docs/guide/feature-status.md`, `mcp/src/runtime/core/instructions.ts`                                                                                                                      |
+| A value kind or a skip reason    | `entity.ts`; `contract.ts` (`KIND_RULES`, `PROSE_KINDS`); `convert()` in `sanitize.ts`; the tables of the tests                                                                                                       |
+| The contract's shape             | `AI_CONTRACT_FORMAT_VERSION`, `expectPortable()`, `sanitize.ts`, the mock (it reads `request.contract`)                                                                                                               |
+| A tag of rich text               | `markdown.ts` and the extensions of `MapoWygEditor`: the editor must accept every tag the AI's HTML has                                                                                                               |
+| A verification rule              | `AiVerificationRules`, `DEFAULT_VERIFICATION_RULES`, `verificationRulesOf()` in `sanitize.ts`; the tests                                                                                                              |
+| A storage purpose                | `STORAGE_PURPOSES` in `storage/sealed.ts`; never rename one that has records: its key comes from the name                                                                                                             |
+| The chain of keys                | `keys/chain.ts`, `keys.test.ts`, `keys-routes.test.ts`, the Keys sections of the module's two docs pages                                                                                                              |
+| The preference or the check      | `server/settings/`, `policyForUser()` in `policy.ts`, `settings.test.ts`, `keys-routes.test.ts`, the docs                                                                                                             |
+| A part of the settings page      | `mapo.ai.settings.*` in both catalogs; uikit `main.css` if the folder moves; the check in `apps/example-ai`                                                                                                           |
+| A setting of the admins          | `settings/admin.ts`, `shared/gateway.ts`, its block of the page, `mapo.ai.settings.behaviour.*`, the docs                                                                                                             |
+| A name of a secret               | `SECRET_WORDS`, `SECRET_ENDINGS`, `SECRET_PAIRS` and `MAPO_SECRET_NAMES` in `entity.ts`; `entity.test.ts`                                                                                                             |
+| The audit record's format        | `AUDIT_RECORD_VERSION` (from the first release on), `usage/report.ts`, `usage.test.ts`, the docs' Usage                                                                                                               |
+| An option of `run`               | `run/options.ts` and its warnings, `MapoAiOptions` in `index.ts`, `module.test.ts`, the docs' options                                                                                                                 |
+| The body or the answer of `run`  | `run/request.ts` (zod), `shared/gateway.ts` (types), the reader in `shared/fill.ts`, `run.test.ts`, the docs                                                                                                          |
+| A base rule of the prompt        | `prompts/base.ts` and `MAPO_AI_PROMPT_VERSION`, `prompts.test.ts`                                                                                                                                                     |
+| A failure of a provider          | `MapoAiProviderFailure`, `FAILURES` in `run/run.ts`, the audit's validator, the docs, `useMapoAiFill.ts`                                                                                                              |
+| A provider of Mapo               | `MAPO_PROVIDERS`, reserved ids; `SERVER_PROVIDERS` in `run/options.ts`; `__tests__/recorded/` or `documented/`; `mapo_ai_setup` in `@mapomodule/mcp`                                                                  |
+| A reader of Mapo                 | `MAPO_READERS` in `readers/registry.ts`; its format in `docs/modules/ai.md`; `status.test.ts`, `module.test.ts`; `MAPO_EXTENSIONS` and `MAPO_READER_IDS` of `mapo_ai_setup` (`mcp/src/runtime/core/ai-setup/plan.ts`) |
+| The answer of `read`             | `MapoAiReadResponse` in `shared/gateway.ts`, `readMapoAiReadResponse()` in `shared/read.ts`, `read.test.ts`                                                                                                           |
+| The sealed record's format       | `ENVELOPE_VERSION` in `storage/sealed.ts`, keeping the previous format readable; the storage tests                                                                                                                    |
+| What goes into a form by itself  | `actionOf()` and `isEmptyFormValue()` in `fill.ts`, `fill.test.ts`, the table of the docs' "Fill a detail form"                                                                                                       |
+| How a related record is found    | `relations.ts`, the plan in `fill.ts`, `relations.test.ts`, the "Related records" sections of both docs pages                                                                                                         |
+| The session of a form            | `join()`, `review` and `undo()` of `useMapoAiFill.ts`; `summarizeMapoAiFill()`; the docs' sessions                                                                                                                    |
+| The preview of Magic Fill        | `summarizeMapoAiFill()`, `mapoAiPreselected()`; the ticks of `useMapoAiMagicFill.ts`; the banner; the docs                                                                                                            |
+| The session in a draft           | `snapshot()` and `resume()` of `useMapoAiFill.ts`; `fillSession.ts` and its format (raise it, read the older); `fillSession.test.ts`                                                                                  |
+| A mark or a message of the fill  | `mapo.ai.fill.*`, `mapo.ai.errors.*` in both `mapo.{en,it}.json` of `@mapomodule/i18n`; `useMapoAiFill.test.ts`                                                                                                       |
+| How the form writes a value      | `writeField()` of `useMapoAiFill.ts`, which repeats `setFieldValue()` of the form's `useMapoForm.ts`                                                                                                                  |
+| A part of Magic Fill             | `MAGIC_FILL_COMPONENTS` and the plugin in `module.ts`; `mapo.ai.magicFill.*`; the docs' "Magic Fill"                                                                                                                  |
+| What the panel checks            | `checkMapoAiSource()` in `magicFill.ts`, in step with `run/request.ts`; `magicFill.test.ts`                                                                                                                           |
+| The answer of `status`           | `readMapoAiStatus()` in `magicFill.ts`, `magicFill.test.ts`                                                                                                                                                           |
 
 ## Verify
 

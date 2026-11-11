@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { MAPO_INSTRUCTIONS } from "../runtime/core/instructions.js";
+import { PROMPTS } from "../runtime/core/prompts.js";
 import { overviewSummary, renderOverview } from "../runtime/core/overview.js";
 import { OVERVIEW_DOC, OVERVIEW_URI } from "../runtime/core/resources.js";
+import { aiTools } from "../runtime/core/tools/ai.js";
 import { apiTools } from "../runtime/core/tools/api.js";
 import { appTools } from "../runtime/core/tools/app.js";
 import { backendTools } from "../runtime/core/tools/backend.js";
@@ -90,12 +92,21 @@ describe("server instructions", () => {
     ...appTools,
     ...scaffoldTools,
     ...backendTools,
+    ...aiTools,
   ].map((tool) => tool.name);
 
   it("name only tools that exist", () => {
     const named = MAPO_INSTRUCTIONS.match(/\bmapo_[a-z_]+/g) ?? [];
     expect(named.length).toBeGreaterThan(5);
     for (const name of named) expect(toolNames, name).toContain(name);
+  });
+
+  it("let every prompt name only tools that exist", () => {
+    for (const prompt of PROMPTS) {
+      const named = prompt.render({}).match(/\bmapo_[a-z_]+/g) ?? [];
+      expect(named.length, prompt.name).toBeGreaterThan(0);
+      for (const name of named) expect(toolNames, prompt.name).toContain(name);
+    }
   });
 
   it("point at the overview", () => {

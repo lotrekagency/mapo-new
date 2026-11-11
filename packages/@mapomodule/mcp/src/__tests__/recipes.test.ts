@@ -48,6 +48,8 @@ describe("matchRecipes", () => {
     ["TS2307 cannot find module mapomodule/types", "imports"],
     ["connect claude code or copilot through mcp", "ai-assistant"],
     ["set up the camomilla session cookie", "camomilla"],
+    ["guide me through setting up the AI in my backoffice", "ai-setup"],
+    ["what can the AI module do for my project", "ai-setup"],
     ["ask the AI to fill a form from a pasted text", "ai-fill"],
     ["fill the detail form with values the AI verified", "ai-fill"],
     ["use magic fill on a detail page", "ai-magic-fill"],

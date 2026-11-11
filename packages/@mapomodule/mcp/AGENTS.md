@@ -21,7 +21,7 @@ src/
   build/                 build time only: docs indexing + component/field/composable extraction
   runtime/core/          transport-agnostic: instructions, tokenizer, indexer, search, recipes,
                          prompts, resources, doctor, openapi, endpoint URL, scaffold/, write guard,
-                         tools/
+                         ai-setup/ (what mapo_ai_setup asks, offers and proposes), tools/
   runtime/nitro/         Nitro adapters (context, to-mcp-tool, to-mcp-prompt)
   runtime/mcp/handlers/mapo/   the named handler: index.ts, tools/, resources/, prompts/
 scripts/build-knowledge.mjs    generator driver; clean-handler-dts.mjs strips .d.ts from handlers
@@ -39,13 +39,14 @@ scripts/build-knowledge.mjs    generator driver; clean-handler-dts.mjs strips .d
 
 ## Change together
 
-| You change                         | Also change                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| A tool's name, inputs or behaviour | `README.md` tools table, `docs/modules/mcp.md`, prompts that name it, `src/__tests__/cli.test.ts` |
-| The instructions                   | Nothing else, but keep them consistent with `docs/guide/concepts.md`                              |
-| A recipe                           | `src/__tests__/recipes.test.ts` (a question it must win)                                          |
-| The indexer's exclusions           | `src/__tests__/knowledge.test.ts`, `docs/contributing/documentation.md`                           |
-| The scaffold templates             | Check the generated page still renders in `apps/example-e2e`                                      |
+| You change                                                               | Also change                                                                                                                |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| A tool's name, inputs or behaviour                                       | `README.md` tools table, `docs/modules/mcp.md`, prompts that name it, `src/__tests__/cli.test.ts`                          |
+| The instructions                                                         | Nothing else, but keep them consistent with `docs/guide/concepts.md`                                                       |
+| A recipe                                                                 | `src/__tests__/recipes.test.ts` (a question it must win)                                                                   |
+| The indexer's exclusions                                                 | `src/__tests__/knowledge.test.ts`, `docs/contributing/documentation.md`                                                    |
+| The scaffold templates                                                   | Check the generated page still renders in `apps/example-e2e`                                                               |
+| `@mapomodule/ai`: an option, a provider, a page or a heading of its docs | `runtime/core/ai-setup/`: the catalog, the questions and the plan of `mapo_ai_setup`; `knowledge.test.ts` checks its pages |
 
 ## Verify
 

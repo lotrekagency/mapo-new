@@ -140,11 +140,39 @@ Pick the lightest layer that does the job, in this order:
 Say which layer you chose and why.`,
 };
 
+export const aiSetupPrompt: MapoPrompt<{ need?: string }> = {
+  name: "mapo-ai-setup",
+  title: "Set up the AI and Magic Fill",
+  description:
+    "Turn on @mapomodule/ai and Magic Fill: what it can do for a need, its configuration, the keys and the tokens.",
+  argsSchema: {
+    need: optional(
+      "What the AI should do, e.g. 'fill events from the press releases editors paste'",
+    ),
+  },
+  render: ({
+    need,
+  }) => `Help me turn on Mapo's AI module and Magic Fill in this project${
+    need ? `, for this need: ${need}` : ""
+  }.
+
+Follow this order and do not skip a step:
+1. mapo_inspect_app — see whether @mapomodule/ai and @mapomodule/uikit are installed, and the order of the modules. If the dev server is not running, say so and go on.
+2. mapo_ai_setup with my need only — read its questions, and map my need to its \`wants\`.
+3. Ask me its questions one round at a time, at most three, the recommended answer first, and wait for my answers. Tell me plainly when the module cannot do something I need, and what it offers instead.
+4. mapo_ai_setup with my answers — show me whether the module can do it, the configuration, the keys and tokens, the files and the checks. Ask again what it lists under "Still to ask".
+5. Only after my OK: merge the \`mapo.ai\` block into nuxt.config.ts and create the plugins with mapo_ai_setup and \`write: true\`. Give me the environment variables' names: I set their values myself. Never write a key, a token or the secret in a file.
+6. Tell me how to check it, with the plan's "Check it" and mapo_doctor.
+
+Cite the docs pages the plan points at, and read them with mapo_get_doc when you need more.`,
+};
+
 export const PROMPTS = [
   crudPagePrompt,
   customFieldPrompt,
   debugFormPrompt,
   migratePrompt,
   themePrompt,
+  aiSetupPrompt,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ] as Array<MapoPrompt<any>>;

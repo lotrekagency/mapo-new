@@ -34,6 +34,10 @@ Every `MapoDetail` of the app now has the two parts, for a user the app lets use
 
 For real models, enable `openai`, `anthropic`, `ollama` or `openai-compatible` ([Providers](/modules/ai#providers)) and give the keys ([Keys](/modules/ai#keys)). In production the gateway needs its secret, `NUXT_MAPO_AI_SECRET` ([The secret and the storage](/modules/ai#the-secret-and-the-storage)).
 
+::: tip With an assistant
+An assistant connected to Mapo's MCP server can walk you through it: the `mapo-ai-setup` prompt, or the `mapo_ai_setup` tool, asks what the AI is for, says what the module can and cannot do, and proposes the configuration, the keys and the files ([@mapomodule/mcp](/modules/mcp#setting-up-the-ai)).
+:::
+
 ## 2. What the operator does
 
 ### The panel

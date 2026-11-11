@@ -18,15 +18,16 @@ Everything under "Rebuilding" follows the code by itself, as long as the package
 
 ## What to update when Mapo changes
 
-| You changed                                         | Also update                                                                              |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| A docs page path or a heading                       | The recipes that point at it (the MCP tests fail until you do)                           |
-| A feature that makes a new task possible            | A recipe for the task; a prompt if the workflow takes several tools in a fixed order     |
-| The package list, the config keys, the request flow | `docs/guide/concepts.md` and, if the summary changes, `src/runtime/core/instructions.ts` |
-| A component's props, events or slots                | Nothing by hand: keep the JSDoc accurate and rebuild                                     |
-| A field type                                        | `src/runtime/core/openapi.ts` if a schema shape should map to it                         |
-| A composable                                        | Nothing by hand, as long as it is registered with `addImports`                           |
-| A tool, a prompt or a resource                      | `README.md` of the package, `docs/modules/mcp.md` and the CLI test (see below)           |
+| You changed                                                 | Also update                                                                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A docs page path or a heading                               | The recipes that point at it (the MCP tests fail until you do)                                                     |
+| A feature that makes a new task possible                    | A recipe for the task; a prompt if the workflow takes several tools in a fixed order                               |
+| The package list, the config keys, the request flow         | `docs/guide/concepts.md` and, if the summary changes, `src/runtime/core/instructions.ts`                           |
+| A component's props, events or slots                        | Nothing by hand: keep the JSDoc accurate and rebuild                                                               |
+| A field type                                                | `src/runtime/core/openapi.ts` if a schema shape should map to it                                                   |
+| A composable                                                | Nothing by hand, as long as it is registered with `addImports`                                                     |
+| A tool, a prompt or a resource                              | `README.md` of the package, `docs/modules/mcp.md` and the CLI test (see below)                                     |
+| An option, a provider or a docs heading of `@mapomodule/ai` | `src/runtime/core/ai-setup/`: what `mapo_ai_setup` asks, offers and proposes; `knowledge.test.ts` checks its pages |
 
 Then verify:
 
