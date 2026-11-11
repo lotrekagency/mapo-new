@@ -55,6 +55,7 @@ describe("matchRecipes", () => {
     ["show the operator what Magic Fill sends to the AI", "ai-magic-fill"],
     ["list the proposals without proof the AI gave", "ai-magic-fill"],
     ["apply selected values of Magic Fill before and after", "ai-magic-fill"],
+    ["choose the items of a list Magic Fill proposes", "ai-magic-fill"],
     ["bring back Magic Fill's marks after a reload", "ai-magic-fill"],
     ["keep my detail extension's state in the draft", "detail-context"],
     ["leave a password field out of the saved draft", "form-draft"],
