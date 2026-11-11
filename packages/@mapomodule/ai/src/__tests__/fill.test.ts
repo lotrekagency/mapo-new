@@ -20,6 +20,7 @@ import {
   writeModelValue,
 } from "../runtime/shared/fill";
 import type { MapoAiFillForm } from "../runtime/shared/fill";
+import type { MapoAiRelationMatch } from "../runtime/shared/relations";
 import type {
   AiFieldOutcome,
   AiFieldOutcomes,
@@ -899,5 +900,237 @@ describe("the items of a list", () => {
       0,
     ]);
     expect(verifiedItemsToAdd(filled("x"), [])).toEqual([]);
+  });
+});
+
+describe("planMapoAiFill — related records", () => {
+  const found = (
+    at: string,
+    id: number,
+    renamed = false,
+  ): MapoAiRelationMatch => ({
+    at,
+    name: `Name ${id}`,
+    status: "found",
+    id,
+    value: id,
+    label: `Name ${id}`,
+    ...(renamed ? { renamed: true } : {}),
+  });
+  const ambiguous = (at: string): MapoAiRelationMatch => ({
+    at,
+    name: "Open",
+    status: "ambiguous",
+    count: 2,
+    candidates: [
+      { id: 1, value: 1, label: "Open data" },
+      { id: 2, value: 2, label: "Open source" },
+    ],
+  });
+
+  it("applies a record found with the AI's name on an empty field, as any verified value", () => {
+    const [entry] = planMapoAiFill(
+      { category: filled({ search: "Name 2" }) },
+      formOf({}),
+      { category: [found("", 2)] },
+    );
+
+    expect(entry).toMatchObject({ action: "apply", replaces: false });
+    expect(entry?.relations).toEqual([found("", 2)]);
+  });
+
+  it("has the operator confirm a record found under another name, never by itself", () => {
+    const [entry] = planMapoAiFill(
+      { category: filled({ search: "Culture" }) },
+      formOf({}),
+      { category: [found("", 5, true)] },
+    );
+
+    expect(entry?.action).toBe("confirm");
+  });
+
+  it("leaves to the operator a record several records match, or none, with what was found", () => {
+    const entries = planMapoAiFill(
+      { category: filled({ search: "Open" }), author: filled({ search: "X" }) },
+      formOf({}),
+      {
+        category: [ambiguous("")],
+        author: [{ at: "", name: "X", status: "none" }],
+      },
+    );
+
+    expect(entries.map((entry) => entry.action)).toEqual(["manual", "manual"]);
+    expect(entries[0]?.relations).toEqual([ambiguous("")]);
+  });
+
+  it("has a record found replace another only through the operator, and finds the same one unchanged", () => {
+    const holds = vi.fn((key: string, value: unknown) => value === 3);
+    const form: MapoAiFillForm = {
+      ...formOf({ category: 2, other: 3 }),
+      holds,
+    };
+
+    const [replaced, same] = planMapoAiFill(
+      { category: filled({ search: "A" }), other: filled({ search: "B" }) },
+      form,
+      { category: [found("", 4)], other: [found("", 3)] },
+    );
+
+    expect(replaced).toMatchObject({ action: "confirm", replaces: true });
+    expect(same).toMatchObject({ action: "unchanged", replaces: false });
+    // The form is asked with the value the field would take: the record.
+    expect(holds).toHaveBeenCalledWith("other", 3);
+  });
+
+  it("joins a list of records to the field's own, never replacing them, and applies it whole only when every record was found", () => {
+    const refs = [{ search: "A" }, { search: "B" }];
+    const [whole] = planMapoAiFill({ tags: filled(refs) }, formOf({}), {
+      tags: [found("0", 1), found("1", 2)],
+    });
+    const [part] = planMapoAiFill({ tags: filled(refs) }, formOf({}), {
+      tags: [found("0", 1), ambiguous("1")],
+    });
+    const [held] = planMapoAiFill(
+      { tags: filled(refs) },
+      formOf({ tags: [9] }),
+      {
+        tags: [found("0", 1), found("1", 2)],
+      },
+    );
+    const [nothing] = planMapoAiFill({ tags: filled(refs) }, formOf({}), {
+      tags: [ambiguous("0"), { at: "1", name: "B", status: "none" }],
+    });
+
+    expect(whole?.action).toBe("apply");
+    expect(part).toMatchObject({ action: "confirm", replaces: false });
+    expect(held).toMatchObject({ action: "confirm", replaces: false });
+    expect(nothing?.action).toBe("manual");
+  });
+
+  it("applies a list of items whole only when every record its items name was found, and lets the operator choose them otherwise", () => {
+    const blocks: AiFieldOutcome = {
+      status: "filled",
+      value: [{ article: { search: "A" } }, { article: { search: "Open" } }],
+      verified: true,
+      quotes: [],
+      items: [
+        { fields: { article: filled({ search: "A" }) }, verified: true },
+        { fields: { article: filled({ search: "Open" }) }, verified: true },
+      ],
+    };
+
+    const [ready] = planMapoAiFill({ blocks }, formOf({}), {
+      blocks: [found("0.article", 1), found("1.article", 2)],
+    });
+    const [waiting] = planMapoAiFill({ blocks }, formOf({}), {
+      blocks: [found("0.article", 1), ambiguous("1.article")],
+    });
+
+    expect(ready?.action).toBe("apply");
+    expect(waiting?.action).toBe("confirm");
+    expect(
+      verifiedItemsToAdd(
+        blocks,
+        [],
+        [found("0.article", 1), ambiguous("1.article")],
+      ),
+    ).toEqual([0]);
+    expect(
+      verifiedItemsToAdd(
+        blocks,
+        [{ article: 1 }],
+        [found("0.article", 1), { ...ambiguous("1.article"), choice: 1 }],
+      ),
+    ).toEqual([1]);
+  });
+});
+
+describe("runMapoAiFill — related records", () => {
+  type PostOf = (
+    path: string,
+    body: unknown,
+    options: { signal?: AbortSignal },
+  ) => Promise<unknown>;
+
+  const CATEGORY_FIELDS: AnyFieldDescriptor[] = [
+    {
+      key: "category",
+      type: "fks",
+      label: "Category",
+      attrs: { endpoint: "/api/categories", returnObject: false },
+    },
+    {
+      key: "author",
+      type: "fks",
+      label: "Author",
+      attrs: { endpoint: "/api/authors", itemText: "username" },
+    },
+  ];
+
+  it("lists the few records of a relation before the call, and searches a name after the answer", async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path === "/api/categories") return [{ id: 2, name: "Culture" }];
+      if (path === "/api/authors")
+        return { count: 80, next: "/p2", results: [] };
+      if (path === "/api/authors?search=anna")
+        return [{ id: 9, username: "anna" }];
+      throw new Error(path);
+    });
+    const post = vi.fn<PostOf>(async () =>
+      answered({
+        category: filled({ id: 2 }),
+        author: filled({ search: "anna" }),
+      }),
+    );
+
+    const answer = await runMapoAiFill(
+      { fields: CATEGORY_FIELDS, source: "x", form: formOf({}) },
+      { post, get },
+    );
+
+    const body = post.mock.calls[0]?.[1] as { entity: Record<string, unknown> };
+    expect(body.entity.relationChoices).toEqual({
+      category: [{ value: 2, label: "Culture" }],
+    });
+    expect(answer.lists.records).toEqual({
+      category: [{ id: 2, name: "Culture" }],
+    });
+    expect(answer.entries.map((entry) => [entry.key, entry.action])).toEqual([
+      ["category", "apply"],
+      ["author", "apply"],
+    ]);
+    expect(answer.entries[1]?.relations?.[0]).toMatchObject({
+      value: { id: 9, username: "anna" },
+      label: "anna",
+    });
+  });
+
+  it("keeps the page's own records of a relation, and leaves relations alone without get", async () => {
+    const get = vi.fn(async () => [{ id: 2, name: "Culture" }]);
+    const post = vi.fn<PostOf>(async () =>
+      answered({ category: filled({ id: 7 }) }),
+    );
+    const entity = {
+      relationChoices: { category: [{ value: 7, label: "Sport" }] },
+    };
+
+    await runMapoAiFill(
+      {
+        fields: CATEGORY_FIELDS.slice(0, 1),
+        source: "x",
+        form: formOf({}),
+        entity,
+      },
+      { post, get },
+    );
+    const body = post.mock.calls[0]?.[1] as { entity: Record<string, unknown> };
+    expect(get).not.toHaveBeenCalled();
+    expect(body.entity.relationChoices).toEqual(entity.relationChoices);
+
+    const without = await runMapoAiFill(
+      { fields: CATEGORY_FIELDS.slice(0, 1), source: "x", form: formOf({}) },
+      { post },
+    );
+    expect(without.entries[0]?.action).toBe("manual");
   });
 });

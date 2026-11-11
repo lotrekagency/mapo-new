@@ -19,6 +19,7 @@ import {
 } from "../composables/useMapoAiMagicFill";
 import type { MapoAiMagicFillDetail } from "../composables/useMapoAiMagicFill";
 import { mapoAiValueText } from "../shared/fill";
+import { effectiveMatch, isExactMatch } from "../shared/relations";
 import type {
   MapoAiProposedItem,
   MapoAiToConfirm,
@@ -158,7 +159,10 @@ function openPanel(): void {
   open.value = true;
 }
 
-/** A value that waits, as the preview shows it: its text, or its items. */
+/**
+ * A value that waits, as the preview shows it: its text, with the label of
+ * a choice or the name of a related record, or its items.
+ */
 function valueText(item: MapoAiToConfirm): string {
   if (item.items) {
     return t("mapo.ai.magicFill.summary.items", {
@@ -166,7 +170,7 @@ function valueText(item: MapoAiToConfirm): string {
       total: item.items.total,
     });
   }
-  return mapoAiValueText(item.value, 80);
+  return mapoAiValueText(magic.fill.textOf(item.path, item.value), 80);
 }
 
 /**
@@ -176,17 +180,19 @@ function valueText(item: MapoAiToConfirm): string {
  */
 function currentText(item: MapoAiToConfirm): string {
   const others = Object.entries(item.languages ?? {}).map(
-    ([language, held]) => `${language}: ${heldText(held)}`,
+    ([language, held]) => `${language}: ${heldText(item, held)}`,
   );
-  return [heldText(item.current), ...others].filter(Boolean).join(" · ");
+  return [heldText(item, item.current), ...others].filter(Boolean).join(" · ");
 }
 
-/** A value a field holds, as the preview shows it: its text, or how many items its list has. */
-function heldText(value: unknown): string {
-  if (!Array.isArray(value)) return mapoAiValueText(value, 80);
-  if (value.length === 0) return "";
-  const text = mapoAiValueText(value, 80);
-  return text || t("mapo.ai.fill.items", { n: value.length });
+/**
+ * A value a field holds, as the preview shows it: its text, with the label
+ * of a choice or the name of a related record, or how many items its list
+ * has.
+ */
+function heldText(item: MapoAiToConfirm, value: unknown): string {
+  const isNone = Array.isArray(value) && value.length === 0;
+  return isNone ? "" : mapoAiValueText(magic.fill.textOf(item.path, value), 80);
 }
 
 /** Why a value waits, but what its group's title already says. */
@@ -208,21 +214,60 @@ function notesText(item: MapoAiToConfirm, said: MapoAiWaitReason[]): string {
     item.quote && !item.list
       ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(item.quote, 80) })
       : "";
+  // A list, of items or of records, goes after what its field holds.
   const own = Array.isArray(item.current) ? item.current.length : 0;
-  const joins =
-    item.list && own > 0
-      ? t("mapo.ai.magicFill.summary.addsTo", { n: own })
-      : "";
+  const isJoining = !item.reasons.includes("replaces") && own > 0;
+  const joins = isJoining
+    ? t("mapo.ai.magicFill.summary.addsTo", { n: own })
+    : "";
+  const records = recordNotes(item);
   const told: MapoAiWaitReason[] = item.list ? [...said, "not-proven"] : said;
-  return [proof, joins, reasonsText(item, told)].filter(Boolean).join(" · ");
+  // The records' own notes say what these reasons would.
+  const quiet: MapoAiWaitReason[] = records.length
+    ? [...told, "renamed", "to-pick"]
+    : told;
+  return [proof, joins, ...records, reasonsText(item, quiet)]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-/** An item of a list as its tick says it: verified, to check, or already in the list. */
+/**
+ * What the preview says of the related records a value names that need
+ * the operator: one found under another name, one to pick on the field's
+ * mark, one to choose in the field.
+ */
+function recordNotes(item: MapoAiToConfirm): string[] {
+  return (item.relations ?? []).flatMap((match) => {
+    if (match.ignored) return [];
+    const current = effectiveMatch(match);
+    const name = mapoAiValueText(match.name, 60);
+    if (current.status === "found") {
+      if (!current.renamed) return [];
+      const label = mapoAiValueText(current.label ?? "", 60);
+      return [t("mapo.ai.fill.relationRenamed", { name, label })];
+    }
+    const isToPick = current.status === "ambiguous" && !!match.candidates;
+    return [
+      isToPick
+        ? t("mapo.ai.magicFill.summary.recordToPick", { name })
+        : t("mapo.ai.magicFill.summary.recordToChoose", { name }),
+    ];
+  });
+}
+
+/**
+ * An item of a list as its tick says it: verified, to check, or already in
+ * the list; and whether a record it names is to pick once it is in.
+ */
 function itemNote(one: MapoAiProposedItem): string {
   if (one.held) return t("mapo.ai.magicFill.summary.itemHeld");
-  return one.verified
+  const proof = one.verified
     ? t("mapo.ai.magicFill.summary.itemVerified")
     : t("mapo.ai.magicFill.summary.itemToCheck");
+  const isToPick = (one.relations ?? []).some((match) => !isExactMatch(match));
+  return isToPick
+    ? `${proof} · ${t("mapo.ai.magicFill.summary.itemToPick")}`
+    : proof;
 }
 
 /**

@@ -12,12 +12,21 @@ import type {
   MapoAiFillReview,
   MapoAiModelWrite,
 } from "./fill";
-import { isSafePath, readMapoAiFieldOutcome } from "./fill";
+import { holdsRelation, isSafePath, readMapoAiFieldOutcome } from "./fill";
 import { isRecord } from "./guards";
+import { MAPO_AI_RELATION_CANDIDATES_MAX, isScalar } from "./relations";
+import type { MapoAiRelationCandidate, MapoAiRelationMatch } from "./relations";
 import type { AiFieldOutcome } from "./sanitize";
 
-/** The format of a kept session: a draft of another one is not read. */
-export const MAPO_AI_FILL_SESSION_FORMAT = 1;
+/**
+ * The format of a kept session: a draft of another one is not read, but
+ * for the first, which kept no related records (its relations were the
+ * operator's to set).
+ */
+export const MAPO_AI_FILL_SESSION_FORMAT = 2;
+
+/** Formats the reader takes. */
+const READABLE_FORMATS: ReadonlySet<unknown> = new Set([1, 2]);
 
 /** An answer that joined a session: who gave it, and when. */
 export interface MapoAiFillAnswer {
@@ -62,6 +71,8 @@ export interface MapoAiFillSessionField {
   round: number;
   /** What the field held when its answer came, while it waits. */
   held?: string;
+  /** What was found for the related records its value names, and what became of them. */
+  relations?: MapoAiRelationMatch[];
   /** Its writes, oldest first: what `restore()` and `undo()` put back. */
   writes: MapoAiFillSessionWrite[];
 }
@@ -97,13 +108,14 @@ const REVIEWS: ReadonlySet<string> = new Set<MapoAiFillReview>([
  * A kept session read as outside data; `undefined` for another format, or
  * for no session. A field or an answer that cannot be read is left out,
  * and so is a second field at the same path. A field whose writes cannot
- * be read stays, with no writes: nothing undoes it.
+ * be read stays, with no writes: nothing undoes it. A field whose related
+ * records cannot be read stays without them, so its value is never written.
  */
 export function readMapoAiFillSession(
   value: unknown,
 ): MapoAiFillSession | undefined {
   if (!isRecord(value)) return undefined;
-  if (value.format !== MAPO_AI_FILL_SESSION_FORMAT) return undefined;
+  if (!READABLE_FORMATS.has(value.format)) return undefined;
   const { rounds } = value;
   if (!isCount(rounds)) return undefined;
   const answers: MapoAiFillAnswer[] = [];
@@ -211,10 +223,16 @@ function fieldOf(
     return undefined;
   }
   if (!isFlagged || !isReviewed || !isHeld || !outcome) return undefined;
+  const relations = relationsOf(value.relations, path);
+  // A value that names records, without what was found for them, is the
+  // operator's to set: it waits no more for Apply, which would write the
+  // names themselves.
+  const isUnresolved = holdsRelation(outcome) && !relations;
+  const isWaiting = action === "apply" || action === "confirm";
   return {
     key,
     path,
-    action,
+    action: isUnresolved && isWaiting ? "manual" : action,
     replaces: replaces === true,
     shown: shown === true,
     outcome,
@@ -223,8 +241,93 @@ function fieldOf(
     undoable: undoable === true,
     round,
     ...(typeof held === "string" ? { held } : {}),
+    ...(relations ? { relations } : {}),
     writes: writesOf(value.writes) ?? [],
   };
+}
+
+/**
+ * A field's related records; `undefined` when there are none, or when one
+ * cannot be read. A place inside the field's value must be inside its path.
+ */
+function relationsOf(
+  value: unknown,
+  path: string,
+): MapoAiRelationMatch[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const matches: MapoAiRelationMatch[] = [];
+  for (const raw of value) {
+    const match = relationOf(raw, path);
+    if (!match) return undefined;
+    matches.push(match);
+  }
+  return matches.length ? matches : undefined;
+}
+
+function relationOf(
+  value: unknown,
+  path: string,
+): MapoAiRelationMatch | undefined {
+  if (!isRecord(value)) return undefined;
+  const { at, name, status, id, label, count, choice } = value;
+  const isAt = at === "" || isPathText(at);
+  const isName = typeof name === "string";
+  if (!isAt || !isName || !isRelationStatus(status)) return undefined;
+  const candidates =
+    value.candidates === undefined ? undefined : candidatesOf(value.candidates);
+  const isPlace =
+    value.path === undefined ||
+    (isPathText(value.path) && value.path.startsWith(`${path}.`));
+  const isId = id === undefined || isScalar(id);
+  const isValue = value.value === undefined || isPlainData(value.value);
+  const isLabel = label === undefined || typeof label === "string";
+  const isCounted = count === undefined || isCount(count);
+  const isChoice =
+    choice === undefined ||
+    (isCount(choice) && choice < (candidates?.length ?? 0));
+  const areFlags = [value.renamed, value.failed, value.ignored].every(
+    (flag) => flag === undefined || typeof flag === "boolean",
+  );
+  const isCandidates = value.candidates === undefined || candidates;
+  const isRead =
+    isPlace && isId && isValue && isLabel && isCounted && isChoice && areFlags;
+  if (!isRead || !isCandidates) return undefined;
+  return {
+    at,
+    name,
+    status,
+    ...(isScalar(id) ? { id } : {}),
+    ...(value.value !== undefined ? { value: value.value } : {}),
+    ...(typeof label === "string" ? { label } : {}),
+    ...(value.renamed === true ? { renamed: true } : {}),
+    ...(candidates ? { candidates } : {}),
+    ...(isCount(count) ? { count } : {}),
+    ...(value.failed === true ? { failed: true } : {}),
+    ...(isCount(choice) ? { choice } : {}),
+    ...(value.ignored === true ? { ignored: true } : {}),
+    ...(isPathText(value.path) ? { path: value.path } : {}),
+  };
+}
+
+function candidatesOf(value: unknown): MapoAiRelationCandidate[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  if (value.length > MAPO_AI_RELATION_CANDIDATES_MAX) return undefined;
+  const candidates: MapoAiRelationCandidate[] = [];
+  for (const raw of value) {
+    if (!isRecord(raw)) return undefined;
+    const { id, label } = raw;
+    const isRead =
+      isScalar(id) && typeof label === "string" && isPlainData(raw.value);
+    if (!isRead || raw.value === undefined) return undefined;
+    candidates.push({ id, value: raw.value, label });
+  }
+  return candidates;
+}
+
+function isRelationStatus(
+  value: unknown,
+): value is MapoAiRelationMatch["status"] {
+  return value === "found" || value === "ambiguous" || value === "none";
 }
 
 /** A field's writes; `undefined` when one of them cannot be read. */

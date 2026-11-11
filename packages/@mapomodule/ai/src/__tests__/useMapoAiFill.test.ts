@@ -258,7 +258,7 @@ describe("useMapoAiFill — the answer in the form", () => {
       label: "mapo.ai.fill.confirm",
       dot: true,
       description:
-        'mapo.ai.fill.proposes {"value":"Ours"} mapo.ai.fill.notProven',
+        'mapo.ai.fill.proposes {"value":"Ours"} mapo.ai.fill.quotedNotFound {"quote":"Quote of Ours"} mapo.ai.fill.notProven',
     });
     expect(marks.status).toMatchObject({
       label: "mapo.ai.fill.discarded",
@@ -1943,7 +1943,7 @@ describe("useMapoAiFill — the session in a draft", () => {
     expect(text).not.toContain("A line no field quotes");
     expect(text).not.toContain("Only the title");
     expect(kept).toMatchObject({
-      format: 1,
+      format: 2,
       rounds: 1,
       answers: [
         { round: 1, provider: { id: "mock", model: "mock" }, prompt: 1 },
@@ -2082,7 +2082,7 @@ describe("useMapoAiFill — the session in a draft", () => {
     const ai = useMapoAiFill(form);
     await ai.fill("x");
 
-    expect(ai.resume({ format: 2, rounds: 1, fields: [] })).toBe(false);
+    expect(ai.resume({ format: 3, rounds: 1, fields: [] })).toBe(false);
 
     expect(ai.fields.value).toEqual([]);
     expect(form.annotations.value).toEqual({});
@@ -2127,5 +2127,805 @@ describe("useMapoAiFill — the session in a draft", () => {
     const kept = stored(ai.snapshot());
 
     expect(kept.fields[0]).toMatchObject({ undoable: false, writes: [] });
+  });
+});
+
+describe("useMapoAiFill — the proof in the mark", () => {
+  it("shows each quote of a value with where the AI places it, two at most and each once", async () => {
+    serve(
+      answered({
+        title: {
+          status: "filled",
+          value: "About us",
+          verified: true,
+          quotes: [
+            { quote: "About us", where: "page 2", found: true },
+            { quote: "About us", where: "page 2", found: true },
+            { quote: "Title: About us", where: "", found: true },
+            { quote: "A third", where: "", found: true },
+          ],
+        },
+      }),
+    );
+    const form = target();
+
+    await useMapoAiFill(form).fill("x");
+
+    expect(form.annotations.value.title?.description).toBe(
+      'mapo.ai.fill.provenIn {"quote":"About us","where":"page 2"} mapo.ai.fill.proven {"quote":"Title: About us"}',
+    );
+  });
+
+  it("says that a page asks for no quotes, and marks a value without any", async () => {
+    serve(
+      answered({
+        excerpt: {
+          status: "filled",
+          value: "Ours",
+          verified: false,
+          quotes: [],
+        },
+      }),
+    );
+    const form = target();
+
+    await useMapoAiFill(form, { entity: { evidence: false } }).fill("x");
+
+    expect(form.annotations.value.excerpt?.description).toBe(
+      'mapo.ai.fill.proposes {"value":"Ours"} mapo.ai.fill.notAsked',
+    );
+  });
+});
+
+describe("useMapoAiFill — related records", () => {
+  const stored = (data: unknown) => JSON.parse(JSON.stringify(data));
+
+  const CATEGORIES = [
+    { id: 1, name: "Technology" },
+    { id: 2, name: "Culture" },
+    { id: 3, name: "City" },
+  ];
+
+  /** More records than a page holds: the relation is searched, never listed. */
+  const PAGED = { count: 80, next: "/api/categories?page=2", results: [] };
+
+  const category = (
+    attrs: Record<string, unknown> = {},
+  ): AnyFieldDescriptor => ({
+    key: "category",
+    type: "fks",
+    label: "Category",
+    attrs: { endpoint: "/api/categories", returnObject: false, ...attrs },
+  });
+
+  /** `$mapoFetch` answering `run` with `answer`, and each path it gets from `records`. */
+  function serveWith(
+    answer: unknown,
+    records: Record<string, unknown>,
+  ): ReturnType<typeof vi.fn<Post>> {
+    const fetch = vi.fn<Post>(async (path, options) => {
+      if (options.method !== "GET") return answer;
+      if (!Object.hasOwn(records, path)) throw new Error(`404 ${path}`);
+      return records[path];
+    });
+    nuxt.app = { $mapoFetch: fetch, $i18n: { t } };
+    return fetch;
+  }
+
+  /** A detail form with these fields. */
+  function formWith(
+    fields: AnyFieldDescriptor[],
+    model: Record<string, unknown> = {},
+  ) {
+    return {
+      ...target(model),
+      fields: computed(() => fields),
+      sidebarFields: computed((): AnyFieldDescriptor[] => []),
+    };
+  }
+
+  /** The labels of a mark's buttons. */
+  const buttons = (
+    form: { annotations: { value: FieldAnnotations } },
+    path: string,
+  ) => form.annotations.value[path]?.actions?.map((action) => action.label);
+
+  /** Clicks the button of a mark by its label. */
+  function click(
+    form: { annotations: { value: FieldAnnotations } },
+    path: string,
+    label: string,
+  ): void {
+    const action = form.annotations.value[path]?.actions?.find(
+      (one) => one.label === label,
+    );
+    if (!action) throw new Error(`No ${label} on ${path}`);
+    action.onClick();
+  }
+
+  it("lists the few records of a relation for the AI, and writes the one it picked as the field saves it", async () => {
+    const fetch = serveWith(
+      answered({ category: filled({ id: 2 }), author: filled({ id: 9 }) }),
+      {
+        "/api/categories": CATEGORIES,
+        "/api/authors": [{ id: 9, name: "Anna Rossi" }],
+      },
+    );
+    const form = formWith([
+      category(),
+      {
+        key: "author",
+        type: "fks",
+        label: "Author",
+        attrs: { endpoint: "/api/authors" },
+      },
+    ]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    const run = fetch.mock.calls.find(([path]) => path === "/_mapo/ai/run");
+    const body = run?.[1].body as { entity: Record<string, unknown> };
+    expect(body.entity.relationChoices).toEqual({
+      category: CATEGORIES.map((one) => ({ value: one.id, label: one.name })),
+      author: [{ value: 9, label: "Anna Rossi" }],
+    });
+    // The id where the field saves ids, the record where it saves records.
+    expect(form.model.value).toEqual({
+      category: 2,
+      author: { id: 9, name: "Anna Rossi" },
+    });
+    expect(form.annotations.value.category).toMatchObject({
+      label: "mapo.ai.fill.applied",
+      color: "success",
+    });
+
+    ai.restore("category");
+    expect(form.model.value.category).toBeUndefined();
+    expect(form.annotations.value.category?.description).toContain(
+      'mapo.ai.fill.proposes {"value":"Culture"}',
+    );
+  });
+
+  it("searches the name the AI wrote, and writes the record that has that very name", async () => {
+    const fetch = serveWith(
+      answered({ category: filled({ search: "Culture" }) }),
+      {
+        "/api/categories": PAGED,
+        "/api/categories?search=Culture": [
+          { id: 9, name: "Agriculture" },
+          { id: 2, name: "Culture" },
+        ],
+      },
+    );
+    const form = formWith([category()]);
+
+    await useMapoAiFill(form).fill("x");
+
+    expect(form.model.value).toEqual({ category: 2 });
+    const run = fetch.mock.calls.find(([path]) => path === "/_mapo/ai/run");
+    const body = run?.[1].body as { entity: Record<string, unknown> };
+    expect(body.entity.relationChoices).toBeUndefined();
+  });
+
+  it("lets the only record found under another name wait, with both names, until Apply", async () => {
+    serveWith(answered({ category: filled({ search: "Culture" }) }), {
+      "/api/categories": PAGED,
+      "/api/categories?search=Culture": [{ id: 5, name: "Culture & Arts" }],
+    });
+    const form = formWith([category()]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value).toEqual({});
+    expect(form.annotations.value.category?.label).toBe("mapo.ai.fill.confirm");
+    expect(form.annotations.value.category?.description).toContain(
+      'mapo.ai.fill.relationRenamed {"name":"Culture","label":"Culture & Arts"}',
+    );
+
+    click(form, "category", "mapo.apply");
+    expect(form.model.value).toEqual({ category: 5 });
+  });
+
+  it("offers the candidates of a name several records match on the field's mark, and Restore offers them again", async () => {
+    serveWith(answered({ category: filled({ search: "Open" }) }), {
+      "/api/categories": PAGED,
+      "/api/categories?search=Open": [
+        { id: 1, name: "Open data" },
+        { id: 2, name: "Open source" },
+      ],
+    });
+    const form = formWith([category()]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.model.value).toEqual({});
+    expect(form.annotations.value.category).toMatchObject({
+      label: "mapo.ai.fill.ambiguous",
+      color: "warning",
+    });
+    expect(form.annotations.value.category?.description).toContain(
+      'mapo.ai.fill.relationPick {"name":"Open"}',
+    );
+    expect(buttons(form, "category")).toEqual([
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+
+    click(form, "category", "Open source");
+    expect(form.model.value).toEqual({ category: 2 });
+    expect(form.annotations.value.category?.label).toBe("mapo.ai.fill.applied");
+
+    ai.restore("category");
+    expect(form.model.value).toEqual({});
+    expect(buttons(form, "category")).toEqual([
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+  });
+
+  it("says when no record matches the name, too many do, or the search failed", async () => {
+    serveWith(
+      answered({
+        category: filled({ search: "Nope" }),
+        theme: filled({ search: "Data" }),
+        place: filled({ search: "Rome" }),
+      }),
+      {
+        "/api/categories": PAGED,
+        "/api/categories?search=Nope": [],
+        "/api/themes": PAGED,
+        "/api/themes?search=Data": {
+          count: 12,
+          results: [
+            { id: 1, name: "Data 1" },
+            { id: 2, name: "Data 2" },
+          ],
+        },
+        "/api/places": PAGED,
+      },
+    );
+    const form = formWith([
+      category(),
+      { key: "theme", type: "fks", attrs: { endpoint: "/api/themes" } },
+      { key: "place", type: "fks", attrs: { endpoint: "/api/places" } },
+    ]);
+
+    await useMapoAiFill(form).fill("x");
+
+    expect(form.model.value).toEqual({});
+    expect(form.annotations.value.category).toMatchObject({
+      label: "mapo.ai.fill.manual",
+      actions: [expect.objectContaining({ label: "mapo.ai.fill.ignore" })],
+    });
+    expect(form.annotations.value.category?.description).toContain(
+      'mapo.ai.fill.relationNone {"name":"Nope"}',
+    );
+    expect(form.annotations.value.theme?.description).toContain(
+      'mapo.ai.fill.relationMany {"name":"Data","n":12}',
+    );
+    expect(form.annotations.value.place?.description).toContain(
+      'mapo.ai.fill.relationFailed {"name":"Rome"}',
+    );
+  });
+
+  it("counts a record the field already holds as unchanged, by its id", async () => {
+    serveWith(answered({ category: filled({ id: 2 }) }), {
+      "/api/categories": CATEGORIES,
+    });
+    const form = formWith([category({ returnObject: true })], {
+      category: { id: 2, name: "Culture", slug: "culture" },
+    });
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(ai.fields.value[0]?.action).toBe("unchanged");
+    expect(form.annotations.value).toEqual({});
+  });
+
+  it("adds the records of a list of records after the field's own, and never one it holds", async () => {
+    serveWith(answered({ tags: filled([{ id: 1 }, { id: 3 }]) }), {
+      "/api/tags": CATEGORIES,
+    });
+    const tags: AnyFieldDescriptor = {
+      key: "tags",
+      type: "m2m",
+      label: "Tags",
+      attrs: { endpoint: "/api/tags", returnObject: false },
+    };
+    const held = formWith([tags], { tags: [1] });
+    const ai = useMapoAiFill(held);
+
+    await ai.fill("x");
+
+    // A list of records replaces nothing: it waits, to join the field's own.
+    expect(ai.fields.value[0]).toMatchObject({
+      action: "confirm",
+      replaces: false,
+    });
+    ai.apply("tags");
+    expect(held.model.value.tags).toEqual([1, 3]);
+    ai.restore("tags");
+    expect(held.model.value.tags).toEqual([1]);
+
+    const empty = formWith([tags]);
+    await useMapoAiFill(empty).fill("x");
+    expect(empty.model.value.tags).toEqual([1, 3]);
+  });
+
+  it("picks, in a list of records already in, the record several match, and Restore takes it away with the rest", async () => {
+    serveWith(
+      answered({ tags: filled([{ search: "City" }, { search: "Open" }]) }),
+      {
+        "/api/tags": PAGED,
+        "/api/tags?search=City": [{ id: 3, name: "City" }],
+        "/api/tags?search=Open": [
+          { id: 1, name: "Open data" },
+          { id: 2, name: "Open source" },
+        ],
+      },
+    );
+    const form = formWith([
+      {
+        key: "tags",
+        type: "m2m",
+        label: "Tags",
+        attrs: { endpoint: "/api/tags", returnObject: false },
+      },
+    ]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    // Found in part: it waits, with the record found to apply and the
+    // candidates of the other.
+    expect(form.model.value).toEqual({});
+    expect(buttons(form, "tags")).toEqual([
+      "mapo.apply",
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+
+    click(form, "tags", "mapo.apply");
+    expect(form.model.value.tags).toEqual([3]);
+    expect(buttons(form, "tags")).toEqual([
+      "mapo.ai.fill.keep",
+      "mapo.restore",
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+
+    click(form, "tags", "Open data");
+    expect(form.model.value.tags).toEqual([3, 1]);
+    expect(buttons(form, "tags")).toEqual([
+      "mapo.ai.fill.keep",
+      "mapo.restore",
+    ]);
+
+    ai.restore("tags");
+    expect(form.model.value.tags).toBeUndefined();
+  });
+
+  describe("inside the items of a list", () => {
+    const BLOCKS: AnyFieldDescriptor = {
+      key: "blocks",
+      type: "repeater",
+      label: "Blocks",
+      attrs: {
+        templates: {
+          related: {
+            label: "Related",
+            fields: [
+              {
+                key: "article",
+                type: "fks",
+                label: "Article",
+                attrs: {
+                  endpoint: "/api/articles",
+                  itemText: "title",
+                  returnObject: false,
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const item = (name: string) => ({
+      template: "related",
+      fields: { article: filled({ search: name }) },
+      verified: true,
+    });
+
+    const answer = answered({
+      blocks: {
+        status: "filled",
+        value: [
+          { _template: "related", article: { search: "Open data" } },
+          { _template: "related", article: { search: "Open" } },
+        ],
+        verified: true,
+        quotes: [],
+        items: [item("Open data"), item("Open")],
+      },
+    });
+
+    const ARTICLES = {
+      "/api/articles": PAGED,
+      "/api/articles?search=Open%20data": [{ id: 7, title: "Open data" }],
+      "/api/articles?search=Open": [
+        { id: 7, title: "Open data" },
+        { id: 8, title: "Open source" },
+      ],
+    };
+
+    it("adds an item with the record found, and marks the record to pick inside an item added without it", async () => {
+      serveWith(answer, ARTICLES);
+      const form = formWith([BLOCKS]);
+      const ai = useMapoAiFill(form);
+
+      await ai.fill("x");
+
+      // Not every record was found: the items wait, the first one ready.
+      expect(form.model.value).toEqual({});
+      expect(form.annotations.value.blocks?.description).toContain(
+        'mapo.ai.fill.itemsToPick {"n":1}',
+      );
+
+      ai.apply("blocks", { items: [0, 1] });
+      expect(form.model.value.blocks).toEqual([
+        { _template: "related", article: 7 },
+        { _template: "related", article: null },
+      ]);
+      expect(form.annotations.value["blocks.0.article"]).toBeUndefined();
+      expect(form.annotations.value["blocks.1.article"]).toMatchObject({
+        label: "mapo.ai.fill.ambiguous",
+      });
+      expect(buttons(form, "blocks.1.article")).toEqual([
+        "Open data",
+        "Open source",
+        "mapo.ai.fill.ignore",
+      ]);
+
+      click(form, "blocks.1.article", "Open source");
+      expect(form.model.value.blocks).toEqual([
+        { _template: "related", article: 7 },
+        { _template: "related", article: 8 },
+      ]);
+      expect(form.annotations.value["blocks.1.article"]).toBeUndefined();
+
+      ai.restore("blocks");
+      expect(form.model.value.blocks).toBeUndefined();
+    });
+
+    it("ticks by default only the items whose records were all found", async () => {
+      serveWith(answer, ARTICLES);
+      const form = formWith([BLOCKS]);
+      const ai = useMapoAiFill(form);
+
+      await ai.fill("x");
+      click(form, "blocks", "mapo.apply");
+
+      expect(form.model.value.blocks).toEqual([
+        { _template: "related", article: 7 },
+      ]);
+    });
+
+    it("lets the operator ignore a record to pick, and takes the marks away when the list becomes theirs", async () => {
+      serveWith(answer, ARTICLES);
+      const form = formWith([BLOCKS]);
+      const ai = useMapoAiFill(form);
+
+      await ai.fill("x");
+      ai.apply("blocks", { items: [0, 1] });
+      click(form, "blocks.1.article", "mapo.ai.fill.ignore");
+      expect(form.annotations.value["blocks.1.article"]).toBeUndefined();
+      expect(form.annotations.value.blocks?.label).toBe("mapo.ai.fill.applied");
+
+      const other = formWith([BLOCKS]);
+      const again = useMapoAiFill(other);
+      await again.fill("x");
+      again.apply("blocks", { items: [0, 1] });
+      again.keep("blocks");
+      expect(other.annotations.value).toEqual({});
+    });
+
+    it("never writes the names of a list whose records a draft could not keep", async () => {
+      serveWith(answer, ARTICLES);
+      const before = formWith([BLOCKS]);
+      const ai = useMapoAiFill(before);
+      await ai.fill("x");
+      const kept = stored(ai.snapshot());
+      // Six candidates are more than a draft keeps: its records are dropped.
+      const [field] = kept.fields;
+      field.relations[1].candidates = Array.from({ length: 6 }, (_, i) => ({
+        id: i,
+        value: i,
+        label: `Article ${i}`,
+      }));
+
+      const after = formWith([BLOCKS]);
+      const again = useMapoAiFill(after);
+      expect(again.resume(kept)).toBe(true);
+      again.apply("blocks", { items: [0, 1] });
+
+      expect(after.model.value).toEqual({});
+      expect(again.fields.value[0]?.action).toBe("manual");
+    });
+
+    it("keeps the records found in a draft, so the record to pick is marked again", async () => {
+      serveWith(answer, ARTICLES);
+      const before = formWith([BLOCKS]);
+      const ai = useMapoAiFill(before);
+      await ai.fill("x");
+      ai.apply("blocks", { items: [0, 1] });
+      const kept = stored(ai.snapshot());
+
+      const after = formWith([BLOCKS], stored(before.model.value));
+      const again = useMapoAiFill(after);
+
+      expect(again.resume(kept)).toBe(true);
+      expect(buttons(after, "blocks.1.article")).toEqual([
+        "Open data",
+        "Open source",
+        "mapo.ai.fill.ignore",
+      ]);
+      click(after, "blocks.1.article", "Open data");
+      expect(after.model.value.blocks).toEqual([
+        { _template: "related", article: 7 },
+        { _template: "related", article: 7 },
+      ]);
+      again.undo();
+      expect(after.model.value.blocks).toBeUndefined();
+    });
+  });
+
+  it("offers the records of a list of records to pick one name at a time, in the AI's order", async () => {
+    serveWith(
+      answered({ tags: filled([{ search: "Open" }, { search: "Rossi" }]) }),
+      {
+        "/api/tags": PAGED,
+        "/api/tags?search=Open": [
+          { id: 1, name: "Open data" },
+          { id: 2, name: "Open source" },
+        ],
+        "/api/tags?search=Rossi": [
+          { id: 7, name: "Anna Rossi" },
+          { id: 8, name: "Luca Rossi" },
+        ],
+      },
+    );
+    const form = formWith([
+      {
+        key: "tags",
+        type: "m2m",
+        label: "Tags",
+        attrs: { endpoint: "/api/tags", returnObject: false },
+      },
+    ]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(buttons(form, "tags")).toEqual([
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+    expect(form.annotations.value.tags?.description).toContain(
+      'mapo.ai.fill.relationPickNext {"name":"Rossi"}',
+    );
+    click(form, "tags", "Open source");
+    expect(form.model.value.tags).toEqual([2]);
+    expect(buttons(form, "tags")).toEqual([
+      "mapo.ai.fill.keep",
+      "mapo.restore",
+      "Anna Rossi",
+      "Luca Rossi",
+      "mapo.ai.fill.ignore",
+    ]);
+    click(form, "tags", "Luca Rossi");
+    expect(form.model.value.tags).toEqual([2, 8]);
+    ai.undo();
+    expect(form.model.value.tags).toBeUndefined();
+  });
+
+  it("says what a record picked would replace in a field that holds one", async () => {
+    serveWith(answered({ category: filled({ search: "Open" }) }), {
+      "/api/categories": PAGED,
+      "/api/categories?search=Open": [
+        { id: 1, name: "Open data" },
+        { id: 2, name: "Open source" },
+      ],
+    });
+    const form = formWith([category({ returnObject: true })], {
+      category: { id: 3, name: "City" },
+    });
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.annotations.value.category?.description).toContain(
+      'mapo.ai.fill.pickReplaces {"current":"City"}',
+    );
+    click(form, "category", "Open data");
+    expect(form.model.value.category).toEqual({ id: 1, name: "Open data" });
+    ai.restore("category");
+    expect(form.model.value.category).toEqual({ id: 3, name: "City" });
+  });
+
+  it("writes no record picked into a list the operator changed since the AI's write", async () => {
+    serveWith(
+      answered({
+        blocks: {
+          status: "filled",
+          value: [
+            { _template: "related", article: { search: "Open data" } },
+            { _template: "related", article: { search: "Open" } },
+          ],
+          verified: true,
+          quotes: [],
+          items: [
+            {
+              template: "related",
+              fields: { article: filled({ search: "Open data" }) },
+              verified: true,
+            },
+            {
+              template: "related",
+              fields: { article: filled({ search: "Open" }) },
+              verified: true,
+            },
+          ],
+        },
+      }),
+      {
+        "/api/articles": PAGED,
+        "/api/articles?search=Open%20data": [{ id: 7, title: "Open data" }],
+        "/api/articles?search=Open": [
+          { id: 7, title: "Open data" },
+          { id: 8, title: "Open source" },
+        ],
+      },
+    );
+    const own = { _template: "related", article: 1 };
+    const form = formWith(
+      [
+        {
+          key: "blocks",
+          type: "repeater",
+          label: "Blocks",
+          attrs: {
+            templates: {
+              related: {
+                label: "Related",
+                fields: [
+                  {
+                    key: "article",
+                    type: "fks",
+                    attrs: {
+                      endpoint: "/api/articles",
+                      itemText: "title",
+                      returnObject: false,
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      { blocks: [own] },
+    );
+    const ai = useMapoAiFill(form);
+    await ai.fill("x");
+    ai.apply("blocks", { items: [0, 1] });
+    expect(buttons(form, "blocks.2.article")).toEqual([
+      "Open data",
+      "Open source",
+      "mapo.ai.fill.ignore",
+    ]);
+
+    // The operator puts a block first: the third block is now the AI's
+    // first, and the pick, in the same tick, must not land in it.
+    const blocks = form.model.value.blocks as unknown[];
+    form.model.value.blocks = [{ _template: "related", article: 9 }, ...blocks];
+    ai.choose("blocks.2.article", 1);
+
+    expect(form.model.value.blocks).toEqual([
+      { _template: "related", article: 9 },
+      own,
+      { _template: "related", article: 7 },
+      { _template: "related", article: null },
+    ]);
+  });
+
+  it("adds a record the AI names twice once", async () => {
+    serveWith(
+      answered({
+        tags: filled([{ search: "Culture" }, { search: "culture" }]),
+      }),
+      {
+        "/api/tags": PAGED,
+        "/api/tags?search=Culture": [{ id: 2, name: "Culture" }],
+        "/api/tags?search=culture": [{ id: 2, name: "Culture" }],
+      },
+    );
+    const form = formWith([
+      {
+        key: "tags",
+        type: "m2m",
+        attrs: { endpoint: "/api/tags", returnObject: false },
+      },
+    ]);
+
+    await useMapoAiFill(form).fill("x");
+
+    expect(form.model.value.tags).toEqual([2]);
+  });
+
+  it("writes nothing when the call is cancelled while the records are listed", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    const fetch = vi.fn<Post>(async (path, options) => {
+      if (options.method === "GET") {
+        return new Promise((resolve) => {
+          answer = resolve;
+        });
+      }
+      return answered({ category: filled({ id: 2 }) });
+    });
+    nuxt.app = { $mapoFetch: fetch, $i18n: { t } };
+    const form = formWith([category()]);
+    const ai = useMapoAiFill(form);
+
+    const done = ai.fill("x");
+    await new Promise((resolve) => setTimeout(resolve));
+    const listed = fetch.mock.calls.find(
+      ([path]) => path === "/api/categories",
+    );
+    expect((listed?.[1] as { signal?: AbortSignal }).signal).toBeInstanceOf(
+      AbortSignal,
+    );
+    ai.cancel();
+    answer(CATEGORIES);
+    await done;
+
+    expect(form.model.value).toEqual({});
+    expect(ai.fields.value).toEqual([]);
+  });
+
+  it("shows a choice by its label, and a record by its name", async () => {
+    serve(answered({ status: filled("review", false) }));
+    const form = formWith([
+      {
+        key: "status",
+        type: "select",
+        label: "Status",
+        attrs: {
+          items: [
+            { label: "Draft", value: "draft" },
+            { label: "In review", value: "review" },
+          ],
+        },
+      },
+    ]);
+    const ai = useMapoAiFill(form);
+
+    await ai.fill("x");
+
+    expect(form.annotations.value.status?.description).toContain(
+      'mapo.ai.fill.proposes {"value":"In review"}',
+    );
+    expect(ai.textOf("status", "draft")).toBe("Draft");
+    expect(ai.textOf("status", "other")).toBe("other");
+    expect(ai.textOf("missing", "<p>Text</p>")).toBe("Text");
   });
 });

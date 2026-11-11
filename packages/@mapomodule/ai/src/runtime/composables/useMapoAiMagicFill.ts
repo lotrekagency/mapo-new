@@ -11,7 +11,8 @@ import { useNuxtApp } from "nuxt/app";
 import { metadataToJsonSchema } from "@mapomodule/utils";
 import type { JSONSchema } from "@mapomodule/utils";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
-import { dataOf, mapoAiValueText } from "../shared/fill";
+import { dataOf, mapoAiValueText, proposalOf } from "../shared/fill";
+import { effectiveMatch } from "../shared/relations";
 import { isRecord } from "../shared/guards";
 import type { MapoAiFillEntity } from "../shared/fill";
 import type {
@@ -36,7 +37,7 @@ import type {
   MapoAiToConfirm,
 } from "../shared/magicFill";
 import { readMapoAiFile } from "../shared/read";
-import { gatewayPoster } from "./poster";
+import { gatewayGetter, gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
 import type { Translate } from "./translate";
 import { mapoAiFillErrorOf, useMapoAiFill } from "./useMapoAiFill";
@@ -415,13 +416,21 @@ function magicFillState<T extends object>(
   const app = useNuxtApp();
   const t = translatorOf(app);
   const post = gatewayPoster(app);
+  // The records of the form's relations, with the operator's session.
+  const get = gatewayGetter(app);
   const { status, refresh } = useMapoAiStatus();
 
   /** What the AI knows of the record, read from the page at each call: its props may change. */
   function entityOf(): MapoAiFillEntity {
     const label = detail.modelName?.value;
     const model = detail.permissionModel?.value;
-    return { ...(label ? { label } : {}), ...(model ? { model } : {}) };
+    // `definePageMeta({ magicFill: { evidence: false } })` asks no quotes.
+    const isWithoutProofs = pageOptionsOf(app)?.evidence === false;
+    return {
+      ...(label ? { label } : {}),
+      ...(model ? { model } : {}),
+      ...(isWithoutProofs ? { evidence: false } : {}),
+    };
   }
   /** How the page reads a schema from `OPTIONS`, at each call. */
   function schemaReaderOf() {
@@ -708,7 +717,7 @@ function magicFillState<T extends object>(
           entity: entityOf(),
           signal: own.signal,
         },
-        { post },
+        { post, get },
       );
       if (previewing !== own) return;
       asked.value = { state: "ready", answer };
@@ -752,6 +761,7 @@ function magicFillState<T extends object>(
           ...(before?.languages ? { languages: before.languages } : {}),
         };
       }),
+      { evidence: entityOf().evidence !== false },
     );
   });
 
@@ -791,15 +801,19 @@ function magicFillState<T extends object>(
           const { outcome } = field;
           const isWaiting = !field.applied && field.review === undefined;
           if (!isWaiting || outcome.status !== "filled") return [];
-          const values: readonly unknown[] = Array.isArray(outcome.value)
-            ? outcome.value
+          // The value as the preview lists it: the records found in place
+          // of those the AI named.
+          const proposal =
+            proposalOf(outcome, field.relations) ?? outcome.value;
+          const values: readonly unknown[] = Array.isArray(proposal)
+            ? proposal
             : [];
           const items = outcome.items
             ? values.map((value, index) =>
                 tickOfListItem(field.path, index, value),
               )
             : [];
-          return [tickOf(field.path, outcome.value, field.replaces), ...items];
+          return [tickOf(field.path, proposal, field.replaces), ...items];
         }),
       );
       const kept = [...ticks.value].filter(([tick]) => waitingNow.has(tick));
@@ -897,7 +911,7 @@ function magicFillState<T extends object>(
     const values = isRecord(item.value)
       ? Object.entries(item.value)
           .filter(([name]) => name !== "_template")
-          .map(([, value]) => mapoAiValueText(value, 60))
+          .map(([name, value]) => itemValueText(item, name, value))
           .filter(Boolean)
           .slice(0, 2)
       : [];
@@ -938,6 +952,36 @@ function magicFillState<T extends object>(
     itemLabelOf,
     t,
   };
+}
+
+/**
+ * A value of an item as the preview names it: a related record by the name
+ * of the record found, else by the AI's; any other value by its text.
+ */
+function itemValueText(
+  item: MapoAiProposedItem,
+  name: string,
+  value: unknown,
+): string {
+  const match = item.relations?.find((one) => one.at === name);
+  if (!match) return mapoAiValueText(value, 60);
+  const current = effectiveMatch(match);
+  const isFound = current.status === "found" && current.label !== undefined;
+  return mapoAiValueText(isFound ? current.label : match.name, 60);
+}
+
+/**
+ * The options the page gives Magic Fill, `definePageMeta({ magicFill: {…} })`,
+ * read from the route as outside data: `undefined` for `true`, `false` or
+ * none.
+ */
+function pageOptionsOf(app: object): Record<string, unknown> | undefined {
+  const router: unknown = Reflect.get(app, "$router");
+  const route: unknown = isRecord(router) ? router.currentRoute : undefined;
+  const current: unknown = isRecord(route) ? route.value : undefined;
+  const meta: unknown = isRecord(current) ? current.meta : undefined;
+  const options: unknown = isRecord(meta) ? meta.magicFill : undefined;
+  return isRecord(options) ? options : undefined;
 }
 
 /** The label of a repeater's template, by its key: its own `label`, else the key. */

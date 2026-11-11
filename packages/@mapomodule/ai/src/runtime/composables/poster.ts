@@ -35,12 +35,18 @@ export function gatewayPoster(app: object): GatewayPoster {
       : Promise.reject(new Error("No $fetch to call the AI gateway with"));
 }
 
-/** Gets a path of the app's server, and resolves with the answer read as JSON. */
-export type GatewayGetter = (path: string) => Promise<unknown>;
+/**
+ * Gets a path of the app's server, and resolves with the answer read as
+ * JSON. The signal closes the request.
+ */
+export type GatewayGetter = (
+  path: string,
+  options?: { signal?: AbortSignal },
+) => Promise<unknown>;
 
 type GetFetcher = (
   request: string,
-  options: { method: "GET" },
+  options: { method: "GET"; signal?: AbortSignal },
 ) => Promise<unknown>;
 
 function isGetFetcher(value: unknown): value is GetFetcher {
@@ -56,8 +62,11 @@ export function gatewayGetter(app: object): GatewayGetter {
     : isGetFetcher(globalFetch)
       ? globalFetch
       : undefined;
-  return (path) =>
+  return (path, options = {}) =>
     fetcher
-      ? fetcher(path, { method: "GET" })
+      ? fetcher(path, {
+          method: "GET",
+          ...(options.signal ? { signal: options.signal } : {}),
+        })
       : Promise.reject(new Error("No $fetch to call the AI gateway with"));
 }

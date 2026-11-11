@@ -276,6 +276,32 @@ describe("What I send to the AI", () => {
     expect(preview).toEqual(PREVIEW);
   });
 
+  it("lists the records of a relation as run lists them, with get", async () => {
+    const post = vi.fn(async () => PREVIEW);
+    const get = vi.fn(async () => [{ id: 2, name: "Culture" }]);
+    const input = {
+      fields: [
+        {
+          key: "category",
+          type: "fks",
+          label: "Category",
+          attrs: { endpoint: "/api/categories", returnObject: false },
+        },
+      ],
+      source: "Category: Culture",
+    } as const;
+
+    await previewMapoAiFill(input, { post, get });
+
+    const body = (post.mock.calls[0] as unknown[] | undefined)?.[1] as {
+      entity: Record<string, unknown>;
+    };
+    expect(get).toHaveBeenCalledWith("/api/categories", { signal: undefined });
+    expect(body.entity.relationChoices).toEqual({
+      category: [{ value: 2, label: "Culture" }],
+    });
+  });
+
   it("throws for an answer that is no preview", async () => {
     await expect(
       previewMapoAiFill(
@@ -691,5 +717,148 @@ describe("mapoAiPreselected", () => {
     };
 
     expect(mapoAiPreselected(summary)).toEqual(["summary", "excerpt"]);
+  });
+});
+
+describe("the preview of related records", () => {
+  const ref = (search: string): AiFieldOutcome => ({
+    status: "filled",
+    value: { search },
+    verified: true,
+    quotes: [{ quote: search, where: "", found: true }],
+  });
+  const waiting = (
+    key: string,
+    outcome: AiFieldOutcome,
+    relations: MapoAiFillEntry["relations"],
+  ) => ({
+    key,
+    path: key,
+    action: "confirm" as const,
+    replaces: false,
+    shown: true,
+    outcome,
+    applied: false,
+    relations,
+  });
+
+  it("shows the records found in the AI's value, and why one waits: another name, or records to choose", () => {
+    const summary = summarizeMapoAiFill([
+      waiting("category", ref("Culture"), [
+        {
+          at: "",
+          name: "Culture",
+          status: "found",
+          id: 5,
+          value: 5,
+          label: "Culture & Arts",
+          renamed: true,
+        },
+      ]),
+      waiting(
+        "tags",
+        {
+          status: "filled",
+          value: [{ search: "City" }, { search: "Open" }],
+          verified: true,
+          quotes: [],
+        },
+        [
+          {
+            at: "0",
+            name: "City",
+            status: "found",
+            id: 3,
+            value: 3,
+            label: "City",
+          },
+          { at: "1", name: "Open", status: "ambiguous", count: 9 },
+        ],
+      ),
+    ]);
+
+    expect(
+      summary.toFill.map((item) => [item.path, item.value, item.reasons]),
+    ).toEqual([
+      ["category", 5, ["renamed"]],
+      ["tags", [3], ["to-pick"]],
+    ]);
+    expect(summary.toFill[0]?.relations?.[0]?.label).toBe("Culture & Arts");
+    // A record found under another name waits for the operator's own tick.
+    expect(mapoAiPreselected(summary)).toEqual(["tags"]);
+  });
+
+  it("shows what a list of records joins, as for a list of items", () => {
+    const [tags] = summarizeMapoAiFill([
+      {
+        ...waiting(
+          "tags",
+          {
+            status: "filled",
+            value: [{ search: "City" }],
+            verified: true,
+            quotes: [],
+          },
+          [
+            {
+              at: "0",
+              name: "City",
+              status: "found",
+              id: 3,
+              value: 3,
+              label: "City",
+            },
+          ],
+        ),
+        current: [9],
+      },
+    ]).toFill;
+
+    expect(tags).toMatchObject({ value: [3], current: [9], reasons: [] });
+  });
+
+  it("ticks an item of a list only when every record it names was found with the AI's name", () => {
+    const item = () => ({ fields: {}, verified: true });
+    const [list] = summarizeMapoAiFill([
+      waiting(
+        "blocks",
+        {
+          status: "filled",
+          value: [{ article: { search: "A" } }, { article: { search: "B" } }],
+          verified: true,
+          quotes: [],
+          items: [item(), item()],
+        },
+        [
+          {
+            at: "0.article",
+            name: "A",
+            status: "found",
+            id: 1,
+            value: 1,
+            label: "A",
+          },
+          { at: "1.article", name: "B", status: "none" },
+        ],
+      ),
+    ]).toFill;
+
+    expect(list?.list?.map((one) => [one.value, one.relations])).toEqual([
+      [
+        { article: 1 },
+        [
+          {
+            at: "article",
+            name: "A",
+            status: "found",
+            id: 1,
+            value: 1,
+            label: "A",
+          },
+        ],
+      ],
+      [{ article: null }, [{ at: "article", name: "B", status: "none" }]],
+    ]);
+    expect(list ? mapoAiPreselectedItems(list) : []).toEqual([0]);
   });
 });

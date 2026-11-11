@@ -316,15 +316,20 @@ const REFUSED = {
   usage: { inputTokens: 1, outputTokens: 1 },
 };
 
-/** The gateway: `status`, `run` answering `fields`, and `run/preview`. */
+/**
+ * The gateway: `status`, `run` answering `fields`, and `run/preview`; and
+ * the backend's paths the relations read, from `backend`.
+ */
 function gateway(
   status: Record<string, unknown>,
   fields: Record<string, unknown> = {},
+  backend: Record<string, unknown> = {},
 ): void {
   nuxt.app = {
     $i18n: { t: (key: string) => key },
     $mapoFetch: async (path: string) => {
       requests.push(path);
+      if (Object.hasOwn(backend, path)) return backend[path];
       if (path === "/_mapo/ai/status") return status;
       if (path === "/_mapo/ai/run/preview") return PREVIEW;
       if (path === "/_mapo/ai/run") {
@@ -527,6 +532,64 @@ describe("Magic Fill's parts on a detail", () => {
     await settle();
     expect(form.model.value.title).toBe("About us");
     expect(checkbox("Title")).toBeUndefined();
+  });
+
+  it("name a choice by its label and a record by its name, and leave a record found under another name unticked", async () => {
+    gateway(
+      STATUS,
+      {
+        status: unfound("review"),
+        category: {
+          status: "filled",
+          value: { search: "Culture" },
+          verified: true,
+          quotes: [{ quote: "Culture", where: "", found: true }],
+        },
+      },
+      {
+        "/api/categories": { count: 80, next: "/p2", results: [] },
+        "/api/categories?search=Culture": [{ id: 5, name: "Culture & Arts" }],
+      },
+    );
+    const form = detail([
+      {
+        key: "status",
+        type: "select",
+        label: "Status",
+        attrs: {
+          items: [
+            { label: "Draft", value: "draft" },
+            { label: "In review", value: "review" },
+          ],
+        },
+      },
+      {
+        key: "category",
+        type: "fks",
+        label: "Category",
+        attrs: { endpoint: "/api/categories", returnObject: false },
+      },
+    ]);
+    const root = mountDetail(form);
+    await useMapoAiStatus().refresh();
+    await settle();
+    const magic = useMapoAiMagicFill(form);
+    magic.text.value = "Status: in review. Category: Culture.";
+
+    await magic.extract();
+    await settle();
+
+    const text = textOf(root);
+    expect(text).toContain("Status In review");
+    expect(text).toContain("Category Culture & Arts");
+    expect(text).toContain("mapo.ai.fill.relationRenamed");
+    expect(checkbox("Status")?.checked).toBe(true);
+    expect(checkbox("Category")?.checked).toBe(false);
+    checkbox("Category")?.click();
+    await settle();
+    button(APPLY_SELECTED)?.click();
+    await settle();
+    expect(form.model.value).toEqual({ status: "review", category: 5 });
   });
 
   it("ignore every value that waits, and keep what is in the form", async () => {

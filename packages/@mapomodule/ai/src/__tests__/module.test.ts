@@ -1066,7 +1066,7 @@ describe("Magic Fill", () => {
     );
   });
 
-  it("types the key a page turns it off with", async () => {
+  it("types the key a page turns it off with, or turns its proofs off with", async () => {
     await setup({ public: {} });
 
     const found = (
@@ -1076,6 +1076,10 @@ describe("Magic Fill", () => {
     ).find(
       ({ template }) => template.filename === "types/mapo-ai-magic-fill.d.ts",
     );
-    expect(found?.template.getContents()).toContain("magicFill?: boolean;");
+    const types = found?.template.getContents();
+    expect(types).toContain(
+      "magicFill?: boolean | MapoAiMagicFillPageOptions;",
+    );
+    expect(types).toContain("evidence?: boolean;");
   });
 });

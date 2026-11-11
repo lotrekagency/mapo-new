@@ -36,7 +36,7 @@ function field(extra: Record<string, unknown> = {}): Record<string, unknown> {
 
 function session(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    format: 1,
+    format: 2,
     rounds: 1,
     answers: [
       { round: 1, provider: { id: "mock", model: "mock" }, prompt: 1, at: 1 },
@@ -51,9 +51,13 @@ describe("readMapoAiFillSession", () => {
     expect(readMapoAiFillSession(session())).toEqual(session());
   });
 
+  it("reads a session of the first format, which kept no related records", () => {
+    expect(readMapoAiFillSession(session({ format: 1 }))).toEqual(session());
+  });
+
   it.each([
     ["no object", "a session"],
-    ["another format", session({ format: 2 })],
+    ["another format", session({ format: 3 })],
     ["no count of answers", session({ rounds: -1 })],
     ["a count that is no whole number", session({ rounds: 1.5 })],
   ])("reads nothing from %s", (_name, value) => {
@@ -138,5 +142,94 @@ describe("readMapoAiFillSession", () => {
       }),
     );
     expect(read?.fields[0]?.writes).toEqual([{ order: 3, records: [record] }]);
+  });
+});
+
+describe("readMapoAiFillSession — related records", () => {
+  /** A category that waits, several records matching the AI's name. */
+  const related = (relations: unknown, extra: Record<string, unknown> = {}) =>
+    field({
+      key: "category",
+      path: "category",
+      action: "manual",
+      applied: false,
+      undoable: false,
+      writes: [],
+      outcome: {
+        status: "filled",
+        value: { search: "Open" },
+        verified: true,
+        quotes: [{ quote: "Category: Open", where: "", found: true }],
+      },
+      relations,
+      ...extra,
+    });
+
+  const match = (extra: Record<string, unknown> = {}) => ({
+    at: "",
+    name: "Open",
+    status: "ambiguous",
+    count: 2,
+    candidates: [
+      { id: 1, value: 1, label: "Open data" },
+      { id: 2, value: 2, label: "Open source" },
+    ],
+    ...extra,
+  });
+
+  it("reads the records found for a field, the pick and the place included", () => {
+    const kept = session({
+      fields: [related([match({ choice: 1, ignored: false })])],
+    });
+
+    expect(readMapoAiFillSession(kept)?.fields[0]?.relations).toEqual([
+      match({ choice: 1 }),
+    ]);
+  });
+
+  it.each([
+    ["a place outside the field", { path: "other.0.article" }],
+    ["an unsafe place in the value", { at: "__proto__" }],
+    [
+      "more than five candidates",
+      {
+        candidates: Array.from({ length: 6 }, (_, i) => ({
+          id: i,
+          value: i,
+          label: `${i}`,
+        })),
+      },
+    ],
+    ["a pick out of the candidates", { choice: 2 }],
+    [
+      "a candidate without a value",
+      { candidates: [{ id: 1, label: "Open data" }] },
+    ],
+    ["a value no draft carries", { status: "found", value: new Date(0) }],
+    ["an unknown status", { status: "maybe" }],
+  ])(
+    "drops the records of a field for %s, and leaves its value to set by hand",
+    (_name, extra) => {
+      const waiting = related([match(extra)], { action: "confirm" });
+
+      const [read] =
+        readMapoAiFillSession(session({ fields: [waiting] }))?.fields ?? [];
+
+      expect(read?.relations).toBeUndefined();
+      // Apply would write the AI's names themselves: the value is the
+      // operator's to set.
+      expect(read?.action).toBe("manual");
+    },
+  );
+
+  it("reads a field of the first format that names a record as one to set by hand", () => {
+    const first = session({
+      format: 1,
+      fields: [related(undefined, { action: "confirm" })],
+    });
+
+    expect(readMapoAiFillSession(first)?.fields[0]).toMatchObject({
+      action: "manual",
+    });
   });
 });

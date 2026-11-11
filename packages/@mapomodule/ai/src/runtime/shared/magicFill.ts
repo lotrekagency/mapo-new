@@ -16,9 +16,15 @@ import {
   foundQuoteOf,
   isItemHeld,
   isItemList,
+  isRecordList,
   isUnprovenValue,
+  itemRelations,
   mapoAiFillRequest,
+  proposalOf,
+  withRelationLists,
 } from "./fill";
+import { effectiveMatch, isExactMatch } from "./relations";
+import type { MapoAiRelationMatch } from "./relations";
 import type {
   MapoAiFillDependencies,
   MapoAiFillEntry,
@@ -376,7 +382,8 @@ export function sourceChars(parts: readonly MapoAiSourcePart[]): number {
 /**
  * Asks the gateway what `run` would send for the fill the input describes,
  * "What I send to the AI": the same request, to `run/preview`, which calls
- * no provider, counts nothing and audits nothing.
+ * no provider, counts nothing and audits nothing. With `get`, the records
+ * of the form's relations are listed as `run` lists them.
  * @throws The rejection of `post` (an error status, a network failure, an
  *   abort), or `MapoAiFillAnswerError` when the answer is no preview.
  */
@@ -384,9 +391,10 @@ export async function previewMapoAiFill<T>(
   input: MapoAiFillInput<T> & { signal?: AbortSignal },
   dependencies: MapoAiFillDependencies,
 ): Promise<MapoAiRunPreviewResponse> {
+  const { entity } = await withRelationLists(input, dependencies);
   const answer = await dependencies.post(
     `${MAPO_AI_GATEWAY_PATH}/run/preview`,
-    mapoAiFillRequest(input),
+    mapoAiFillRequest({ ...input, entity }),
     { signal: input.signal },
   );
   const preview = readMapoAiRunPreview(answer);
@@ -517,9 +525,16 @@ export function mapoAiSkipReasonKey(reason: string): string | undefined {
 /**
  * Why a value waits for the operator: no quote proves it (`not-proven`),
  * it would replace what the field holds (`replaces`), the form hides the
- * field (`hidden`).
+ * field (`hidden`), a related record was found under another name than the
+ * AI's (`renamed`), or some of the records it names are to pick in the
+ * field, or to set by hand (`to-pick`).
  */
-export type MapoAiWaitReason = "not-proven" | "replaces" | "hidden";
+export type MapoAiWaitReason =
+  | "not-proven"
+  | "replaces"
+  | "hidden"
+  | "renamed"
+  | "to-pick";
 
 /** An item of a list that waits, as the preview lists it. */
 export interface MapoAiProposedItem {
@@ -533,6 +548,12 @@ export interface MapoAiProposedItem {
   verified: boolean;
   /** The field holds it already: it is never added again. */
   held: boolean;
+  /**
+   * The related records it names, by their place in the item
+   * (`organisation`), as they were found: one not found is to pick once
+   * the item is in, and the item is not ticked from the start.
+   */
+  relations?: MapoAiRelationMatch[];
 }
 
 /** A value of the answer that waits for the operator's Apply. */
@@ -541,10 +562,18 @@ export interface MapoAiToConfirm {
   key: string;
   /** The path of its value in the model, as `apply()` takes it. */
   path: string;
-  /** The value the AI proposes. */
+  /**
+   * The value the AI proposes, as the field would take it: for a value
+   * that names related records, the records found in their place.
+   */
   value: unknown;
   /** Why it waits; none when the form was busy as the answer arrived. */
   reasons: MapoAiWaitReason[];
+  /**
+   * For a value that names related records: what was found for each, by
+   * its place in the value (`""`, or `2` in a list of records).
+   */
+  relations?: MapoAiRelationMatch[];
   /** For a list: its items, and how many of them are verified. */
   items?: { total: number; verified: number };
   /**
@@ -555,9 +584,9 @@ export interface MapoAiToConfirm {
   /** For a verified value: the words of the source that prove it. */
   quote?: string;
   /**
-   * For a value that would replace one, or a list of items that would join
-   * the field's own: what the field holds now, at its path, as the summary
-   * was given it. The "before" of the preview.
+   * For a value that would replace one, or a list of items or of related
+   * records that would join the field's own: what the field holds now, at
+   * its path, as the summary was given it. The "before" of the preview.
    */
   current?: unknown;
   /**
@@ -614,7 +643,8 @@ export interface MapoAiFillSummary {
  * discarded one the operator then wrote over stays discarded. A value that
  * waits goes to one group of the preview: `toReplace` when the field holds
  * a value it would replace (never a list of items), else `unproven` when
- * the AI quoted nothing for it, else `toFill`.
+ * the AI quoted nothing for it, else `toFill`. With `evidence: false`, the
+ * page asked for no quotes: no value is `unproven`.
  */
 export function summarizeMapoAiFill(
   fields: readonly (MapoAiFillEntry & {
@@ -623,6 +653,7 @@ export function summarizeMapoAiFill(
     current?: unknown;
     languages?: Record<string, unknown>;
   })[],
+  options: { evidence?: boolean } = {},
 ): MapoAiFillSummary {
   const summary: MapoAiFillSummary = {
     applied: 0,
@@ -637,7 +668,7 @@ export function summarizeMapoAiFill(
     notFound: 0,
   };
   for (const field of fields) {
-    const { action, outcome, review } = field;
+    const { action, outcome, review, relations } = field;
     const isChanged = review === "edited" && outcome.status === "filled";
     if (review === "kept") summary.kept += 1;
     else if (isChanged) summary.edited += 1;
@@ -650,18 +681,29 @@ export function summarizeMapoAiFill(
     else if (outcome.status === "filled") {
       const quote = outcome.verified ? foundQuoteOf(outcome) : undefined;
       const isList = isItemList(outcome);
-      // What a list's items join is shown too, as what a value replaces.
+      // What a list's items, or records, join is shown too, as what a
+      // value replaces.
+      const joins = isList || isRecordList(outcome);
       const hasCurrent =
-        (field.replaces || isList) && field.current !== undefined;
+        (field.replaces || joins) && field.current !== undefined;
+      // The records of the value itself; those inside items go with them.
+      const own = (relations ?? []).filter((one) => !one.at.includes("."));
+      const isRenamed = own.some((one) => effectiveMatch(one).renamed === true);
+      const isToPick = own.some(
+        (one) => effectiveMatch(one).status !== "found" && !one.ignored,
+      );
       const waiting: MapoAiToConfirm = {
         key: field.key,
         path: field.path,
-        value: outcome.value,
+        value: proposalOf(outcome, relations) ?? outcome.value,
         reasons: [
           ...(outcome.verified ? [] : ["not-proven" as const]),
           ...(field.replaces ? ["replaces" as const] : []),
           ...(field.shown ? [] : ["hidden" as const]),
+          ...(isRenamed ? ["renamed" as const] : []),
+          ...(isToPick ? ["to-pick" as const] : []),
         ],
+        ...(own.length ? { relations: own } : {}),
         ...(outcome.items
           ? {
               items: {
@@ -672,13 +714,18 @@ export function summarizeMapoAiFill(
           : {}),
         ...(quote !== undefined ? { quote } : {}),
         ...(hasCurrent ? { current: field.current } : {}),
-        ...(isList ? { list: proposedItems(outcome, field.current) } : {}),
+        ...(isList
+          ? { list: proposedItems(outcome, field.current, relations) }
+          : {}),
         ...(field.replaces && field.languages
           ? { languages: field.languages }
           : {}),
       };
+      // Without quotes asked, a value without any is no proposal without
+      // proof: it waits to fill, as any value no quote proves.
+      const isUnproven = options.evidence !== false && isUnprovenValue(outcome);
       if (field.replaces) summary.toReplace.push(waiting);
-      else if (isUnprovenValue(outcome)) summary.unproven.push(waiting);
+      else if (isUnproven) summary.unproven.push(waiting);
       else summary.toFill.push(waiting);
     }
   }
@@ -689,42 +736,52 @@ export function summarizeMapoAiFill(
  * The paths of the values the preview ticks as it lists them: those for
  * empty fields the form shows, which take no value away. A value that
  * would replace one, or that the AI quoted nothing for, waits for the
- * operator's own tick; a field the form hides is never ticked, nor
- * written.
+ * operator's own tick, and so does a related record found under another
+ * name; a field the form hides is never ticked, nor written.
  */
 export function mapoAiPreselected(summary: MapoAiFillSummary): string[] {
   return summary.toFill
     .filter((item) => !item.reasons.includes("hidden"))
+    .filter((item) => !item.reasons.includes("renamed"))
     .filter((item) => !item.list || mapoAiPreselectedItems(item).length > 0)
     .map((item) => item.path);
 }
 
 /**
  * The items of a list the preview ticks as it lists them, by their place:
- * the verified ones the field does not hold yet. A list of a field the form
- * hides gets none.
+ * the verified ones the field does not hold yet, whose related records
+ * were all found with the AI's names. A list of a field the form hides
+ * gets none.
  */
 export function mapoAiPreselectedItems(item: MapoAiToConfirm): number[] {
   if (!item.list || item.reasons.includes("hidden")) return [];
   return item.list
     .filter((one) => one.verified && !one.held)
+    .filter((one) => (one.relations ?? []).every(isExactMatch))
     .map((one) => one.index);
 }
 
-/** The items of a list's outcome, each with whether `held` holds it. */
+/**
+ * The items of a list's outcome, as the field would take them, each with
+ * whether `held` holds it and the records it names.
+ */
 function proposedItems(
   outcome: AiFieldOutcome,
   held: unknown,
+  relations: readonly MapoAiRelationMatch[] | undefined,
 ): MapoAiProposedItem[] {
   if (outcome.status !== "filled" || !outcome.items) return [];
-  const values: readonly unknown[] = Array.isArray(outcome.value)
-    ? outcome.value
-    : [];
-  return outcome.items.map((item, index) => ({
-    index,
-    value: values[index],
-    ...(item.template ? { template: item.template } : {}),
-    verified: item.verified,
-    held: isItemHeld(values[index], held),
-  }));
+  const proposal = proposalOf(outcome, relations);
+  const values: readonly unknown[] = Array.isArray(proposal) ? proposal : [];
+  return outcome.items.map((item, index) => {
+    const inside = itemRelations(relations, index);
+    return {
+      index,
+      value: values[index],
+      ...(item.template ? { template: item.template } : {}),
+      verified: item.verified,
+      held: isItemHeld(values[index], held),
+      ...(inside.length ? { relations: inside } : {}),
+    };
+  });
 }

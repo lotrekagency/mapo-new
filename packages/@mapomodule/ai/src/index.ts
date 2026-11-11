@@ -104,6 +104,10 @@ export type {
   MapoAiReadOptions,
 } from "./runtime/shared/read";
 export type { MapoAiFillAnswer } from "./runtime/shared/fillSession";
+export type {
+  MapoAiRelationCandidate,
+  MapoAiRelationMatch,
+} from "./runtime/shared/relations";
 export type { MapoAiRead } from "./runtime/composables/useMapoAiRead";
 export type {
   MapoAiFillSummary,
@@ -301,7 +305,8 @@ export interface MapoAiOptions {
    * and a banner above the form with where a call is and its summary.
    * `false` leaves it out of the app. A page turns it off with
    * `definePageMeta({ magicFill: false })`, or shows only some extensions
-   * with the `extensions` prop of `MapoDetail`.
+   * with the `extensions` prop of `MapoDetail`; it asks for no quotes with
+   * `definePageMeta({ magicFill: { evidence: false } })`.
    * @default true
    */
   magicFill?: boolean;

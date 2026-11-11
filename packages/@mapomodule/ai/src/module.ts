@@ -83,17 +83,26 @@ export default defineNuxtPlugin({
 });
 `;
 
-/** The page's meta key that turns Magic Fill off, typed for the app's pages. */
-const MAGIC_FILL_PAGE_META = `declare module "#app" {
+/** The page's meta key of Magic Fill, typed for the app's pages. */
+const MAGIC_FILL_PAGE_META = `/** How Magic Fill works on a page. */
+interface MapoAiMagicFillPageOptions {
+  /**
+   * \`false\` asks the AI for no quotes of the source: no value is then
+   * verified, so every one waits for the operator in the preview. For a
+   * record whose values the source does not write word for word.
+   */
+  evidence?: boolean;
+}
+declare module "#app" {
   interface PageMeta {
-    /** \`false\` turns Magic Fill off on this page. */
-    magicFill?: boolean;
+    /** \`false\` turns Magic Fill off on this page; an object says how it works there. */
+    magicFill?: boolean | MapoAiMagicFillPageOptions;
   }
 }
 declare module "vue-router" {
   interface RouteMeta {
-    /** \`false\` turns Magic Fill off on this page. */
-    magicFill?: boolean;
+    /** \`false\` turns Magic Fill off on this page; an object says how it works there. */
+    magicFill?: boolean | MapoAiMagicFillPageOptions;
   }
 }
 export {};

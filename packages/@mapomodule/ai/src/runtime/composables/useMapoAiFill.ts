@@ -28,8 +28,12 @@ import {
   holdsRelation,
   isItemHeld,
   isItemList,
+  isItemResolved,
+  isRecordList,
+  proposalOf,
   verifiedItemsToAdd,
   isEmptyFormValue,
+  isSafePath,
   isUnprovenValue,
   mapoAiValueText,
   readModelValue,
@@ -56,8 +60,20 @@ import type {
   MapoAiFillSession,
   MapoAiFillSessionField,
 } from "../shared/fillSession";
-import type { AiItemOutcome } from "../shared/sanitize";
-import { gatewayPoster } from "./poster";
+import {
+  effectiveMatch,
+  holdsRelationId,
+  isRelationResolved,
+  mapoAiRelationFields,
+  relationIdOf,
+  sameId,
+} from "../shared/relations";
+import type {
+  MapoAiRelationField,
+  MapoAiRelationMatch,
+} from "../shared/relations";
+import type { AiFieldOutcome, AiItemOutcome } from "../shared/sanitize";
+import { gatewayGetter, gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
 import type { Translate } from "./translate";
 
@@ -219,8 +235,18 @@ export interface MapoAiFill {
    */
   keep(path: string): void;
   /**
+   * Puts in the record the operator picks, by its place among the
+   * candidates of a mark that asks for one, by the mark's path: a related
+   * record several records match, in the field's value or inside an item
+   * the AI's list added (`blocks.4.article`). The value goes in as Apply
+   * writes it; inside an item, or in a list of records already in, it joins
+   * what the AI wrote, and Restore takes it away with the rest.
+   */
+  choose(path: string, candidate: number): void;
+  /**
    * Removes the composable's mark of a field, by its path or the mark's,
    * or every mark: a value that waits is ignored, one in the form stays.
+   * The mark of a record to pick in a value already in ignores the pick.
    */
   dismiss(path?: string): void;
   /**
@@ -254,6 +280,12 @@ export interface MapoAiFill {
    * does not have.
    */
   replaced(path: string): MapoAiFillReplaced | undefined;
+  /**
+   * A value of a field of the session as the marks show it, by the
+   * field's path: the label of a choice or the name of a related record,
+   * a rich text's words, a list's values, or how many items a list has.
+   */
+  textOf(path: string, value: unknown): string;
   /** A call is waiting for its answer. */
   pending: Readonly<Ref<boolean>>;
   /** Why the last call got no answer. */
@@ -320,6 +352,21 @@ interface FieldWrite {
   records: WriteRecord[];
 }
 
+/** What a write leaves in a field, and, for a list, which of the AI's entries it adds. */
+interface PlannedWrite {
+  value: unknown;
+  /** For a list: the AI's entries it adds, by their place in the AI's list, in order. */
+  added?: number[];
+  /** For a list: how many entries the field held before them. */
+  own?: number;
+}
+
+/** A record to pick at a mark, and the field of the session whose value names it. */
+interface Pick {
+  field: MapoAiFillField;
+  match: MapoAiRelationMatch;
+}
+
 /** The message of each error status of `run`, under `mapo.ai.errors`. */
 const ERROR_MESSAGES: Readonly<Record<number, string>> = {
   400: "unsupported",
@@ -347,6 +394,9 @@ const FAILURE_MESSAGES: ReadonlyMap<string, string> = new Map([
 
 /** Messages that can say how long to wait, as `<message>In`. */
 const WAITING_MESSAGES = new Set(["rateLimited", "unavailable"]);
+
+/** Quotes a mark shows of a value, the first ones the AI gave. */
+const MAX_QUOTES = 2;
 
 /**
  * Fills a detail form with the AI, through the gateway's `run`. It sends
@@ -384,6 +434,9 @@ export function useMapoAiFill<T extends object>(
   const app = useNuxtApp();
   const t = translatorOf(app);
   const post = gatewayPoster(app);
+  // The backend's records, with the operator's session, as the form's own
+  // relation fields read them.
+  const get = gatewayGetter(app);
 
   const pending = shallowRef(false);
   const error = shallowRef<MapoAiFillError>();
@@ -401,6 +454,8 @@ export function useMapoAiFill<T extends object>(
   const memory = new Map<string, FieldWrite[]>();
   /** What a field that waits held when its answer came: a change is the operator's. */
   const held = new Map<string, string | undefined>();
+  /** The records each relation listed for the AI, by path: their names show ids. */
+  const listed = new Map<string, readonly unknown[]>();
   /** Writes made in the session, to order them. */
   let writes = 0;
 
@@ -465,9 +520,12 @@ export function useMapoAiFill<T extends object>(
           },
           signal: own.signal,
         },
-        { post },
+        { post, get },
       );
       if (controller !== own) return;
+      for (const [path, records] of Object.entries(answer.lists.records)) {
+        listed.set(path, records);
+      }
       const reply = answer.response;
       response.value = reply;
       // A refusal, and an answer that cannot be read, leave the session
@@ -495,7 +553,7 @@ export function useMapoAiFill<T extends object>(
         // plan found it empty: its value then waits, as a replacement the
         // operator sees before and after. A list's items go after what the
         // onChange put there.
-        const isFilledSince = !isItemList(field.outcome) && holdsValue(field);
+        const isFilledSince = !joinsOwn(field.outcome) && holdsValue(field);
         if (isFilledSince) setField(path, { action: "confirm" });
         else write(path);
       }
@@ -559,32 +617,103 @@ export function useMapoAiFill<T extends object>(
   }
 
   /**
-   * Writes the AI's value of a field, a copy of it, or the list `value`
-   * gives as it is. A list of items goes after the field's own, never in
-   * their place (`listWith()`): an earlier write's `onChange` may have put
-   * items in the field after the plan found it empty. `false` when it
-   * cannot, or when a list has nothing left to add.
+   * Writes the AI's value of a field, a copy of it (`plannedWrite()`), or
+   * what `planned` gives. A list goes after the field's own entries, never
+   * in their place (`listWith()`, `recordsWith()`): an earlier write's
+   * `onChange` may have put some in the field after the plan found it
+   * empty. `false` when it cannot, or when a list has nothing left to add.
    */
-  function write(path: string, value?: readonly unknown[]): boolean {
+  function write(path: string, planned?: PlannedWrite): boolean {
     const field = fieldAt(path);
-    const outcome = field?.outcome;
     const located = field ? targets.get(field.key) : undefined;
-    if (!field || !located || outcome?.status !== "filled") return false;
+    if (!field || !located || field.outcome.status !== "filled") return false;
     if (field.applied || field.review !== undefined || !canWrite()) {
       return false;
     }
-    const written =
-      value ??
-      (isItemList(outcome)
-        ? listWith(field, undefined)
-        : structuredClone(outcome.value));
-    if (written === undefined) return false;
-    const records = writeField(located, written);
+    const chosen = planned ?? plannedWrite(field);
+    if (chosen === undefined) return false;
+    const records = writeField(located, chosen.value);
     if (!records) return false;
     writes += 1;
     memory.set(path, [...(memory.get(path) ?? []), { order: writes, records }]);
-    setField(path, { applied: true, undoable: true });
+    setField(path, {
+      applied: true,
+      undoable: true,
+      ...placedRelations(field, chosen),
+    });
     return true;
+  }
+
+  /**
+   * What a write of a field's own proposal leaves in it: a copy of the
+   * AI's value; for a value that names related records, the records found
+   * in their place; for a list, the field's own entries, then the AI's it
+   * does not hold yet. `undefined` when there is nothing to write, as for a
+   * value that names records no one looked for.
+   */
+  function plannedWrite(field: MapoAiFillField): PlannedWrite | undefined {
+    const { outcome } = field;
+    if (isNamedUnresolved(field)) return undefined;
+    if (isItemList(outcome)) return listWith(field, undefined);
+    if (isRecordList(outcome)) return recordsWith(field);
+    const value = proposalOf(outcome, field.relations);
+    return value === undefined ? undefined : { value: structuredClone(value) };
+  }
+
+  /**
+   * Where the records the items of a list name go, once a write put the
+   * items in the field: their place there (`blocks.4.article`), where one
+   * the operator picks is marked.
+   */
+  function placedRelations(
+    field: MapoAiFillField,
+    planned: PlannedWrite,
+  ): Partial<MapoAiFillField> {
+    const { relations } = field;
+    const isItems = isItemList(field.outcome);
+    if (!relations || !isItems || !planned.added) return {};
+    const own = planned.own ?? 0;
+    const places = new Map(
+      planned.added.map((index, rank) => [index, own + rank]),
+    );
+    return {
+      relations: relations.map((match) => {
+        const [first = "", ...rest] = match.at.split(".");
+        const place = places.get(Number(first));
+        const isPlaced = place !== undefined && rest.length > 0;
+        if (!isPlaced) return match;
+        return { ...match, path: [field.path, place, ...rest].join(".") };
+      }),
+    };
+  }
+
+  /**
+   * Writes again into a field the AI's value is in, as one more write of
+   * the session: a record the operator picks joins what the AI wrote.
+   * Restore and undo take it away with the rest, newest first.
+   */
+  function rewrite(field: MapoAiFillField, value: unknown): boolean {
+    const located = targets.get(field.key);
+    const isOurs = field.applied && field.review === undefined;
+    if (!located || !isOurs || !canWrite()) return false;
+    const records = writeField(located, value);
+    if (!records) return false;
+    writes += 1;
+    memory.set(field.path, [
+      ...(memory.get(field.path) ?? []),
+      { order: writes, records },
+    ]);
+    return true;
+  }
+
+  /**
+   * The relation a field of the session is, as its descriptor declares it:
+   * an `fks` or `m2m` field with an endpoint.
+   */
+  function relationFieldOf(
+    field: MapoAiFillField,
+  ): MapoAiRelationField | undefined {
+    return relationOfTarget(targets.get(field.key));
   }
 
   /**
@@ -700,6 +829,25 @@ export function useMapoAiFill<T extends object>(
       return false;
     }
     const model = target.model.value;
+    // A related record is held when the field holds the same one, by its
+    // id: the form may keep the record with other properties than the
+    // endpoint's.
+    const relation = relationOfTarget(located);
+    if (relation) {
+      const proposed: readonly unknown[] = Array.isArray(value)
+        ? value
+        : [value];
+      const ids = proposed.map((one) => relationIdOf(one, relation.itemValue));
+      const isKnown = ids.length > 0 && ids.every((id) => id !== undefined);
+      if (!isKnown) return false;
+      return writePaths(located).every((path) => {
+        const held = readModelValue(model, path);
+        return ids.every(
+          (id) =>
+            id !== undefined && holdsRelationId(held, id, relation.itemValue),
+        );
+      });
+    }
     // A list of items is held when every item is, wherever it sits.
     const isItems =
       Array.isArray(value) && value.length > 0 && value.every(isRecord);
@@ -807,8 +955,9 @@ export function useMapoAiFill<T extends object>(
       if (!isWaiting) continue;
       held.set(field.path, snapshotOf(field));
       if (field.outcome.status !== "filled") continue;
-      // A list's items go after the field's own: they replace nothing.
-      const replaces = !isItemList(field.outcome) && holdsValue(field);
+      // A list's items, or records, go after the field's own: they
+      // replace nothing.
+      const replaces = !joinsOwn(field.outcome) && holdsValue(field);
       if (replaces === field.replaces) continue;
       setField(field.path, { replaces });
       reworded.push(field.path);
@@ -816,11 +965,11 @@ export function useMapoAiFill<T extends object>(
     return reworded;
   }
 
-  /** The paths of the marks of fields, by their value paths. */
+  /** The paths of the marks of fields, by their value paths: those inside their items too. */
   function marksAt(paths: readonly string[]): string[] {
     return paths.flatMap((path) => {
       const field = fieldAt(path);
-      return field ? [markPathOf(field)] : [];
+      return field ? markPathsOf(field) : [];
     });
   }
 
@@ -843,6 +992,9 @@ export function useMapoAiFill<T extends object>(
           outcome.status === "filled" &&
           outcome.verified;
         if (!isCandidate) continue;
+        // Records found under another name, or not found, still wait.
+        const isNamed = holdsRelation(outcome);
+        if (isNamed && !isRelationResolved(field.relations)) continue;
         const located = targets.get(field.key);
         const isTakenNow =
           isShown(located) && canTake(located) && !holdsValue(field);
@@ -865,39 +1017,177 @@ export function useMapoAiFill<T extends object>(
     if (isList && !list) return;
     if (!write(path, list)) return;
     const reworded = retakeWaiting();
-    refreshMarks([markPathOf(field), ...marksAt(reworded)]);
+    refreshMarks([...markPathsOf(field), ...marksAt([path, ...reworded])]);
+  }
+
+  function choose(markPath: string, candidate: number): void {
+    const pick = pickAt(markPath);
+    if (!pick || !canWrite()) return;
+    const { field, match } = pick;
+    const picked = match.candidates?.[candidate];
+    if (!picked) return;
+    // A value that waits goes in only into a field the operator sees.
+    const isWaiting = !field.applied && match.path === undefined;
+    if (isWaiting && !shownNow(field.path)) return;
+    // A value already in goes on only while it holds what the AI wrote:
+    // the operator may have moved or removed the item the record goes to.
+    const last = memory.get(field.path)?.at(-1);
+    const isOurs = last !== undefined && !isChanged(last.records);
+    if (!isWaiting && !isOurs) return;
+    const before = markPathsOf(field);
+    setField(field.path, {
+      relations: (field.relations ?? []).map((one) =>
+        one.at === match.at ? { ...one, choice: candidate } : one,
+      ),
+    });
+    const updated = fieldAt(field.path);
+    let isDone = false;
+    if (updated && match.path !== undefined) {
+      // Inside an item the AI's list added: the record goes there.
+      const value = valueWith(updated, match.path, picked.value);
+      isDone = value !== undefined && rewrite(updated, value);
+    } else if (updated?.applied) {
+      // A list of records already in: the record joins them.
+      const list = recordsWith(updated);
+      isDone = list !== undefined && rewrite(updated, list.value);
+    } else if (updated) {
+      // The value waits: it goes in with the record picked, as Apply.
+      isDone = write(updated.path);
+    }
+    // A pick that could not be written is no pick.
+    if (!isDone) setField(field.path, { relations: field.relations });
+    const reworded = retakeWaiting();
+    refreshMarks([...before, ...marksAt([field.path, ...reworded])]);
+  }
+
+  /**
+   * The record to pick at a mark: inside an item the AI's list added, the
+   * one whose place it is; at a field's mark, the only record of its value
+   * that several records match, with candidates to pick from.
+   */
+  function pickAt(markPath: string): Pick | undefined {
+    for (const field of fields.value) {
+      if (field.review !== undefined || !field.relations) continue;
+      const nested = field.relations.find((match) => match.path === markPath);
+      if (nested) {
+        const isOpen = field.applied && isToPick(nested);
+        return isOpen ? { field, match: nested } : undefined;
+      }
+      if (markPathOf(field) !== markPath) continue;
+      // Several records to pick in a list of records: one at a time, in
+      // the AI's order, so the buttons are always those of one name.
+      const first = field.relations.find(
+        (match) => !match.at.includes(".") && isToPick(match),
+      );
+      if (first) return { field, match: first };
+    }
+    return undefined;
+  }
+
+  /** The record a mark inside an item of a list is about, and its field. */
+  function nestedAt(markPath: string): Pick | undefined {
+    for (const field of fields.value) {
+      const match = field.relations?.find((one) => one.path === markPath);
+      if (match) return { field, match };
+    }
+    return undefined;
+  }
+
+  /** The paths of a field's marks: its own, and those of the records to pick inside its items. */
+  function markPathsOf(field: MapoAiFillField): string[] {
+    const nested = (field.relations ?? []).flatMap((match) =>
+      match.path !== undefined ? [match.path] : [],
+    );
+    return [markPathOf(field), ...nested];
+  }
+
+  /**
+   * A copy of the field's value with `value` at a path inside it, where an
+   * item the AI added holds a record to pick: only what is on the way is
+   * copied, so the other items stay as they are. `undefined` when the path
+   * no longer leads anywhere in the value.
+   */
+  function valueWith(
+    field: MapoAiFillField,
+    path: string,
+    value: unknown,
+  ): unknown {
+    const isInside = path.startsWith(`${field.path}.`) && isSafePath(path);
+    if (!isInside) return undefined;
+    const segments = path.slice(field.path.length + 1).split(".");
+    const current = readModelValue(target.model.value, field.path);
+    return withValueAt(toRaw(current), segments, structuredClone(value));
   }
 
   /**
    * The list a write of a list's items leaves in its field: the field's own
-   * items, then the chosen ones it does not hold yet, in the AI's order.
-   * `undefined` when none is left to add. The own items are those of the
-   * field's path: a `synci18n` list then goes into every language, as the
-   * form writes it.
+   * items, then the chosen ones it does not hold yet, in the AI's order,
+   * each with the records it names that were found (one not found is
+   * `null`, to pick once the item is in). `undefined` when none is left to
+   * add. The own items are those of the field's path: a `synci18n` list
+   * then goes into every language, as the form writes it.
    */
   function listWith(
     field: MapoAiFillField,
     chosen: readonly number[] | undefined,
-  ): unknown[] | undefined {
-    const { outcome } = field;
-    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) {
-      return undefined;
-    }
-    const proposed: readonly unknown[] = outcome.value;
+  ): PlannedWrite | undefined {
+    // Items that name records no one looked up are never written.
+    if (isNamedUnresolved(field)) return undefined;
+    const proposal = proposalOf(field.outcome, field.relations);
+    if (!Array.isArray(proposal)) return undefined;
+    const proposed: readonly unknown[] = proposal;
     const held = readModelValue(target.model.value, field.path);
     // The field's own items stay the same objects, so the form keeps them
     // as they are; the AI's are copies.
     const own: readonly unknown[] = Array.isArray(held) ? toRaw(held) : [];
     const indexes = chosen ?? proposed.map((_, index) => index);
     // An item the AI gives twice goes in once.
-    const added: unknown[] = [];
+    const added: { index: number; item: unknown }[] = [];
     for (const [index, item] of proposed.entries()) {
       const isChosen = indexes.includes(index);
-      if (isChosen && !isItemHeld(item, [...own, ...added])) added.push(item);
+      const taken = [...own, ...added.map((one) => one.item)];
+      if (isChosen && !isItemHeld(item, taken)) added.push({ index, item });
     }
-    return added.length
-      ? [...own, ...added.map((item) => structuredClone(item))]
-      : undefined;
+    if (!added.length) return undefined;
+    return {
+      value: [...own, ...added.map((one) => structuredClone(one.item))],
+      added: added.map((one) => one.index),
+      own: own.length,
+    };
+  }
+
+  /**
+   * The list a write of a list of related records leaves in its field: the
+   * field's own records, then the records found that it does not hold yet,
+   * in the AI's order. `undefined` when none is left to add.
+   *
+   * @param withRenamed Records found under another name go too: Apply and
+   *   a pick come after the operator saw both names; a write by itself
+   *   comes only when every record was found with the AI's own name.
+   */
+  function recordsWith(
+    field: MapoAiFillField,
+    withRenamed = true,
+  ): PlannedWrite | undefined {
+    const relation = relationFieldOf(field);
+    if (!relation || !field.relations) return undefined;
+    const held = readModelValue(target.model.value, field.path);
+    const own: readonly unknown[] = Array.isArray(held) ? toRaw(held) : [];
+    const added: { index: number; value: unknown }[] = [];
+    for (const match of field.relations.map(effectiveMatch)) {
+      const isFound = match.status === "found" && match.id !== undefined;
+      const isUsable = withRenamed || match.renamed !== true;
+      if (!isFound || !isUsable || match.id === undefined) continue;
+      const taken = [...own, ...added.map((one) => one.value)];
+      if (holdsRelationId(taken, match.id, relation.itemValue)) continue;
+      added.push({ index: Number(match.at), value: match.value });
+    }
+    if (!added.length) return undefined;
+    return {
+      value: [...own, ...added.map((one) => structuredClone(one.value))],
+      added: added.map((one) => one.index),
+      own: own.length,
+    };
   }
 
   /** The form shows a field of the answer now: its predicates on the model as it is. */
@@ -919,10 +1209,17 @@ export function useMapoAiFill<T extends object>(
       undoRecords(untouchedOf(one.records));
     }
     memory.delete(path);
-    setField(path, { applied: false, undoable: false });
+    // The marks inside its items go with the items.
+    const paths = markPathsOf(field);
+    setField(path, {
+      applied: false,
+      undoable: false,
+      // The records picked go too: the value waits as it came.
+      ...(field.relations ? { relations: field.relations.map(unpicked) } : {}),
+    });
     // What the fields that wait hold now is where the operator starts from.
     const reworded = retakeWaiting();
-    refreshMarks([markPathOf(field), ...marksAt(reworded)]);
+    refreshMarks([...paths, ...marksAt(reworded)]);
   }
 
   function keep(path: string): void {
@@ -930,10 +1227,22 @@ export function useMapoAiFill<T extends object>(
     if (!field?.applied || field.review !== undefined) return;
     memory.delete(path);
     setField(path, { review: "kept", undoable: false });
-    refreshMarks([markPathOf(field)]);
+    refreshMarks(markPathsOf(field));
   }
 
   function dismiss(path?: string): void {
+    // The mark of a record to pick in a value already in: the pick goes,
+    // the value stays the AI's.
+    const pick = path === undefined ? undefined : pickOrNoteAt(path);
+    if (pick) {
+      setField(pick.field.path, {
+        relations: (pick.field.relations ?? []).map((one) =>
+          one.at === pick.match.at ? { ...one, ignored: true } : one,
+        ),
+      });
+      refreshMarks(markPathsOf(pick.field));
+      return;
+    }
     const chosen = fields.value.filter(
       (field) =>
         path === undefined || field.path === path || markPathOf(field) === path,
@@ -948,9 +1257,20 @@ export function useMapoAiFill<T extends object>(
       path === undefined
         ? [...marks.keys()]
         : chosen.length
-          ? chosen.map(markPathOf)
+          ? chosen.flatMap(markPathsOf)
           : [path];
     refreshMarks(paths);
+  }
+
+  /**
+   * A record to pick, or to set by hand, whose mark sits in a value already
+   * in: inside an item the AI's list added, or in a list of records.
+   */
+  function pickOrNoteAt(markPath: string): Pick | undefined {
+    const nested = nestedAt(markPath);
+    if (nested) return nested;
+    const pick = pickAt(markPath);
+    return pick?.field.applied ? pick : undefined;
   }
 
   /**
@@ -962,7 +1282,7 @@ export function useMapoAiFill<T extends object>(
     if (!field || field.review !== undefined) return;
     memory.delete(path);
     setField(path, { review: "edited", undoable: false });
-    refreshMarks([markPathOf(field)]);
+    refreshMarks(markPathsOf(field));
   }
 
   function undo(): void {
@@ -981,6 +1301,7 @@ export function useMapoAiFill<T extends object>(
     error.value = undefined;
     memory.clear();
     held.clear();
+    listed.clear();
     targets.clear();
     rounds.value = 0;
     answers.value = [];
@@ -1029,6 +1350,7 @@ export function useMapoAiFill<T extends object>(
       undoable: field.undoable && kept.length > 0,
       round: field.round,
       ...(wasHeld !== undefined ? { held: wasHeld } : {}),
+      ...(field.relations ? { relations: field.relations } : {}),
       writes: kept,
     };
   }
@@ -1079,6 +1401,7 @@ export function useMapoAiFill<T extends object>(
         ...(saved.review ? { review: saved.review } : {}),
         undoable: saved.undoable && kept.length > 0,
         round: saved.round,
+        ...(saved.relations ? { relations: saved.relations } : {}),
       });
     }
     fields.value = taken;
@@ -1094,7 +1417,7 @@ export function useMapoAiFill<T extends object>(
     answers.value = session.answers;
     const orders = [...memory.values()].flat().map((one) => one.order);
     writes = Math.max(0, ...orders);
-    refreshMarks(taken.map(markPathOf));
+    refreshMarks(taken.flatMap(markPathsOf));
     return true;
   }
 
@@ -1159,7 +1482,100 @@ export function useMapoAiFill<T extends object>(
 
   function refreshMarks(paths: readonly string[]): void {
     const unique = [...new Set(paths)];
-    setMarks(unique.map((one) => [one, markOf(one)]));
+    setMarks(
+      unique.map((one) => [
+        one,
+        nestedAt(one) ? relationMarkOf(one) : markOf(one),
+      ]),
+    );
+  }
+
+  /**
+   * The mark of a record to pick inside an item the AI's list added, while
+   * the list is the AI's: the candidates to pick from, or the words that
+   * say to set it by hand, with Ignore.
+   */
+  function relationMarkOf(markPath: string): FieldAnnotation | undefined {
+    const nested = nestedAt(markPath);
+    if (!nested) return undefined;
+    const { field, match } = nested;
+    const isOpen =
+      field.applied && field.review === undefined && match.ignored !== true;
+    if (!isOpen || effectiveMatch(match).status === "found") return undefined;
+    const ignore: FieldAnnotationAction = {
+      label: t("mapo.ai.fill.ignore"),
+      icon: "i-lucide-x",
+      onClick: () => dismiss(markPath),
+    };
+    const description = relationNote(match);
+    if (isToPick(match)) {
+      return {
+        label: t("mapo.ai.fill.ambiguous"),
+        icon: "i-lucide-triangle-alert",
+        color: "warning",
+        description,
+        actions: [...candidateActions(markPath, match), ignore],
+      };
+    }
+    return {
+      label: t("mapo.ai.fill.manual"),
+      icon: "i-lucide-link",
+      color: "info",
+      description,
+      actions: [ignore],
+    };
+  }
+
+  /** A button for each record the operator can pick at a mark. */
+  function candidateActions(
+    markPath: string,
+    match: MapoAiRelationMatch,
+  ): FieldAnnotationAction[] {
+    return (match.candidates ?? []).map((candidate, index) => ({
+      label: mapoAiValueText(candidate.label, 60),
+      icon: "i-lucide-link",
+      onClick: () => choose(markPath, index),
+    }));
+  }
+
+  /** What a mark says of a record that several records match, or none. */
+  function relationNote(match: MapoAiRelationMatch): string {
+    const name = mapoAiValueText(match.name, 80);
+    if (match.status === "ambiguous") {
+      return isToPick(match)
+        ? t("mapo.ai.fill.relationPick", { name })
+        : t("mapo.ai.fill.relationMany", { name, n: match.count ?? 0 });
+    }
+    return match.failed
+      ? t("mapo.ai.fill.relationFailed", { name })
+      : t("mapo.ai.fill.relationNone", { name });
+  }
+
+  /**
+   * What a field's mark says of the records its value names that need the
+   * operator: one found under another name, several to pick from, none.
+   * Those inside items have marks of their own.
+   */
+  function relationLines(field: MapoAiFillField): string[] {
+    const active = pickAt(markPathOf(field))?.match.at;
+    return (field.relations ?? []).flatMap((match) => {
+      if (match.at.includes(".") || match.ignored === true) return [];
+      const current = effectiveMatch(match);
+      // Another record to pick waits for the one whose buttons the mark has.
+      const isNext = isToPick(match) && match.at !== active;
+      if (isNext) {
+        const name = mapoAiValueText(match.name, 80);
+        return [t("mapo.ai.fill.relationPickNext", { name })];
+      }
+      if (current.status !== "found") return [relationNote(match)];
+      if (current.renamed !== true) return [];
+      return [
+        t("mapo.ai.fill.relationRenamed", {
+          name: mapoAiValueText(match.name, 80),
+          label: mapoAiValueText(current.label ?? "", 80),
+        }),
+      ];
+    });
   }
 
   /** Sets or removes marks, by path; a mark of someone else is removed only when replaced. */
@@ -1187,14 +1603,18 @@ export function useMapoAiFill<T extends object>(
   function markOf(markPath: string): FieldAnnotation | undefined {
     // A field the operator decided has no mark, nor one that already held
     // the value, and neither does a value with no quote at all while it
-    // waits: it is listed apart.
+    // waits: it is listed apart. A record to pick or to set by hand keeps
+    // its mark, the only place that says so.
     const group = fields.value.filter(
       (field) =>
         markPathOf(field) === markPath &&
         field.outcome.status !== "empty" &&
         field.action !== "unchanged" &&
         field.review === undefined &&
-        (field.applied || !isUnprovenValue(field.outcome)),
+        (field.applied ||
+          !isUnprovenValue(field.outcome) ||
+          isWithoutProofs() ||
+          relationLines(field).length > 0),
     );
     if (!group.length) return undefined;
     const waiting = group.filter(
@@ -1221,10 +1641,17 @@ export function useMapoAiFill<T extends object>(
       onClick: () => dismiss(markPath),
     };
     // A list adds by itself only its verified items it does not hold:
-    // with none, its items are the operator's to choose.
-    const applicable = waiting.filter(
-      (field) => !isItemList(field.outcome) || itemsByDefault(field).length,
-    );
+    // with none, its items are the operator's to choose. A list of records
+    // adds those found that the field does not hold.
+    const applicable = waiting.filter((field) => {
+      if (isItemList(field.outcome)) return itemsByDefault(field).length > 0;
+      if (isRecordList(field.outcome)) return recordsWith(field) !== undefined;
+      return true;
+    });
+    // The candidates of a record to pick, and the Ignore of the pick in a
+    // value already in.
+    const pick = pickAt(markPath);
+    const picks = pick ? candidateActions(markPath, pick.match) : [];
     const applyAll: FieldAnnotationAction = {
       label: t("mapo.apply"),
       icon: "i-lucide-check",
@@ -1257,6 +1684,7 @@ export function useMapoAiFill<T extends object>(
         // An earlier answer's value in the field: Restore puts it back too.
         actions: [
           ...(applicable.length ? [applyAll] : []),
+          ...picks,
           ...(undoable.length ? [restoreAll] : []),
           ignore,
         ],
@@ -1269,7 +1697,17 @@ export function useMapoAiFill<T extends object>(
         icon: "i-lucide-sparkles",
         color: isVerified ? "success" : "warning",
         description,
-        actions: [keepAll, restoreAll],
+        // Ignore here ignores the pick: the value stays the AI's.
+        actions: [keepAll, restoreAll, ...picks, ...(pick ? [ignore] : [])],
+      };
+    }
+    if (isManual && pick) {
+      return {
+        label: t("mapo.ai.fill.ambiguous"),
+        icon: "i-lucide-triangle-alert",
+        color: "warning",
+        description,
+        actions: [...picks, ignore],
       };
     }
     if (isManual) {
@@ -1299,18 +1737,23 @@ export function useMapoAiFill<T extends object>(
       });
     }
     if (outcome.status !== "filled") return "";
-    const value = shown(field, outcome.value);
-    if (field.action === "manual") {
+    // A value that names records shows those found, by their names.
+    const proposed = proposalOf(outcome, field.relations);
+    const value = shown(field, proposed ?? outcome.value);
+    const proof = proofOf(outcome);
+    const relationNotes = relationLines(field);
+    if (field.action === "manual" && !field.applied) {
+      // Records looked for and not found: what was found of each, and what
+      // a record picked would replace, so the operator sees both.
+      if (field.relations) {
+        const replacing = field.replaces ? pickReplacementOf(field) : "";
+        return [...relationNotes, replacing, proof].filter(Boolean).join(" ");
+      }
       const message = holdsRelation(outcome)
         ? "mapo.ai.fill.manualText"
         : "mapo.ai.fill.manualField";
       return t(message, { value });
     }
-    const quote = foundQuoteOf(outcome);
-    const isProven = outcome.verified && quote !== undefined;
-    const proof = isProven
-      ? t("mapo.ai.fill.proven", { quote: mapoAiValueText(quote, 200) })
-      : t("mapo.ai.fill.notProven");
     const notes = [
       ...(outcome.dropped?.length
         ? [t("mapo.ai.fill.dropped", { n: outcome.dropped.length })]
@@ -1345,13 +1788,61 @@ export function useMapoAiFill<T extends object>(
         ...notes,
       ].join(" ");
     }
-    if (field.applied) return [proof, ...notes].join(" ");
+    if (field.applied) return [proof, ...relationNotes, ...notes].join(" ");
     if (outcome.items)
       return [itemsLineOf(field, outcome.items), ...notes].join(" ");
     const proposal = field.replaces
       ? replacementOf(field, value)
       : t("mapo.ai.fill.proposes", { value });
-    return [proposal, proof, ...notes].join(" ");
+    return [proposal, ...relationNotes, proof, ...notes].join(" ");
+  }
+
+  /**
+   * What a mark says of a value's proof: the words of the source that
+   * prove it, each with where the AI places them (a file, a page), or a
+   * list's first quote among its items; otherwise the words the AI quoted
+   * that are not in the source, for the operator to look for, and that no
+   * quote proves it, or that the page asks for none.
+   */
+  function proofOf(outcome: AiFieldOutcome): string {
+    if (outcome.status !== "filled") return "";
+    const found = outcome.quotes.filter((one) => one.found);
+    if (outcome.verified && found.length) {
+      const seen = new Set<string>();
+      const lines = found.flatMap((one) => {
+        const quote = mapoAiValueText(one.quote, 200);
+        if (seen.has(quote)) return [];
+        seen.add(quote);
+        const where = mapoAiValueText(one.where, 60);
+        return [
+          where
+            ? t("mapo.ai.fill.provenIn", { quote, where })
+            : t("mapo.ai.fill.proven", { quote }),
+        ];
+      });
+      return lines.slice(0, MAX_QUOTES).join(" ");
+    }
+    const quote = foundQuoteOf(outcome);
+    if (outcome.verified && quote !== undefined) {
+      return t("mapo.ai.fill.proven", { quote: mapoAiValueText(quote, 200) });
+    }
+    const missing = outcome.quotes
+      .filter((one) => !one.found && one.quote.trim() !== "")
+      .slice(0, 1)
+      .map((one) =>
+        t("mapo.ai.fill.quotedNotFound", {
+          quote: mapoAiValueText(one.quote, 120),
+        }),
+      );
+    const lead = isWithoutProofs()
+      ? t("mapo.ai.fill.notAsked")
+      : t("mapo.ai.fill.notProven");
+    return [...missing, lead].join(" ");
+  }
+
+  /** The page asks for no quotes: a value without any is no proposal without proof. */
+  function isWithoutProofs(): boolean {
+    return options.entity?.evidence === false;
   }
 
   /**
@@ -1365,20 +1856,29 @@ export function useMapoAiFill<T extends object>(
   ): string {
     const verified = items.filter((item) => item.verified).length;
     const held = itemsHeld(field);
+    // Items with a record to pick once they are in, or to set by hand.
+    const toPick = items.filter(
+      (_, index) => !isItemResolved(field.relations, index),
+    ).length;
     return [
       t("mapo.ai.fill.proposesItems", { n: items.length, verified }),
       ...(held ? [t("mapo.ai.fill.itemsHeld", { n: held })] : []),
+      ...(toPick ? [t("mapo.ai.fill.itemsToPick", { n: toPick })] : []),
       ...(itemsByDefault(field).length || held === items.length
         ? []
         : [t("mapo.ai.fill.chooseItems")]),
     ].join(" ");
   }
 
-  /** The items of a list Apply adds on its mark: the verified ones the field does not hold. */
+  /**
+   * The items of a list Apply adds on its mark: the verified ones the field
+   * does not hold, whose records were all found with the AI's names.
+   */
   function itemsByDefault(field: MapoAiFillField): number[] {
     return verifiedItemsToAdd(
       field.outcome,
       readModelValue(target.model.value, field.path),
+      field.relations,
     );
   }
 
@@ -1389,12 +1889,12 @@ export function useMapoAiFill<T extends object>(
    * draft that could not keep it.
    */
   function itemsAdded(field: MapoAiFillField): number[] | undefined {
-    const { outcome } = field;
-    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) return [];
+    const proposal = proposalOf(field.outcome, field.relations);
+    if (!Array.isArray(proposal)) return [];
     const first = memory.get(field.path)?.at(0)?.records[0];
     if (!first) return undefined;
     const now = readModelValue(target.model.value, field.path);
-    const proposed: readonly unknown[] = outcome.value;
+    const proposed: readonly unknown[] = proposal;
     return proposed.flatMap((item, index) =>
       isItemHeld(item, now) && !isItemHeld(item, first.before) ? [index] : [],
     );
@@ -1424,10 +1924,10 @@ export function useMapoAiFill<T extends object>(
 
   /** How many items of a list the field holds already. */
   function itemsHeld(field: MapoAiFillField): number {
-    const { outcome } = field;
-    if (outcome.status !== "filled" || !Array.isArray(outcome.value)) return 0;
+    const proposal = proposalOf(field.outcome, field.relations);
+    if (!Array.isArray(proposal)) return 0;
     const own = readModelValue(target.model.value, field.path);
-    const proposed: readonly unknown[] = outcome.value;
+    const proposed: readonly unknown[] = proposal;
     return proposed.filter((item) => isItemHeld(item, own)).length;
   }
 
@@ -1450,6 +1950,16 @@ export function useMapoAiFill<T extends object>(
     return current
       ? t("mapo.ai.fill.proposesInsteadOf", { value, current })
       : t("mapo.ai.fill.proposesInstead", { value });
+  }
+
+  /** What a record the operator picks for a field that holds a value would replace. */
+  function pickReplacementOf(field: MapoAiFillField): string {
+    const before = replaced(field.path);
+    const current =
+      before && !isEmptyFormValue(before.value)
+        ? shown(field, before.value)
+        : "";
+    return current ? t("mapo.ai.fill.pickReplaces", { current }) : "";
   }
 
   function replaced(path: string): MapoAiFillReplaced | undefined {
@@ -1485,29 +1995,85 @@ export function useMapoAiFill<T extends object>(
   }
 
   /**
-   * A value as the marks show it: the labels of the records a relation
-   * lists, its text, or how many items a list has.
+   * A value as the marks show it: the labels of a select's choices or the
+   * names of related records, its text, or how many items a list has.
    */
   function shown(field: MapoAiFillField, value: unknown): string {
-    const label = choiceLabels(field.key, value);
+    const label = labelsOf(field, value);
     if (label) return label;
     const text = mapoAiValueText(value);
     if (text || !Array.isArray(value)) return text;
     return t("mapo.ai.fill.items", { n: value.length });
   }
 
-  /** The labels of the listed records a value points to, by their ids. */
-  function choiceLabels(key: string, value: unknown): string | undefined {
+  function textOf(path: string, value: unknown): string {
+    const field = fieldAt(path);
+    return field ? shown(field, value) : mapoAiValueText(value);
+  }
+
+  /**
+   * The labels a value shows, when each of its values has one: a choice
+   * of a select, a related record (found, listed for the AI, or its own
+   * name), a record the AI picked from the page's list. `undefined` when
+   * one of them has none, so the value shows as it is.
+   */
+  function labelsOf(
+    field: MapoAiFillField,
+    value: unknown,
+  ): string | undefined {
+    const located = targets.get(field.key);
+    const values: readonly unknown[] = Array.isArray(value) ? value : [value];
+    if (!values.length) return undefined;
+    const labels = values.map((one) => labelOfValue(field, located, one));
+    const isNamed = labels.every((one) => one !== undefined && one !== "");
+    return isNamed ? labels.join(", ") : undefined;
+  }
+
+  function labelOfValue(
+    field: MapoAiFillField,
+    located: KeyTarget<T> | undefined,
+    value: unknown,
+  ): string | undefined {
+    // A record the AI picked by its id, from the page's list.
+    const isPicked =
+      isRecord(value) && Object.keys(value).length === 1 && "id" in value;
+    if (isPicked) return pageChoiceLabel(field.key, value.id);
+    const relation = relationOfTarget(located);
+    if (relation) return recordLabel(field, relation, value);
+    return located ? selectLabel(located.descriptor, value) : undefined;
+  }
+
+  /** The label of a record the page lists for the AI, by its id. */
+  function pageChoiceLabel(key: string, id: unknown): string | undefined {
     const lists = options.entity?.relationChoices;
     const choices = lists && Object.hasOwn(lists, key) ? lists[key] : undefined;
-    if (!choices) return undefined;
-    const refs = Array.isArray(value) ? value : [value];
-    const labels = refs.map((ref) => {
-      const id = isRecord(ref) ? ref.id : undefined;
-      return choices.find((choice) => choice.value === id)?.label;
-    });
-    const isNamed = labels.length > 0 && labels.every((one) => one);
-    return isNamed ? labels.join(", ") : undefined;
+    return choices?.find((choice) => sameId(choice.value, id))?.label;
+  }
+
+  /**
+   * The name of a related record a field holds, the record or its id: the
+   * record found for the AI's value, one the endpoint listed, or the
+   * record's own name.
+   */
+  function recordLabel(
+    field: MapoAiFillField,
+    relation: MapoAiRelationField,
+    value: unknown,
+  ): string | undefined {
+    const id = relationIdOf(value, relation.itemValue);
+    if (id === undefined) return undefined;
+    const found = (field.relations ?? [])
+      .map(effectiveMatch)
+      .find((match) => match.status === "found" && sameId(match.id, id));
+    if (found?.label) return found.label;
+    const records = listed.get(relation.path) ?? [];
+    const record = records.find((one) =>
+      sameId(relationIdOf(one, relation.itemValue), id),
+    );
+    const named = isRecord(record) ? record : isRecord(value) ? value : {};
+    const text = named[relation.itemText];
+    const isText = typeof text === "string" || typeof text === "number";
+    return isText ? String(text) : undefined;
   }
 
   // A component that goes away stops waiting: its form may be gone too.
@@ -1516,6 +2082,7 @@ export function useMapoAiFill<T extends object>(
   return {
     fill,
     apply,
+    choose,
     restore,
     keep,
     dismiss,
@@ -1524,6 +2091,7 @@ export function useMapoAiFill<T extends object>(
     cancel,
     isShown: shownNow,
     replaced,
+    textOf,
     pending,
     error,
     response,
@@ -1533,6 +2101,103 @@ export function useMapoAiFill<T extends object>(
     snapshot,
     resume,
   };
+}
+
+/** A list whose entries join the field's own, and never replace them: items, or related records. */
+function joinsOwn(outcome: AiFieldOutcome): boolean {
+  return isItemList(outcome) || isRecordList(outcome);
+}
+
+/**
+ * A value that names related records nobody looked up, as one a draft
+ * brings back without them: the form cannot take it as it is.
+ */
+function isNamedUnresolved(field: MapoAiFillField): boolean {
+  return holdsRelation(field.outcome) && !field.relations;
+}
+
+/**
+ * A record several records match, that the operator has neither picked
+ * nor ignored, with candidates to pick from.
+ */
+function isToPick(match: MapoAiRelationMatch): boolean {
+  const isOpen =
+    effectiveMatch(match).status === "ambiguous" && match.ignored !== true;
+  return isOpen && (match.candidates?.length ?? 0) > 0;
+}
+
+/** A match as it came: nobody picked or ignored it, and it has no place in the field. */
+function unpicked(match: MapoAiRelationMatch): MapoAiRelationMatch {
+  const { choice: _choice, ignored: _ignored, path: _path, ...rest } = match;
+  return rest;
+}
+
+/**
+ * The relation a field is, as its descriptor declares it: an `fks` or
+ * `m2m` field with an endpoint, written whole.
+ */
+function relationOfTarget<T extends object>(
+  located: KeyTarget<T> | undefined,
+): MapoAiRelationField | undefined {
+  if (!located || located.rest !== "") return undefined;
+  const key = String(located.descriptor.key);
+  return mapoAiRelationFields([located.descriptor]).find(
+    (relation) => relation.path === key,
+  );
+}
+
+/**
+ * The label of a select's choice, by its value, from `attrs.items` (Nuxt
+ * UI's shape, or plain strings) or `attrs.options` (`text` and `value`).
+ */
+function selectLabel(descriptor: unknown, value: unknown): string | undefined {
+  const attrs =
+    isRecord(descriptor) && isRecord(descriptor.attrs) ? descriptor.attrs : {};
+  const items: unknown = Array.isArray(attrs.items)
+    ? attrs.items
+    : attrs.options;
+  if (!Array.isArray(items)) return undefined;
+  const data = dataOf(value);
+  for (const item of items) {
+    if (typeof item === "string") {
+      if (dataOf(item) === data) return item;
+      continue;
+    }
+    if (!isRecord(item) || dataOf(item.value) !== data) continue;
+    const label = item.label ?? item.text;
+    if (typeof label === "string") return label;
+  }
+  return undefined;
+}
+
+/**
+ * A copy of a list or an object with a value at a path inside it: only
+ * what is on the way is copied, so the rest stays the same objects.
+ * `undefined` when the path leads nowhere in it.
+ */
+function withValueAt(
+  container: unknown,
+  segments: readonly string[],
+  value: unknown,
+): unknown {
+  const [first, ...rest] = segments;
+  if (first === undefined) return value;
+  if (Array.isArray(container)) {
+    const index = Number(first);
+    const isPlace =
+      Number.isInteger(index) && index >= 0 && index < container.length;
+    if (!isPlace) return undefined;
+    const inner = withValueAt(toRaw(container[index]), rest, value);
+    if (inner === undefined) return undefined;
+    const copy = [...container];
+    copy[index] = inner;
+    return copy;
+  }
+  if (!isRecord(container)) return undefined;
+  const own = Object.hasOwn(container, first) ? container[first] : undefined;
+  const inner = rest.length ? withValueAt(toRaw(own), rest, value) : value;
+  if (inner === undefined) return undefined;
+  return { ...container, [first]: inner };
 }
 
 /**

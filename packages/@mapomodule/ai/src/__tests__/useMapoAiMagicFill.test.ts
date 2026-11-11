@@ -1220,7 +1220,7 @@ describe("useMapoAiMagicFill — the page's draft", () => {
 
     expect(page.touch).toHaveBeenCalled();
     expect(part?.save()).toMatchObject({
-      format: 1,
+      format: 2,
       rounds: 1,
       answers: [{ provider: { id: "ollama", model: "gemma4:12b" } }],
     });
@@ -1309,5 +1309,62 @@ describe("useMapoAiMagicFill — the page's draft", () => {
 
     expect(magic.fill.fields.value.map((one) => one.path)).toEqual(["title"]);
     expect(form.annotations.value.title?.label).toBe("mapo.ai.fill.applied");
+  });
+});
+
+describe("useMapoAiMagicFill — the page's options", () => {
+  it("asks for no quotes on a page that turns its proofs off, and lists a value without any to fill", async () => {
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () =>
+        answered({
+          title: {
+            status: "filled",
+            value: "About us",
+            verified: false,
+            quotes: [],
+          },
+        }),
+    });
+    nuxt.app.$router = {
+      currentRoute: ref({ meta: { magicFill: { evidence: false } } }),
+    };
+    const form = detail();
+    const { magic } = mounted(form);
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: About us";
+
+    await magic.extract();
+
+    const request = calls.find((call) => call.path === "/_mapo/ai/run");
+    expect(request?.options.body).toMatchObject({
+      entity: { label: "Article", model: "article", evidence: false },
+    });
+    // No quote was asked: the value is no proposal without proof, and its
+    // field is marked.
+    expect(magic.summary.value?.unproven).toEqual([]);
+    expect(magic.summary.value?.toFill.map((item) => item.path)).toEqual([
+      "title",
+    ]);
+    expect(form.annotations.value.title?.description).toContain(
+      "mapo.ai.fill.notAsked",
+    );
+  });
+
+  it("asks for quotes on a page that leaves its proofs on", async () => {
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/run": () => answered({}),
+    });
+    nuxt.app.$router = { currentRoute: ref({ meta: { magicFill: true } }) };
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Title: About us";
+
+    await magic.extract();
+
+    const request = calls.find((call) => call.path === "/_mapo/ai/run");
+    const body = request?.options.body as { entity: Record<string, unknown> };
+    expect(body.entity).not.toHaveProperty("evidence");
   });
 });

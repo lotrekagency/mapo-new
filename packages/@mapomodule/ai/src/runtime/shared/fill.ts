@@ -8,8 +8,9 @@
  * What goes into the form by itself: a value a quote of the source
  * verifies, on a field that is empty. Anything else waits for the
  * operator: a value no quote proves, or one that would replace what the
- * form holds; a related record, which the form cannot take before someone
- * finds it; a value the gateway discarded, shown with its reason and never
+ * form holds; a related record that was not found with the AI's own name
+ * (`relations.ts` finds them), which the form cannot take before someone
+ * picks it; a value the gateway discarded, shown with its reason and never
  * written.
  */
 
@@ -25,6 +26,17 @@ import type {
   MapoAiUsage,
 } from "./gateway";
 import { isRecord } from "./guards";
+import {
+  hasFoundRelation,
+  isExactMatch,
+  isRelationRef,
+  isRelationResolved,
+  listMapoAiRelations,
+  mapoAiRelationFields,
+  relationValueOf,
+  resolveMapoAiRelations,
+} from "./relations";
+import type { MapoAiRelationLists, MapoAiRelationMatch } from "./relations";
 import type {
   AiAnswerWarning,
   AiCoordinates,
@@ -36,7 +48,6 @@ import type {
   AiItemOutcome,
   AiItemValue,
   AiQuote,
-  AiRelationRef,
   AiScalar,
   AiSingleValue,
   AiValue,
@@ -370,19 +381,6 @@ function isScalar(value: unknown): value is AiScalar {
   return isText || isNumber || isBoolean;
 }
 
-/** `{ id }`, `{ search, item? }` or `{ item }`: a related record, as the answer names it. */
-function isRelationRef(value: unknown): value is AiRelationRef {
-  if (!isRecord(value)) return false;
-  const keys = Object.keys(value);
-  const isOnly = (key: string) => keys.length === 1 && keys[0] === key;
-  if (isOnly("id")) return isScalar(value.id);
-  if (isOnly("item")) return typeof value.item === "string";
-  const isSearch = typeof value.search === "string";
-  const isItem = value.item === undefined || typeof value.item === "string";
-  const hasOthers = keys.some((key) => key !== "search" && key !== "item");
-  return isSearch && isItem && !hasOthers;
-}
-
 function isCoordinates(value: unknown): value is AiCoordinates {
   if (!isRecord(value)) return false;
   const { lat, lng } = value;
@@ -417,8 +415,9 @@ function isAiValue(value: unknown, depth: number): value is AiValue {
  * - `apply`: it goes in by itself: a value a quote verifies, on an empty field;
  * - `confirm`: it waits for the operator: no quote proves it, or it would
  *   replace the value the form holds;
- * - `manual`: the form cannot take it as it is: a related record, which
- *   someone has to find;
+ * - `manual`: the form cannot take it as it is: a related record not
+ *   found, which the operator picks, or a part of a field that converts
+ *   its value;
  * - `unchanged`: the form already holds it, the record's value or the
  *   operator's: there is nothing to write, and nothing to review;
  * - `discard`: it broke a rule of its field, and is never written;
@@ -456,6 +455,12 @@ export interface MapoAiFillEntry {
   shown: boolean;
   /** The outcome, as `run` answered it. */
   outcome: AiFieldOutcome;
+  /**
+   * For a value that names related records: what was found for each, by
+   * where the value names it. Without it, such a value is the operator's
+   * to set (`manual`).
+   */
+  relations?: MapoAiRelationMatch[];
 }
 
 /** The form an answer is applied to, as the plan reads it. */
@@ -498,12 +503,21 @@ export interface MapoAiFillForm {
  * A list of items on a field that holds some waits too, and never
  * `replaces`: its items would be added after the field's own.
  *
- * @param fields The `fields` of a fill result.
- * @param form   Where each field's value is, and what it holds now.
+ * A value that names related records takes them from `relations`: it goes
+ * in by itself only when each was found with the AI's own name; a record
+ * found under another name waits, and a value with no record found is the
+ * operator's to pick (`manual`). A list of records, as an `m2m` field's,
+ * joins the field's own as a list of items does, and never `replaces`.
+ *
+ * @param fields    The `fields` of a fill result.
+ * @param form      Where each field's value is, and what it holds now.
+ * @param relations What was found for the related records each key's value
+ *   names, as `resolveMapoAiRelations()` gives it.
  */
 export function planMapoAiFill(
   fields: AiFieldOutcomes,
   form: MapoAiFillForm,
+  relations: Readonly<Record<string, MapoAiRelationMatch[]>> = {},
 ): MapoAiFillEntry[] {
   const entries: MapoAiFillEntry[] = [];
   for (const [key, outcome] of Object.entries(fields)) {
@@ -514,22 +528,63 @@ export function planMapoAiFill(
     const holdsValue = [path, ...written].some(
       (at) => !isEmptyFormValue(form.read(at)),
     );
+    const matches = Object.hasOwn(relations, key) ? relations[key] : undefined;
+    const isNamed = holdsRelation(outcome);
+    const found = isNamed && matches ? matches : undefined;
+    const proposal = proposalOf(outcome, found);
     const isFilled = outcome.status === "filled";
     const isSame =
-      isFilled && holdsValue && form.holds?.(key, outcome.value) === true;
-    const replaces = isFilled && holdsValue && !isSame && !isItemList(outcome);
+      isFilled &&
+      holdsValue &&
+      proposal !== undefined &&
+      form.holds?.(key, proposal) === true;
+    const joins = isItemList(outcome) || isRecordList(outcome);
+    const replaces = isFilled && holdsValue && !isSame && !joins;
     const shown = form.isShown?.(key) ?? true;
     const takes = form.canTake?.(key) ?? true;
+    const action = actionOf(outcome, {
+      holdsValue,
+      shown,
+      takes,
+      isSame,
+      relations: isNamed ? (found ?? null) : undefined,
+    });
     entries.push({
       key,
       path,
-      action: actionOf(outcome, { holdsValue, shown, takes, isSame }),
+      action,
       replaces,
       shown,
       outcome,
+      ...(found ? { relations: found } : {}),
     });
   }
   return entries;
+}
+
+/**
+ * The value a field takes from an outcome: the AI's, or, for one that
+ * names related records, the records found in their place
+ * (`relationValueOf()`). `undefined` for nothing to write.
+ */
+export function proposalOf(
+  outcome: AiFieldOutcome,
+  relations: readonly MapoAiRelationMatch[] | undefined,
+): unknown {
+  if (outcome.status !== "filled") return undefined;
+  return relations ? relationValueOf(outcome.value, relations) : outcome.value;
+}
+
+/**
+ * A list of related records, as an `m2m` field holds: its records join
+ * the field's own, as a list's items do, and replace none.
+ */
+export function isRecordList(outcome: AiFieldOutcome): boolean {
+  if (outcome.status !== "filled" || !Array.isArray(outcome.value)) {
+    return false;
+  }
+  const values: readonly unknown[] = outcome.value;
+  return values.length > 0 && values.every(isRelationRef);
 }
 
 function actionOf(
@@ -539,16 +594,31 @@ function actionOf(
     shown: boolean;
     takes: boolean;
     isSame: boolean;
+    /**
+     * For a value that names related records: what was found, or `null`
+     * when nothing could look for them.
+     */
+    relations?: readonly MapoAiRelationMatch[] | null;
   },
 ): MapoAiFillAction {
   if (outcome.status === "empty") return "empty";
   if (outcome.status === "discarded") return "discard";
   // Nothing to write, nor to find: the field holds the value already.
   if (field.isSame) return "unchanged";
-  const isManual = holdsRelation(outcome) || !field.takes;
-  if (isManual) return "manual";
-  // Only into an empty field: a list's items are no exception.
-  const isDirect = outcome.verified && !field.holdsValue && field.shown;
+  if (!field.takes) return "manual";
+  const { relations } = field;
+  // Records nobody looked for are the operator's to find.
+  if (relations === null) return "manual";
+  const isResolved = relations ? isRelationResolved(relations) : true;
+  // A list's items go in with the records found, the others to pick once
+  // an item is in; a value with no record found has nothing to write.
+  const canWrite =
+    isResolved || isItemList(outcome) || hasFoundRelation(relations);
+  if (!canWrite) return "manual";
+  // Only into an empty field: a list's items are no exception. A record
+  // found under another name, or not found, waits.
+  const isDirect =
+    outcome.verified && !field.holdsValue && field.shown && isResolved;
   return isDirect ? "apply" : "confirm";
 }
 
@@ -594,19 +664,50 @@ function holdsData(own: unknown, given: unknown): boolean {
 
 /**
  * The items of a list that go in when nobody chose them one by one: the
- * verified ones the field does not hold yet, by their place in the list.
- * What a page ticks from the start, and what Apply on the list's mark adds.
+ * verified ones the field does not hold yet, by their place in the list,
+ * whose related records were all found with the AI's own names. What a
+ * page ticks from the start, and what Apply on the list's mark adds.
+ *
+ * @param relations What was found for the records the items name.
  */
 export function verifiedItemsToAdd(
   outcome: AiFieldOutcome,
   held: unknown,
+  relations?: readonly MapoAiRelationMatch[],
 ): number[] {
   if (outcome.status !== "filled" || !outcome.items) return [];
-  const values: readonly unknown[] = Array.isArray(outcome.value)
-    ? outcome.value
-    : [];
-  return outcome.items.flatMap((item, index) =>
-    item.verified && !isItemHeld(values[index], held) ? [index] : [],
+  const proposal = proposalOf(outcome, relations);
+  const values: readonly unknown[] = Array.isArray(proposal) ? proposal : [];
+  return outcome.items.flatMap((item, index) => {
+    const isReady = item.verified && isItemResolved(relations, index);
+    return isReady && !isItemHeld(values[index], held) ? [index] : [];
+  });
+}
+
+/**
+ * Every record an item of a list names was found with the AI's own name,
+ * or picked by the operator: the item goes in whole.
+ */
+export function isItemResolved(
+  relations: readonly MapoAiRelationMatch[] | undefined,
+  index: number,
+): boolean {
+  return itemRelations(relations, index).every(isExactMatch);
+}
+
+/**
+ * The matches of the records an item of a list names, each with its place
+ * in the item (`organisation` for `2.organisation` of the third item).
+ */
+export function itemRelations(
+  relations: readonly MapoAiRelationMatch[] | undefined,
+  index: number,
+): MapoAiRelationMatch[] {
+  const prefix = `${index}.`;
+  return (relations ?? []).flatMap((match) =>
+    match.at.startsWith(prefix)
+      ? [{ ...match, at: match.at.slice(prefix.length) }]
+      : [],
   );
 }
 
@@ -849,6 +950,12 @@ export interface MapoAiFillDependencies {
     body: unknown,
     options: { signal?: AbortSignal },
   ): Promise<unknown>;
+  /**
+   * Gets a path of the app's backend with the operator's session, as
+   * `post` does: the records of the form's relations are listed and
+   * searched with it. Without it, a related record is the operator's to set.
+   */
+  get?(path: string, options: { signal?: AbortSignal }): Promise<unknown>;
 }
 
 /** What the gateway answered to a fill request, and what becomes of each field. */
@@ -856,6 +963,8 @@ export interface MapoAiFillAnswer {
   response: MapoAiFillResponse;
   /** What becomes of each field of the answer; none when the model refused. */
   entries: MapoAiFillEntry[];
+  /** The records each relation listed for the AI to pick from, by path. */
+  lists: MapoAiRelationLists;
 }
 
 /** The server answered something that is no answer of `run` to a fill request. */
@@ -872,6 +981,12 @@ export class MapoAiFillAnswerError extends Error {
  * The form is read when the answer arrives, so a field the operator filled
  * while waiting counts as filled.
  *
+ * With `get`, the form's relations are looked up on the backend: before
+ * the call, the records of each one that has few, for the AI to pick from
+ * (`relationChoices`, besides those the page gives); after the answer, each
+ * name the AI wrote, searched in its endpoint. What was found goes with
+ * each entry (`relations`).
+ *
  * @throws The rejection of `post` (an error status, a network failure, an
  *   abort), or {@link MapoAiFillAnswerError} when the answer cannot be read.
  */
@@ -879,9 +994,14 @@ export async function runMapoAiFill<T>(
   input: MapoAiFillInput<T> & { form: MapoAiFillForm; signal?: AbortSignal },
   dependencies: MapoAiFillDependencies,
 ): Promise<MapoAiFillAnswer> {
-  const body = mapoAiFillRequest(input);
+  const { get } = dependencies;
+  const { signal } = input;
+  const relationFields = get ? mapoAiRelationFields(input.fields) : [];
+  const pageChoices = input.entity?.relationChoices;
+  const { entity, lists } = await withRelationLists(input, dependencies);
+  const body = mapoAiFillRequest({ ...input, entity });
   const answer = await dependencies.post(`${MAPO_AI_GATEWAY_PATH}/run`, body, {
-    signal: input.signal,
+    signal,
   });
   const response = readMapoAiFillResponse(answer);
   if (!response) {
@@ -889,11 +1009,63 @@ export async function runMapoAiFill<T>(
       "The server's answer is not an answer of run to a fill request",
     );
   }
-  const entries =
-    response.status === "answered"
-      ? planMapoAiFill(response.result.fields, input.form)
-      : [];
-  return { response, entries };
+  if (response.status !== "answered") return { response, entries: [], lists };
+  const { fields } = response.result;
+  const relations =
+    get && relationFields.length
+      ? await resolveMapoAiRelations(
+          fields,
+          relationFields,
+          lists,
+          { get },
+          {
+            signal,
+            ...(pageChoices ? { choices: pageChoices } : {}),
+          },
+        )
+      : {};
+  return {
+    response,
+    entries: planMapoAiFill(fields, input.form, relations),
+    lists,
+  };
+}
+
+/**
+ * The entity of a request with the records of the form's relations that
+ * are few enough to pick from, asked of the backend with `get`, besides
+ * those the page gives (`relationChoices`), and those records. Without
+ * `get`, the entity as it is.
+ */
+export async function withRelationLists<T>(
+  input: MapoAiFillInput<T> & { signal?: AbortSignal },
+  dependencies: Pick<MapoAiFillDependencies, "get">,
+): Promise<{
+  entity: MapoAiFillEntity | undefined;
+  lists: MapoAiRelationLists;
+}> {
+  const { get } = dependencies;
+  const relationFields = get ? mapoAiRelationFields(input.fields) : [];
+  const pageChoices = input.entity?.relationChoices;
+  const lists: MapoAiRelationLists =
+    get && relationFields.length
+      ? await listMapoAiRelations(
+          relationFields,
+          { get },
+          {
+            ...(input.signal ? { signal: input.signal } : {}),
+            skip: new Set(Object.keys(pageChoices ?? {})),
+          },
+        )
+      : { choices: {}, records: {} };
+  const hasLists = Object.keys(lists.choices).length > 0;
+  const entity: MapoAiFillEntity | undefined = hasLists
+    ? {
+        ...input.entity,
+        relationChoices: { ...lists.choices, ...pageChoices },
+      }
+    : input.entity;
+  return { entity, lists };
 }
 
 /**
