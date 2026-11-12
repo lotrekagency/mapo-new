@@ -1,3 +1,45 @@
+# mapomodule [2.0.0-experimental.1](https://github.com/lotrekagency/mapo-new/compare/mapomodule@1.0.0...mapomodule@2.0.0-experimental.1) (2026-11-12)
+
+- feat(release)!: prepare for first 2.0.0.beta release \ BREAKING CHANGE: this is a completely rewritten version of mapo ([d906c8d](https://github.com/lotrekagency/mapo-new/commit/d906c8da8675bef2505ead5f744fd72fbf5acab2))
+
+### Bug Fixes
+
+- **build:** add build.config.ts, fix core module exports, update articles demo and migration guide ([84641fc](https://github.com/lotrekagency/mapo-new/commit/84641fc7026d19a0549fc8e6bd56ec580a2f2142))
+- **lint,typecheck:** resolve ESLint and TypeScript errors across packages ([87f44a2](https://github.com/lotrekagency/mapo-new/commit/87f44a2f6621e56218d2babef302f7b845cd148c))
+- **mapomodule:** remove commented-out i18n module installation ([1880d0c](https://github.com/lotrekagency/mapo-new/commit/1880d0c3913aecd51e0b721ecfdda5355568eb7b))
+- **mapomodule:** resolve sub-modules via createResolver for pnpm strict mode ([c5a08bc](https://github.com/lotrekagency/mapo-new/commit/c5a08bcd70d74df2d0c2bf31369d5a45a51ed257))
+- **packages:** add prepare script to stub dist before postinstall ([4d10fee](https://github.com/lotrekagency/mapo-new/commit/4d10feeb918d9ea7f0c328bb2a200197739881cb))
+- **release:** build packages from semantic-release prepare, not prepack ([e7f4327](https://github.com/lotrekagency/mapo-new/commit/e7f4327027ac4b4f1f430dfc35fb4669a7703c13))
+- update package.json scripts to use prepack and switch dependencies to workspace ([c7d3abc](https://github.com/lotrekagency/mapo-new/commit/c7d3abc3eca338e50d1af8f93a4a59065a548a8b))
+
+### Features
+
+- **ai:** add the @mapomodule/ai package skeleton ([e5e4d5c](https://github.com/lotrekagency/mapo-new/commit/e5e4d5c4bceb9e7483314457d77adc9e6d1dd477))
+- **core:** type runtime config and forward only core options ([7249fd7](https://github.com/lotrekagency/mapo-new/commit/7249fd7383157aa22b551aef443f67cd8391ce14))
+- enhance form components with TypeScript improvements and formatting adjustments ([62b65dc](https://github.com/lotrekagency/mapo-new/commit/62b65dc43d9e89184119024e0f8df52093f04925))
+- **exports:** add ./types subpath to all packages and create mapomodule aggregator ([a59be8a](https://github.com/lotrekagency/mapo-new/commit/a59be8aebc13b785936e862c59080b6caad99271))
+- **form:** update README and package.json ([3a72f1c](https://github.com/lotrekagency/mapo-new/commit/3a72f1cfd664facda78721339a29781966ac63fc))
+- **mapomodule:** install the i18n module ([1bf5038](https://github.com/lotrekagency/mapo-new/commit/1bf5038f03fd67c0a6f605f6d82b72b31885f973))
+- **mcp:** add @mapomodule/mcp MCP server for AI assistants ([dd4a687](https://github.com/lotrekagency/mapo-new/commit/dd4a6872e94026d7c4b82a45a74908732be1af3d))
+- **module:** re-export utilities from @mapo/utils in index.ts ([6bd5ee8](https://github.com/lotrekagency/mapo-new/commit/6bd5ee834ae64fcf5e8bb9280a7d9f9ec00b89b3))
+- scaffold @mapo/\* packages and mapomodule workspace structure ([e59764a](https://github.com/lotrekagency/mapo-new/commit/e59764ac5c80e9af4f2ad718df31907fdf8c8a39))
+- **utils:** read a user's permissions from a backend payload ([a34e152](https://github.com/lotrekagency/mapo-new/commit/a34e15277f5cd34e8d2c0d2ce5e87720d8505a37))
+
+### BREAKING CHANGES
+
+- this is a completely rewritten version of mapo
+
+### Dependencies
+
+- **@mapomodule/ai:** upgraded to 1.0.0-experimental.1
+- **@mapomodule/core:** upgraded to 2.0.0-experimental.1
+- **@mapomodule/form:** upgraded to 2.0.0-experimental.1
+- **@mapomodule/i18n:** upgraded to 2.0.0-experimental.1
+- **@mapomodule/mcp:** upgraded to 1.0.0-experimental.1
+- **@mapomodule/store:** upgraded to 2.0.0-experimental.1
+- **@mapomodule/uikit:** upgraded to 2.0.0-experimental.1
+- **@mapomodule/utils:** upgraded to 2.0.0-experimental.1
+
 # mapomodule [2.0.0-beta.21](https://github.com/lotrekagency/mapo-new/compare/mapomodule@2.0.0-beta.20...mapomodule@2.0.0-beta.21) (2026-11-09)
 
 ### Dependencies
