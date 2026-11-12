@@ -39,8 +39,8 @@ const STOPS: Stop[] = [
     links: [{ label: "Article 1", to: "/articles/1" }],
   },
   {
-    title: "4. Files",
-    what: "Attach a file in the panel: Markdown, a web page, CSV, Excel, JSON, and a calendar event, which the app reads itself. The line Internal: of open-data.md never reaches the AI: the app's read hook takes it out.",
+    title: "4. Files and links",
+    what: "Attach a file in the panel: Markdown, a web page, CSV, Excel, JSON, and a calendar event, which the app reads itself. The line Internal: of open-data.md never reaches the AI: the app's read hook takes it out. Or give the link of a page under Web pages: in development the gateway may read this app's own, so http://localhost:3002/ai-files/open-data.html is read as the file is, under its title and address; the address of a private network, such as http://169.254.169.254/, is refused.",
     links: [
       { label: "A new article", to: "/articles/new" },
       { label: "A new event", to: "/events/new" },
@@ -185,7 +185,7 @@ async function copy(label: string, text: string) {
 
     <UCard :ui="{ body: 'space-y-2' }">
       <template #header>
-        <span class="font-medium">Files to attach</span>
+        <span class="font-medium">Files to attach, or to give as links</span>
       </template>
       <ul class="space-y-1 text-sm">
         <li v-for="one in FILES" :key="one.file">

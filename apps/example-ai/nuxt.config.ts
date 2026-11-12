@@ -15,6 +15,11 @@ const ollamaModels = modelsOf(process.env.EXAMPLE_OLLAMA_MODELS);
 // for the model, where an OpenAI-compatible server may cut it in silence.
 const compatibleModels = modelsOf(process.env.EXAMPLE_OPENAI_COMPATIBLE_MODELS);
 
+// Links are on, and the gateway refuses the server's own addresses: in
+// development it may read this app's own pages, as the tour's links to the
+// files of public/ai-files/ do.
+const isDevelopment = process.env.NODE_ENV !== "production";
+
 /** A list of models written as "a,b". */
 function modelsOf(list: string | undefined): string[] {
   return (list ?? "")
@@ -128,6 +133,7 @@ export default defineNuxtConfig({
       // The backend's users and groups, which the settings page searches
       // when an admin assigns a key (server/api/users, server/api/groups).
       settings: { usersApi: "/api/users/", groupsApi: "/api/groups/" },
+      ...(isDevelopment ? { web: { allow: ["localhost:3002"] } } : {}),
     },
   },
 });
