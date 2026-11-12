@@ -87,6 +87,11 @@ describe("matchRecipes", () => {
     ["give the AI a csv spreadsheet instead of pasted text", "ai-read-files"],
     ["replace the reader of html files in the AI gateway", "ai-readers"],
     ["turn off xlsx files for the AI", "ai-readers"],
+    ["let the operator give the AI the link of a web page", "ai-read-links"],
+    [
+      "read a url server side without ssrf to private networks",
+      "ai-read-links",
+    ],
     ["assign a different openai key to the editors group", "ai-keys"],
     ["let an operator use their own personal token for the AI", "ai-keys"],
     ["add a settings page for the AI to my backoffice", "ai-settings"],
@@ -112,6 +117,17 @@ describe("matchRecipes", () => {
     );
     expect(ids).toContain("media-manager");
     expect(ids.length).toBeGreaterThan(1);
+  });
+
+  it("keeps a question about linking records away from reading a web page", () => {
+    for (const query of [
+      "link an author to the article",
+      "link a record to another record",
+      "a field for a link",
+    ]) {
+      const ids = matchRecipes(query).map((recipe) => recipe.id);
+      expect(ids, query).not.toContain("ai-read-links");
+    }
   });
 
   it("stays silent when the query is unrelated", () => {

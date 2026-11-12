@@ -122,6 +122,8 @@ const MAPO_EXTENSIONS = [
   "xlsx",
 ];
 const MAPO_READER_IDS = ["text", "markdown", "json", "html", "csv", "xlsx"];
+/** The id that turns links off: no reader may take it. */
+const LINK_READER_ID = "link";
 
 /** The extension `ownFormat` names, lower case and without its dot. */
 function formatOf(answers: AiSetupAnswers): string | undefined {
@@ -136,10 +138,12 @@ function isDraftable(format: string): boolean {
 
 /**
  * The id of the app's reader: its extension, unless the extension does not
- * start with a letter, as an id must, or is the id of one of Mapo's readers.
+ * start with a letter, as an id must, or is the id of one of Mapo's readers,
+ * or `link`, which turns links off.
  */
 function readerIdOf(format: string): string {
-  const isId = /^[a-z]/.test(format) && !MAPO_READER_IDS.includes(format);
+  const isTaken = MAPO_READER_IDS.includes(format) || format === LINK_READER_ID;
+  const isId = /^[a-z]/.test(format) && !isTaken;
   return isId ? format : `format-${format}`;
 }
 
