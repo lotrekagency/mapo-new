@@ -46,10 +46,11 @@ The panel slides in from the right, and closing it neither stops nor loses a cal
 
 - **Text**: what the operator pastes, with a count of the characters against `maxSourceChars`.
 - **Files**: each one is read through [`read`](/modules/ai#read-a-file) as it is attached, and its text joins the source after the pasted text. The formats and the largest file come from `status`; a file larger than `maxFileBytes` is refused before it is sent.
+- **Web pages**, where the app reads links (`status.links`): the operator writes the address of a page and presses Read, or Enter. The gateway fetches the page as a visitor would, without the operator's session, through [`read/link`](/modules/ai#read-a-web-page), and its text joins the source after the files', under the page's title and address. The list says, for each link, the characters read, or why there are none: refused (an address of a private network, a port or a site the app keeps out), not reached, the site's error, too large, too many pages in a minute. A text that is no address of the web is refused before it is sent, and a link given already is not read twice.
 - **Instructions for this extraction**, closed by default: what the operator wants, such as "only the first event", below the app's and the admins' rules. Hidden when `maxInstructionsChars` is `0`.
 - **What I send to the AI**, closed by default: what a call would send now, as the gateway composes it ([Preview a call](/modules/ai#preview-a-call)): the model, the rules and instructions the model reads, the operator's instructions, the source by part and length, the fields the AI may fill and those kept away from it, with why. Never a key. It is composed when it opens with nothing current to show; when the panel changes after, it says so, and Compose again composes it anew, so typing spends nothing.
 - **The provider and the model**: those the user may call, from their default; a select when there are several. It says where what is sent goes.
-- **Extract**, off while a file is read, the source is empty or longer than the limits, or the record is busy, and the panel says why.
+- **Extract**, off while a file or a page is read, the source is empty or longer than the limits, or the record is busy, and the panel says why.
 
 Extract reads the record's description first (the detail's `OPTIONS`), then asks the model; the panel closes when the answer arrives. The banner shows the time it takes, and after twenty seconds says that a model can take minutes. Cancel closes the request, and the gateway stops the provider's call. Errors and refusals show in the banner, and an error in the panel too, which stays open.
 
@@ -130,6 +131,8 @@ const fields: FieldDescriptor<Article>[] = [
 | A page         | `definePageMeta({ magicFill: false })`                                 |
 | A `MapoDetail` | The `extensions` prop, listing the keys it shows: not Magic Fill's two |
 
+Links have a switch of their own: `readers: { link: false }` in `mapo.ai`, or `NUXT_MAPO_AI_READERS_LINK=false` in the server's environment, and the panel shows no field for them ([Turn links off](/modules/ai#turn-links-off)).
+
 The two parts are [detail extensions](/uikit/detail#how-to-add-an-action-to-every-detail-page) that a plugin the module adds to the app registers: the button, `mapo-ai-magic-fill` in `actions`, and the banner, `mapo-ai-magic-fill-summary` in `body-top`. A page that registers an AI panel of its own, as the pages of the reference app's AI lab do, lists its own key in `extensions`, or the detail shows both.
 
 ### Ask for no quotes
@@ -166,8 +169,9 @@ When the gateway refuses because of a key or a model, Magic Fill asks again what
 
 ## 6. Limits
 
-- **The source**: `maxSourceChars` characters (100,000 by default), the text and the files together; `maxInstructionsChars` for the instructions (2,000); `maxFileBytes` per file (10 MB). The formats are text, Markdown, JSON, HTML, CSV and XLSX; PDF and images are not read yet. → [Limits](/modules/ai#limits)
-- **The calls**: `perUserPerMinute` per user (20).
+- **The source**: `maxSourceChars` characters (100,000 by default), the text, the files and the pages together; `maxInstructionsChars` for the instructions (2,000); `maxFileBytes` per file or page (10 MB). The formats are text, Markdown, JSON, HTML, CSV and XLSX; PDF and images are not read yet. → [Limits](/modules/ai#limits)
+- **The calls**: `perUserPerMinute` per user (20); `linksPerUserPerMinute` pages read from links (20).
+- **Web pages**: the gateway reads what a page's server sends, so a page a script writes in the browser gives its structured data or nothing, and a page behind a sign-in what it shows a stranger. → [What a page cannot give](/modules/ai#what-a-page-cannot-give)
 - **Related records**: a relation goes to the AI as a list up to 50 records; an answer searches 25 names at most, four at a time.
 - **Time**: a large form makes a long answer, and a model on the app's own servers can take minutes. The banner says so, and Cancel stops the call.
 - **What the AI cannot know**: what the source does not say. A value no quote proves always waits for the operator.

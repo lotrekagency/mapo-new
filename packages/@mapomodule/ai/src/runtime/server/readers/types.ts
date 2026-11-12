@@ -17,6 +17,11 @@ export interface MapoAiReadFile {
   readonly type: string;
   /** Its content. */
   readonly bytes: Uint8Array;
+  /**
+   * For a page read from a link (`read/link`): its address, after its
+   * redirects. Its name is then its host and path.
+   */
+  readonly url?: string;
 }
 
 /** A reader of files: Mapo's, or the app's. */
@@ -65,6 +70,8 @@ export interface MapoAiReadContext {
     readonly type: string;
     /** Its size in bytes. */
     readonly size: number;
+    /** For a page read from a link: its address, after its redirects. */
+    readonly url?: string;
   };
   /** The id of the reader that read it. */
   readonly reader: string;

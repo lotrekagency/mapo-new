@@ -23,6 +23,8 @@ export type {
   MapoAiKeysAnswer,
   MapoAiKeyStatus,
   MapoAiLimits,
+  MapoAiLinkBlock,
+  MapoAiLinkFailure,
   MapoAiPreference,
   MapoAiAction,
   MapoAiActionKind,
@@ -36,6 +38,8 @@ export type {
   MapoAiProviderSettingsInput,
   MapoAiProviderStatus,
   MapoAiReaderStatus,
+  MapoAiReadLinkRequest,
+  MapoAiReadLinkResponse,
   MapoAiReadResponse,
   MapoAiRefusalReason,
   MapoAiRunEntity,
@@ -82,6 +86,12 @@ export type {
   MapoAiReader,
   MapoAiReadFile,
 } from "./runtime/server/readers/types";
+export type {
+  MapoAiFetchedPage,
+  MapoAiFetcher,
+  MapoAiFetchRequest,
+  MapoAiFetchResult,
+} from "./runtime/server/links/types";
 export type { MapoAiPrompt } from "./runtime/server/prompts/compose";
 export type {
   MapoAiPromptContext,
@@ -282,20 +292,47 @@ export interface MapoAiOptions {
   /**
    * The readers `read` reads files with, by id, each `true` or `false`:
    * Mapo's (`text`, `markdown`, `json`, `html`, `csv`, `xlsx`) and those the
-   * app registers with `registerMapoAiReader()`. Every reader is on unless
-   * turned off here, or in the environment (`NUXT_MAPO_AI_READERS_XLSX=false`
-   * for one of Mapo's). A file of a format that is off is `unsupported`.
-   * @default {} (every reader on)
-   * @example { xlsx: false }
+   * app registers with `registerMapoAiReader()`; and `link`, the pages of
+   * links `read/link` fetches. Every reader is on unless turned off here,
+   * or in the environment (`NUXT_MAPO_AI_READERS_XLSX=false`,
+   * `NUXT_MAPO_AI_READERS_LINK=false`). A file of a format that is off is
+   * `unsupported`; with `link` off, `read/link` answers `off`.
+   * @default {} (every reader on, links included)
+   * @example { xlsx: false, link: false }
    */
   readers?: Record<string, boolean>;
   /**
-   * The limits of `run` and `read`: the calls one user may make in a minute
-   * (counted in the memory of each server process), the characters of a
-   * source (`read` reads no file into more), those of the operator's own
-   * instructions (`0` lets operators send none), and the bytes of a file
-   * `read` takes (`0` takes none).
-   * @default { perUserPerMinute: 20, maxSourceChars: 100000, maxInstructionsChars: 2000, maxFileBytes: 10485760 }
+   * How `read/link` fetches the page of a link. It refuses, before any
+   * connection, an address that is not `http:` or `https:`, one with a
+   * user or a password, a port other than 80 and 443, and a host of
+   * `deny`; and, when the connection opens, a host that leads to the
+   * server itself, a private network, the cloud's metadata or a reserved
+   * address. `allow` opens hosts the guard would refuse, such as an
+   * intranet's or the app's own in development: `"localhost:3000"` opens
+   * that port too, `"*.intranet.example"` the subdomains. `deny` keeps
+   * hosts out, and wins over `allow`; `"*"` keeps out every host. A host
+   * of `allow` that cannot be read is left out, and a `deny` that cannot
+   * be read keeps out every host. `userAgent` is what the requests name as
+   * their client, `timeout` the seconds a page may take, its redirects
+   * included (up to 120).
+   * @default { allow: [], deny: [], userAgent: "Mozilla/5.0 (compatible; MapoAI/1.0)", timeout: 20 }
+   * @example { allow: ["wiki.intranet.example"], deny: ["api.example.org"] }
+   */
+  web?: {
+    allow?: string[];
+    deny?: string[];
+    userAgent?: string;
+    timeout?: number;
+  };
+  /**
+   * The limits of `run`, `read` and `read/link`: the calls one user may
+   * make to `run` in a minute (counted in the memory of each server
+   * process), the characters of a source (`read` reads no file or page
+   * into more), those of the operator's own instructions (`0` lets
+   * operators send none), the bytes of a file `read` takes and of a page
+   * `read/link` fetches (`0` takes none), and the pages one user may read
+   * from their links in a minute (`0` reads none).
+   * @default { perUserPerMinute: 20, maxSourceChars: 100000, maxInstructionsChars: 2000, maxFileBytes: 10485760, linksPerUserPerMinute: 20 }
    */
   limits?: Partial<MapoAiLimits>;
   /**

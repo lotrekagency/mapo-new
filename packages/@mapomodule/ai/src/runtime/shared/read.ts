@@ -1,11 +1,18 @@
 /**
- * The browser's half of `read`: a file sent to the gateway as a form, and
- * the answer read as outside data. Pure: the call to the server is passed
- * in.
+ * The browser's half of `read` and `read/link`: a file sent to the gateway
+ * as a form, a link as JSON, and the answers read as outside data. Pure:
+ * the call to the server is passed in.
  */
 
 import { MAPO_AI_GATEWAY_PATH } from "./gateway";
-import type { MapoAiReadResponse, MapoAiSourcePart } from "./gateway";
+import type {
+  MapoAiLinkBlock,
+  MapoAiLinkFailure,
+  MapoAiReadLinkRequest,
+  MapoAiReadLinkResponse,
+  MapoAiReadResponse,
+  MapoAiSourcePart,
+} from "./gateway";
 import { isRecord } from "./guards";
 
 /** What {@link readMapoAiFile} needs from the app. */
@@ -96,4 +103,116 @@ export function readMapoAiReadResponse(
     return [{ kind: "text", text: String(part.text), ...name }];
   });
   return parts.length ? { status: "read", reader, parts } : undefined;
+}
+
+// ─── read/link ───────────────────────────────────────────────────────────────
+
+const BLOCKS = new Set<string>([
+  "scheme",
+  "credentials",
+  "port",
+  "address",
+  "denied",
+]);
+const FAILURES = new Set<string>([
+  "dns",
+  "connection",
+  "tls",
+  "timeout",
+  "redirects",
+]);
+
+/** What {@link readMapoAiLink} needs from the app. */
+export interface MapoAiReadLinkDependencies {
+  /**
+   * Posts a body to a path of the app's server as JSON and resolves with
+   * the answer read as JSON, rejecting on an error status: `$mapoFetch` in
+   * a Mapo app.
+   */
+  post(
+    path: string,
+    body: MapoAiReadLinkRequest,
+    options: { signal?: AbortSignal },
+  ): Promise<unknown>;
+}
+
+/**
+ * Whether a text is a link the gateway may read: an address of the web,
+ * `http:` or `https:`. The gateway checks it again, with its own rules.
+ */
+export function isMapoAiLink(text: string): boolean {
+  try {
+    const url = new URL(text.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sends a link to the gateway, which fetches its page and reads it into
+ * the parts of a source, as `run` takes them; the answer says why there
+ * are none when there are none.
+ * @throws The rejection of `post` (an error status: 429 past the user's
+ *   limit of links, 400, 401, 403; a network failure; an abort), or
+ *   {@link MapoAiReadAnswerError} when the answer cannot be read.
+ */
+export async function readMapoAiLink(
+  url: string,
+  dependencies: MapoAiReadLinkDependencies,
+  options: { signal?: AbortSignal } = {},
+): Promise<MapoAiReadLinkResponse> {
+  const answer = await dependencies.post(
+    `${MAPO_AI_GATEWAY_PATH}/read/link`,
+    { url },
+    { signal: options.signal },
+  );
+  const response = readMapoAiReadLinkResponse(answer);
+  if (!response) {
+    throw new MapoAiReadAnswerError(
+      "The server's answer is not an answer of read/link",
+    );
+  }
+  return response;
+}
+
+/** The answer of `read/link`, read as outside data; `undefined` when it is none. */
+export function readMapoAiReadLinkResponse(
+  value: unknown,
+): MapoAiReadLinkResponse | undefined {
+  const answer = isRecord(value) ? value : {};
+  const { status, reason } = answer;
+  if (status === "off") return { status: "off" };
+  if (status === "blocked") {
+    return isBlock(reason) ? { status, reason } : undefined;
+  }
+  if (status === "unreachable") {
+    return isFailure(reason) ? { status, reason } : undefined;
+  }
+  if (status === "http-error") {
+    const code = answer.httpStatus;
+    const isCode =
+      typeof code === "number" &&
+      Number.isInteger(code) &&
+      code >= 100 &&
+      code <= 599;
+    return isCode ? { status, httpStatus: code } : undefined;
+  }
+  if (status === "too-large") {
+    const max = answer.maxBytes;
+    const isCount = Number.isInteger(max) && Number(max) >= 0;
+    return isCount ? { status, maxBytes: Number(max) } : undefined;
+  }
+  const read = readMapoAiReadResponse(value);
+  if (read?.status !== "read") return read;
+  const url = typeof answer.url === "string" ? answer.url : "";
+  return isMapoAiLink(url) ? { ...read, url } : undefined;
+}
+
+function isBlock(value: unknown): value is MapoAiLinkBlock {
+  return typeof value === "string" && BLOCKS.has(value);
+}
+
+function isFailure(value: unknown): value is MapoAiLinkFailure {
+  return typeof value === "string" && FAILURES.has(value);
 }

@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useMapoAiRead } from "../runtime/composables/useMapoAiRead";
 import {
+  isMapoAiLink,
   MapoAiReadAnswerError,
   readMapoAiFile,
+  readMapoAiLink,
+  readMapoAiReadLinkResponse,
   readMapoAiReadResponse,
 } from "../runtime/shared/read";
 
@@ -110,7 +113,93 @@ describe("readMapoAiFile", () => {
   });
 });
 
+describe("readMapoAiReadLinkResponse", () => {
+  it("reads every answer of read/link", () => {
+    const answers: unknown[] = [
+      { status: "off" },
+      { status: "blocked", reason: "address" },
+      { status: "unreachable", reason: "timeout" },
+      { status: "http-error", httpStatus: 404 },
+      { status: "too-large", maxBytes: 1024 },
+      { status: "unsupported" },
+      { status: "too-long", reader: "html", chars: 120_000 },
+      {
+        status: "read",
+        reader: "html",
+        url: "https://museo.example/notte",
+        parts: [{ kind: "text", text: "Notte", name: "museo.example/notte" }],
+      },
+    ];
+
+    expect(answers.map(readMapoAiReadLinkResponse)).toEqual(answers);
+  });
+
+  it("reads what is no answer as none", () => {
+    const answers: unknown[] = [
+      null,
+      { status: "blocked", reason: "because" },
+      { status: "unreachable" },
+      { status: "http-error", httpStatus: 4040 },
+      { status: "too-large" },
+      {
+        status: "read",
+        reader: "html",
+        url: "javascript:x",
+        parts: [{ kind: "text", text: "a" }],
+      },
+      { status: "read", reader: "html", parts: [{ kind: "text", text: "a" }] },
+    ];
+
+    expect(answers.map(readMapoAiReadLinkResponse)).toEqual(
+      answers.map(() => undefined),
+    );
+  });
+
+  it("tells a link of the web from any other text", () => {
+    expect(isMapoAiLink(" https://museo.example/a?b=1 ")).toBe(true);
+    expect(isMapoAiLink("http://localhost:3000/")).toBe(true);
+    expect(isMapoAiLink("museo.example/a")).toBe(false);
+    expect(isMapoAiLink("ftp://museo.example/")).toBe(false);
+    expect(isMapoAiLink("javascript:alert(1)")).toBe(false);
+  });
+});
+
+describe("readMapoAiLink", () => {
+  it("sends the link as JSON to read/link, and refuses an answer it cannot read", async () => {
+    const post = vi.fn(async () => ({ status: "off" }));
+
+    expect(await readMapoAiLink("https://museo.example/", { post })).toEqual({
+      status: "off",
+    });
+    expect(post).toHaveBeenCalledWith(
+      "/_mapo/ai/read/link",
+      { url: "https://museo.example/" },
+      { signal: undefined },
+    );
+    await expect(
+      readMapoAiLink("https://museo.example/", { post: async () => ({}) }),
+    ).rejects.toBeInstanceOf(MapoAiReadAnswerError);
+  });
+});
+
 describe("useMapoAiRead", () => {
+  it("reads the page of a link through the app's $mapoFetch", async () => {
+    const mapoFetch = vi.fn(async () => ({
+      status: "blocked",
+      reason: "address",
+    }));
+    nuxt.app = { $mapoFetch: mapoFetch };
+
+    const response = await useMapoAiRead().readLink("http://10.0.0.1/");
+
+    expect(response).toEqual({ status: "blocked", reason: "address" });
+    expect(mapoFetch).toHaveBeenCalledWith("/_mapo/ai/read/link", {
+      method: "POST",
+      body: { url: "http://10.0.0.1/" },
+      signal: undefined,
+    });
+  });
+
   it("reads a file through the app's $mapoFetch", async () => {
     const mapoFetch = vi.fn(async () => ({ status: "unsupported" }));
     nuxt.app = { $mapoFetch: mapoFetch };

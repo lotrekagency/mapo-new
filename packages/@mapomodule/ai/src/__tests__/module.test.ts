@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isRecord } from "../runtime/shared/guards";
 import { DEFAULT_VERIFICATION_RULES } from "../runtime/shared/sanitize";
 
-/** Mapo's readers, each on, as the module writes them when the app turns none off. */
+/** Mapo's readers and links, each on, as the module writes them when the app turns none off. */
 const READERS_ON = {
   text: true,
   markdown: true,
@@ -10,6 +10,7 @@ const READERS_ON = {
   html: true,
   csv: true,
   xlsx: true,
+  link: true,
 };
 
 /** The options of `run` and `read` the module writes when the app sets none of them. */
@@ -20,11 +21,18 @@ const RUN_DEFAULTS = {
   secretWords: [],
   verification: { ...DEFAULT_VERIFICATION_RULES },
   readers: READERS_ON,
+  web: {
+    allow: [],
+    deny: [],
+    userAgent: "Mozilla/5.0 (compatible; MapoAI/1.0)",
+    timeout: 20,
+  },
   limits: {
     perUserPerMinute: 20,
     maxSourceChars: 100_000,
     maxInstructionsChars: 2_000,
     maxFileBytes: 10 * 1024 * 1024,
+    linksPerUserPerMinute: 20,
   },
   audit: { retentionDays: 90 },
   prices: { currency: "USD", providers: {} },
@@ -288,6 +296,11 @@ describe("the module", () => {
         handler: "resolved:./runtime/server/routes/read.post",
       },
       {
+        route: "/_mapo/ai/read/link",
+        method: "post",
+        handler: "resolved:./runtime/server/routes/read-link.post",
+      },
+      {
         route: "/_mapo/ai/run",
         method: "post",
         handler: "resolved:./runtime/server/routes/run.post",
@@ -389,6 +402,10 @@ describe("the module", () => {
       {
         name: "registerMapoAiReader",
         from: "resolved:./runtime/server/readers/registry",
+      },
+      {
+        name: "registerMapoAiFetcher",
+        from: "resolved:./runtime/server/links/registry",
       },
     ]);
   });
@@ -545,6 +562,7 @@ describe("the options of run", () => {
         maxSourceChars: 100_000,
         maxInstructionsChars: 2_000,
         maxFileBytes: 10 * 1024 * 1024,
+        linksPerUserPerMinute: 20,
       },
       audit: { retentionDays: 30 },
     });

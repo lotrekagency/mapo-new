@@ -65,10 +65,12 @@ const STATUS = {
     maxSourceChars: 100,
     maxInstructionsChars: 20,
     maxFileBytes: 1000,
+    linksPerUserPerMinute: 20,
   },
   readers: [
     { id: "text", label: "Text", extensions: ["txt"], types: ["text/plain"] },
   ],
+  links: true,
 };
 
 function text(value: string, name?: string): MapoAiSourcePart {
@@ -78,6 +80,18 @@ function text(value: string, name?: string): MapoAiSourcePart {
 describe("readMapoAiStatus", () => {
   it("reads what status answers", () => {
     expect(readMapoAiStatus(STATUS)).toEqual(STATUS);
+  });
+
+  it("reads links on only when status says so, and no links from a gateway whose limits do not name them", () => {
+    const { linksPerUserPerMinute: _, ...olderLimits } = STATUS.limits;
+    const older = readMapoAiStatus({
+      ...STATUS,
+      links: "yes",
+      limits: olderLimits,
+    });
+
+    expect(older?.links).toBeUndefined();
+    expect(older?.limits?.linksPerUserPerMinute).toBe(0);
   });
 
   it("reads the storage an admin is told about", () => {

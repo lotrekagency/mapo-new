@@ -21,6 +21,12 @@ const MAPO_READERS: readonly MapoAiReader[] = [
   xlsxReader,
 ];
 
+/**
+ * The id `mapo.ai.readers` turns links off with: no reader of the registry
+ * has it, since a link is read by the reader of its page's format.
+ */
+export const MAPO_AI_LINK_READER = "link";
+
 /** The ids of Mapo's readers: `text`, `markdown`, `json`, `html`, `csv`, `xlsx`. */
 export const MAPO_AI_READER_IDS: readonly string[] = MAPO_READERS.map(
   (reader) => reader.id,
@@ -54,15 +60,21 @@ const registered = new Map<string, MapoAiReader>();
  *     read: (file) => [{ kind: "text", text: eventText(file.bytes), name: file.name }],
  *   });
  * });
- * @throws TypeError when the id is not a reader's, `read` is missing, or it
- *   lists no extension and no media type, or one that is none; Error when
- *   the id is registered already
+ * @throws TypeError when the id is not a reader's, or is `link`, which
+ *   turns links off; when `read` is missing, or it lists no extension and
+ *   no media type, or one that is none; Error when the id is registered
+ *   already
  */
 export function registerMapoAiReader(reader: MapoAiReader): void {
   const id: unknown = reader?.id;
   if (typeof id !== "string" || !READER_ID.test(id)) {
     throw new TypeError(
       `A reader's id is lowercase letters, digits and "-", starting with a letter: ${JSON.stringify(id)}`,
+    );
+  }
+  if (id === MAPO_AI_LINK_READER) {
+    throw new TypeError(
+      `"${MAPO_AI_LINK_READER}" is the id that turns links off, not a reader's: a link is read by the reader of its page's format`,
     );
   }
   if (typeof reader.read !== "function") {

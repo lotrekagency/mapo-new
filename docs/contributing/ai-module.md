@@ -11,7 +11,7 @@ The module is meant to help an operator enter data with a language model, in two
 
 In both, the model only proposes: the operator reviews every value before anything is saved, and the gateway never writes to the backend.
 
-Magic Fill is complete; Import AI is not started. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read`: Magic Fill is built on them, with its panel, banner and preview on every detail page, and the AI settings page calls the routes of the keys. Under them is the shared core both features run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
+Magic Fill is complete; Import AI is not started. The package installs the gateway, behind the backend session: `status`; `read`, which reads a file into text with Mapo's readers or the app's, and `read/link`, which fetches the page of a link and reads it the same way; `run`, which builds what the AI is asked from a record's descriptions, calls a provider (the `mock`, a model in OpenAI's or Anthropic's cloud through `openai` or `anthropic`, a model on the app's own servers through `ollama` or `openai-compatible`, or one the app registers) and answers the outcome of each field, with an audit of every call in an encrypted storage on the server; and the routes of the keys, where the AI's admins assign provider keys and models and each user may save a token of their own, so that each call uses the key nearest its user. In the browser, `useMapoAiFill()` fills a detail form through `run` and `useMapoAiRead()` sends a file to `read` and a link to `read/link`: Magic Fill is built on them, with its panel, banner and preview on every detail page, and the AI settings page calls the routes of the keys. Under them is the shared core both features run on: what the AI may fill in a record, what it is asked, and how its answer is checked. The core is pure TypeScript; the types of its results are public, since `run` answers them.
 
 What comes next, in order, is in [Next and nice to have](#next-and-nice-to-have): readers for PDFs and images, then the import of several records.
 
@@ -50,10 +50,11 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/server/run/`         | The `run` route's request, contract, options, policy, limit, audit and operation                                             |
 | `src/runtime/server/providers/`   | The provider interface, the registry, the mock and the providers for cloud and local models                                  |
 | `src/runtime/server/readers/`     | The readers of files, their registry, and the `read` route's request and operation                                           |
+| `src/runtime/server/links/`       | The pages of links: the rules, Mapo's fetcher on Node with the guard of the network, the app's fetcher, the operation        |
 | `src/runtime/server/keys/`        | The chain of keys, the admins' assignments in one sealed record, the users' own tokens, the key routes' wiring               |
 | `src/runtime/server/settings/`    | The settings page's server: the preference, the check of a connection, the admins' settings                                  |
 | `src/runtime/server/usage/`       | The usage and the changes, read from the audit and summed when read; their costs                                             |
-| `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read` and the routes of the keys                                            |
+| `src/runtime/server/body.ts`      | A request's body read up to a bound, for `run`, `read`, `read/link` and the routes of the keys                               |
 | `src/runtime/server/prompts/`     | Mapo's base rules and the prompt in layers                                                                                   |
 | `src/runtime/server/storage/`     | The sealed storage of the gateway's state                                                                                    |
 | `src/runtime/server/plugins/`     | When the server starts: the storage's checks and sweeps, the providers `run` will not call                                   |
@@ -66,7 +67,7 @@ A filled value is either **verified** or **to check**, and the difference matter
 | `src/runtime/shared/patterns.ts`  | The bound on a pattern's work, before the sanitizer runs it                                                                  |
 | `src/runtime/shared/gateway.ts`   | The gateway's response types and the contract version                                                                        |
 | `src/runtime/shared/fill.ts`      | The browser's half of `run`: the request, the answer read, what goes into the form                                           |
-| `src/runtime/shared/read.ts`      | The browser's half of `read`: the file sent as a form, the answer read                                                       |
+| `src/runtime/shared/read.ts`      | The browser's half of `read` and `read/link`: the file sent as a form, the link as JSON, the answers read                    |
 | `src/runtime/shared/settings.ts`  | The settings page's reading of the backend's users and groups, as DRF lists them                                             |
 | `src/runtime/composables/`        | `useMapoAiFill()`: an answer applied to a detail form, with marks, undo and errors; `useMapoAiRead()`: a file sent to `read` |
 | `src/runtime/components/`         | `MapoAiSettings` and its parts, with Nuxt UI; `settingsClient.ts` in `composables/` is their client                          |
@@ -589,6 +590,55 @@ The app's readers come before Mapo's, in the order the app registers them, and a
 - **The hook is no boundary**: a text the page sends to `run` itself never goes through it, so an app that must keep something away from every provider needs a check where `run` reads its source.
 - **No limit of calls on `read`**: it calls no AI, but a large workbook costs the server memory and time.
 
+## Reading links
+
+`POST /_mapo/ai/read/link` fetches the page of a link and reads it as `read` reads a file: a link is not a format, but another way to the readers. The page goes to the reader of its media type, or of its path's extension, so the HTML reader reads a web page, and a link to a CSV or a workbook is read as the file would be.
+
+| File                                          | Role                                                                                                                     |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `src/runtime/server/links/types.ts`           | `MapoAiFetcher`: what a fetcher gets and answers                                                                         |
+| `src/runtime/server/links/rules.ts`           | What an address may be before any connection, the hosts of `allow` and `deny`, a page's name; pure                       |
+| `src/runtime/server/links/node.ts`            | Mapo's fetcher, on Node: the addresses no page of the web has, the lookup the connection uses, the redirects, the bounds |
+| `src/runtime/server/links/registry.ts`        | `registerMapoAiFetcher()`                                                                                                |
+| `src/runtime/server/links/link.ts`            | The operation: the rules, the count, the fetch, what a fetcher answers read as outside data, then `read`'s operation     |
+| `src/runtime/server/links/nitro.ts`           | The wiring: the options, the limit per user, the fetcher, `read`'s readers and hooks                                     |
+| `src/runtime/server/routes/read-link.post.ts` | The route: the session, the body, `Retry-After` past the limit                                                           |
+
+### Why the gateway fetches the page
+
+A page of the app cannot fetch another site's page: the browser's rules on other origins stop it. The gateway can, from the app's server, and that is why it needs a guard: `read/link` is the first route that calls an address a user chooses. Mapo's providers call only the addresses the app writes (`baseURL`), never one from a request; a link comes from a request by definition.
+
+### The guard
+
+Who can make a server fetch an address gets the server's view of the network: the server itself (Ollama on `localhost:11434`), its private network, the backend from inside, a cloud's metadata at `169.254.169.254`, which hands out the server's credentials. `read/link` answers the page's text, so a fetch the gateway does not refuse is a read (server-side request forgery). The guard, in order:
+
+1. **The rules** (`rules.ts`, pure): `http:` or `https:` only, no user or password, the web's ports unless `allow` opens one for its host, and `deny`, which wins. The address is read with `new URL()`, as a browser reads it, so `http://2130706433/` and `http://0x7f.1/` are `127.0.0.1` before any check.
+2. **An address written in the link** is checked before any connection (`addressRefusal()`): Node looks up nothing for it.
+3. **A name** is asked of DNS through c-ares (`Resolver` of `node:dns/promises`, a timeout of 3 seconds, two tries), not `dns.lookup()`, which takes one of libuv's four threads for each name: names that answer slowly, sent on purpose, would stall the files, the crypto and the unzipping of the whole server. c-ares reads no hosts file, so a name only `/etc/hosts` knows is not found unless `allow` opens it. It is checked by the `lookup` of the connection itself (`guardedLookup()`). Node calls it to open the socket, so the addresses it checks are those the socket connects to, and a DNS that answers a public address to a first lookup and a private one to the next (DNS rebinding) cannot pass. A name with one special address among others is refused whole: Node tries the addresses in turn ("happy eyeballs"), and any of them may be the one connected to.
+4. **Every redirect** goes through 1 to 3 again, followed by hand, five at most, never by the HTTP client. A host `allow` opens is left to the app only for the operator's link and for a redirect that stays on it (`isHopOpened()`): a public page that redirects to `localhost:3000`, or to an intranet's host, is checked as any address is. Hosts compare without the final dot of a fully qualified name, so `evil.example.` is the `evil.example` of `deny`.
+5. **The request** carries no cookie, no `Authorization` and no `Referer`, on a connection of its own (`agent: false`): nothing of the operator's, or of another request, travels with it.
+6. **The size and the time**: a `content-length` above `maxFileBytes` is refused before the body; the body is counted as it comes; gzip, deflate and Brotli unzip with `maxOutputLength`, so a zip bomb stops at the bound; one `AbortSignal.timeout()` covers the whole read, redirects included.
+
+The ranges are those of IANA's registries of special-purpose addresses, IPv4's and IPv6's (SIIT's `::ffff:0:0:0/96` included), in a `net.BlockList`, which also reads an IPv4 address written as IPv6 (`::ffff:127.0.0.1`) as itself. NAT64's well-known prefix (`64:ff9b::/96`) is read as the IPv4 address it carries: refused whole, it would cut a server on an IPv6-only network off from every IPv4 site; let through whole, it would reach `127.0.0.1` through a NAT64 gateway.
+
+### Mapo's fetcher, on Node
+
+Node's `http` and `https` take a `lookup`; the standard `fetch` does not (Node's undici takes a dispatcher instead, from a package Mapo does not depend on). So Mapo's fetcher uses Node, with no dependency, and `nitro.ts` imports it only when a page is read: a server that reads no link never loads it, and one without Node's modules fails then, with `unreachable` and the reason in the log, not when it starts. An app on such a runtime, or behind a proxy, registers a fetcher of its own: it replaces the half of the guard that needs the network, while the rules still apply before it.
+
+### On by default
+
+Links are on wherever `mapo.ai` is, as every reader is: an operator expects to give a link where they give a text or a file. The guard is what makes that default acceptable, and the app turns links off with `readers: { link: false }`, `NUXT_MAPO_AI_READERS_LINK=false`, a limit at 0 or `deny: ["*"]`; `status.links` says what applies, so Magic Fill shows the field only where it works. An option that cannot be read fails closed: a `deny` the server cannot read whole keeps out every host, a host of `allow` it cannot read is left out.
+
+### Strengths and weaknesses
+
+- **One way of reading**: a page is read by the readers of files, with their bounds, the app's readers and the `mapo-ai:read` hook, which sees the page's `url`.
+- **No dependency**, and the guard checks the address the socket uses, not the one a first lookup gave.
+- **Pages a script writes** reach the AI as their server sends them, often with only their structured data. A renderer is the app's to add, as its fetcher.
+- **Node only, and no proxy**: Mapo's fetcher needs Node's network and does not read `HTTP_PROXY`; an edge runtime, or a server that reaches the web through a proxy, needs the app's fetcher.
+- **The limit is per process**, as `run`'s.
+- **`allow` opens a host whole**: its addresses are no longer checked, so it is for hosts the app owns; a wildcard opens every name under it.
+- **The page's address goes to the provider** with the text, query included: a link with a token in it gives the token to the AI's provider too.
+
 ## Keys
 
 A provider that calls its server with a key gets, for each call, the key nearest the user: their own token, where an admin's assignment allows one; a key the AI's admins assigned to the user, to one of their groups or to everyone; the project's, from the environment. The admins' assignments also narrow the models. The browser never gets a key: `status` says the level and the last four characters.
@@ -985,6 +1035,10 @@ Add it to `SECRET_ENDINGS`, to `SECRET_WORDS` for a whole word, or to `SECRET_PA
 3. Import a dependency inside `read()`, so a server that reads no such file never loads it; bound what it holds in memory by what it really unpacks, as `checkWorkbook()` does for a workbook, never by what the file declares.
 4. Test it in `readers.test.ts` on files written in the test, and add it to the formats of [Read a file](/modules/ai#read-a-file), to `READERS` in `status.test.ts` and to `READERS_ON` in `module.test.ts`.
 
+### Change the guard of links
+
+The ranges are `SPECIAL_IPV4` and `SPECIAL_IPV6` in `links/node.ts`, the rules before any connection `refusalOf()` in `links/rules.ts`. A change to either gets cases in `links.test.ts`, for an address written in the link, for a name the lookup resolves and for a redirect. Never let the HTTP client follow redirects, nor share a connection with an agent: each hop goes through the rules, and the lookup is the connection's own. A new reason to refuse or to fail is a value of `MapoAiLinkBlock` or `MapoAiLinkFailure` in `shared/gateway.ts`, read in `shared/read.ts` and `links/link.ts`, with a label under `mapo.ai.magicFill.linkReasons` in both catalogs.
+
 ### Change a base rule
 
 Change it in `prompts/base.ts` and raise `MAPO_AI_PROMPT_VERSION`, so every answer and audit record says which rules it was asked with. Keep the rules that protect: the source is data, nothing is invented. Once there is an evaluation set, measure the change with it before it ships.
@@ -1010,6 +1064,7 @@ The module's documentation is written with the code, on this plan. [AI-assisted 
 | Fill a detail form: Guide a field                | The `ai` options of the descriptors, `list: false` (B63)         |
 | Magic Fill                                       | A summary; the how-to page tells the rest                        |
 | Read a file                                      | The readers of files, `useMapoAiRead()`                          |
+| Read a web page                                  | Reading links: `read/link`, the guard, `registerMapoAiFetcher()` |
 | Providers                                        | The mock, an app's own, local models, the cloud                  |
 | Keys                                             | The three levels, the routes of the keys and of the tokens       |
 | AI settings                                      | The settings page: preferences, keys, how the AI works, usage    |
@@ -1035,14 +1090,16 @@ This page, for people who work on Mapo, follows every change to the source. At t
 
 In this order:
 
-1. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search.
-2. **Import of several records** (Import AI), with a check for duplicates between new items and existing records.
+1. **Readers for PDFs and images**: a PDF's text, and images and scans, read into text, which is all `run` takes; then the `where` of a quote, the part it names, can narrow its search. A link to a PDF is read as soon as its reader exists.
+2. **Web search**: the operator searches the web from the panel, through a search API the app chooses, picks the results, and each page is read by `read/link`; so the model keeps no tool, every quote is verified on the text the gateway read, and every provider can do it, the local ones too. The providers' own search (OpenAI's, Anthropic's) is the alternative, with less code but for two providers only, a tool in the model's hands and no text to verify the quotes on. Its place in the plan is decided with it.
+3. **Import of several records** (Import AI), with a check for duplicates between new items and existing records.
 
 ### Nice to have
 
 Ideas with no place in the plan yet:
 
 - Read month names and dates in words in the source's language, with `Intl`.
+- Links: a switch for the AI's admins, which can only turn them off; ranges of addresses in `allow` (`10.20.0.0/16`); a hook that refuses a link before it is fetched, by user; the page's title in the panel's list; Mapo's fetcher through the server's proxy (`HTTP_PROXY`).
 - Check the `where` of a quote: the part of the source that holds it, by the name the page gave it.
 - Keep a relation's records for the page's life, instead of asking at each Extract; and an option for how many records a relation lists for the AI.
 - Pick a record among the candidates in the preview, not only on the field's mark; and search a name again with words the operator writes.
