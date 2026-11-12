@@ -6,6 +6,7 @@
 // It enables two providers with them: Mapo's own `ollama`, and the app's
 // `example-ollama`, which server/plugins/mapo-ai-ollama.ts registers.
 // EXAMPLE_OLLAMA_URL is Ollama's address, when it is not the default.
+const isDevelopment = process.env.NODE_ENV !== "production";
 const ollamaURL = process.env.EXAMPLE_OLLAMA_URL;
 const ollamaModels = (process.env.EXAMPLE_OLLAMA_MODELS ?? "")
   .split(",")
@@ -90,6 +91,11 @@ export default defineNuxtConfig({
       // The module's AI settings page lives in apps/example-ai: here the keys
       // lab (/ai/keys) shows the same routes as they are.
       settings: { path: false },
+      // Links are on, and the gateway refuses the server's own addresses:
+      // in development it may read this app's own pages, as the AI panels'
+      // sample link does (app/components/ai/AiSourceFile.vue). Another
+      // port: NUXT_MAPO_AI_WEB_ALLOW='["localhost:3100"]'.
+      ...(isDevelopment ? { web: { allow: ["localhost:3000"] } } : {}),
     },
 
     i18n: {

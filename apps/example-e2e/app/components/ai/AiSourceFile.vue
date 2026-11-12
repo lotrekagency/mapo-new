@@ -6,7 +6,17 @@
 // "Internal: …" out of every file (server/plugins/mapo-ai-readers.ts). The
 // text goes into the panel's box, where the operator reads it, and edits
 // it, before sending it. The sample files are in public/ai-files/.
-import type { MapoAiReaderStatus, MapoAiSourcePart } from "mapomodule/types";
+//
+// Or the page of a link: readLink() sends it to POST /_mapo/ai/read/link,
+// which fetches the page as a stranger would and reads it the same way. The
+// gateway refuses the server's own addresses: nuxt.config.ts opens
+// localhost:3000 in development, so this app's own web page can be read
+// from http://localhost:3000, never from another host or port.
+import type {
+  MapoAiReaderStatus,
+  MapoAiReadLinkResponse,
+  MapoAiSourcePart,
+} from "mapomodule/types";
 
 defineProps<{
   /** The formats the gateway reads, from `status`. */
@@ -27,7 +37,18 @@ const SAMPLES = [
   { file: "launch.ics", label: "Calendar (the app's reader)" },
 ];
 
-const { read } = useMapoAiRead();
+/** Two links: this app's web page, opened in development, and the cloud's metadata, always refused. */
+const origin = useRequestURL().origin;
+const LINKS = [
+  { url: `${origin}/ai-files/open-data.html`, label: "This app's web page" },
+  {
+    url: "http://169.254.169.254/latest/meta-data/",
+    label: "The cloud's metadata (refused)",
+  },
+];
+
+const { read, readLink } = useMapoAiRead();
+const link = ref("");
 const input = ref<HTMLInputElement>();
 const pending = ref(false);
 const outcome = ref<{
@@ -79,6 +100,66 @@ async function readSample(name: string) {
   await readFile(new File([blob], name, { type: blob.type }));
 }
 
+async function readPage(url: string) {
+  pending.value = true;
+  outcome.value = undefined;
+  try {
+    const answer = await readLink(url);
+    if (answer.status === "read") {
+      const text = answer.parts.map((part) => part.text).join("\n\n");
+      emit("read", { text, parts: answer.parts });
+      outcome.value = {
+        color: "success",
+        text: `${answer.url}: read by the reader "${answer.reader}", ${text.length} characters in the box.`,
+      };
+      return;
+    }
+    outcome.value = {
+      color: answer.status === "blocked" ? "error" : "warning",
+      text: `${url}: ${linkWhy(answer)}`,
+    };
+  } catch (error) {
+    const status = isRecord(error) ? error.statusCode : undefined;
+    outcome.value = {
+      color: "error",
+      text: `${url}: the gateway refused it (HTTP ${status ?? "?"}).`,
+    };
+  } finally {
+    pending.value = false;
+  }
+}
+
+/** Why a link gave no text, as read/link answers it. */
+function linkWhy(
+  answer: Exclude<MapoAiReadLinkResponse, { status: "read" }>,
+): string {
+  switch (answer.status) {
+    case "off":
+      return "the app reads no link (mapo.ai.readers.link).";
+    case "blocked":
+      return `refused before any request (${answer.reason}).`;
+    case "unreachable":
+      return `not reached (${answer.reason}).`;
+    case "http-error":
+      return `the site answered ${answer.httpStatus}.`;
+    case "too-large":
+      return `larger than ${answer.maxBytes} bytes.`;
+    case "unsupported":
+      return "no reader takes the page's format.";
+    case "empty":
+      return "the page holds no text: a script may write it.";
+    case "too-long":
+      return "its text is longer than run takes (mapo.ai.limits.maxSourceChars).";
+    case "failed":
+      return "its reader could not read it: the server's log says why.";
+  }
+}
+
+function onLink() {
+  const url = link.value.trim();
+  if (url) void readPage(url);
+}
+
 function onPick(event: Event) {
   const target = event.target;
   const file =
@@ -124,6 +205,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
         :disabled="pending"
         :title="sample.file"
         @click="readSample(sample.file)"
+      >
+        {{ sample.label }}
+      </UButton>
+    </div>
+    <div class="flex flex-wrap items-center gap-1">
+      <UInput
+        v-model="link"
+        size="xs"
+        type="url"
+        placeholder="https://…"
+        aria-label="A link for the AI"
+        class="w-64"
+        @keydown.enter.prevent="onLink"
+      />
+      <UButton
+        size="xs"
+        icon="i-lucide-link"
+        :loading="pending"
+        :disabled="!link.trim()"
+        @click="onLink"
+      >
+        Read a link
+      </UButton>
+      <span class="text-xs text-muted">or:</span>
+      <UButton
+        v-for="sample in LINKS"
+        :key="sample.url"
+        size="xs"
+        color="neutral"
+        variant="outline"
+        :disabled="pending"
+        :title="sample.url"
+        @click="readPage(sample.url)"
       >
         {{ sample.label }}
       </UButton>
