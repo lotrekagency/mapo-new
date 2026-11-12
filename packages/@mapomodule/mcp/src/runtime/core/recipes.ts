@@ -670,7 +670,7 @@ export const RECIPES: Recipe[] = [
     heading: "Enable the module",
     seeAlso: ["modules/mcp.md", "howto/magic-fill.md"],
     summary:
-      "Experimental: setting mapo.ai in nuxt.config.ts installs @mapomodule/ai, and a provider turns Magic Fill on in every MapoDetail. The mapo_ai_setup tool, or the mapo-ai-setup prompt, asks the developer what the AI is for, says what the module can and cannot do for it, and proposes the configuration, the environment variables (names only), the keys and tokens, and the server plugins.",
+      "Experimental, on npm's experimental dist-tag only (pnpm add mapomodule@experimental): setting mapo.ai in nuxt.config.ts installs @mapomodule/ai, and a provider turns Magic Fill on in every MapoDetail. The mapo_ai_setup tool, or the mapo-ai-setup prompt, asks the developer what the AI is for, says what the module can and cannot do for it, and proposes the configuration, the environment variables (names only), the keys and tokens, and the server plugins.",
   },
   {
     id: "ai-run",

@@ -168,7 +168,7 @@ function appNotes(manifest: MapoAppManifest | null): string[] {
   const notes = [
     names.includes("@mapomodule/ai")
       ? "`@mapomodule/ai` is installed: `mapo.ai` is set."
-      : "`@mapomodule/ai` is not installed yet: setting `mapo.ai` in `nuxt.config.ts` installs it, through the meta-module.",
+      : "`@mapomodule/ai` is not installed yet: it ships with `mapomodule` on npm's `experimental` dist-tag only (`pnpm add mapomodule@experimental`), and there setting `mapo.ai` in `nuxt.config.ts` installs it, through the meta-module.",
     names.includes("@mapomodule/uikit")
       ? "uikit is installed: Magic Fill shows on every `MapoDetail` once the module is on."
       : "uikit is not installed: Magic Fill needs it. `useMapoAiFill()` still fills a form in the app's own components.",
@@ -252,7 +252,7 @@ export function renderAiSetupQuestions(
     : "";
   return (
     "# Set up the AI and Magic Fill\n\n" +
-    "`@mapomodule/ai` is experimental and opt-in: setting `mapo.ai` in `nuxt.config.ts` installs it. It fills records from a source (a pasted text, a web page, a sheet) through a gateway on the app's server, and the operator checks every value: the AI never saves anything by itself.\n\n" +
+    "`@mapomodule/ai` is experimental and opt-in, published with `mapomodule` on npm's `experimental` dist-tag only (`pnpm add mapomodule@experimental`): there, setting `mapo.ai` in `nuxt.config.ts` installs it. It fills records from a source (a pasted text, a web page, a sheet) through a gateway on the app's server, and the operator checks every value: the AI never saves anything by itself.\n\n" +
     `## This app\n\n${appNotes(manifest)
       .map((note) => `- ${note}`)
       .join("\n")}\n\n` +

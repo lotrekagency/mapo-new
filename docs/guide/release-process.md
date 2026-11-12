@@ -102,6 +102,23 @@ Semver puts `experimental` after `beta`, so a range such as `^2.0.0-beta.21` als
 
 ---
 
+## Cutting a release
+
+A maintainer releases from `beta` or `experimental`:
+
+1. **Bring the branch up to date.** `experimental` takes in `beta` first (`git merge origin/beta`), so it carries everything `next` has. Both branches commit their `CHANGELOG.md` files, so once both have released, such a merge conflicts at the top of them: keep both entries.
+2. **Push the branch.** semantic-release releases only from a branch the remote has, and reads the tags from there.
+3. **Preview.** Run the `CD` workflow from the branch with `release_mode: dry-run` (Actions → CD → Run workflow, or `gh workflow run CD --ref experimental -f release_mode=dry-run`): the log of each package says the version it would release, `The next release version is …`.
+4. **Release.** Run it again with `release_mode: normal`.
+5. **Check.** `npm view mapomodule dist-tags` shows the new version on the channel's tag and the other tags where they were; the [Slack announcement](#slack-announcement) follows.
+
+The first release from `experimental` also:
+
+- publishes `@mapomodule/ai` for the first time, with `NPM_TOKEN` ([Required Secrets](#required-secrets)). npm points the new package's `latest` at that version too, as it did for `@mapomodule/mcp` (`latest` is `1.0.0-beta.1`): harmless for apps, which get the package through `mapomodule` and its exact versions;
+- spans every commit since the `1.0.0` releases: its notes are long, and `@semantic-release/github` comments on each pull request merged since then, once per package released.
+
+---
+
 ## Scripts
 
 | Script                  | Description                                                                                                                                            |
