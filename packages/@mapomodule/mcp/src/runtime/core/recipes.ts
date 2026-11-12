@@ -760,11 +760,11 @@ export const RECIPES: Recipe[] = [
     doc: "howto/magic-fill.md",
     seeAlso: ["modules/ai.md", "uikit/detail.md", "uikit/mapoverride.md"],
     summary:
-      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text or files read through read, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, and Save ends the session. Below the summary, the preview lists the values that wait, each with a tick: to fill (empty fields, ticked), to replace (shown before and after, never ticked from the start) and proposals without proof; Apply selected writes the ticked ones, the others keep waiting, and Ignore all ignores them. A value the record already holds is no replacement: the summary counts it. A list of items, as a repeater's, is chosen item by item, its verified items ticked from the start; the chosen items go after the record's own, never one it holds already. Related records show by their names: one found under another name waits unticked, and a record to pick inside an item gets its own mark once the item is in. definePageMeta({ magicFill: { evidence: false } }) asks the AI for no quotes on a page: every value then waits, marked. On a page with drafts, the session goes into MapoDetail's draft: after a reload, Restore brings back the marks with their quotes, the summary and Undo all, never the source. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. Next to check, in the banner, takes the operator to each mark that waits, in the order of the form: the tab, group or list item that holds the field opens and the field takes the focus (revealField of the detail's context). The banner's errors say what to do: a key or a model taken away while the page was open (run answers data.reason) makes Magic Fill ask status again. Fields are prepared with their labels, help texts and ai on the descriptor: hint, exclude, and list: false for a relation whose names must not reach the provider. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
+      "Experimental: with mapo.ai and uikit, every MapoDetail gets Magic Fill: a button in the sidebar card opens a panel (a text, files read through read or links read through read/link, the operator's instructions, What I send to the AI from run/preview, the provider and model, Extract), and a banner above the form follows the call, with Cancel, and sums up the session, with Undo all: a second extraction keeps the first one's marks, Keep or a change makes a value the operator's, and Save ends the session. Below the summary, the preview lists the values that wait, each with a tick: to fill (empty fields, ticked), to replace (shown before and after, never ticked from the start) and proposals without proof; Apply selected writes the ticked ones, the others keep waiting, and Ignore all ignores them. A value the record already holds is no replacement: the summary counts it. A list of items, as a repeater's, is chosen item by item, its verified items ticked from the start; the chosen items go after the record's own, never one it holds already. Related records show by their names: one found under another name waits unticked, and a record to pick inside an item gets its own mark once the item is in. definePageMeta({ magicFill: { evidence: false } }) asks the AI for no quotes on a page: every value then waits, marked. On a page with drafts, the session goes into MapoDetail's draft: after a reload, Restore brings back the marks with their quotes, the summary and Undo all, never the source. What I send to the AI shows every user of the AI the rules as the model reads them, the app's, the mapo-ai:prompt hooks' and the admins' included. Next to check, in the banner, takes the operator to each mark that waits, in the order of the form: the tab, group or list item that holds the field opens and the field takes the focus (revealField of the detail's context). The banner's errors say what to do: a key or a model taken away while the page was open (run answers data.reason) makes Magic Fill ask status again. Fields are prepared with their labels, help texts and ai on the descriptor: hint, exclude, and list: false for a relation whose names must not reach the provider. mapo.ai.magicFill: false, definePageMeta({ magicFill: false }) or MapoDetail's extensions prop turn it off; the components can be replaced with MapoOverride, and useMapoAiMagicFill(detail, { part }) gives their state and tells the other parts an override is there.",
   },
   {
     id: "ai-read-files",
-    task: "Give the AI a file, a web page, a CSV or an Excel sheet, instead of a pasted text",
+    task: "Give the AI a file instead of a pasted text: Markdown, a saved HTML page, a CSV or an Excel sheet",
     keywords: [
       "useMapoAiRead",
       "_mapo/ai/read",
@@ -781,7 +781,27 @@ export const RECIPES: Recipe[] = [
     doc: "modules/ai.md",
     heading: "Read a file",
     summary:
-      "Experimental: useMapoAiRead().read(file) posts one file to POST /_mapo/ai/read, which reads text, Markdown, JSON, HTML (into Markdown) and CSV or XLSX (each sheet whole, as a Markdown table) into the text parts run takes, without calling any AI; pass answer.parts to useMapoAiFill().fill(). The answer's status says when there are none: unsupported, empty, too-long (more than limits.maxSourceChars) or failed; files up to limits.maxFileBytes, 10 MB by default.",
+      "Experimental: useMapoAiRead().read(file) posts one file to POST /_mapo/ai/read, which reads text, Markdown, JSON, HTML (its main content into Markdown, under its title and address, with its JSON-LD and Open Graph data in a second part) and CSV or XLSX (each sheet whole, as a Markdown table) into the text parts run takes, without calling any AI; pass answer.parts to useMapoAiFill().fill(). The answer's status says when there are none: unsupported, empty, too-long (more than limits.maxSourceChars) or failed; files up to limits.maxFileBytes, 10 MB by default. A web page by its address, as a link: useMapoAiRead().readLink(url), recipe ai-read-links.",
+  },
+  {
+    id: "ai-read-links",
+    task: "Give the AI a web page by its address, and keep the server's own network out of reach",
+    keywords: [
+      "url",
+      "web page",
+      "web address",
+      "page address",
+      "fetch a page",
+      "ssrf",
+      "private network",
+      "mapo.ai.web",
+      "registerMapoAiFetcher",
+      "experimental",
+    ],
+    doc: "modules/ai.md",
+    heading: "Read a web page",
+    summary:
+      "Experimental: useMapoAiRead().readLink(url) posts { url } to POST /_mapo/ai/read/link, which fetches the page from the app's server as a stranger would (no cookie, no Authorization) and reads it with the reader of its format, as read reads a file; Magic Fill's panel has a field for links where status.links is true. Links are on by default; the guard refuses non-http(s) addresses, credentials, ports other than 80 and 443, the hosts of mapo.ai.web.deny, and any host that leads to the server itself, a private network or a cloud's metadata, checked by the connection's own lookup and again at each redirect (five at most). mapo.ai.web: { allow (hosts opened, \"localhost:3000\" for development), deny (\"*\" keeps every host out), userAgent, timeout (20 s) }; limits.linksPerUserPerMinute (20) and limits.maxFileBytes bound the pages; mapo.ai.readers.link: false or NUXT_MAPO_AI_READERS_LINK=false turns links off. The answer: read (with url), off, blocked (reason), unreachable (reason), http-error (httpStatus), too-large, or read's own. registerMapoAiFetcher({ fetch }) in a Nitro plugin replaces Mapo's fetcher, which runs on Node, and its guard of the network.",
   },
   {
     id: "ai-readers",
@@ -800,7 +820,7 @@ export const RECIPES: Recipe[] = [
     doc: "modules/ai.md",
     heading: "Replace or add a reader",
     summary:
-      "Experimental: in a Nitro plugin, registerMapoAiReader({ id, extensions, types?, read(file) }) puts the app's reader in place of Mapo's with the same id (text, markdown, json, html, csv, xlsx) or adds a format; the mapo-ai:read hook touches up the parts any reader read (context.parts), files only, never pasted text; mapo.ai.readers turns a reader off by id ({ xlsx: false }, or NUXT_MAPO_AI_READERS_XLSX=false).",
+      "Experimental: in a Nitro plugin, registerMapoAiReader({ id, extensions, types?, read(file) }) puts the app's reader in place of Mapo's with the same id (text, markdown, json, html, csv, xlsx) or adds a format; the id link is taken, by links. The mapo-ai:read hook touches up the parts any reader read (context.parts), of files and of pages read from links (context.file.url), never pasted text; mapo.ai.readers turns a reader off by id ({ xlsx: false }, or NUXT_MAPO_AI_READERS_XLSX=false), and links with link: false.",
   },
   {
     id: "ai-providers",

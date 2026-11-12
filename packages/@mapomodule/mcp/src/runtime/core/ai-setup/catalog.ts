@@ -111,6 +111,7 @@ export const AI_TOPICS: AiTopic[] = [
     heading: "Related records",
   },
   fromRecipe("ai-read-files", "Sources"),
+  fromRecipe("ai-read-links", "Sources"),
   fromRecipe("ai-readers", "Sources"),
   fromRecipe("ai-providers", "Providers and models"),
   {
@@ -230,6 +231,8 @@ export const AI_NEED_IDS = [
   "fill-record",
   "extract-records",
   "files",
+  "links",
+  "web-search",
   "pdf-images",
   "own-format",
   "related-records",
@@ -291,6 +294,20 @@ export const AI_NEEDS: AiNeed[] = [
     verdict: "ready",
     how: "The gateway's `read` turns a file into text with Mapo's readers; Magic Fill's panel takes files, and `useMapoAiRead()` does it in a component of the app.",
     topics: ["ai-read-files"],
+  },
+  {
+    id: "links",
+    need: "Start from the link of a web page",
+    verdict: "ready",
+    how: "The gateway's `read/link` fetches the page from the app's server, without the operator's session, and reads it as a file; links are on by default, and a guard refuses the server's own and private networks. Magic Fill's panel takes links, `useMapoAiRead().readLink()` does it in a component; `mapo.ai.web.allow` opens an intranet's hosts, `mapo.ai.readers.link: false` turns links off.",
+    topics: ["ai-read-links"],
+  },
+  {
+    id: "web-search",
+    need: "Search the web for the source",
+    verdict: "not-yet",
+    how: "Mapo does not search the web. The operator can give the link of each page instead (`read/link`), or the app can search in a page of its own and send the pages' links.",
+    topics: ["ai-read-links"],
   },
   {
     id: "pdf-images",

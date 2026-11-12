@@ -74,8 +74,8 @@ export const AI_QUESTIONS: AiQuestion[] = [
       {
         label: "Texts, web pages, Markdown, CSV, Excel, JSON",
         detail:
-          "Mapo reads them all: pasted or attached in Magic Fill's panel.",
-        pass: 'wants: ["files"]',
+          "Mapo reads them all: pasted, attached or given as links in Magic Fill's panel.",
+        pass: 'wants: ["files", "links"]',
         recommended: true,
       },
       {
