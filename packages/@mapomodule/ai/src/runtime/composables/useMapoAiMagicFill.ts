@@ -16,6 +16,9 @@ import { effectiveMatch } from "../shared/relations";
 import { isRecord } from "../shared/guards";
 import type { MapoAiFillEntity } from "../shared/fill";
 import type {
+  MapoAiLinkBlock,
+  MapoAiLinkFailure,
+  MapoAiReadLinkResponse,
   MapoAiRunPreviewResponse,
   MapoAiSourcePart,
   MapoAiStatus,
@@ -36,7 +39,7 @@ import type {
   MapoAiSourceProblem,
   MapoAiToConfirm,
 } from "../shared/magicFill";
-import { readMapoAiFile } from "../shared/read";
+import { readMapoAiFile, readMapoAiLink } from "../shared/read";
 import { gatewayGetter, gatewayPoster } from "./poster";
 import { translatorOf } from "./translate";
 import type { Translate } from "./translate";
@@ -117,6 +120,52 @@ export interface MapoAiMagicFillFile {
   chars?: number;
 }
 
+/** What became of the page of a link the operator gave. */
+export type MapoAiMagicFillLinkState =
+  /** `read/link` reads it. */
+  | "reading"
+  /** Its text is part of the source. */
+  | "read"
+  /** No reader takes its format. */
+  | "unsupported"
+  /** It has no text. */
+  | "empty"
+  /** Its text is longer than `run` takes. */
+  | "too-long"
+  /** Its reader could not read it. */
+  | "failed"
+  /** The app reads no link. */
+  | "off"
+  /** The gateway refused the link, or a redirect: `reason` says why. */
+  | "blocked"
+  /** The page could not be reached: `reason` says why. */
+  | "unreachable"
+  /** Its server answered an error: `httpStatus`. */
+  | "http-error"
+  /** It has more bytes than `maxFileBytes`. */
+  | "too-large"
+  /** The user read more pages than the limit lets them in a minute. */
+  | "limited";
+
+/** A link the operator gave, and what became of its page. */
+export interface MapoAiMagicFillLink {
+  /** Its place in the list, to remove it. */
+  id: number;
+  /** The link, as the operator wrote it. */
+  url: string;
+  /** For `read`: the page's address, after its redirects. */
+  address?: string;
+  state: MapoAiMagicFillLinkState;
+  /** For `blocked` and `unreachable`: why. */
+  reason?: MapoAiLinkBlock | MapoAiLinkFailure;
+  /** For `http-error`: the status its server answered. */
+  httpStatus?: number;
+  /** For `read`: its parts, named after its address. */
+  parts?: MapoAiSourcePart[];
+  /** For `read`, the characters of its text; for `too-long`, those the reader found. */
+  chars?: number;
+}
+
 /**
  * Where a call is: `idle`, none; `describing`, the record's description
  * (`OPTIONS`) is read; `waiting`, the AI is asked, until it answers.
@@ -126,7 +175,7 @@ export type MapoAiMagicFillPhase = "idle" | "describing" | "waiting";
 /** Why Extract cannot run now. */
 export type MapoAiMagicFillProblem =
   | MapoAiSourceProblem
-  /** A file is still being read. */
+  /** A file, or the page of a link, is still being read. */
   | { kind: "reading" }
   /** No provider can be called for the user. */
   | { kind: "no-provider" }
@@ -159,6 +208,18 @@ export interface MapoAiMagicFill {
   attach(files: readonly File[]): void;
   /** Removes a file, and stops reading it. */
   detach(id: number): void;
+  /**
+   * The links the operator gave, in order, and what became of each page;
+   * empty where the app reads no link (`status.links`).
+   */
+  links: Readonly<Ref<readonly MapoAiMagicFillLink[]>>;
+  /**
+   * Reads the page of a link through `read/link`, at once. A link given
+   * already, and read or being read, is not read again.
+   */
+  attachLink(url: string): void;
+  /** Removes a link, and stops reading its page. */
+  detachLink(id: number): void;
   /** The operator's instructions for this extraction. */
   instructions: Ref<string>;
   /** The provider and model of the next call; the user's default at first. */
@@ -169,7 +230,7 @@ export interface MapoAiMagicFill {
   status: Readonly<Ref<MapoAiStatus | undefined>>;
   /** Whether Magic Fill is offered here: the app lets the user use the AI, and the record can be edited. */
   available: ComputedRef<boolean>;
-  /** The source as it would be sent: the pasted text, then each file read. */
+  /** The source as it would be sent: the pasted text, then each file read, then each page. */
   parts: ComputedRef<MapoAiSourcePart[]>;
   /** Why Extract cannot run now; none when it can. */
   problems: ComputedRef<MapoAiMagicFillProblem[]>;
@@ -306,7 +367,8 @@ const presences = new WeakMap<MapoAiMagicFill, Presence>();
 
 /**
  * Magic Fill on a detail page: the panel's source (a pasted text, files
- * read through `read`), the operator's instructions, the provider and the
+ * read through `read`, the pages of links through `read/link`), the
+ * operator's instructions, the provider and the
  * model, the call through `useMapoAiFill()`, where it is, and its summary.
  * One state per detail: the button in the sidebar card, the panel and the
  * banner above the form share it, and it lives while one of them is
@@ -492,6 +554,7 @@ function magicFillState<T extends object>(
   const text = shallowRef("");
   const instructions = shallowRef("");
   const files = shallowRef<readonly MapoAiMagicFillFile[]>([]);
+  const links = shallowRef<readonly MapoAiMagicFillLink[]>([]);
   const choice = shallowRef<MapoAiProviderChoice>();
   const phase = shallowRef<MapoAiMagicFillPhase>("idle");
   const startedAt = shallowRef<number>();
@@ -537,12 +600,14 @@ function magicFillState<T extends object>(
   });
 
   const parts = computed(() =>
-    mapoAiSourceParts(
-      text.value,
-      files.value
+    mapoAiSourceParts(text.value, [
+      ...files.value
         .filter((file) => file.state === "read")
         .map((file) => file.parts ?? []),
-    ),
+      ...links.value
+        .filter((link) => link.state === "read")
+        .map((link) => link.parts ?? []),
+    ]),
   );
 
   const problems = computed<MapoAiMagicFillProblem[]>(() => {
@@ -550,7 +615,9 @@ function magicFillState<T extends object>(
       detail.readonly?.value === true ||
       detail.isBusy?.value === true ||
       detail.isLoading?.value === true;
-    const isReading = files.value.some((file) => file.state === "reading");
+    const isReading =
+      files.value.some((file) => file.state === "reading") ||
+      links.value.some((link) => link.state === "reading");
     return [
       ...checkMapoAiSource(
         parts.value,
@@ -626,6 +693,57 @@ function magicFillState<T extends object>(
     readers.get(id)?.abort();
     readers.delete(id);
     files.value = files.value.filter((file) => file.id !== id);
+  }
+
+  // ─── Links ────────────────────────────────────────────────────────────────
+
+  let nextLink = 0;
+  const pageReaders = new Map<number, AbortController>();
+
+  function setLink(id: number, change: Partial<MapoAiMagicFillLink>): void {
+    links.value = links.value.map((link) =>
+      link.id === id ? { ...link, ...change } : link,
+    );
+  }
+
+  function attachLink(url: string): void {
+    const written = url.trim();
+    if (!written) return;
+    const isGiven = links.value.some((link) => {
+      const isSame = link.url === written;
+      const isKept = link.state === "reading" || link.state === "read";
+      return isSame && isKept;
+    });
+    if (isGiven) return;
+    const id = nextLink++;
+    links.value = [...links.value, { id, url: written, state: "reading" }];
+    void readLink(id, written);
+  }
+
+  async function readLink(id: number, url: string): Promise<void> {
+    const controller = new AbortController();
+    pageReaders.set(id, controller);
+    try {
+      const answer = await readMapoAiLink(
+        url,
+        { post },
+        { signal: controller.signal },
+      );
+      if (pageReaders.get(id) !== controller) return;
+      setLink(id, linkChangeOf(answer));
+    } catch (error) {
+      if (pageReaders.get(id) !== controller) return;
+      const isLimited = mapoAiFillErrorOf(error, t).status === 429;
+      setLink(id, { state: isLimited ? "limited" : "failed" });
+    } finally {
+      if (pageReaders.get(id) === controller) pageReaders.delete(id);
+    }
+  }
+
+  function detachLink(id: number): void {
+    pageReaders.get(id)?.abort();
+    pageReaders.delete(id);
+    links.value = links.value.filter((link) => link.id !== id);
   }
 
   // ─── The call ─────────────────────────────────────────────────────────────
@@ -778,6 +896,8 @@ function magicFillState<T extends object>(
   onScopeDispose(() => {
     for (const reader of readers.values()) reader.abort();
     readers.clear();
+    for (const reader of pageReaders.values()) reader.abort();
+    pageReaders.clear();
     previewing?.abort();
     previewing = undefined;
   });
@@ -970,6 +1090,9 @@ function magicFillState<T extends object>(
     files,
     attach,
     detach,
+    links,
+    attachLink,
+    detachLink,
     instructions,
     choice,
     choices,
@@ -1092,4 +1215,24 @@ function readableKey(key: string): string {
     .replace(/^translations\.[^.]+\./, "")
     .replace(/[_.-]/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+/** What an answer of `read/link` makes of a link of the panel. */
+function linkChangeOf(
+  answer: MapoAiReadLinkResponse,
+): Partial<MapoAiMagicFillLink> {
+  if (answer.status === "read") {
+    const chars = answer.parts.reduce((sum, part) => sum + part.text.length, 0);
+    return { state: "read", parts: answer.parts, address: answer.url, chars };
+  }
+  if (answer.status === "too-long") {
+    return { state: "too-long", chars: answer.chars };
+  }
+  if (answer.status === "blocked" || answer.status === "unreachable") {
+    return { state: answer.status, reason: answer.reason };
+  }
+  if (answer.status === "http-error") {
+    return { state: "http-error", httpStatus: answer.httpStatus };
+  }
+  return { state: answer.status };
 }

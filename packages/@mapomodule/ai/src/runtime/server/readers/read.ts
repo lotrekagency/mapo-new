@@ -58,7 +58,12 @@ export async function readSourceFile(
   let parts: MapoAiSourcePart[];
   try {
     const touched = await deps.touchUp({
-      file: Object.freeze({ name: file.name, type: file.type, size }),
+      file: Object.freeze({
+        name: file.name,
+        type: file.type,
+        size,
+        ...(file.url ? { url: file.url } : {}),
+      }),
       reader: reader.id,
       parts: read,
     });

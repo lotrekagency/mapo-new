@@ -79,6 +79,12 @@ export interface MapoAiStatus {
    * then the app's own. For a user the app lets in.
    */
   readers?: MapoAiReaderStatus[];
+  /**
+   * Whether `read/link` reads the pages of links: the app has not turned
+   * the `link` reader off (`mapo.ai.readers`), and its limits let a page
+   * be read. For a user the app lets in.
+   */
+  links?: boolean;
 }
 
 /** A format `read` takes, as `status` lists it. */
@@ -566,8 +572,16 @@ export interface MapoAiLimits {
   maxSourceChars: number;
   /** Characters of the operator's own instructions; `0` lets operators send none. */
   maxInstructionsChars: number;
-  /** Bytes of a file `read` takes; `0` lets operators send none. */
+  /**
+   * Bytes of a file `read` takes, and of a page `read/link` reads; `0`
+   * lets operators send none.
+   */
   maxFileBytes: number;
+  /**
+   * Pages one user may read from their links in a minute, in one server
+   * process; `0` reads none.
+   */
+  linksPerUserPerMinute: number;
 }
 
 // ─── run ─────────────────────────────────────────────────────────────────────
@@ -814,6 +828,82 @@ export type MapoAiReadResponse =
       chars: number;
     }
   | { status: "failed"; reader: string };
+
+// ─── read/link ───────────────────────────────────────────────────────────────
+
+/** The body of `POST /_mapo/ai/read/link`. */
+export interface MapoAiReadLinkRequest {
+  /** The page's address: `http:` or `https:`. */
+  url: string;
+}
+
+/** Characters of a link `read/link` takes. */
+export const MAPO_AI_MAX_LINK = 2048;
+
+/**
+ * Why the gateway refuses a link, or a redirect, before it asks for the
+ * page:
+ * - `scheme`: it is no address of the web, `http:` or `https:`;
+ * - `credentials`: it carries a user or a password;
+ * - `port`: a port other than the web's, 80 and 443, which the app has not
+ *   opened (`mapo.ai.web.allow`);
+ * - `address`: its host leads to the server itself, a private network, or
+ *   another address no page of the web has;
+ * - `denied`: the app keeps its host out (`mapo.ai.web.deny`).
+ */
+export type MapoAiLinkBlock =
+  | "scheme"
+  | "credentials"
+  | "port"
+  | "address"
+  | "denied";
+
+/**
+ * Why a page could not be reached:
+ * - `dns`: its host was not found;
+ * - `connection`: its server refused the connection, or broke it;
+ * - `tls`: its certificate cannot be trusted;
+ * - `timeout`: it took longer than `mapo.ai.web.timeout`;
+ * - `redirects`: it redirected more than five times.
+ */
+export type MapoAiLinkFailure =
+  | "dns"
+  | "connection"
+  | "tls"
+  | "timeout"
+  | "redirects";
+
+/**
+ * The answer of `POST /_mapo/ai/read/link`: what became of the page of a
+ * link. The answers of `read`, the page read as a file, with the address
+ * it came from on `read`; and those of a link:
+ * - `off`: the app reads no link (`mapo.ai.readers.link`, or a limit at 0);
+ * - `blocked`: the gateway refused the link, or one of its redirects,
+ *   before it asked for the page, and `reason` says why;
+ * - `unreachable`: the page could not be reached, and `reason` says why;
+ * - `http-error`: the page's server answered with an error, `httpStatus`;
+ * - `too-large`: the page has more bytes than `maxFileBytes`, compressed or
+ *   not.
+ */
+export type MapoAiReadLinkResponse =
+  | {
+      status: "read";
+      reader: string;
+      /** The parts read: one at least, each named after the page's address. */
+      parts: MapoAiSourcePart[];
+      /** The page's address, after its redirects. */
+      url: string;
+    }
+  | Exclude<MapoAiReadResponse, { status: "read" }>
+  | { status: "off" }
+  | { status: "blocked"; reason: MapoAiLinkBlock }
+  | { status: "unreachable"; reason: MapoAiLinkFailure }
+  | { status: "http-error"; httpStatus: number }
+  | {
+      status: "too-large";
+      /** The bytes a page may have: `maxFileBytes`. */
+      maxBytes: number;
+    };
 
 /**
  * The secret the storage seals with, as the server found it: `set` (the

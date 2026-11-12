@@ -103,6 +103,7 @@ export function readMapoAiStatus(value: unknown): MapoAiStatus | undefined {
   if (Array.isArray(value.readers)) {
     status.readers = value.readers.map(readerOf).filter(isPresent);
   }
+  if (value.links === true) status.links = true;
   return status;
 }
 
@@ -225,6 +226,8 @@ function limitsOf(value: unknown): MapoAiLimits | undefined {
     maxSourceChars,
     maxInstructionsChars,
     maxFileBytes,
+    // A gateway that does not say it reads no link.
+    linksPerUserPerMinute: countOf(value.linksPerUserPerMinute) ?? 0,
   };
 }
 

@@ -2,6 +2,7 @@ import { defineEventHandler, setResponseHeader } from "h3";
 import { MAPO_AI_CONTRACT_VERSION } from "../../shared/gateway";
 import type { MapoAiStatus } from "../../shared/gateway";
 import { readMapoAiCaller } from "../auth/nitro";
+import { mapoAiLinksAreOn } from "../links/nitro";
 import { mapoAiReaderStatuses } from "../readers/nitro";
 import { mapoAiPreference, mapoAiUserPolicy } from "../run/nitro";
 import { providerStatuses } from "../run/policy";
@@ -11,7 +12,8 @@ import { mapoAiStorageState } from "../storage/nitro";
  * `GET /_mapo/ai/status`: what the gateway offers the signed-in user: the
  * providers `run` may call for them, with their models and, for those that
  * call with a key, where their key comes from (never the key); the
- * defaults, the limits and the formats `read` takes; to the AI's admins
+ * defaults, the limits, the formats `read` takes and whether `read/link`
+ * reads the pages of links; to the AI's admins
  * also the state of its storage. Like every route of the gateway it
  * answers 401 without a session, and 503 when the admins' keys are stored
  * and cannot be read.
@@ -41,5 +43,6 @@ export default defineEventHandler(async (event): Promise<MapoAiStatus> => {
   if (preference) status.preference = preference;
   status.limits = { ...policy.options.limits };
   status.readers = mapoAiReaderStatuses(event);
+  status.links = mapoAiLinksAreOn(event);
   return status;
 });

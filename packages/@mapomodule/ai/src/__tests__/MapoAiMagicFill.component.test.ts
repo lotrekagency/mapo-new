@@ -102,6 +102,51 @@ const UButton: Component = {
   },
 };
 
+/** Each `UInput` mounted: its label, its value, and what a person types and presses. */
+interface InputStub {
+  readonly label: string;
+  readonly value: string;
+  readonly invalid: boolean;
+  type(text: string): void;
+  enter(): void;
+}
+const inputs: InputStub[] = [];
+
+const UInput: Component = {
+  name: "UInput",
+  inheritAttrs: false,
+  props: { modelValue: String },
+  emits: ["update:modelValue"],
+  setup(
+    props: { modelValue?: string },
+    { emit, attrs }: SetupContext<["update:modelValue"]>,
+  ) {
+    const stub: InputStub = {
+      get label() {
+        return String(attrs["aria-label"] ?? "");
+      },
+      get value() {
+        return props.modelValue ?? "";
+      },
+      get invalid() {
+        return attrs["aria-invalid"] === true;
+      },
+      type(text) {
+        emit("update:modelValue", text);
+      },
+      enter() {
+        const onKeydown = attrs.onKeydown;
+        if (typeof onKeydown === "function") {
+          onKeydown({ key: "Enter", preventDefault: () => undefined });
+        }
+      },
+    };
+    inputs.push(stub);
+    onUnmounted(() => inputs.splice(inputs.indexOf(stub), 1));
+    return () => h("input");
+  },
+};
+
 /** Each `UAlert` mounted, by its title. */
 const alerts: Array<{ readonly title: string }> = [];
 
@@ -248,6 +293,7 @@ const STUBS: Record<string, Component> = {
   UAlert,
   UIcon: passthrough("UIcon"),
   UTextarea: passthrough("UTextarea"),
+  UInput,
   UFileUpload: passthrough("UFileUpload"),
   USelect: passthrough("USelect"),
   // Registered by name, as the module registers them for the app.
@@ -393,6 +439,7 @@ const checkbox = (label: string) =>
 const APPLY_SELECTED = "mapo.ai.magicFill.summary.applySelected";
 
 beforeEach(() => {
+  inputs.splice(0);
   buttons.splice(0);
   checkboxes.splice(0);
   alerts.splice(0);
@@ -922,6 +969,70 @@ describe("Magic Fill's parts on a detail", () => {
     expect(apply?.disabled).toBe(true);
     apply?.click();
     expect(form.model.value.notes).toBeUndefined();
+  });
+});
+
+describe("Magic Fill's panel: links", () => {
+  const FIELDS: AnyFieldDescriptor[] = [
+    { key: "title", type: "text", label: "Title" },
+  ];
+  const LINK_LABEL = "mapo.ai.magicFill.linkLabel";
+  const input = () => inputs.find((one) => one.label === LINK_LABEL);
+
+  async function opened(
+    status: Record<string, unknown>,
+    backend: Record<string, unknown> = {},
+  ): Promise<HeadlessNode> {
+    gateway(status, {}, backend);
+    const root = mountDetail(detail(FIELDS));
+    await useMapoAiStatus().refresh();
+    await settle();
+    button("mapo.ai.magicFill.action")?.click();
+    await settle();
+    return root;
+  }
+
+  it("offer a field for a link only when status says the gateway reads links", async () => {
+    await opened(STATUS);
+    expect(input()).toBeUndefined();
+
+    app?.unmount();
+    await opened({ ...STATUS, links: true });
+    expect(input()).toBeDefined();
+  });
+
+  it("refuse a text that is no address of the web, read a link, and say what became of each page", async () => {
+    const root = await opened(
+      { ...STATUS, links: true },
+      {
+        "/_mapo/ai/read/link": {
+          status: "read",
+          reader: "html",
+          url: "https://museo.example/eventi/notte?x=1",
+          parts: [{ kind: "text", text: "Notte", name: "museo.example" }],
+        },
+      },
+    );
+
+    input()?.type("museo.example/notte");
+    await settle();
+    input()?.enter();
+    await settle();
+    expect(input()?.invalid).toBe(true);
+    expect(textOf(root)).toContain("mapo.ai.magicFill.linkInvalid");
+    expect(requests).not.toContain("/_mapo/ai/read/link");
+
+    input()?.type("https://museo.example/eventi/notte?x=1");
+    await settle();
+    expect(input()?.invalid).toBe(false);
+    button("mapo.ai.magicFill.readLink")?.click();
+    await settle();
+
+    expect(requests).toContain("/_mapo/ai/read/link");
+    expect(input()?.value).toBe("");
+    expect(textOf(root)).toContain("museo.example/eventi/notte");
+    expect(textOf(root)).toContain("mapo.ai.magicFill.linkStates.read");
+    expect(button("mapo.ai.magicFill.extract")?.disabled).toBe(false);
   });
 });
 

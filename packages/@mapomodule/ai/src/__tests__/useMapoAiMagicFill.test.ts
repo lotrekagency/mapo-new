@@ -1087,6 +1087,120 @@ describe("useMapoAiMagicFill — files", () => {
   });
 });
 
+describe("useMapoAiMagicFill — links", () => {
+  it("reads the page of each link through read/link, and sends its parts after the files'", async () => {
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/read": () => ({
+        status: "read",
+        reader: "text",
+        parts: [{ kind: "text", text: "Hello", name: "a.txt" }],
+      }),
+      "/_mapo/ai/read/link": () => ({
+        status: "read",
+        reader: "html",
+        url: "https://museo.example/notte",
+        parts: [{ kind: "text", text: "Notte", name: "museo.example/notte" }],
+      }),
+    });
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+    magic.text.value = "Pasted";
+
+    magic.attachLink(" https://museo.example/notte?x=1 ");
+    magic.attach([new File(["Hello"], "a.txt")]);
+    expect(magic.links.value[0]).toMatchObject({
+      url: "https://museo.example/notte?x=1",
+      state: "reading",
+    });
+    expect(magic.problems.value).toContainEqual({ kind: "reading" });
+    await flush();
+
+    expect(magic.links.value).toMatchObject([
+      { state: "read", address: "https://museo.example/notte", chars: 5 },
+    ]);
+    expect(magic.parts.value).toEqual([
+      { kind: "text", text: "Pasted" },
+      { kind: "text", text: "Hello", name: "a.txt" },
+      { kind: "text", text: "Notte", name: "museo.example/notte" },
+    ]);
+    expect(
+      calls.find((call) => call.path === "/_mapo/ai/read/link")?.options.body,
+    ).toEqual({ url: "https://museo.example/notte?x=1" });
+  });
+
+  it("says what became of a page it could not read, and reads a link given already only once", async () => {
+    const answers = [
+      () => ({ status: "blocked", reason: "address" }),
+      () => ({ status: "unreachable", reason: "dns" }),
+      () => ({ status: "http-error", httpStatus: 404 }),
+      () => ({ status: "too-large", maxBytes: 1000 }),
+      () => ({ status: "off" }),
+      () => {
+        throw fetchError(429);
+      },
+      () => {
+        throw fetchError(500);
+      },
+    ];
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/read/link": () => answers.shift()?.(),
+    });
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+
+    for (const at of [1, 2, 3, 4, 5, 6, 7]) {
+      magic.attachLink(`https://example.org/${at}`);
+      await flush();
+    }
+    magic.attachLink("https://example.org/1");
+    magic.attachLink("   ");
+
+    expect(
+      magic.links.value.map(({ state, reason, httpStatus }) => [
+        state,
+        reason ?? httpStatus ?? "",
+      ]),
+    ).toEqual([
+      ["blocked", "address"],
+      ["unreachable", "dns"],
+      ["http-error", 404],
+      ["too-large", ""],
+      ["off", ""],
+      ["limited", ""],
+      ["failed", ""],
+      ["reading", ""],
+    ]);
+    expect(magic.parts.value).toEqual([]);
+    expect(
+      calls.filter((call) => call.path === "/_mapo/ai/read/link"),
+    ).toHaveLength(8);
+  });
+
+  it("does not read again a link being read, and stops reading a link removed meanwhile", async () => {
+    const read = held();
+    const calls = gateway({
+      "/_mapo/ai/status": () => STATUS,
+      "/_mapo/ai/read/link": read.route,
+    });
+    const { magic } = mounted(detail());
+    await useMapoAiStatus().refresh();
+    magic.attachLink("https://museo.example/");
+    magic.attachLink("https://museo.example/");
+    const [link] = magic.links.value;
+
+    magic.detachLink(link!.id);
+
+    const requests = calls.filter(
+      (call) => call.path === "/_mapo/ai/read/link",
+    );
+    expect(requests).toHaveLength(1);
+    expect((requests[0]?.options.signal as AbortSignal).aborted).toBe(true);
+    expect(magic.links.value).toEqual([]);
+  });
+});
+
 describe("useMapoAiMagicFill — What I send to the AI", () => {
   const PREVIEW = {
     task: "fill",

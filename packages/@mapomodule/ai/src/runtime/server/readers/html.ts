@@ -1119,5 +1119,8 @@ export const htmlReader: MapoAiReader = {
   extensions: ["html", "htm", "xhtml"],
   types: ["text/html", "application/xhtml+xml"],
   read: (file) =>
-    htmlPageParts(readHtmlPage(htmlText(file.bytes, file.type)), file.name),
+    htmlPageParts(
+      readHtmlPage(htmlText(file.bytes, file.type), { address: file.url }),
+      file.name,
+    ),
 };

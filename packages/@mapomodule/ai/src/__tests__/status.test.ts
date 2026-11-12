@@ -230,6 +230,7 @@ describe("GET /_mapo/ai/status", () => {
       providers: [],
       limits: DEFAULT_LIMITS,
       readers: READERS,
+      links: true,
     });
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -258,6 +259,7 @@ describe("GET /_mapo/ai/status", () => {
       },
       limits: { ...DEFAULT_LIMITS, perUserPerMinute: 5 },
       readers: READERS,
+      links: true,
     });
   });
 
@@ -313,6 +315,7 @@ describe("GET /_mapo/ai/status", () => {
       providers: [],
       limits: DEFAULT_LIMITS,
       readers: READERS,
+      links: true,
     });
     expect(JSON.stringify(body)).not.toContain(SECRET);
   });

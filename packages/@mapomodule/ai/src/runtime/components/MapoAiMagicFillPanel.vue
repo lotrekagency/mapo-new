@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * Magic Fill's panel, sliding in from the right: the source (a pasted
- * text, files read through the gateway's `read`), the operator's
+ * text, files read through the gateway's `read`, the pages of links read
+ * through `read/link`), the operator's
  * instructions, "What I send to the AI", the provider and the model, and
  * Extract. Closing it neither stops nor loses a call: the banner above the
  * form follows it. The button or the banner renders it, and only the first
@@ -15,9 +16,11 @@ import {
 import type {
   MapoAiMagicFillDetail,
   MapoAiMagicFillFile,
+  MapoAiMagicFillLink,
   MapoAiMagicFillProblem,
 } from "../composables/useMapoAiMagicFill";
 import { sourceChars } from "../shared/magicFill";
+import { isMapoAiLink } from "../shared/read";
 import type { MapoAiProviderChoice } from "../shared/magicFill";
 
 const props = defineProps<{
@@ -31,6 +34,7 @@ const {
   open,
   text,
   files,
+  links,
   instructions,
   choice,
   choices,
@@ -52,6 +56,7 @@ const readers = computed(() => status.value?.readers ?? []);
 const takesFiles = computed(
   () => (limits.value?.maxFileBytes ?? 1) > 0 && readers.value.length > 0,
 );
+const takesLinks = computed(() => status.value?.links === true);
 const takesInstructions = computed(
   () => (limits.value?.maxInstructionsChars ?? 1) > 0,
 );
@@ -131,6 +136,50 @@ function fileIcon(file: MapoAiMagicFillFile): string {
   if (file.state === "reading") return "i-lucide-loader-circle";
   if (file.state === "read") return "i-lucide-file-text";
   return "i-lucide-file-x";
+}
+
+/** The link being written, before Read sends it. */
+const link = shallowRef("");
+/** Read was asked for a text that is no address of the web. */
+const isLinkInvalid = shallowRef(false);
+
+function readLink(): void {
+  const written = link.value.trim();
+  if (!written) return;
+  if (!isMapoAiLink(written)) {
+    isLinkInvalid.value = true;
+    return;
+  }
+  isLinkInvalid.value = false;
+  magic.attachLink(written);
+  link.value = "";
+}
+
+/** A link as the list shows it: its host and path, without the query. */
+function linkName(item: MapoAiMagicFillLink): string {
+  try {
+    const url = new URL(item.address ?? item.url);
+    return `${url.host}${url.pathname === "/" ? "" : url.pathname}`;
+  } catch {
+    return item.url;
+  }
+}
+
+function linkText(item: MapoAiMagicFillLink): string {
+  const reason = item.reason
+    ? t(`mapo.ai.magicFill.linkReasons.${item.reason}`)
+    : "";
+  return t(`mapo.ai.magicFill.linkStates.${item.state}`, {
+    n: item.chars ?? 0,
+    status: item.httpStatus ?? 0,
+    reason,
+  });
+}
+
+function linkIcon(item: MapoAiMagicFillLink): string {
+  if (item.state === "reading") return "i-lucide-loader-circle";
+  if (item.state === "read") return "i-lucide-globe";
+  return "i-lucide-link-2-off";
 }
 
 /** The files the operator chooses go to Magic Fill; the upload stays empty. */
@@ -220,6 +269,84 @@ function close(): void {
                   t('mapo.ai.magicFill.removeFile', { name: file.name })
                 "
                 @click="magic.detach(file.id)"
+              />
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="takesLinks" class="space-y-2">
+          <p class="font-medium">{{ t("mapo.ai.magicFill.links") }}</p>
+          <div class="flex gap-2">
+            <UInput
+              v-model="link"
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              :placeholder="t('mapo.ai.magicFill.linkPlaceholder')"
+              :aria-label="t('mapo.ai.magicFill.linkLabel')"
+              :aria-invalid="isLinkInvalid"
+              :color="isLinkInvalid ? 'error' : undefined"
+              class="min-w-0 flex-1"
+              @update:model-value="isLinkInvalid = false"
+              @keydown.enter.prevent="readLink"
+            />
+            <UButton
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-link"
+              :label="t('mapo.ai.magicFill.readLink')"
+              :disabled="!link.trim()"
+              @click="readLink"
+            />
+          </div>
+          <p
+            class="text-xs"
+            :class="isLinkInvalid ? 'text-error' : 'text-muted'"
+            aria-live="polite"
+          >
+            {{
+              isLinkInvalid
+                ? t("mapo.ai.magicFill.linkInvalid")
+                : t("mapo.ai.magicFill.linksHint")
+            }}
+          </p>
+          <ul v-if="links.length" class="space-y-1">
+            <li
+              v-for="item in links"
+              :key="item.id"
+              class="flex items-center gap-2"
+            >
+              <UIcon
+                :name="linkIcon(item)"
+                class="size-4 shrink-0"
+                :class="
+                  item.state === 'reading'
+                    ? 'animate-spin motion-reduce:animate-none'
+                    : ''
+                "
+                aria-hidden="true"
+              />
+              <span
+                class="min-w-0 flex-1 truncate"
+                :title="item.address ?? item.url"
+              >
+                {{ linkName(item) }}
+              </span>
+              <span
+                class="shrink-0 text-xs"
+                :class="item.state === 'read' ? 'text-muted' : 'text-error'"
+              >
+                {{ linkText(item) }}
+              </span>
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-x"
+                :aria-label="
+                  t('mapo.ai.magicFill.removeLink', { name: linkName(item) })
+                "
+                @click="magic.detachLink(item.id)"
               />
             </li>
           </ul>

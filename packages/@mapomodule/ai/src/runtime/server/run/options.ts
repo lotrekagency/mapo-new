@@ -1,7 +1,8 @@
 /**
  * The options of `run` and `read`: the providers `run` may call, its
  * defaults, the app's rules, the verification rules, the readers `read`
- * leaves on, the limits and the audit's retention.
+ * leaves on, how `read/link` reads a page, the limits and the audit's
+ * retention.
  * They are read twice, with the same rules: when the app builds, from
  * `mapo.ai`, with a warning for each value that cannot be read; when the
  * server runs, from the private runtime config, where the environment may
@@ -22,6 +23,7 @@ import {
 } from "../providers/cloud";
 import type { MapoAiEffort } from "../providers/cloud";
 import { DEFAULT_OLLAMA_URL, serverURL } from "../providers/local";
+import { hostPatternOf } from "../links/rules";
 import { readSecretWord } from "../../shared/entity";
 import { DEFAULT_VERIFICATION_RULES } from "../../shared/sanitize";
 import type { AiVerificationRules } from "../../shared/sanitize";
@@ -165,6 +167,8 @@ export interface MapoAiRunOptions {
    * not here is on.
    */
   readers: Record<string, boolean>;
+  /** How `read/link` reads a page. */
+  web: MapoAiWebOptions;
   limits: MapoAiLimits;
   audit: { retentionDays: number };
   /**
@@ -177,6 +181,26 @@ export interface MapoAiRunOptions {
     providers: Record<string, Record<string, MapoAiModelPrice>>;
   };
 }
+
+/** How `read/link` reads a page, from `mapo.ai.web`, read and complete. */
+export interface MapoAiWebOptions {
+  /** The hosts the app opens, as written: `localhost:3000`, `*.intranet.example`. */
+  allow: string[];
+  /** The hosts the app keeps out, as written: `*` for every host. */
+  deny: string[];
+  /** What the requests for a page name as their client. */
+  userAgent: string;
+  /** Seconds a page may take, its redirects included. */
+  timeout: number;
+}
+
+/** Seconds a page may take, its redirects included, unless `mapo.ai.web.timeout` says otherwise. */
+export const DEFAULT_WEB_TIMEOUT = 20;
+/** What the requests for a page name as their client, unless `mapo.ai.web.userAgent` says otherwise. */
+export const DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; MapoAI/1.0)";
+const MAX_WEB_TIMEOUT = 120;
+const MAX_HOSTS = 200;
+const MAX_USER_AGENT = 200;
 
 /** Seconds a call to a provider may take, unless `timeout` says otherwise. */
 export const DEFAULT_PROVIDER_TIMEOUT = 120;
@@ -216,6 +240,7 @@ export const DEFAULT_LIMITS: Readonly<MapoAiLimits> = Object.freeze({
   maxSourceChars: 100_000,
   maxInstructionsChars: 2_000,
   maxFileBytes: 10 * 1024 * 1024,
+  linksPerUserPerMinute: 20,
 });
 /** Days an audit record is kept, unless `mapo.ai.audit.retentionDays` says otherwise. */
 export const DEFAULT_RETENTION_DAYS = 90;
@@ -247,6 +272,7 @@ export function readRunOptions(
     secretWords: secretWordsOf(options.secretWords, warn),
     verification: verificationOf(options.verification, warn),
     readers: readersOf(options.readers, warn),
+    web: webOf(options.web, warn),
     limits: limitsOf(options.limits, warn),
     audit: auditOf(options.audit, warn),
     prices: pricesOf(options.prices, warn),
@@ -720,6 +746,119 @@ function readersOf(
   return readers;
 }
 
+/**
+ * How `read/link` reads a page. A host `allow` cannot read is left out, so
+ * fewer hosts are opened; a `deny` that cannot be read is `["*"]`, so no
+ * page is read rather than one the app meant to keep out. A time or a
+ * client that cannot be read keeps its default.
+ */
+function webOf(
+  value: unknown,
+  warn: (message: string) => void,
+): MapoAiWebOptions {
+  const web: MapoAiWebOptions = {
+    allow: [],
+    deny: [],
+    userAgent: DEFAULT_USER_AGENT,
+    timeout: DEFAULT_WEB_TIMEOUT,
+  };
+  if (value === undefined || value === null) return web;
+  if (!isRecord(value)) {
+    warn(
+      "mapo.ai.web is not { allow?, deny?, userAgent?, timeout? }, so read/link reads no page.",
+    );
+    return { ...web, deny: ["*"] };
+  }
+  unknownKeys(
+    value,
+    ["allow", "deny", "userAgent", "timeout"],
+    "mapo.ai.web",
+    warn,
+  );
+  const allow = hostsOf(value.allow, "mapo.ai.web.allow", warn);
+  web.allow = allow.hosts.filter((entry) => {
+    const isEveryHost = entry === "*";
+    if (isEveryHost) {
+      warn(
+        'mapo.ai.web.allow: "*" would open every host, a private network\'s included, so it is left out.',
+      );
+    }
+    return !isEveryHost;
+  });
+  const deny = hostsOf(value.deny, "mapo.ai.web.deny", warn);
+  if (deny.whole) web.deny = deny.hosts;
+  else {
+    warn("mapo.ai.web.deny cannot be read whole, so read/link reads no page.");
+    web.deny = ["*"];
+  }
+  const userAgent = value.userAgent;
+  if (userAgent !== undefined) {
+    const isUsable =
+      typeof userAgent === "string" &&
+      userAgent.trim() !== "" &&
+      userAgent.length <= MAX_USER_AGENT &&
+      !Array.from(userAgent).some(isControl);
+    if (isUsable) web.userAgent = userAgent.trim();
+    else {
+      warn(
+        `mapo.ai.web.userAgent is not one line of up to ${MAX_USER_AGENT} characters, so it is "${DEFAULT_USER_AGENT}".`,
+      );
+    }
+  }
+  const timeout = value.timeout;
+  if (timeout !== undefined) {
+    const isUsable =
+      typeof timeout === "number" && timeout > 0 && timeout <= MAX_WEB_TIMEOUT;
+    if (isUsable) web.timeout = timeout;
+    else {
+      warn(
+        `mapo.ai.web.timeout is not a number of seconds above 0, up to ${MAX_WEB_TIMEOUT}, so it is ${DEFAULT_WEB_TIMEOUT}.`,
+      );
+    }
+  }
+  return web;
+}
+
+/** Whether a character is a control one, which no header may hold: a line break, a NUL. */
+function isControl(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return code < 32 || code === 127;
+}
+
+/**
+ * The hosts of `allow` or `deny`, as written: each a host pattern, up to
+ * 200. An entry that is none is left out, and the warning says so;
+ * `whole` says whether every entry was read.
+ */
+function hostsOf(
+  value: unknown,
+  option: string,
+  warn: (message: string) => void,
+): { hosts: string[]; whole: boolean } {
+  if (value === undefined || value === null) return { hosts: [], whole: true };
+  if (!Array.isArray(value)) {
+    warn(`${option} is not a list of hosts.`);
+    return { hosts: [], whole: false };
+  }
+  if (value.length > MAX_HOSTS) {
+    warn(
+      `${option} names more than ${MAX_HOSTS} hosts: the others are left out.`,
+    );
+  }
+  const hosts: string[] = [];
+  for (const entry of value.slice(0, MAX_HOSTS)) {
+    const isHost =
+      typeof entry === "string" && hostPatternOf(entry) !== undefined;
+    if (isHost) hosts.push(entry.trim());
+    else {
+      warn(
+        `${option}: ${JSON.stringify(entry)} is no host ("example.org", "*.example.org", "localhost:3000"), so it is left out.`,
+      );
+    }
+  }
+  return { hosts, whole: hosts.length === value.length };
+}
+
 function limitsOf(
   value: unknown,
   warn: (message: string) => void,
@@ -729,7 +868,7 @@ function limitsOf(
   const names = Object.keys(DEFAULT_LIMITS) as (keyof MapoAiLimits)[];
   if (!isRecord(value)) {
     warn(
-      "mapo.ai.limits is not { perUserPerMinute?, maxSourceChars?, maxInstructionsChars?, maxFileBytes? }, so every limit is 0: run takes no call, and read no file.",
+      "mapo.ai.limits is not { perUserPerMinute?, maxSourceChars?, maxInstructionsChars?, maxFileBytes?, linksPerUserPerMinute? }, so every limit is 0: run takes no call, read no file and read/link no page.",
     );
     for (const name of names) limits[name] = 0;
     return limits;

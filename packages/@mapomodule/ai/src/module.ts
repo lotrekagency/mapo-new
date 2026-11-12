@@ -16,7 +16,10 @@ import {
 import type { NuxtModule } from "@nuxt/schema";
 import { accessRuleOption } from "./access";
 import type { MapoAiOptions } from "./index";
-import { MAPO_AI_READER_IDS } from "./runtime/server/readers/registry";
+import {
+  MAPO_AI_LINK_READER,
+  MAPO_AI_READER_IDS,
+} from "./runtime/server/readers/registry";
 import {
   providerKeyOf,
   providerKeyVariable,
@@ -195,10 +198,13 @@ export default defineNuxtModule<MapoAiOptions>({
         return [id, { ...enabled, apiKey: written ?? "" }];
       }),
     );
-    // Every reader of Mapo has its place, so the environment can turn one
-    // off at runtime (`NUXT_MAPO_AI_READERS_XLSX=false`).
+    // Every reader of Mapo has its place, and so do links, so the
+    // environment can turn one off at runtime (`NUXT_MAPO_AI_READERS_XLSX=false`,
+    // `NUXT_MAPO_AI_READERS_LINK=false`).
     const readers = {
-      ...Object.fromEntries(MAPO_AI_READER_IDS.map((id) => [id, true])),
+      ...Object.fromEntries(
+        [...MAPO_AI_READER_IDS, MAPO_AI_LINK_READER].map((id) => [id, true]),
+      ),
       ...run.readers,
     };
     nuxt.options.runtimeConfig.mapoAi = {
@@ -323,6 +329,10 @@ export default defineNuxtModule<MapoAiOptions>({
         name: "registerMapoAiReader",
         from: resolver.resolve("./runtime/server/readers/registry"),
       },
+      {
+        name: "registerMapoAiFetcher",
+        from: resolver.resolve("./runtime/server/links/registry"),
+      },
     ]);
 
     // What the app's pages use, without an import: the composables that
@@ -361,6 +371,12 @@ export default defineNuxtModule<MapoAiOptions>({
       route: `${MAPO_AI_GATEWAY_PATH}/read`,
       method: "post",
       handler: resolver.resolve("./runtime/server/routes/read.post"),
+    });
+    // The page of a link, fetched by the gateway and read as a file is.
+    addServerHandler({
+      route: `${MAPO_AI_GATEWAY_PATH}/read/link`,
+      method: "post",
+      handler: resolver.resolve("./runtime/server/routes/read-link.post"),
     });
     addServerHandler({
       route: `${MAPO_AI_GATEWAY_PATH}/run`,
