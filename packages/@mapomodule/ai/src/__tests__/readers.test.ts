@@ -3,6 +3,7 @@ import {
   decodeEntities,
   htmlReader,
   htmlToMarkdown,
+  readHtmlPage,
 } from "../runtime/server/readers/html";
 import {
   checkWorkbook,
@@ -260,6 +261,339 @@ describe("the reader of HTML", () => {
     await expect(textOf(htmlReader, fileOf("a.html", bytes))).resolves.toBe(
       "Prezzo: € 5",
     );
+  });
+
+  it("reads lists and quotes nested without end in a time and a text that grow with the page", () => {
+    // Each paragraph carried every list's indent and every quote's mark: these
+    // pages of under a megabyte ran the server out of memory.
+    const pages = [
+      "<ul><li>a".repeat(100_000),
+      `${"<blockquote>".repeat(200_000)}${"<p>a".repeat(100_000)}`,
+      `${"<ul>".repeat(50_000)}${"<li>a".repeat(100_000)}`,
+    ];
+
+    for (const html of pages) {
+      const started = performance.now();
+      const text = htmlToMarkdown(html);
+      expect(performance.now() - started).toBeLessThan(3000);
+      expect(text.length).toBeLessThan(html.length * 8);
+    }
+    const deep = htmlToMarkdown(
+      `${"<blockquote>".repeat(20)}<p>dentro</p>${"</blockquote>".repeat(20)}<p>fuori</p>`,
+    );
+    expect(deep).toBe(`${"> ".repeat(16)}dentro\n\nfuori`);
+  });
+
+  it("refuses a page whose text would pass five million characters", () => {
+    const html = `<blockquote>${"<p>parola parola parola</p>".repeat(400_000)}</blockquote>`;
+
+    expect(() => htmlToMarkdown(html)).toThrow("passes 5000000 characters");
+  });
+
+  it("reads a page in the encoding its media type names, before its <meta>", async () => {
+    const head = new TextEncoder().encode(
+      '<html><head><meta charset="windows-1251"></head><body><p>Prezzo: ',
+    );
+    const bytes = new Uint8Array([...head, 0xa4, 0x20, 0x35]);
+    const file = fileOf("a.html", bytes, "text/html; charset=ISO-8859-15");
+
+    await expect(textOf(htmlReader, file)).resolves.toBe("Prezzo: € 5");
+  });
+});
+
+describe("the reader of HTML, on a page's main content", () => {
+  const around = (main: string) =>
+    `<html><body><header><nav><a href="/">Home</a></nav>
+      <p>Aperto da martedì a domenica, 9:30–17:00</p></header>
+      ${main}
+      <aside><p>Altri eventi</p></aside><footer><p>Privacy</p></footer>
+      </body></html>`;
+
+  it("reads only the page's <main>, without its header, sidebar and footer", () => {
+    const html = around(
+      "<main><h1>Notte dei pianeti</h1><p>Sabato 16 gennaio 2027.</p></main>",
+    );
+
+    expect(htmlToMarkdown(html)).toBe(
+      "# Notte dei pianeti\n\nSabato 16 gennaio 2027.",
+    );
+  });
+
+  it("takes an element whose role is main as the page's <main>", () => {
+    const html = around(
+      '<div ROLE="Main" class="x"><div><p>Dentro</p></div><p>Ancora</p></div><p>Fuori</p>',
+    );
+
+    expect(htmlToMarkdown(html)).toBe("Dentro\n\nAncora");
+  });
+
+  it("reads the page's one <article> when it has no <main>", () => {
+    const html = around(
+      "<article><h2>Notte dei pianeti</h2><p>Sabato.</p></article>",
+    );
+
+    expect(htmlToMarkdown(html)).toBe("## Notte dei pianeti\n\nSabato.");
+  });
+
+  it("reads the whole page when it marks no main content, or more than one", () => {
+    const articles = around(
+      "<article><p>Uno</p></article><article><p>Due</p></article>",
+    );
+    const mains = around("<main><p>Uno</p></main><main><p>Due</p></main>");
+    const whole = [
+      "Aperto da martedì a domenica, 9:30–17:00",
+      "Uno",
+      "Due",
+      "Altri eventi",
+      "Privacy",
+    ].join("\n\n");
+
+    expect(htmlToMarkdown(articles)).toBe(whole);
+    expect(htmlToMarkdown(mains)).toBe(whole);
+  });
+
+  it("reads the whole page when its <main> holds no text", () => {
+    const html = around("<main><img src='a.jpg'></main><p>Il testo</p>");
+
+    expect(htmlToMarkdown(html)).toContain("Il testo");
+  });
+
+  it("never takes a <main> inside an element it leaves out", () => {
+    const html = around(
+      "<template><main><p>Mai</p></main></template><article><p>Sì</p></article>",
+    );
+
+    expect(htmlToMarkdown(html)).toBe("Sì");
+  });
+});
+
+describe("the reader of HTML, on a page's title and address", () => {
+  it("puts the page's title and canonical address on top, and reads its relative links against it", async () => {
+    const html = `<html><head><title>Notte dei pianeti &middot; Museo</title>
+      <link rel="alternate canonical" href="https://museo.example/eventi/notte?x=1#top"></head>
+      <body><main><p>Vedi <a href="/biglietti">i biglietti</a>,
+      <a href="//cdn.example/mappa.pdf">la mappa</a>, <a href="#orari">gli orari</a>
+      o <a href="javascript:go()">qui</a>.</p></main></body></html>`;
+
+    expect(await htmlReader.read(fileOf("notte.html", html))).toEqual([
+      {
+        kind: "text",
+        name: "notte.html",
+        text: [
+          "Page title: Notte dei pianeti · Museo",
+          "Page URL: https://museo.example/eventi/notte?x=1",
+          "",
+          "Vedi [i biglietti](https://museo.example/biglietti), [la mappa](https://cdn.example/mappa.pdf), gli orari o qui.",
+        ].join("\n"),
+      },
+    ]);
+  });
+
+  it("reads the links against the page's <base>, itself read against the address", () => {
+    const html = `<head><base href="/eventi/"><meta property="og:url" content="https://museo.example/a/b"></head>
+      <body><p><a href="notte">La notte</a></p></body>`;
+
+    expect(readHtmlPage(html)).toMatchObject({
+      address: "https://museo.example/a/b",
+      text: "[La notte](https://museo.example/eventi/notte)",
+    });
+  });
+
+  it("takes the title and the address of Open Graph when the page writes no other", () => {
+    const html = `<head><meta property="og:title" content="La notte">
+      <meta property="og:url" content="https://museo.example/notte"></head><body><p>x</p></body>`;
+
+    expect(readHtmlPage(html)).toMatchObject({
+      title: "La notte",
+      address: "https://museo.example/notte",
+    });
+  });
+
+  it("takes an address of the web only, and the one it was read from first", () => {
+    const relative = `<head><link rel="canonical" href="/notte"></head><body><p>x</p></body>`;
+    const ftp = `<head><link rel="canonical" href="ftp://museo.example/notte"></head><body><p>x</p></body>`;
+    const both = `<head><link rel="canonical" href="https://museo.example/vecchia"></head><body><p><a href="b">b</a></p></body>`;
+
+    expect(readHtmlPage(relative).address).toBeUndefined();
+    expect(readHtmlPage(ftp).address).toBeUndefined();
+    expect(
+      readHtmlPage(both, { address: "https://museo.example/nuova/" }),
+    ).toMatchObject({
+      address: "https://museo.example/nuova/",
+      text: "[b](https://museo.example/nuova/b)",
+    });
+  });
+
+  it("reads the relative links against the base given, and keeps their words only without one", () => {
+    const html = `<p><a href="/contatti">contatti</a></p>`;
+
+    expect(htmlToMarkdown(html, { base: "https://acme.it/chi-siamo" })).toBe(
+      "[contatti](https://acme.it/contatti)",
+    );
+    expect(htmlToMarkdown(html)).toBe("contatti");
+  });
+});
+
+describe("the reader of HTML, on a page's structured data", () => {
+  const EVENT = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    "@id": "https://museo.example/#notte",
+    name: "Notte dei pianeti",
+    startDate: "2027-01-16T19:00:00+01:00",
+    location: {
+      "@type": "Place",
+      name: "Museo della Scienza",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "Via San Vittore 21",
+        addressLocality: "Milano",
+      },
+    },
+    offers: [
+      { "@type": "Offer", price: 12, priceCurrency: "EUR" },
+      { "@type": "Offer", price: 8, priceCurrency: "EUR" },
+    ],
+    isAccessibleForFree: false,
+    description: "x".repeat(1001),
+    potentialAction: { "@type": "BuyAction", target: "https://museo.example" },
+  };
+  const GRAPH = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "BreadcrumbList", itemListElement: [{ name: "Home" }] },
+      {
+        "@type": ["Organization"],
+        name: "Museo",
+        logo: { "@type": "ImageObject", url: "a.png" },
+      },
+      { "@type": "WebPage", name: { "@value": "La notte", "@language": "it" } },
+    ],
+  };
+  const page = (head: string, body = "<p>Testo.</p>") =>
+    `<html><head><title>Notte</title>${head}</head><body>${body}</body></html>`;
+  const jsonLd = (value: unknown) =>
+    `<script type="application/ld+json; charset=utf-8">${JSON.stringify(value)}</script>`;
+
+  it("writes JSON-LD and Open Graph as lines in a part of their own, without what says nothing of the content", async () => {
+    const html = page(
+      [
+        '<meta property="og:title" content="Notte dei pianeti">',
+        '<meta property="og:image" content="https://museo.example/a.jpg">',
+        '<meta name="description" content="Telescopi &amp; pianeti.">',
+        '<meta property="article:tag" content="astronomia">',
+        '<meta property="article:tag" content="famiglie">',
+        '<meta property="article:tag" content="famiglie">',
+        '<meta name="viewport" content="width=device-width">',
+        jsonLd(EVENT),
+        jsonLd(GRAPH),
+        '<script type="application/ld+json">{ not json</script>',
+      ].join(""),
+    );
+
+    const parts = await htmlReader.read(fileOf("notte.html", html));
+
+    expect(parts).toEqual([
+      { kind: "text", name: "notte.html", text: "Page title: Notte\n\nTesto." },
+      {
+        kind: "text",
+        name: "Structured data of notte.html",
+        text: [
+          "@type: Event",
+          "name: Notte dei pianeti",
+          "startDate: 2027-01-16T19:00:00+01:00",
+          "location.name: Museo della Scienza",
+          "location.address.streetAddress: Via San Vittore 21",
+          "location.address.addressLocality: Milano",
+          "offers.price: 12",
+          "offers.priceCurrency: EUR",
+          "offers.price: 8",
+          "offers.priceCurrency: EUR",
+          "isAccessibleForFree: false",
+          "",
+          "@type: Organization",
+          "name: Museo",
+          "",
+          "@type: WebPage",
+          "name: La notte",
+          "",
+          "og:title: Notte dei pianeti",
+          "description: Telescopi & pianeti.",
+          "article:tag: astronomia",
+          "article:tag: famiglie",
+        ].join("\n"),
+      },
+    ]);
+  });
+
+  it("gives the structured data alone, with the title on top, for a page whose text a script writes", async () => {
+    const html = page(
+      jsonLd({ "@type": "Event", name: "Notte" }),
+      '<div id="app"></div><script src="/app.js"></script>',
+    );
+
+    expect(await htmlReader.read(fileOf("app.html", html))).toEqual([
+      {
+        kind: "text",
+        name: "Structured data of app.html",
+        text: "Page title: Notte\n\n@type: Event\nname: Notte",
+      },
+    ]);
+  });
+
+  it("names the part after the page within the characters run takes", async () => {
+    const name = `${"n".repeat(195)}.html`;
+    const parts = await htmlReader.read(
+      fileOf(name, page(jsonLd({ name: "Notte" }))),
+    );
+
+    expect(parts[1]?.name).toHaveLength(200);
+    expect(parts[1]?.name?.startsWith("Structured data of nnn")).toBe(true);
+  });
+
+  it("keeps about 10,000 characters of structured data, whole lines, the first ones", () => {
+    const many = {
+      "@type": "ItemList",
+      itemListElement: Array.from({ length: 2000 }, (_, at) => ({
+        name: `Elemento ${at}`,
+      })),
+    };
+    const structured = readHtmlPage(page(jsonLd(many))).structured;
+    const lines = structured.split("\n");
+
+    expect(structured.length).toBeLessThanOrEqual(10_000);
+    expect(structured.length).toBeGreaterThan(9_900);
+    expect(lines[1]).toBe("itemListElement.name: Elemento 0");
+    expect(lines.every((line) => /^[@\w.]+: /.test(line))).toBe(true);
+  });
+
+  it("leaves out what lies deeper than eight levels, a block too long and the blocks past twenty", () => {
+    let deep: unknown = { name: "fondo" };
+    for (let at = 0; at < 10; at += 1) deep = { child: deep };
+    const long = { name: "lungo", filler: "y".repeat(500_001) };
+    const blocks = Array.from({ length: 21 }, (_, at) => jsonLd({ n: at }));
+    const structured = (head: string) => readHtmlPage(page(head)).structured;
+
+    expect(structured(jsonLd({ name: "su", ...(deep as object) }))).toBe(
+      "name: su",
+    );
+    expect(structured(jsonLd(long))).toBe("");
+    expect(structured(blocks.join("")).split("\n\n")).toEqual(
+      Array.from({ length: 20 }, (_, at) => `n: ${at}`),
+    );
+  });
+
+  it("reads a page of many <meta> in a time that grows with it", () => {
+    const metas = Array.from(
+      { length: 50_000 },
+      (_, at) => `<meta property="og:x" content="v${at}">`,
+    ).join("");
+    const started = performance.now();
+
+    const structured = readHtmlPage(page(metas)).structured;
+
+    expect(performance.now() - started).toBeLessThan(3000);
+    expect(structured.startsWith("og:x: v0\nog:x: v1")).toBe(true);
   });
 });
 

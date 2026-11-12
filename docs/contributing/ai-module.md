@@ -569,6 +569,11 @@ The app's readers come before Mapo's, in the order the app registers them, and a
 
 - **Text, Markdown, JSON**: the text as the file writes it. JSON is parsed only to tell a damaged file, never written again: `JSON.stringify` would round a 20-digit id.
 - **HTML**: a tokenizer of its own, with no DOM, which Nitro's runtimes do not have, and no dependency. It writes Markdown, so the AI can carry headings, lists, links, bold and italic into a rich text field, whose restricted Markdown takes them. It skips what a person does not read, a menu (`nav`) included; it keeps a link's address to the web, an email or a phone, for a URL or an email field; a table becomes a Markdown table, a table in a cell its words. It decodes Latin-1's and typography's named characters, every numeric one, and Windows-1252's own range (`&#146;`) as browsers do.
+  - **Two readings of a page.** `scanHtml()` walks the tags once for each, with the same rules of what to skip. The first (`scanPage()`) finds the title, the `<meta>` it keeps, the canonical address, the `<base>`, the JSON-LD and how many `<main>` and `<article>` the page has; the second writes the text, of the region alone when there is one (`inRegion()`). A region with no text is written again as the whole page, so the worst case reads a page three times, in a time that still grows with it.
+  - **The bounds of the writing.** Lists and quotes nested deeper than 16 are written as the 16th: each paragraph carries its lists' indent and its quotes' marks, and a page of under a megabyte nested without end ran the server out of memory. The text written stops at 5,000,000 characters, more than any source `run` takes, and the page is `failed`.
+  - **The main content** is the page's one `<main>` (or `role="main"`), else its one `<article>`. Several of them mean a list, such as a page of news, so the page is read whole: the reader never guesses which is the content. The header and the footer of a page that marks nothing still reach the AI.
+  - **The title and the address** go on top of the text as lines (`Page title:`, `Page URL:`), not in the part's name, so a quote can carry them and a URL field be verified. The labels are not a field's, so the mock's "Label: value" rule never fills a field with them.
+  - **The structured data** is a second part, named first with `Structured data of`, since the prompt cuts a part's name to 120 characters. JSON-LD is read with `JSON.parse` within bounds (20 blocks of 500,000 characters at most, eight levels), written as `path: value` lines, a list's items one after the other; what says nothing of the content stays out by key (`@context`, `@id`, `potentialAction`, `breadcrumb`) and by type (`BreadcrumbList`, `ImageObject`, `SearchAction`, WordPress's parts), and a value longer than 1,000 characters is in the text already. The lines stop at 10,000 characters, at a line's end. A page whose text a script writes often keeps its JSON-LD for search engines, so the reader gives that alone rather than nothing.
 - **CSV**: a parser of its own, RFC 4180 in forty lines, where `papaparse` would add a package and its types. The delimiter is Excel's `sep=` line, else the first of tab, `;`, `|` and `,` that splits the first row and half of the first twenty: `;` before `,`, since a CSV that writes decimals with a comma separates with `;`.
 - **XLSX**: `read-excel-file` (MIT), in its `universal` build, which unzips with `fflate` and parses with a SAX parser: plain JavaScript, on every runtime of Nitro. It is imported with the first workbook, so a server that reads none never loads it. A cell gives its value: a date in ISO form, a number with 15 significant digits, as a spreadsheet keeps it.
 
@@ -579,7 +584,8 @@ The app's readers come before Mapo's, in the order the app registers them, and a
 - **One dependency**, for XLSX, loaded only when a workbook comes.
 - **A sheet goes whole**: a large one is `too-long` rather than sampled, and a workbook counts all its sheets: the operator cannot pick one sheet yet.
 - **A cell's format is lost**: `25%` reads `0.25`, an amount its number; hidden rows and sheets are read.
-- **The HTML reader is no browser**: it does not apply the CSS (`display: none` is read), nor know which part of a page is its content, so a page's header and footer reach the AI.
+- **The HTML reader is no browser**: it does not apply the CSS (`display: none` is read) nor run the scripts, and it knows a page's content only where the page marks it, with one `<main>` or one `<article>`; elsewhere a page's header and footer reach the AI.
+- **The structured data can disagree with the text**: a page may update one and not the other. Both reach the AI, each in its part, and nothing tells the model which to trust.
 - **The hook is no boundary**: a text the page sends to `run` itself never goes through it, so an app that must keep something away from every provider needs a check where `run` reads its source.
 - **No limit of calls on `read`**: it calls no AI, but a large workbook costs the server memory and time.
 
@@ -1056,7 +1062,7 @@ Ideas with no place in the plan yet:
 - Pick the sheets of a workbook, or a range of rows, before `run`: today a workbook goes whole.
 - A hook where `run` reads its source, for an app that must keep something away from every provider, pasted text included.
 - A limit of calls on `read`, and reading a large workbook without holding it all in memory.
-- A reader of a web page's main content only, without its header, menus and footer.
+- Microdata (`itemprop`) and RDFa read as structured data, as JSON-LD is; and a page's main content guessed where it marks none, by the density of its text.
 - Count a prompt's tokens before an Anthropic call (`count_tokens`, free), to warn before a long source.
 - The batch APIs of OpenAI and Anthropic, at half the price, for Import AI.
 - Claude and OpenAI's models through Amazon Bedrock, Google Vertex AI or Azure, for a region in Europe.
