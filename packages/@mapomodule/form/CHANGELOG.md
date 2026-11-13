@@ -1,3 +1,9 @@
+# @mapomodule/form [2.0.0-experimental.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-experimental.1...@mapomodule/form@2.0.0-experimental.2) (2026-11-13)
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-experimental.2
+
 # @mapomodule/form [2.0.0-experimental.1](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@1.0.0...@mapomodule/form@2.0.0-experimental.1) (2026-11-12)
 
 - feat(release)!: prepare for first 2.0.0.beta release \ BREAKING CHANGE: this is a completely rewritten version of mapo ([d906c8d](https://github.com/lotrekagency/mapo-new/commit/d906c8da8675bef2505ead5f744fd72fbf5acab2))
