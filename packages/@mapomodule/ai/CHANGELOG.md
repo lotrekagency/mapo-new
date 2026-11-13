@@ -1,3 +1,14 @@
+# @mapomodule/ai [1.0.0-experimental.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/ai@1.0.0-experimental.1...@mapomodule/ai@1.0.0-experimental.2) (2026-11-13)
+
+### Features
+
+- **ai:** read a page's main content, title and structured data from HTML ([bc6362f](https://github.com/lotrekagency/mapo-new/commit/bc6362f92fce16a6a031aa3b1afcb760747a73cd))
+- **ai:** read a web page from its link ([498f2d2](https://github.com/lotrekagency/mapo-new/commit/498f2d2cb0012cc282c882418ed335cba6e1796b))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-experimental.2
+
 # @mapomodule/ai 1.0.0-experimental.1 (2026-11-12)
 
 ### Bug Fixes
