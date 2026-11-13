@@ -1,3 +1,9 @@
+# @mapomodule/mcp [1.0.0-experimental.2](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-experimental.1...@mapomodule/mcp@1.0.0-experimental.2) (2026-11-13)
+
+### Bug Fixes
+
+- **mcp:** describe reading a web page from its link ([29980aa](https://github.com/lotrekagency/mapo-new/commit/29980aae2c7b445e31885795e90599f237e5c51f))
+
 # @mapomodule/mcp 1.0.0-experimental.1 (2026-11-12)
 
 ### Bug Fixes
