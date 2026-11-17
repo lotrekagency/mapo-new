@@ -15,6 +15,7 @@ import { useMediaStore } from "../stores/media.js";
 import { pickLanguage, restrictLanguages } from "../utils/langInfo.js";
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { describeMediaErrors, pickMetadata } from "../utils/mediaMetadata.js";
+import { mediaFileUrl } from "../utils/mediaUrl.js";
 import type { MediaItem } from "../types/media.js";
 
 const props = defineProps<{
@@ -104,7 +105,13 @@ watch(
   },
 );
 
-const metaRows = computed(() => {
+// Links open the versioned URL, so a file replaced at the same URL shows its new
+// content; the text stays the real URL, the one worth copying.
+const fileUrl = computed(() => (media.value ? mediaFileUrl(media.value) : ""));
+
+const metaRows = computed<
+  { label: string; value: string; isUrl: boolean; href?: string }[]
+>(() => {
   if (!media.value) return [];
   const m = media.value;
   return [
@@ -120,7 +127,7 @@ const metaRows = computed(() => {
       isUrl: false,
     },
     { label: t("mapo.created"), value: formatDate(m.created), isUrl: false },
-    { label: t("mapo.url"), value: m.file, isUrl: true },
+    { label: t("mapo.url"), value: m.file, isUrl: true, href: fileUrl.value },
   ];
 });
 
@@ -264,7 +271,7 @@ function formatDate(dateStr: string): string {
             size="xs"
             variant="ghost"
             color="neutral"
-            :href="media.file"
+            :href="fileUrl"
             target="_blank"
             :title="t('mapo.mediaEditor.openInNewTab')"
           />
@@ -295,7 +302,7 @@ function formatDate(dateStr: string): string {
                 <dd class="flex-1 truncate font-mono text-default">
                   <a
                     v-if="row.isUrl"
-                    :href="row.value"
+                    :href="row.href ?? row.value"
                     target="_blank"
                     rel="noopener"
                     class="text-primary hover:underline"

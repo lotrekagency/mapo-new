@@ -421,6 +421,8 @@ MIME-aware renderer: `image` → `<img>`, `video` → `<video>`, otherwise a fil
 />
 ```
 
+The file loads with `?v=<modified, else created>` appended, and so do the editor's links to it: a file replaced with **Keep current URL** has the same URL, and without the version the browser would keep showing the cached old one. A URL that already has a query string (a signed one) and `data:` or `blob:` URLs are left as they are, and the stored `file` never changes. Camomilla updates `created` on every save, a replacement included. Outside the backoffice, how long browsers keep the old file at that URL depends on the server's cache headers.
+
 ---
 
 ## Form fields
