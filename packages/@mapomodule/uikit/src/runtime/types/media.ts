@@ -111,9 +111,17 @@ export interface MediaAdapter {
   buildFolderPayload?(folder: Partial<MediaFolder>): Record<string, unknown>;
   /**
    * Build the PATCH payload for a media metadata update.
-   * Default: `{ title, alt_text, description, translations }`.
+   *
+   * `previous` is the media as it was when editing started; the editor always
+   * passes it. Default: with `previous`, only the fields that changed, with
+   * `translations` narrowed to the changed languages and fields; without it,
+   * `{ title, alt_text, description, translations }`. An empty object skips
+   * the request.
    */
-  buildMediaPatchPayload?(media: MediaItem): Record<string, unknown>;
+  buildMediaPatchPayload?(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Record<string, unknown>;
   /**
    * Build the multipart PATCH payload for a file replacement.
    * @example

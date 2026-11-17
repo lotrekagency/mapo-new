@@ -162,8 +162,16 @@ interface MediaAdapter {
   buildDetailParams?(ctx: { lang?: string }): Record<string, unknown>;
   /** Map a canonical folder ({ name, parent }) to the backend's create/update payload. */
   buildFolderPayload?(folder: Partial<MediaFolder>): Record<string, unknown>;
-  /** Build the PATCH payload for a metadata update (default: title/alt_text/description/translations). */
-  buildMediaPatchPayload?(media: MediaItem): Record<string, unknown>;
+  /**
+   * Build the PATCH payload for a metadata update. `previous` is the media as it was
+   * when editing started (the editor always passes it): the default then sends only
+   * the changed fields, `translations` narrowed to the changed languages and fields.
+   * Without it: title/alt_text/description/translations. `{}` skips the request.
+   */
+  buildMediaPatchPayload?(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Record<string, unknown>;
   /** Build the multipart PATCH payload for a file replacement (default REST: { file, maintain_url }). */
   buildReplaceFilePayload?(
     file: File,
@@ -288,11 +296,13 @@ Auto-imported Pinia store available throughout the app.
 
 ### Getters
 
-| Getter          | Description                                                     |
-| --------------- | --------------------------------------------------------------- |
-| `parentFolder`  | Last entry of `parentFolders`                                   |
-| `editListSet`   | `editList` as a `Set` for O(1) lookup                           |
-| `editListState` | `{ value, indeterminate, outside }` for the select-all checkbox |
+| Getter            | Description                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `parentFolder`    | Last entry of `parentFolders`                                                                  |
+| `editListSet`     | `editList` as a `Set` for O(1) lookup                                                          |
+| `editListState`   | `{ value, indeterminate, outside }` for the select-all checkbox                                |
+| `activeLanguages` | Languages of the metadata: the ones set with `setLanguages`, else the endpoint's (`lang_info`) |
+| `initialLanguage` | Language the editor opens on and uploads write into; `""` when media are not translated        |
 
 ### Actions
 
@@ -303,16 +313,17 @@ await store.getRoot({ page?, search?, mime?, all? })  // fetch current folder
 await store.navigateToFolder(folder | null)           // null = root; uses detail(folderId)
 await store.openEditor(media)                          // fetch detail + open drawer
 store.closeEditor()
-store.setLang('it')                                    // language for detail metadata
+store.setLang('it')                                    // preferred language: detail metadata, editor, uploads
+store.setLanguages(['it', 'en'])                       // impose the metadata languages; [] reads them from OPTIONS
 
-await store.updateMedia(media)
+await store.updateMedia(media, previous?)              // previous: the pre-edit copy, to send only the changes
 await store.replaceFile(mediaId, file, maintainUrl?)
 await store.deleteMedia(media)
 
 await store.updateOrCreateFolder({ id?, name, parent? })
 await store.deleteFolder(folder)
 
-const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void
+const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void; translated media get the metadata as the initialLanguage translation
 
 store.setSelectionMode('none' | 'single' | 'multi')
 store.setSelection(value)
@@ -342,8 +353,8 @@ Main shell. Mounts the store and calls `reset()` on `onUnmounted`.
 | `selectionMode`    | `SelectMode`                       | `'none'` | Selection mode                                                 |
 | `mime`             | `string \| null`                   | `null`   | Initial MIME filter                                            |
 | `noFolders`        | `boolean`                          | `false`  | Hide the folder sidebar                                        |
-| `languages`        | `string[]`                         | —        | Languages for editor metadata form                             |
-| `defaultLang`      | `string`                           | —        | Default editor language                                        |
+| `languages`        | `string[]`                         | —        | Metadata languages (default: the endpoint's `lang_info`)       |
+| `defaultLang`      | `string`                           | —        | Language the editor opens on and uploads write into            |
 | `initialSelection` | `MediaItem \| MediaItem[] \| null` | `null`   | Pre-seed the picker selection (e.g. the field's current value) |
 
 Emits `update:selection` with `MediaItem | MediaItem[] | null` in picker mode. When `mime` is set it is treated as a **hard lock** (`lockMimeType`): the folders panel only offers the matching filter. When `defaultLang` is set, media detail fetches send it as `language_code`.
@@ -516,13 +527,17 @@ Families (`image/*`, `video/*`, `audio/*`, `application/*`) and exact types (`ap
 
 ## How to: handle multilingual media metadata
 
-Pass the language list to the manager — the editor drawer shows a language switch and writes per-language values into `media.translations[lang]`:
+The manager reads the metadata languages from the media endpoint's OPTIONS (`lang_info`, as Camomilla publishes it), so most apps pass nothing. Pass a list to impose one:
 
 ```vue
 <MapoMediaManager :languages="['it', 'en']" default-lang="it" />
 ```
 
-`defaultLang` is also sent as `language_code` on detail fetches (the Camomilla adapter maps it). The "Default" tab edits the untranslated base fields.
+With languages, the editor shows one tab per language (the switch appears from two languages up) and reads and writes `media.translations[lang]`. There is no tab for the untranslated fields: on a backend that translates media they are the active language's values under another name, and Camomilla ignores them on write. The editor opens on `defaultLang` when it is among the languages, otherwise on the first one. Uploads put title, alt text and description in that same language's translation. Without languages, the editor and the uploader use the plain fields.
+
+Saving sends only what changed, `translations` included: the default adapter diffs against the copy taken when editing started. A failed save shows the backend's errors in an error toast, and the editor stays open with the edits.
+
+`defaultLang` is also sent as `language_code` on detail fetches (the Camomilla adapter maps it).
 
 ## How to: gate editing with permissions
 

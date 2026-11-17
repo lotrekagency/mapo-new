@@ -218,7 +218,6 @@
     },
     "mediaEditor": {
       "details": "Dettagli",
-      "defaultLang": "Predefinita",
       "openInNewTab": "Apri in una nuova scheda",
       "confirmDelete": "Vuoi veramente eliminare \"{name}\"?"
     },

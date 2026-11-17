@@ -218,7 +218,6 @@
     },
     "mediaEditor": {
       "details": "Details",
-      "defaultLang": "Default",
       "openInNewTab": "Open in new tab",
       "confirmDelete": "Are you sure you want to delete \"{name}\"?"
     },

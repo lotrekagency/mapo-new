@@ -8,7 +8,8 @@ import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
-import { languagesFromMetadata } from "../utils/langInfo.js";
+import { languagesFromMetadata, pickLanguage } from "../utils/langInfo.js";
+import { buildUploadBody } from "../utils/mediaMetadata.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -93,8 +94,25 @@ export const useMediaStore = defineStore("mapo-media", () => {
   // it a hardcoded list.
   const languages = ref<string[]>([]);
   let languagesPromise: Promise<void> | null = null;
+  // The host's own list (the manager's `languages` prop). Kept here, not in
+  // the editor, so the editor and the uploader always work on the same list.
+  const languageOverride = ref<string[]>([]);
 
   // ─── Getters ──────────────────────────────────────────────────────────────
+  /** Languages the metadata is edited and uploaded in: the host's list, else the endpoint's. */
+  const activeLanguages = computed(() =>
+    languageOverride.value.length ? languageOverride.value : languages.value,
+  );
+
+  /**
+   * Language the editor opens on and uploads write into: the preferred one
+   * (`setLang`) when offered, else the first. `""` when media are not
+   * translated.
+   */
+  const initialLanguage = computed(() =>
+    pickLanguage(activeLanguages.value, _currentLang.value),
+  );
+
   const parentFolder = computed(
     () => parentFolders.value[parentFolders.value.length - 1] ?? null,
   );
@@ -242,14 +260,31 @@ export const useMediaStore = defineStore("mapo-media", () => {
     _currentLang.value = lang;
   }
 
-  async function updateMedia(media: MediaItem): Promise<MediaItem> {
+  /** Impose the metadata languages instead of reading them from the endpoint; empty clears it. */
+  function setLanguages(langs: string[] | undefined): void {
+    languageOverride.value = langs ?? [];
+  }
+
+  /**
+   * Save the metadata of `media`. With `previous`, the media as it was when
+   * editing started, the default adapter sends only what changed; when nothing
+   * did, no request is made.
+   */
+  async function updateMedia(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Promise<MediaItem> {
     const a = adapter();
     const payload = (
       a.buildMediaPatchPayload ?? defaultMediaAdapter.buildMediaPatchPayload
-    )(media);
-    const updated = await mediaCrud().partialUpdate(media.id, payload as never);
-    // Keep the open editor in sync with the server response (legacy behavior).
-    if (editMedia.value?.id === media.id) editMedia.value = updated;
+    )(media, previous);
+    let updated = media;
+    const hasChanges = Object.keys(payload).length > 0;
+    if (hasChanges) {
+      updated = await mediaCrud().partialUpdate(media.id, payload as never);
+      // Keep the open editor in sync with the server response (legacy behavior).
+      if (editMedia.value?.id === media.id) editMedia.value = updated;
+    }
     useSnackStore().show(useMapoT()("mapo.mediaManager.fileInfo"), "success");
     await getRoot();
     return updated;
@@ -389,15 +424,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
     payload: MediaUploadPayload,
     onProgress?: (percent: number) => void,
   ): Promise<MediaItem> {
+    // Translated media take their metadata as a translation, and only the
+    // endpoint's OPTIONS says whether they are: wait for that answer.
+    await deriveLanguages();
+    const body = buildUploadBody(payload, initialLanguage.value || undefined);
     // Build the body through the same multipart pipeline every other write uses
     // (`data` JSON envelope + files at their dot-path). Hand-rolling a flat
     // FormData here made uploads the only write that spoke a different wire
     // format, which backends parsing the envelope reject.
-    const body: Record<string, unknown> = { file: payload.file };
-    if (payload.title) body.title = payload.title;
-    if (payload.alt_text) body.alt_text = payload.alt_text;
-    if (payload.description) body.description = payload.description;
-    if (payload.folder != null) body.folder = payload.folder;
     const formData = applyMultipartPolicy(body, "force") as FormData;
 
     // ofetch has no upload-progress hook, so uploads go through XHR.
@@ -459,6 +493,9 @@ export const useMediaStore = defineStore("mapo-media", () => {
     _currentFolderId.value = null;
     _currentSearch.value = "";
     _currentAll.value = false;
+    // Both come from the manager's props: the next manager sets its own.
+    _currentLang.value = undefined;
+    languageOverride.value = [];
   }
 
   return {
@@ -477,6 +514,8 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selectMode,
     languages,
     // getters
+    activeLanguages,
+    initialLanguage,
     parentFolder,
     editListSet,
     editListState,
@@ -487,6 +526,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     openEditor,
     closeEditor,
     setLang,
+    setLanguages,
     updateMedia,
     replaceFile,
     updateOrCreateFolder,

@@ -36,3 +36,14 @@ export function languagesFromMetadata(metadata: unknown): string[] {
     (code): code is string => typeof code === "string",
   );
 }
+
+/**
+ * The language to start from: `preferred` when the list offers it, else the
+ * first one. Returns `""` for an empty list, which callers read as "this
+ * model is not translated".
+ */
+export function pickLanguage(languages: string[], preferred?: string): string {
+  if (!preferred) return languages[0] ?? "";
+  const isOffered = languages.includes(preferred);
+  return isOffered ? preferred : (languages[0] ?? "");
+}

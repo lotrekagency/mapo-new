@@ -10,7 +10,16 @@ const props = withDefaults(
     selectionMode?: SelectMode;
     mime?: string | null;
     noFolders?: boolean;
+    /**
+     * Languages of the media metadata, for the editor and the uploader.
+     * Default: the ones the media endpoint declares on OPTIONS (`lang_info`).
+     */
     languages?: string[];
+    /**
+     * Language the editor opens on and uploads write into, when it is among
+     * the languages (default: the first). Also sent as `language_code` on
+     * detail fetches.
+     */
     defaultLang?: string;
     /** Pre-seed the picker selection (e.g. the field's current value). */
     initialSelection?:
@@ -83,6 +92,8 @@ onMounted(async () => {
   // Detail fetches send language_code when a default language is provided
   // (legacy parity: v1 passed $i18n.locale).
   if (props.defaultLang) store.setLang(props.defaultLang);
+  // The editor and the uploader read the languages from the store.
+  store.setLanguages(props.languages);
   await store.getRoot({ page: 1 });
 });
 

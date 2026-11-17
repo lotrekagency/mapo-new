@@ -9,17 +9,23 @@ import {
   setNestedValue,
 } from "@mapomodule/utils";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
+import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { getErrorData } from "@mapomodule/core/runtime/utils/fetchError";
 import { useMediaStore } from "../stores/media.js";
+import { pickLanguage } from "../utils/langInfo.js";
+import { describeMediaErrors, pickMetadata } from "../utils/mediaMetadata.js";
 import type { MediaItem } from "../types/media.js";
 
 const props = defineProps<{
   /** Overrides the languages read from the endpoint. Rarely needed. */
   languages?: string[];
+  /** Language the editor opens on, when it is among the languages. Default: the first one. */
   defaultLang?: string;
 }>();
 
 const { t } = useI18n();
 const store = useMediaStore();
+const snack = useSnackStore();
 
 // Model-permission gating (legacy parity): edit/delete only with the
 // change/delete permission on the configured media model.
@@ -35,14 +41,34 @@ const editing = ref(false);
 const saving = ref(false);
 const newFile = ref<File | null>(null);
 const maintainUrl = ref(false);
-const currentLang = ref("");
+// Remounts the file changer, clearing the file it shows, once that file is stored.
+const fileChangerKey = ref(0);
 
-// The languages actually offered. An explicit prop wins; otherwise they come
-// from the media endpoint's own OPTIONS metadata, so a host page never has to
-// restate what the backend already knows — and a media model nobody registered
-// for translation shows no switcher rather than tabs whose values it discards.
+// The languages actually offered. An explicit prop wins; otherwise the store's
+// list: the manager's own, or the media endpoint's OPTIONS metadata, so a host
+// page never has to restate what the backend already knows — and a media model
+// nobody registered for translation shows no switcher rather than tabs whose
+// values it discards.
 const activeLangs = computed(() =>
-  props.languages?.length ? props.languages : store.languages,
+  props.languages?.length ? props.languages : store.activeLanguages,
+);
+
+// The language being edited, `""` when media are not translated. There is no
+// "untranslated" tab next to the languages: on a backend that translates media
+// the plain fields are the active language's columns under another name, and
+// Camomilla drops them on write, so every edit goes to a translation.
+const currentLang = ref("");
+watch(
+  activeLangs,
+  (langs) => {
+    const isOffered = langs.includes(currentLang.value);
+    if (isOffered) return;
+    currentLang.value = pickLanguage(
+      langs,
+      props.defaultLang ?? store.initialLanguage,
+    );
+  },
+  { immediate: true },
 );
 
 onMounted(() => {
@@ -135,22 +161,48 @@ function cancelEditing() {
   newFile.value = null;
 }
 
+// Field labels for the error toast, keyed like the backend reports the fields.
+const errorLabels = computed(() => ({
+  title: t("mapo.title"),
+  alt_text: t("mapo.altTag"),
+  description: t("mapo.description"),
+  file: t("mapo.file"),
+}));
+
+function notifySaveError(error: unknown) {
+  const lines = describeMediaErrors(getErrorData(error), errorLabels.value);
+  snack.show(lines.join("\n") || t("mapo.genericError"), "error");
+}
+
 async function save() {
   if (!media.value) return;
   saving.value = true;
+  // Snapshot the edited metadata BEFORE replacing the file: replaceFile
+  // syncs editMedia with the server response, which would otherwise
+  // silently discard the user's unsaved title/alt/description edits.
+  const edited = { ...media.value };
   try {
-    // Snapshot the edited metadata BEFORE replacing the file: replaceFile
-    // syncs editMedia with the server response, which would otherwise
-    // silently discard the user's unsaved title/alt/description edits.
-    const edited = { ...media.value };
     if (newFile.value) {
-      await store.replaceFile(edited.id, newFile.value, maintainUrl.value);
+      const replaced = await store.replaceFile(
+        edited.id,
+        newFile.value,
+        maintainUrl.value,
+      );
+      // The file is stored: a retry after a failed metadata save must not
+      // upload it again, and the form keeps the edits over the server copy.
+      newFile.value = null;
+      maintainUrl.value = false;
+      fileChangerKey.value++;
+      store.editMedia = { ...replaced, ...pickMetadata(edited) };
     }
-    await store.updateMedia(edited);
+    await store.updateMedia(edited, editSnapshot ?? undefined);
     editSnapshot = null;
     editing.value = false;
     newFile.value = null;
     maintainUrl.value = false;
+  } catch (error) {
+    // Stay in edit mode with the edits on screen, so they can be fixed.
+    notifySaveError(error);
   } finally {
     saving.value = false;
   }
@@ -269,13 +321,6 @@ function formatDate(dateStr: string): string {
             <!-- Lang switch -->
             <UFieldGroup v-if="activeLangs.length > 1" size="xs">
               <UButton
-                :variant="currentLang === '' ? 'solid' : 'outline'"
-                color="neutral"
-                @click="currentLang = ''"
-              >
-                {{ t("mapo.mediaEditor.defaultLang") }}
-              </UButton>
-              <UButton
                 v-for="lang in activeLangs"
                 :key="lang"
                 :variant="currentLang === lang ? 'solid' : 'outline'"
@@ -312,6 +357,7 @@ function formatDate(dateStr: string): string {
 
             <!-- File replace -->
             <MapoMediaFileChanger
+              :key="fileChangerKey"
               :media="media"
               @update:file="newFile = $event"
               @update:maintain-url="maintainUrl = $event"

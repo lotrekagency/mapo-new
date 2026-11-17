@@ -166,6 +166,8 @@ const item = await store.uploadMedia(
 );
 ```
 
+When the media are translated (the media endpoint declares languages in `lang_info`, or the manager sets them), the store sends the title, alt text and description as the translation of `store.initialLanguage`: a backend that translates media, Camomilla among them, ignores those plain fields on write.
+
 ---
 
 ## Self-contained demo behind a proxy integration
