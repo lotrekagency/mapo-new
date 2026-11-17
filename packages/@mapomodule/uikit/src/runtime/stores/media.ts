@@ -15,7 +15,7 @@ import {
 } from "../utils/langInfo.js";
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
-import { folderKey } from "../utils/mediaFolders.js";
+import { folderKey, folderPath } from "../utils/mediaFolders.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -196,8 +196,10 @@ export const useMediaStore = defineStore("mapo-media", () => {
   }
 
   // ─── Breadcrumb maintenance ─────────────────────────────────────────────
-  // Driven by the response's `parent_folder` (matches the legacy contract):
-  // push when entering a new folder, slice when navigating back up.
+  // Driven by the response's `parent_folder` (matches the legacy contract).
+  // The folder tree lets the user jump to any folder, so the path is read from
+  // the folder cache the tree fills; only a folder the cache cannot place
+  // falls back to the legacy rule: push when entering, slice when going back.
   function applyParentFolder(pf: MediaFolder | null): void {
     // A folder without an id is the root too. Camomilla answers the root with
     // an empty folder (`{ title: "", updir: null }`, DRF's serialization of no
@@ -206,6 +208,12 @@ export const useMediaStore = defineStore("mapo-media", () => {
     const isRoot = pf?.id == null;
     if (isRoot) {
       parentFolders.value = [];
+      return;
+    }
+    const cachedPath = folderPath(folderChildren.value, pf.id);
+    if (cachedPath) {
+      // The response's copy of the folder itself is the fresh one.
+      parentFolders.value = [...cachedPath.slice(0, -1), pf];
       return;
     }
     const key = pf.path ?? pf.id;

@@ -291,7 +291,7 @@ Auto-imported Pinia store available throughout the app.
 | `medias`         | `MediaItem[]`                      | Media in the current folder/page                                         |
 | `folders`        | `MediaFolder[]`                    | Folders in the current directory                                         |
 | `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree           |
-| `parentFolders`  | `MediaFolder[]`                    | Breadcrumb path from root                                                |
+| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache   |
 | `page` / `pages` | `number`                           | Pagination                                                               |
 | `mimeType`       | `string \| null`                   | Active MIME filter                                                       |
 | `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it |

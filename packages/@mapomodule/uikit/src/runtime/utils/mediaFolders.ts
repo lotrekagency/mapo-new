@@ -91,3 +91,40 @@ export function folderNodeIcon(node: FolderNode, isOpen: boolean): string {
   const showsChildren = isOpen && !!node.children?.length;
   return showsChildren ? "i-lucide-folder-open" : "i-lucide-folder";
 }
+
+/**
+ * The path to folder `id` read from the `folderChildren` cache: its ancestors
+ * from the top level down, then the folder itself. `undefined` when the cache
+ * cannot place it, or one of its ancestors, or meets a cycle.
+ *
+ * Breadcrumbs need it once the tree lets the user jump to any folder: a
+ * folder opened from another branch is not a child of the one on screen.
+ */
+export function folderPath(
+  folderChildren: Record<string, MediaFolder[]>,
+  id: number,
+): MediaFolder[] | undefined {
+  const parentOf = new Map<number, number | null>();
+  const byId = new Map<number, MediaFolder>();
+  for (const [key, children] of Object.entries(folderChildren)) {
+    const parentId = key === ROOT_FOLDER_KEY ? null : Number(key);
+    for (const child of children) {
+      parentOf.set(child.id, parentId);
+      byId.set(child.id, child);
+    }
+  }
+
+  const path: MediaFolder[] = [];
+  const seen = new Set<number>();
+  let currentId: number | null = id;
+  while (currentId != null) {
+    const folder = byId.get(currentId);
+    const isKnown = folder !== undefined;
+    const isCycle = seen.has(currentId);
+    if (!isKnown || isCycle) return undefined;
+    path.unshift(folder);
+    seen.add(currentId);
+    currentId = parentOf.get(currentId) ?? null;
+  }
+  return path;
+}

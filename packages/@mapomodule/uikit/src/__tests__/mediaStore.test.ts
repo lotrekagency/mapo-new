@@ -333,3 +333,42 @@ describe("media store — moveMedia", () => {
     expect(snack.show).toHaveBeenCalledWith("mapo.mediaMove.failed", "error");
   });
 });
+
+describe("media store — breadcrumbs across branches", () => {
+  const explorer = (folders: MediaFolder[], parentFolder: unknown = null) => ({
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders,
+    parent_folder: parentFolder,
+  });
+  const photos: MediaFolder = { id: 1, name: "Photos", parent: null };
+  const hero: MediaFolder = { id: 3, name: "Hero", parent: 1 };
+  const videos: MediaFolder = { id: 2, name: "Videos", parent: null };
+
+  // The bug it fixes: the tree opens a folder of another branch, and the
+  // breadcrumbs used to append it to the path on screen.
+  it("shows the path of a folder opened from another branch", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+    crud.detail.mockResolvedValueOnce(explorer([hero], photos));
+    await store.navigateToFolder(photos);
+    crud.detail.mockResolvedValueOnce(explorer([], hero));
+    await store.navigateToFolder(hero);
+    expect(store.parentFolders.map((f) => f.name)).toEqual(["Photos", "Hero"]);
+
+    crud.detail.mockResolvedValueOnce(explorer([], videos));
+    await store.navigateToFolder(videos);
+
+    expect(store.parentFolders.map((f) => f.name)).toEqual(["Videos"]);
+  });
+
+  it("falls back to appending a folder the cache cannot place", async () => {
+    const stranger: MediaFolder = { id: 9, name: "Elsewhere", parent: 42 };
+    crud.detail.mockResolvedValueOnce(explorer([], stranger));
+    const store = useMediaStore();
+
+    await store.navigateToFolder(stranger);
+
+    expect(store.parentFolders).toEqual([stranger]);
+  });
+});

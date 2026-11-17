@@ -6,6 +6,7 @@ import {
   findFolderNode,
   folderKey,
   folderNodeIcon,
+  folderPath,
 } from "../runtime/utils/mediaFolders";
 import type { MediaFolder } from "../runtime/types/media";
 
@@ -103,5 +104,34 @@ describe("folderNodeIcon", () => {
     expect(folderNodeIcon(root!, false)).toBe("i-lucide-folder");
     const pending = root!.children![0]!.children![0]!;
     expect(folderNodeIcon(pending, false)).toBe("i-lucide-loader-circle");
+  });
+});
+
+describe("folderPath", () => {
+  const cache = {
+    root: [folder(1, "Photos"), folder(2, "Videos")],
+    1: [folder(3, "Hero", 1)],
+    3: [folder(4, "Banners", 3)],
+  };
+
+  it("reads the ancestors of a nested folder from the cache", () => {
+    expect(folderPath(cache, 4)?.map((f) => f.name)).toEqual([
+      "Photos",
+      "Hero",
+      "Banners",
+    ]);
+  });
+
+  it("places a top-level folder alone", () => {
+    expect(folderPath(cache, 2)?.map((f) => f.name)).toEqual(["Videos"]);
+  });
+
+  it("gives up on a folder the cache does not know", () => {
+    expect(folderPath(cache, 9)).toBeUndefined();
+  });
+
+  it("gives up on a cycle", () => {
+    const cyclic = { root: [], 1: [folder(2, "B", 1)], 2: [folder(1, "A", 2)] };
+    expect(folderPath(cyclic, 1)).toBeUndefined();
   });
 });
