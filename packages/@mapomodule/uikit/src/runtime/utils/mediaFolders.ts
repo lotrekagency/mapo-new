@@ -12,6 +12,21 @@ export function folderKey(id: number | null | undefined): string {
   return id == null ? ROOT_FOLDER_KEY : String(id);
 }
 
+/**
+ * `folder` with its `parent` as an id, as the store and the folder tree read
+ * it. Camomilla serializes a folder's parent (`updir`) as the whole parent
+ * folder, and an adapter may hand that object on as `parent`; it is read by
+ * its `id` (none is the root).
+ */
+export function canonicalFolder(folder: MediaFolder): MediaFolder {
+  const parent: unknown = folder.parent;
+  const isObject = typeof parent === "object";
+  const isNull = parent === null;
+  if (!isObject || isNull) return folder;
+  const parentId = (parent as { id?: number | null }).id ?? null;
+  return { ...folder, parent: parentId };
+}
+
 /** A node of the folder tree: the root (`folder: null`), a folder, or the placeholder of a branch still loading. */
 export interface FolderNode extends TreeItem {
   key: string;

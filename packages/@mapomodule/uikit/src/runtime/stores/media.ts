@@ -15,7 +15,11 @@ import {
 } from "../utils/langInfo.js";
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
-import { folderKey, folderPath } from "../utils/mediaFolders.js";
+import {
+  canonicalFolder,
+  folderKey,
+  folderPath,
+} from "../utils/mediaFolders.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -195,6 +199,24 @@ export const useMediaStore = defineStore("mapo-media", () => {
     return languagesPromise;
   }
 
+  /**
+   * An explorer response (the root or a folder) in the canonical shape: the
+   * adapter's `parseRootResponse`, then every folder with its parent as an id
+   * (`canonicalFolder`), whatever shape the adapter left it in.
+   */
+  function parseExplorer(raw: unknown): MediaApiResponse {
+    const a = adapter();
+    const data = (a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse)(
+      raw,
+    ) as MediaApiResponse;
+    const parentFolder = data.parent_folder;
+    return {
+      ...data,
+      folders: (data.folders ?? []).map(canonicalFolder),
+      parent_folder: parentFolder ? canonicalFolder(parentFolder) : null,
+    };
+  }
+
   // ─── Breadcrumb maintenance ─────────────────────────────────────────────
   // Driven by the response's `parent_folder` (matches the legacy contract).
   // The folder tree lets the user jump to any folder, so the path is read from
@@ -258,9 +280,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
           ? await crud.detail(folderId, { params: listParams })
           : await crud.list(listParams as never);
 
-      const data = (
-        a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse
-      )(raw) as MediaApiResponse;
+      const data = parseExplorer(raw);
 
       medias.value = data.media.items;
       page.value = data.media.paginator.page;
@@ -296,10 +316,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
       id != null
         ? await crud.detail(id, { params })
         : await crud.list(params as never);
-    const data = (a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse)(
-      raw,
-    ) as MediaApiResponse;
-    setFolderChildren(id, data.folders);
+    setFolderChildren(id, parseExplorer(raw).folders);
   }
 
   async function navigateToFolder(folder: MediaFolder | null): Promise<void> {

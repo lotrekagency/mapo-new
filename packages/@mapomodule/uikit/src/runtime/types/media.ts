@@ -15,6 +15,10 @@ import type { MediaItem } from "@mapomodule/form/types";
 export interface MediaFolder {
   id: number;
   name: string;
+  /**
+   * Id of the parent folder, `null` at the top level. The store reads a
+   * parent given as an object (Camomilla's nested `updir`) by its `id`.
+   */
   parent?: number | null;
   /**
    * Materialized path of the folder (e.g. "root/images/hero").

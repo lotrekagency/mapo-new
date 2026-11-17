@@ -372,3 +372,59 @@ describe("media store — breadcrumbs across branches", () => {
     expect(store.parentFolders).toEqual([stranger]);
   });
 });
+
+describe("media store — a parent folder given as an object", () => {
+  const explorer = (folders: unknown[], parentFolder: unknown = null) => ({
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders,
+    parent_folder: parentFolder,
+  });
+  // As the Camomilla adapter hands a subfolder over: its `parent` is the
+  // parent folder itself (Camomilla's nested `updir`).
+  const photos = { id: 1, name: "Photos", parent: null };
+  const hero = {
+    id: 3,
+    name: "Hero",
+    parent: { id: 1, title: "Photos", updir: null },
+  };
+
+  it("keeps the folders with their parent as an id", async () => {
+    crud.detail.mockResolvedValue(explorer([hero], photos));
+    const store = useMediaStore();
+
+    await store.navigateToFolder(photos);
+
+    expect(store.folderChildren[1]?.[0]?.parent).toBe(1);
+  });
+
+  it("refreshes the parent's branch after renaming a subfolder", async () => {
+    crud.list.mockResolvedValue(explorer([photos]));
+    crud.detail.mockResolvedValue(explorer([hero], photos));
+    crud.updateOrCreate.mockResolvedValue({});
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+    await store.loadFolderChildren(1);
+    const cached = store.folderChildren[1]?.[0] as MediaFolder;
+
+    await store.updateOrCreateFolder({ ...cached, name: "Banner" });
+
+    expect(crud.updateOrCreate).toHaveBeenCalledWith({
+      id: 3,
+      name: "Banner",
+      parent: 1,
+    });
+    expect(crud.detail).toHaveBeenLastCalledWith(1, { params: { page: 1 } });
+  });
+
+  it("goes up to the parent after deleting the subfolder on screen", async () => {
+    crud.detail.mockResolvedValue(explorer([], hero));
+    crud.delete.mockResolvedValue(undefined);
+    const store = useMediaStore();
+    await store.navigateToFolder({ id: 3, name: "Hero" });
+
+    await store.deleteFolder(store.parentFolder as MediaFolder);
+
+    expect(crud.delete).toHaveBeenCalledWith(3);
+    expect(crud.detail).toHaveBeenLastCalledWith(1, { params: { page: 1 } });
+  });
+});

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ROOT_FOLDER_KEY,
   buildFolderTree,
+  canonicalFolder,
   findFolderNode,
   folderKey,
   folderNodeIcon,
@@ -133,5 +134,27 @@ describe("folderPath", () => {
   it("gives up on a cycle", () => {
     const cyclic = { root: [], 1: [folder(2, "B", 1)], 2: [folder(1, "A", 2)] };
     expect(folderPath(cyclic, 1)).toBeUndefined();
+  });
+});
+
+describe("canonicalFolder", () => {
+  // Camomilla serializes the parent (`updir`) as the whole parent folder.
+  const nested = (parent: unknown) =>
+    ({ id: 3, name: "Hero", parent }) as unknown as MediaFolder;
+
+  it("reads a parent given as an object by its id", () => {
+    const parent = { id: 1, title: "Photos", updir: null };
+    expect(canonicalFolder(nested(parent))).toEqual(folder(3, "Hero", 1));
+  });
+
+  it("reads a parent object without an id as the root", () => {
+    expect(canonicalFolder(nested({ title: "" })).parent).toBeNull();
+  });
+
+  it("keeps a folder whose parent is already an id or none", () => {
+    const top = folder(1, "Photos");
+    const child = folder(3, "Hero", 1);
+    expect(canonicalFolder(top)).toBe(top);
+    expect(canonicalFolder(child)).toBe(child);
   });
 });

@@ -106,6 +106,8 @@ Explorer payload shape:
 
 A `parent_folder` without an `id` counts as the root too: Camomilla answers the root with an empty folder (`{ "title": "", "updir": null }`) instead of `null`.
 
+A folder's `parent` is an id. A parent given as an object is read by its `id`: Camomilla serializes `updir` as the whole parent folder, and an adapter may pass it on as it is.
+
 ### Media endpoint (default `/api/media`)
 
 Single-media CRUD:
@@ -176,9 +178,9 @@ interface MediaAdapter {
     media: MediaItem,
     previous?: MediaItem,
   ): Record<string, unknown>;
-  /** Build the multipart PATCH payload for a file replacement (default REST: { file, maintain_url }). */
   /** Build the PATCH payload that moves a media to a folder (`null` = root). Default: `{ folder }`. */
   buildMoveMediaPayload?(folderId: number | null): Record<string, unknown>;
+  /** Build the multipart PATCH payload for a file replacement (default REST: { file, maintain_url }). */
   buildReplaceFilePayload?(
     file: File,
     maintainUrl: boolean,
@@ -195,7 +197,7 @@ Every method is optional; the default adapter applies plain REST semantics.
 - mime filter → `fltr=mime_type=<value>`
 - detail params → `language_code`
 - folder create/update payload → `{ title, slug, updir }` (instead of `{ name, parent }`)
-- folder reads normalized back to the canonical `{ name, parent, path }`
+- folder reads normalized back to the canonical `{ name, parent, path }` (the store reads a nested `parent` by its id)
 - file replace flag → `same_url` (instead of `maintain_url`)
 
 Opt out with `camomilla: { mediaAdapter: false }` to keep the default REST adapter.
