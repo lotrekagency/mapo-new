@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
-import type { MediaItem } from "../runtime/types/media";
+import type { MediaFolder, MediaItem } from "../runtime/types/media";
 
 const crud = vi.hoisted(() => ({
   options: vi.fn(),
   list: vi.fn(),
   detail: vi.fn(),
   partialUpdate: vi.fn(),
+  updateOrCreate: vi.fn(),
+  delete: vi.fn(),
 }));
 const snack = vi.hoisted(() => ({ show: vi.fn() }));
+const confirm = vi.hoisted(() => ({ ask: vi.fn() }));
 // The app's `mapo.uikit` runtime config, changed by the content-language test.
 const runtimeConfig = vi.hoisted(() => ({
   public: { mapoUikit: { contentLanguages: [] as string[] } },
@@ -22,6 +25,9 @@ vi.mock("#app", () => ({
 vi.mock("@mapomodule/core/runtime/api/crud", () => ({ useCrud: () => crud }));
 vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
   useSnackStore: () => snack,
+}));
+vi.mock("@mapomodule/store/runtime/stores/confirm", () => ({
+  useConfirmStore: () => confirm,
 }));
 vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
   useMapoT: () => (key: string) => key,
@@ -50,6 +56,8 @@ beforeEach(() => {
   setActivePinia(createPinia());
   for (const fn of Object.values(crud)) fn.mockReset();
   snack.show.mockReset();
+  confirm.ask.mockReset();
+  confirm.ask.mockResolvedValue(true);
   crud.list.mockResolvedValue({
     media: { items: [], paginator: { page: 1, pages: 1 } },
     folders: [],
@@ -190,5 +198,78 @@ describe("media store — breadcrumbs", () => {
 
     await store.navigateToFolder(null);
     expect(store.parentFolders).toEqual([]);
+  });
+});
+
+describe("media store — folder tree cache", () => {
+  const explorer = (folders: MediaFolder[], parentFolder: unknown = null) => ({
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders,
+    parent_folder: parentFolder,
+  });
+  const photos: MediaFolder = { id: 1, name: "Photos", parent: null };
+  const hero: MediaFolder = { id: 3, name: "Hero", parent: 1 };
+  const videos: MediaFolder = { id: 2, name: "Videos", parent: null };
+
+  it("keeps the subfolders of every folder it shows", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    crud.detail.mockResolvedValue(explorer([hero], photos));
+    const store = useMediaStore();
+
+    await store.getRoot({ page: 1 });
+    await store.navigateToFolder(photos);
+
+    expect(store.folderChildren).toEqual({ root: [photos, videos], 1: [hero] });
+  });
+
+  it("does not take a library-wide view for the root's children", async () => {
+    crud.list.mockResolvedValue(explorer([photos]));
+    const store = useMediaStore();
+
+    await store.getRoot({ page: 1, search: "x", all: true });
+
+    expect(store.folderChildren).toEqual({});
+  });
+
+  it("loads a branch without leaving the folder on screen", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+    crud.detail.mockResolvedValue(explorer([], videos));
+
+    await store.loadFolderChildren(2);
+
+    expect(crud.detail).toHaveBeenCalledWith(2, { params: { page: 1 } });
+    expect(store.folderChildren[2]).toEqual([]);
+    expect(store.parentFolders).toEqual([]);
+  });
+
+  it("refreshes the branch of a folder renamed outside the one on screen", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    crud.updateOrCreate.mockResolvedValue({});
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+    crud.detail.mockResolvedValue(
+      explorer([{ ...hero, name: "Banner" }], photos),
+    );
+
+    await store.updateOrCreateFolder({ ...hero, name: "Banner" });
+
+    expect(crud.detail).toHaveBeenCalledWith(1, { params: { page: 1 } });
+    expect(store.folderChildren[1]).toEqual([{ ...hero, name: "Banner" }]);
+  });
+
+  it("goes up to the parent when the folder on screen is deleted", async () => {
+    crud.detail.mockResolvedValue(explorer([hero], photos));
+    crud.delete.mockResolvedValue(undefined);
+    const store = useMediaStore();
+    await store.navigateToFolder(photos);
+    crud.list.mockResolvedValue(explorer([videos]));
+
+    await store.deleteFolder(photos);
+
+    expect(crud.delete).toHaveBeenCalledWith(1);
+    expect(store.parentFolders).toEqual([]);
+    expect(store.folderChildren).toEqual({ root: [videos] });
   });
 });

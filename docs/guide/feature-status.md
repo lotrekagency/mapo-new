@@ -121,7 +121,7 @@ File upload, gallery browsing, folder management, and a picker dialog. Full port
 | `useMediaStore`                                       | ✅     | Pinia store: gallery items, folders, breadcrumb, pagination, selection, bulk edit, MIME lock    |
 | `MapoMediaManager` / `MapoMediaManagerDialog`         | ✅     | Orchestrator shell + `UModal` picker (single/multi), pre-seedable selection                     |
 | Gallery (`MapoMediaGallery`)                          | ✅     | CSS-grid, picker selection, bulk select-all/delete, pagination                                  |
-| Folders (`MapoMediaFolders` / `MapoMediaBreadcrumbs`) | ✅     | MIME filters, inline create/rename/delete, breadcrumb navigation                                |
+| Folders (`MapoMediaFolders` / `MapoMediaBreadcrumbs`) | ✅     | Folder tree loaded branch by branch, MIME filters, inline create/rename/delete, breadcrumbs     |
 | Editor (`MapoMediaEditor`)                            | ✅     | Slideover: info, linked models, open-in-new-tab, i18n metadata, file replace, permission gating |
 | Uploader (`MapoMediaUploader`)                        | ✅     | Drop area + queue, per-file progress (XHR), inline metadata, destination folder                 |
 | `MapoDropArea`                                        | ✅     | Generic drag-and-drop zone (reusable outside media)                                             |

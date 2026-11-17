@@ -15,6 +15,7 @@ import {
 } from "../utils/langInfo.js";
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
+import { folderKey } from "../utils/mediaFolders.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -68,6 +69,12 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const medias = ref<MediaItem[]>([]);
   const folders = ref<MediaFolder[]>([]);
   const parentFolders = ref<MediaFolder[]>([]);
+  /**
+   * Subfolders of every folder seen so far, keyed by `folderKey` (the folder
+   * id, `"root"` for the top level). The folder tree reads it: a branch shows
+   * what is cached and loads the rest when it opens.
+   */
+  const folderChildren = ref<Record<string, MediaFolder[]>>({});
   const page = ref(1);
   const pages = ref(1);
   const mimeType = ref<string | null>(null);
@@ -245,10 +252,40 @@ export const useMediaStore = defineStore("mapo-media", () => {
       page.value = data.media.paginator.page;
       pages.value = data.media.paginator.pages;
       folders.value = data.folders;
+      // A library-wide view (search, mime filter) lists no folder's children.
+      if (!all) setFolderChildren(folderId, data.folders);
       applyParentFolder(data.parent_folder);
     } finally {
       loading.value = false;
     }
+  }
+
+  function setFolderChildren(id: number | null, children: MediaFolder[]) {
+    folderChildren.value = {
+      ...folderChildren.value,
+      [folderKey(id)]: children,
+    };
+  }
+
+  /**
+   * Load the subfolders of folder `id` (the root when `null`) into
+   * `folderChildren`, for the folder tree. It reads the same explorer
+   * endpoint as navigation, without changing the folder on screen.
+   */
+  async function loadFolderChildren(id: number | null): Promise<void> {
+    const a = adapter();
+    const params = (a.buildListParams ?? defaultMediaAdapter.buildListParams)({
+      page: 1,
+    });
+    const crud = folderCrud();
+    const raw =
+      id != null
+        ? await crud.detail(id, { params })
+        : await crud.list(params as never);
+    const data = (a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse)(
+      raw,
+    ) as MediaApiResponse;
+    setFolderChildren(id, data.folders);
   }
 
   async function navigateToFolder(folder: MediaFolder | null): Promise<void> {
@@ -332,14 +369,17 @@ export const useMediaStore = defineStore("mapo-media", () => {
     folder: Partial<MediaFolder>,
   ): Promise<void> {
     const a = adapter();
+    const target = { parent: _currentFolderId.value, ...folder };
     const payload = (
       a.buildFolderPayload ?? defaultMediaAdapter.buildFolderPayload
-    )({
-      parent: _currentFolderId.value,
-      ...folder,
-    });
+    )(target);
     await folderCrud().updateOrCreate(payload as never);
     await getRoot();
+    // The tree can rename a folder outside the one on screen: refresh the
+    // branch it lives in too.
+    const parentId = target.parent ?? null;
+    const isElsewhere = parentId !== _currentFolderId.value;
+    if (isElsewhere) await loadFolderChildren(parentId);
   }
 
   async function deleteFolder(folder: MediaFolder): Promise<void> {
@@ -352,7 +392,22 @@ export const useMediaStore = defineStore("mapo-media", () => {
     });
     if (!confirmed) return;
     await folderCrud().delete(folder.id);
+
+    const parentId = folder.parent ?? null;
+    const remaining = { ...folderChildren.value };
+    delete remaining[folderKey(folder.id)];
+    folderChildren.value = remaining;
+    // The folder on screen, or one above it, is gone: show its parent.
+    const isOnPath = parentFolders.value.some((f) => f.id === folder.id);
+    if (isOnPath) {
+      await navigateToFolder(
+        parentId == null ? null : { id: parentId, name: "" },
+      );
+      return;
+    }
     await getRoot();
+    const isElsewhere = parentId !== _currentFolderId.value;
+    if (isElsewhere) await loadFolderChildren(parentId);
   }
 
   async function deleteMedia(media: MediaItem): Promise<void> {
@@ -500,6 +555,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     medias.value = [];
     folders.value = [];
     parentFolders.value = [];
+    folderChildren.value = {};
     page.value = 1;
     pages.value = 1;
     mimeType.value = null;
@@ -522,6 +578,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     medias,
     folders,
     parentFolders,
+    folderChildren,
     page,
     pages,
     mimeType,
@@ -542,6 +599,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     getRoot,
     deriveLanguages,
     navigateToFolder,
+    loadFolderChildren,
     openEditor,
     closeEditor,
     setLang,

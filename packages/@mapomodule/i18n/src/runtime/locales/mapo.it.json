@@ -228,7 +228,6 @@
     },
     "mediaFolders": {
       "folders": "Cartelle",
-      "goBack": "Torna alla radice",
       "noFolders": "Non sono presenti cartelle... Creane una!",
       "newFolder": "Nuova cartella",
       "folderName": "Nome cartella",
@@ -238,7 +237,7 @@
       "audioFolder": "Audio",
       "docFolder": "Documenti",
       "deleteTitle": "Elimina cartella",
-      "confirmDelete": "Eliminare la cartella \"{name}\"? I media al suo interno non verranno eliminati."
+      "confirmDelete": "Eliminare la cartella \"{name}\" e tutto quello che contiene, sottocartelle e media?"
     },
     "mediaGallery": {
       "noMediaFound": "Nessun media trovato",

@@ -107,7 +107,7 @@ onUnmounted(() => {
     <!-- Folders sidebar -->
     <div
       v-if="showFolders"
-      class="w-48 shrink-0 border-r border-default bg-default"
+      class="w-56 shrink-0 border-r border-default bg-default"
     >
       <MapoMediaFolders />
     </div>

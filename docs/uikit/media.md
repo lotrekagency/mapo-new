@@ -23,7 +23,7 @@ definePageMeta({
 </template>
 ```
 
-That renders the folder sidebar with MIME filters, breadcrumbs, a searchable paginated gallery with bulk delete, an upload tab with per-file progress, and a metadata editor drawer — all backed by `useMediaStore`.
+That renders a folder tree with MIME filters, breadcrumbs, a searchable paginated gallery with bulk delete, an upload tab with per-file progress, and a metadata editor drawer — all backed by `useMediaStore`.
 
 Inside a form, media are regular field descriptors — no imports, the types are injected by `@mapomodule/uikit`:
 
@@ -52,7 +52,7 @@ const fields: FieldDescriptor[] = [
 useMediaStore (Pinia)
     │
     ├── MapoMediaManager          ← orchestrator shell
-    │     ├── MapoMediaFolders    ← folder sidebar + MIME filters
+    │     ├── MapoMediaFolders    ← folder tree + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
     │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination
     │     ├── MapoMediaEditor     ← side drawer for metadata
@@ -89,7 +89,7 @@ Drives navigation. **Both list and detail return the explorer payload** — this
 | `GET /api/media-folders/`        | Root explorer: `{ media, folders, parent_folder: null }` |
 | `GET /api/media-folders/:id/`    | Folder explorer: `{ media, folders, parent_folder }`     |
 | `POST /api/media-folders/`       | Create folder                                            |
-| `PATCH /api/media-folders/:id/`  | Rename / move folder                                     |
+| `PUT /api/media-folders/:id/`    | Rename / move folder (`updateOrCreateFolder`)            |
 | `DELETE /api/media-folders/:id/` | Delete folder                                            |
 
 Explorer payload shape:
@@ -286,6 +286,7 @@ Auto-imported Pinia store available throughout the app.
 | ---------------- | ---------------------------------- | ------------------------------------------------------------------------ |
 | `medias`         | `MediaItem[]`                      | Media in the current folder/page                                         |
 | `folders`        | `MediaFolder[]`                    | Folders in the current directory                                         |
+| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree           |
 | `parentFolders`  | `MediaFolder[]`                    | Breadcrumb path from root                                                |
 | `page` / `pages` | `number`                           | Pagination                                                               |
 | `mimeType`       | `string \| null`                   | Active MIME filter                                                       |
@@ -313,6 +314,7 @@ const store = useMediaStore()
 
 await store.getRoot({ page?, search?, mime?, all? })  // fetch current folder
 await store.navigateToFolder(folder | null)           // null = root; uses detail(folderId)
+await store.loadFolderChildren(folderId | null)       // load a tree branch without navigating
 await store.openEditor(media)                          // fetch detail + open drawer
 store.closeEditor()
 store.setLang('it')                                    // preferred language: detail metadata, editor, uploads
@@ -364,6 +366,12 @@ Emits `update:selection` with `MediaItem | MediaItem[] | null` in picker mode. W
 Slots: `actions` — custom buttons rendered in a footer bar below the content (v1 parity).
 
 In `multi` mode the gallery shows a **selection strip** above the grid: click a thumbnail to deselect it, drag to reorder (the order is preserved in the emitted value).
+
+### `<MapoMediaFolders>`
+
+The folder panel of the manager: the MIME filters, then the folders as a tree (Nuxt UI `UTree`) under a root node. A branch loads its subfolders when it opens (`store.loadFolderChildren`), through the same explorer endpoint as navigation; the folder on screen is selected and the path to it stays open. Clicking a folder opens it in the gallery; rename and delete sit on its row, and a new folder is created in the folder on screen. No props.
+
+Deleting a folder asks for confirmation and warns that its subfolders and media go with it: Camomilla deletes them (`on_delete=CASCADE` on both relations), so the message does not promise otherwise. A backend that keeps them only makes the warning stricter than needed.
 
 ### `<MapoMediaManagerDialog>`
 

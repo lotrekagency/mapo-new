@@ -228,7 +228,6 @@
     },
     "mediaFolders": {
       "folders": "Folders",
-      "goBack": "Back to root",
       "noFolders": "No folders here... Create a new one!",
       "newFolder": "New folder",
       "folderName": "Folder name",
@@ -238,7 +237,7 @@
       "audioFolder": "Audio",
       "docFolder": "Documents",
       "deleteTitle": "Delete folder",
-      "confirmDelete": "Delete folder \"{name}\"? Media inside it will not be deleted."
+      "confirmDelete": "Delete folder \"{name}\" and everything it contains, subfolders and media?"
     },
     "mediaGallery": {
       "noMediaFound": "No media found",
