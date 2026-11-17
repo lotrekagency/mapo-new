@@ -25,14 +25,27 @@ const isDragging = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 let dragCounter = 0;
 
+// Only files dragged in from the computer are drops for this area: an element
+// dragged inside the page (a gallery card, a selection being reordered) is
+// left to whatever handles it, with no overlay and no default prevented.
+function carriesFiles(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes("Files");
+}
+
 function onDragEnter(e: DragEvent) {
-  if (props.disabled) return;
+  if (props.disabled || !carriesFiles(e)) return;
   e.preventDefault();
   dragCounter++;
   isDragging.value = true;
 }
 
-function onDragLeave() {
+function onDragOver(e: DragEvent) {
+  if (props.disabled || !carriesFiles(e)) return;
+  e.preventDefault();
+}
+
+function onDragLeave(e: DragEvent) {
+  if (!carriesFiles(e)) return;
   dragCounter--;
   if (dragCounter <= 0) {
     dragCounter = 0;
@@ -41,7 +54,8 @@ function onDragLeave() {
 }
 
 function onDrop(e: DragEvent) {
-  if (props.disabled) return;
+  if (props.disabled || !carriesFiles(e)) return;
+  e.preventDefault();
   isDragging.value = false;
   dragCounter = 0;
   const files = filterFiles(Array.from(e.dataTransfer?.files ?? []));
@@ -83,10 +97,10 @@ defineExpose({ triggerPick });
       'mapo-drop-area--dragging': isDragging,
       'opacity-50 pointer-events-none': disabled,
     }"
-    @dragenter.prevent="onDragEnter"
-    @dragover.prevent
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
     @dragleave="onDragLeave"
-    @drop.prevent="onDrop"
+    @drop="onDrop"
   >
     <input
       ref="fileInput"

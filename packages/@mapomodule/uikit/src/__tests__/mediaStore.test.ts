@@ -273,3 +273,17 @@ describe("media store — folder tree cache", () => {
     expect(store.folderChildren).toEqual({ root: [videos] });
   });
 });
+
+describe("media store — upload hand-over", () => {
+  it("hands queued files over once", () => {
+    const store = useMediaStore();
+    const first = new File(["a"], "a.png", { type: "image/png" });
+    const second = new File(["b"], "b.png", { type: "image/png" });
+
+    store.queueUploads([first]);
+    store.queueUploads([second]);
+
+    expect(store.takeQueuedUploads()).toEqual([first, second]);
+    expect(store.takeQueuedUploads()).toEqual([]);
+  });
+});

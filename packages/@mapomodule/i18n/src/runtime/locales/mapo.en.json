@@ -241,6 +241,8 @@
     },
     "mediaGallery": {
       "noMediaFound": "No media found",
+      "uploadHere": "Upload here",
+      "dropHint": "Drop files here to upload them to {folder}",
       "selectAll": "Select page",
       "deselectAll": "Deselect page",
       "nSelected": "{number} selected",

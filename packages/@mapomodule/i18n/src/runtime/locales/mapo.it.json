@@ -241,6 +241,8 @@
     },
     "mediaGallery": {
       "noMediaFound": "Nessun media trovato",
+      "uploadHere": "Carica qui",
+      "dropHint": "Trascina qui i file per caricarli in {folder}",
       "selectAll": "Seleziona pagina",
       "deselectAll": "Deseleziona pagina",
       "nSelected": "{number} selezionati",

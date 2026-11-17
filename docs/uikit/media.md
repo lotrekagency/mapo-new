@@ -54,7 +54,8 @@ useMediaStore (Pinia)
     ├── MapoMediaManager          ← orchestrator shell
     │     ├── MapoMediaFolders    ← folder tree + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
-    │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination
+    │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination,
+    │     │                          Upload here + file drop
     │     ├── MapoMediaEditor     ← side drawer for metadata
     │     └── MapoMediaUploader   ← drop area + per-file title, alt text,
     │                                description, folder + progress
@@ -296,6 +297,7 @@ Auto-imported Pinia store available throughout the app.
 | `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                 |
 | `editList`       | `number[]`                         | IDs flagged for bulk operations                                          |
 | `selectMode`     | `SelectMode`                       | Selection mode                                                           |
+| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens        |
 
 ### Getters
 
@@ -328,6 +330,8 @@ await store.updateOrCreateFolder({ id?, name, parent? })
 await store.deleteFolder(folder)
 
 const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void; translated media get the metadata as the initialLanguage translation
+store.queueUploads(files)       // hand files to the uploader (the gallery does it on drop and Upload here)
+store.takeQueuedUploads()       // take them, emptying the hand-over (the uploader does it when it opens)
 
 store.setSelectionMode('none' | 'single' | 'multi')
 store.setSelection(value)
@@ -366,6 +370,12 @@ Emits `update:selection` with `MediaItem | MediaItem[] | null` in picker mode. W
 Slots: `actions` — custom buttons rendered in a footer bar below the content (v1 parity).
 
 In `multi` mode the gallery shows a **selection strip** above the grid: click a thumbnail to deselect it, drag to reorder (the order is preserved in the emitted value).
+
+### `<MapoMediaGallery>`
+
+The grid of the folder on screen, with the selection strip (pickers), the bulk bar and pagination. Its first row tells where uploads land, the folder on screen, and has **Upload here**, which opens the file picker; files dragged in from the computer can be dropped anywhere on the gallery. Either way the files wait in `store.queuedUploads` and the gallery emits `upload`. The manager then opens the Upload tab, which queues them for the folder on screen, with title, alt text and description to fill in before uploading.
+
+Emits: `upload` (no payload). No props.
 
 ### `<MapoMediaFolders>`
 
@@ -414,7 +424,7 @@ Standalone drag-and-drop area, reusable outside the media manager.
 </MapoDropArea>
 ```
 
-Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`.
+Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`. It reacts only to files dragged in from the computer: an element dragged inside the page (a gallery card, a selection being reordered) shows no overlay and is not prevented.
 
 ### `<MapoMediaPreview>`
 

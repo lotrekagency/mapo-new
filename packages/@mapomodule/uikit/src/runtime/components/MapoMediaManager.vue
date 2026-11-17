@@ -168,7 +168,10 @@ onUnmounted(() => {
 
       <!-- Content -->
       <div class="flex-1 overflow-y-auto p-4">
-        <MapoMediaGallery v-if="activeTab === 'gallery'" />
+        <MapoMediaGallery
+          v-if="activeTab === 'gallery'"
+          @upload="activeTab = 'upload'"
+        />
         <MapoMediaUploader v-else @uploaded="activeTab = 'gallery'" />
       </div>
 

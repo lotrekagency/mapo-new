@@ -89,6 +89,12 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const selection = shallowRef<MediaItem | MediaItem[] | null>(null);
   const editList = ref<number[]>([]);
   const selectMode = ref<SelectMode>("none");
+  /**
+   * Files handed to the uploader from outside it (dropped on the gallery,
+   * picked with "Upload here"): it queues them, for the folder on screen,
+   * when it opens.
+   */
+  const queuedUploads = shallowRef<File[]>([]);
 
   // ─── Internal navigation context ────────────────────────────────────────
   const _currentFolderId = ref<number | null>(null);
@@ -541,6 +547,18 @@ export const useMediaStore = defineStore("mapo-media", () => {
     });
   }
 
+  /** Hand files to the uploader, which queues them when it opens. */
+  function queueUploads(files: File[]): void {
+    queuedUploads.value = [...queuedUploads.value, ...files];
+  }
+
+  /** The files handed to the uploader, emptying the hand-over. */
+  function takeQueuedUploads(): File[] {
+    const files = queuedUploads.value;
+    queuedUploads.value = [];
+    return files;
+  }
+
   function setMimeType(mime: string | null): void {
     // A locked picker can narrow the filter but never widen it past the lock.
     mimeType.value = mime ?? lockedMime.value;
@@ -565,6 +583,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection.value = null;
     editList.value = [];
     selectMode.value = "none";
+    queuedUploads.value = [];
     _currentFolderId.value = null;
     _currentSearch.value = "";
     _currentAll.value = false;
@@ -588,6 +607,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection,
     editList,
     selectMode,
+    queuedUploads,
     languages,
     // getters
     activeLanguages,
@@ -616,6 +636,8 @@ export const useMediaStore = defineStore("mapo-media", () => {
     editSelectAll,
     deleteSelected,
     uploadMedia,
+    queueUploads,
+    takeQueuedUploads,
     setMimeType,
     lockMimeType,
     reset,
