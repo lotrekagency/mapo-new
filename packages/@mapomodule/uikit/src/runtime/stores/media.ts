@@ -8,7 +8,12 @@ import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
-import { languagesFromMetadata, pickLanguage } from "../utils/langInfo.js";
+import {
+  languagesFromMetadata,
+  pickLanguage,
+  restrictLanguages,
+} from "../utils/langInfo.js";
+import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
 import type {
   MediaItem,
@@ -98,10 +103,19 @@ export const useMediaStore = defineStore("mapo-media", () => {
   // the editor, so the editor and the uploader always work on the same list.
   const languageOverride = ref<string[]>([]);
 
+  // The app's `mapo.uikit.contentLanguages`, read once with the config.
+  const contentLanguages = useContentLanguages();
+
   // ─── Getters ──────────────────────────────────────────────────────────────
-  /** Languages the metadata is edited and uploaded in: the host's list, else the endpoint's. */
+  /**
+   * Languages the metadata is edited and uploaded in: the host's list, else
+   * the endpoint's, narrowed to the app's content languages.
+   */
   const activeLanguages = computed(() =>
-    languageOverride.value.length ? languageOverride.value : languages.value,
+    restrictLanguages(
+      languageOverride.value.length ? languageOverride.value : languages.value,
+      contentLanguages,
+    ),
   );
 
   /**

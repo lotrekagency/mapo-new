@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { languagesFromMetadata, pickLanguage } from "../runtime/utils/langInfo";
+import {
+  languagesFromMetadata,
+  pickLanguage,
+  restrictLanguages,
+} from "../runtime/utils/langInfo";
 
 describe("languagesFromMetadata", () => {
   it("reads the model's own language list", () => {
@@ -59,5 +63,23 @@ describe("pickLanguage", () => {
 
   it("returns an empty code for a model that is not translated", () => {
     expect(pickLanguage([], "it")).toBe("");
+  });
+});
+
+describe("restrictLanguages", () => {
+  it("restricts nothing without content languages", () => {
+    expect(restrictLanguages(["it", "en"], [])).toEqual(["it", "en"]);
+  });
+
+  it("keeps the content languages, in their order", () => {
+    expect(restrictLanguages(["it", "en", "fr"], ["fr", "it"])).toEqual([
+      "fr",
+      "it",
+    ]);
+  });
+
+  it("never adds a language the list does not offer", () => {
+    expect(restrictLanguages(["it", "en"], ["it", "de"])).toEqual(["it"]);
+    expect(restrictLanguages([], ["it"])).toEqual([]);
   });
 });

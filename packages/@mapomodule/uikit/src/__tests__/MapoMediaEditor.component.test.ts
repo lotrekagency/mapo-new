@@ -19,9 +19,13 @@ const crud = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 const snack = vi.hoisted(() => ({ show: vi.fn() }));
+// The app's `mapo.uikit` runtime config, changed by the content-language test.
+const runtimeConfig = vi.hoisted(() => ({
+  public: { mapoUikit: { contentLanguages: [] as string[] } },
+}));
 
 vi.mock("#app", () => ({
-  useRuntimeConfig: () => ({ public: {} }),
+  useRuntimeConfig: () => runtimeConfig,
   useNuxtApp: () => ({}),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -248,6 +252,7 @@ async function openEditor(props: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  runtimeConfig.public.mapoUikit.contentLanguages = [];
   pinia = createPinia();
   setActivePinia(pinia);
   for (const fn of Object.values(crud)) fn.mockReset();
@@ -376,5 +381,20 @@ describe("MapoMediaEditor", () => {
     );
     expect(button("mapo.save")).toBeDefined();
     expect(input("mapo.title").value).toBe("x".repeat(300));
+  });
+
+  it("narrows an explicit languages prop to the app's content languages", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["en"];
+    await openEditor({ languages: ["it", "en"] });
+
+    expect(langSwitch).toBeNull();
+    expect(input("mapo.title").value).toBe("Photo");
+    input("mapo.title").type("New photo");
+    button("mapo.save")?.click();
+    await settle();
+
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, {
+      translations: { en: { title: "New photo" } },
+    });
   });
 });

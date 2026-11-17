@@ -198,6 +198,24 @@ export const RECIPES: Recipe[] = [
       "translatable descriptors, per-language models and the detail language switcher.",
   },
   {
+    id: "content-languages",
+    task: "Limit the content languages to a subset",
+    keywords: [
+      "contentLanguages",
+      "content languages",
+      "single language",
+      "italian",
+      "hide language tabs",
+      "lang_info",
+      "forceLanguages",
+    ],
+    doc: "uikit/form/i18n.md",
+    heading: "How to: limit the content languages",
+    seeAlso: ["uikit/detail.md", "uikit/menu-manager.md", "uikit/media.md"],
+    summary:
+      "mapo.uikit.contentLanguages narrows the languages of MapoDetail, the menu manager and the media editor; one left means no switch.",
+  },
+  {
     id: "media-manager",
     task: "Use the media manager and media fields",
     keywords: [

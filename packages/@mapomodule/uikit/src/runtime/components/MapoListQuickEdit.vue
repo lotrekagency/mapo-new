@@ -6,6 +6,8 @@ import type { AnyFieldDescriptor, FieldRegistry } from "@mapomodule/form/types";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { useCrud } from "@mapomodule/core/runtime/api/crud";
 import { getErrorDetail } from "@mapomodule/core/runtime/utils/fetchError";
+import { restrictLanguages } from "../utils/langInfo";
+import { useContentLanguages } from "../utils/contentLanguages";
 
 const props = withDefaults(
   defineProps<{
@@ -50,6 +52,13 @@ defineSlots<{
 const { t } = useI18n();
 const snack = useSnackStore();
 const crud = useCrud<T>(props.endpoint);
+
+// The languages the form syncs `synci18n` fields into, narrowed to the app's
+// `mapo.uikit.contentLanguages` as MapoDetail narrows its own.
+const contentLanguages = useContentLanguages();
+const formLanguages = computed(() =>
+  restrictLanguages(props.languages ?? [], contentLanguages),
+);
 
 // Typed as Ref<T> (not Ref<UnwrapRef<T>>) so the template unwrap stays exactly T,
 // which keeps the `extra` slot's `:model` binding type-correct for the generic T.
@@ -144,7 +153,7 @@ async function save() {
           <MapoForm
             v-model="model"
             :fields="editFields"
-            :languages="languages"
+            :languages="formLanguages"
             :registry="registry"
             immediate
           />

@@ -13,6 +13,12 @@ const crud = vi.hoisted(() => ({
   partialUpdate: vi.fn(),
 }));
 
+// The app's `mapo.uikit` runtime config, changed by the content-language tests.
+const runtimeConfig = vi.hoisted(() => ({
+  public: { mapoUikit: { contentLanguages: [] as string[] } },
+}));
+
+vi.mock("#app", () => ({ useRuntimeConfig: () => runtimeConfig }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("@mapomodule/core/runtime/api/crud", () => ({ useCrud: () => crud }));
 vi.mock("@mapomodule/store/runtime/stores/snack", () => ({
@@ -69,14 +75,18 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
 });
 
 // The language switch, resolved by name like the real one.
-let langSwitch: { readonly langs: string[] } | null = null;
+let langSwitch: { readonly langs: string[]; readonly value: string } | null =
+  null;
 const MapoDetailLangSwitch: Component = {
   name: "MapoDetailLangSwitch",
   props: { modelValue: String, langs: Array },
-  setup(props: { langs?: string[] }) {
+  setup(props: { modelValue?: string; langs?: string[] }) {
     langSwitch = {
       get langs() {
         return props.langs ?? [];
+      },
+      get value() {
+        return props.modelValue ?? "";
       },
     };
     onUnmounted(() => {
@@ -108,6 +118,7 @@ async function mountManager(props: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  runtimeConfig.public.mapoUikit.contentLanguages = [];
   for (const fn of Object.values(crud)) fn.mockReset();
   crud.options.mockResolvedValue({});
 });
@@ -139,5 +150,26 @@ describe("MapoMenuManager language switch", () => {
 
     expect(langSwitch).toBeNull();
     expect(menu.translations?.it?.nodes).toEqual([]);
+  });
+});
+
+describe("MapoMenuManager content languages", () => {
+  it("keeps only the app's content languages", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["it"];
+    const menu: MapoMenu = { key: "main", nodes: [], translations: {} };
+    await mountManager({ languages: ["en", "it"], modelValue: menu });
+
+    expect(langSwitch).toBeNull();
+    // English was the page's first language: the tree is the Italian one.
+    expect(menu.translations?.it?.nodes).toEqual([]);
+    expect(menu.translations?.en).toBeUndefined();
+  });
+
+  it("follows the app's order, so its first language is the starting one", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["en", "it"];
+    await mountManager({ languages: ["it", "en"] });
+
+    expect(langSwitch?.langs).toEqual(["en", "it"]);
+    expect(langSwitch?.value).toBe("en");
   });
 });

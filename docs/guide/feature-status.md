@@ -95,6 +95,7 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | Devtools panel                                                          | `/_mapo/devtools/forms` inside Nuxt DevTools — registry inventory & live form inspector                                                                                  |
 | `<MapoDetail>` shell                                                    | Two-column layout, `useCrud` lifecycle, differential PATCH, unsaved-changes guard, 400 → field errors, integrated snack/confirm                                          |
 | `<MapoDetailLangSwitch>`                                                | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                             |
+| `mapo.uikit.contentLanguages`                                           | App-wide content languages: narrows and orders the languages of detail, quick edit, menu and media editor; one left hides the tabs                                       |
 
 ### Form fields library (`@mapomodule/form`)
 

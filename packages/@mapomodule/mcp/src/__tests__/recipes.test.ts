@@ -34,6 +34,8 @@ describe("matchRecipes", () => {
     ["TS2307 cannot find module mapomodule/types", "imports"],
     ["connect claude code or copilot through mcp", "ai-assistant"],
     ["set up the camomilla session cookie", "camomilla"],
+    ["limit the content languages to italian", "content-languages"],
+    ["hide the language tabs on a single language site", "content-languages"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

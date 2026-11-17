@@ -12,7 +12,8 @@ import { usePermissions } from "@mapomodule/store/runtime/composables/usePermiss
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { getErrorData } from "@mapomodule/core/runtime/utils/fetchError";
 import { useMediaStore } from "../stores/media.js";
-import { pickLanguage } from "../utils/langInfo.js";
+import { pickLanguage, restrictLanguages } from "../utils/langInfo.js";
+import { useContentLanguages } from "../utils/contentLanguages.js";
 import { describeMediaErrors, pickMetadata } from "../utils/mediaMetadata.js";
 import type { MediaItem } from "../types/media.js";
 
@@ -51,9 +52,13 @@ const fileChangerKey = ref(0);
 // list: the manager's own, or the media endpoint's OPTIONS metadata, so a host
 // page never has to restate what the backend already knows — and a media model
 // nobody registered for translation shows no switcher rather than tabs whose
-// values it discards.
+// values it discards. Either is narrowed to the app's content languages: the
+// store's list already is, the prop is here.
+const contentLanguages = useContentLanguages();
 const activeLangs = computed(() =>
-  props.languages?.length ? props.languages : store.activeLanguages,
+  props.languages?.length
+    ? restrictLanguages(props.languages, contentLanguages)
+    : store.activeLanguages,
 );
 
 // The language being edited, `""` when media are not translated. There is no

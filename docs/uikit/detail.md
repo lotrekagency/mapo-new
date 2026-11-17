@@ -74,7 +74,7 @@ The page now supports:
 | `multipart`                    | `"auto" \| "force" \| "disable"` | `"auto"`      | Controls multipart/form-data upload behaviour. `"auto"` uses multipart only when the model contains a `File` or `Blob`; `"force"` always uses it; `"disable"` never does.                             |
 | `permissionModel`              | `string`                         | —             | Django model label (e.g. `"news.article"`). When set, save buttons are hidden if the user lacks `add_*` / `change_*`, and the delete card is hidden without `delete_*`. Superusers are never blocked. |
 | `previewField`                 | `string`                         | —             | Model field that holds a public URL. When set a **Preview** button appears in the sidebar; clicking it opens a sandboxed iframe modal.                                                                |
-| `forceLanguages`               | `string[]`                       | —             | Override the language list regardless of the `languages` prop or the `lang_info` returned by the endpoint's OPTIONS response. Useful for per-model language subsets.                                  |
+| `forceLanguages`               | `string[]`                       | —             | Override the language list regardless of the `languages` prop, the endpoint's `lang_info` and `mapo.uikit.contentLanguages`. Useful for per-model language subsets.                                   |
 
 The `registry` prop is optional — `<MapoDetail>` resolves `$mapoFormRegistry` automatically.
 
@@ -465,6 +465,8 @@ Language priority chain:
 1. `forceLanguages` prop (always wins)
 2. `languages` prop (non-empty array)
 3. `lang_info.languages` from the endpoint's OPTIONS response
+
+The app's [`mapo.uikit.contentLanguages`](/uikit/form/i18n#how-to-limit-the-content-languages) then narrows the list from 2 or 3 and sets its order, so the detail opens on its first language; `forceLanguages` bypasses it.
 
 `lang_info.languages` describes the **model**, not the site. `lang_info.site_languages` is context only and is **never** used: a model whose `lang_info.translatable` is `false`, or which has no `lang_info` at all, renders no language switcher. A multilingual site can still expose models nobody registered for translation, and tabs on those invite the editor to type values the backend drops on save.
 

@@ -527,7 +527,7 @@ Families (`image/*`, `video/*`, `audio/*`, `application/*`) and exact types (`ap
 
 ## How to: handle multilingual media metadata
 
-The manager reads the metadata languages from the media endpoint's OPTIONS (`lang_info`, as Camomilla publishes it), so most apps pass nothing. Pass a list to impose one:
+The manager reads the metadata languages from the media endpoint's OPTIONS (`lang_info`, as Camomilla publishes it), so most apps pass nothing. The app's [`mapo.uikit.contentLanguages`](/uikit/form/i18n#how-to-limit-the-content-languages) narrows them, here as in the detail pages. Pass a list to impose one:
 
 ```vue
 <MapoMediaManager :languages="['it', 'en']" default-lang="it" />

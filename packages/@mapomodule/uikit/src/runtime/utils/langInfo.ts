@@ -38,6 +38,20 @@ export function languagesFromMetadata(metadata: unknown): string[] {
 }
 
 /**
+ * `languages` narrowed to `allowed` (the app's `mapo.uikit.contentLanguages`),
+ * in `allowed`'s order, so its first language is the one editing starts on.
+ * An empty `allowed` restricts nothing. It never adds a language the list does
+ * not offer: the backend would drop whatever is typed for it.
+ */
+export function restrictLanguages(
+  languages: string[],
+  allowed: string[],
+): string[] {
+  if (!allowed.length) return languages;
+  return allowed.filter((lang) => languages.includes(lang));
+}
+
+/**
  * The language to start from: `preferred` when the list offers it, else the
  * first one. Returns `""` for an empty list, which callers read as "this
  * model is not translated".

@@ -10,9 +10,13 @@ const crud = vi.hoisted(() => ({
   partialUpdate: vi.fn(),
 }));
 const snack = vi.hoisted(() => ({ show: vi.fn() }));
+// The app's `mapo.uikit` runtime config, changed by the content-language test.
+const runtimeConfig = vi.hoisted(() => ({
+  public: { mapoUikit: { contentLanguages: [] as string[] } },
+}));
 
 vi.mock("#app", () => ({
-  useRuntimeConfig: () => ({ public: {} }),
+  useRuntimeConfig: () => runtimeConfig,
   useNuxtApp: () => ({}),
 }));
 vi.mock("@mapomodule/core/runtime/api/crud", () => ({ useCrud: () => crud }));
@@ -42,6 +46,7 @@ const stored: MediaItem = {
 };
 
 beforeEach(() => {
+  runtimeConfig.public.mapoUikit.contentLanguages = [];
   setActivePinia(createPinia());
   for (const fn of Object.values(crud)) fn.mockReset();
   snack.show.mockReset();
@@ -73,6 +78,20 @@ describe("media store — languages", () => {
     expect(store.initialLanguage).toBe("en");
     store.setLang("de");
     expect(store.initialLanguage).toBe("it");
+  });
+
+  it("narrows the languages to the app's content languages", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["it"];
+    crud.options.mockResolvedValue({
+      lang_info: { translatable: true, languages: ["en", "it"] },
+    });
+    const store = useMediaStore();
+    await store.deriveLanguages();
+    expect(store.activeLanguages).toEqual(["it"]);
+    expect(store.initialLanguage).toBe("it");
+
+    store.setLanguages(["en", "it"]);
+    expect(store.activeLanguages).toEqual(["it"]);
   });
 
   it("forgets the host's languages on reset", () => {

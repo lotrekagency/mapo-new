@@ -9,7 +9,8 @@ import {
 } from "@mapomodule/core/runtime/utils/fetchError";
 import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
-import { languagesFromMetadata } from "../utils/langInfo";
+import { languagesFromMetadata, restrictLanguages } from "../utils/langInfo";
+import { useContentLanguages } from "../utils/contentLanguages";
 import { deepClone, objectDiff } from "@mapomodule/utils";
 import type { AnyFieldDescriptor } from "@mapomodule/form/types";
 import {
@@ -120,13 +121,21 @@ const selected = ref<MenuTreeNode | null>(null);
 // Camomilla describes the model's language situation in the endpoint's OPTIONS
 // metadata; reading it means a host page no longer hardcodes a list, and a menu
 // model that is not registered for translation shows no switcher instead of tabs
-// the backend would drop. props.languages still wins when a page insists.
+// the backend would drop. props.languages still wins when a page insists; the
+// app's `mapo.uikit.contentLanguages` narrows either list.
 const derivedLangs = ref<string[]>([]);
+const contentLanguages = useContentLanguages();
 const activeLangs = computed<string[]>(() =>
-  props.languages.length ? props.languages : derivedLangs.value,
+  restrictLanguages(
+    props.languages.length ? props.languages : derivedLangs.value,
+    contentLanguages,
+  ),
 );
 
-const currentLang = ref(props.lang ?? props.languages[0] ?? "");
+// The page's `lang` when it passes one; otherwise the `activeLangs` watcher
+// below sets the first language actually offered (`languages[0]` can be one
+// `mapo.uikit.contentLanguages` hides or puts later).
+const currentLang = ref(props.lang ?? "");
 const isLoading = ref(String(props.identifier) !== "new");
 const isSaving = ref(false);
 
@@ -153,11 +162,15 @@ const effectiveReadonly = computed(() => {
 // ─── Language handling ───────────────────────────────────────────────────────
 
 // Derivation resolves after mount, so the initial currentLang is "" whenever the
-// list is not hardcoded. Adopt the first language as soon as one is known.
+// list is not hardcoded. Adopt the first language as soon as one is known, and
+// move there when the current one is not offered: the first of `languages`, or
+// the `lang` the page passed, can be one the app hides.
 watch(
   activeLangs,
   (langs) => {
-    if (!currentLang.value && langs.length) currentLang.value = langs[0]!;
+    const isOffered = langs.includes(currentLang.value);
+    if (isOffered || !langs.length) return;
+    currentLang.value = langs[0]!;
   },
   { immediate: true },
 );
