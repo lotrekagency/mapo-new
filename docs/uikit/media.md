@@ -533,7 +533,9 @@ The manager reads the metadata languages from the media endpoint's OPTIONS (`lan
 <MapoMediaManager :languages="['it', 'en']" default-lang="it" />
 ```
 
-With languages, the editor shows one tab per language (the switch appears from two languages up) and reads and writes `media.translations[lang]`. There is no tab for the untranslated fields: on a backend that translates media they are the active language's values under another name, and Camomilla ignores them on write. The editor opens on `defaultLang` when it is among the languages, otherwise on the first one. Uploads put title, alt text and description in that same language's translation. Without languages, the editor and the uploader use the plain fields.
+With languages, the editor shows one tab per language (the switch appears from two languages up) and reads and writes `media.translations[lang]`. The tabs are `MapoDetailLangSwitch`, the same as `MapoDetail`: an app that replaces it with MapoOverride changes the media editor too. There is no tab for the untranslated fields: on a backend that translates media they are the active language's values under another name, and Camomilla ignores them on write.
+
+The editor opens on `defaultLang` when it is among the languages, otherwise on the first one. The tabs never change the page's URL, but they follow a `?lang=` already in it: a media edited from a detail page open in English opens in English. Uploads put title, alt text and description in the translation of `defaultLang`, or of the first language. Without languages, the editor and the uploader use the plain fields.
 
 Saving sends only what changed, `translations` included: the default adapter diffs against the copy taken when editing started. A failed save shows the backend's errors in an error toast, and the editor stays open with the edits.
 

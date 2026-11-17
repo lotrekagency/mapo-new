@@ -17,8 +17,8 @@ const props = withDefaults(
     languages?: string[];
     /**
      * Language the editor opens on and uploads write into, when it is among
-     * the languages (default: the first). Also sent as `language_code` on
-     * detail fetches.
+     * the languages (default: the first; in the editor a `?lang=` in the page
+     * URL wins). Also sent as `language_code` on detail fetches.
      */
     defaultLang?: string;
     /** Pre-seed the picker selection (e.g. the field's current value). */

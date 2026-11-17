@@ -159,13 +159,50 @@ const USlideover: Component = {
   },
 };
 
+// `MapoDetailLangSwitch` declares the contract the editor binds: `modelValue`,
+// `langs` and `noRouteChange` in, `update:modelValue` out.
+interface LangSwitchStub {
+  readonly langs: string[];
+  readonly value: string;
+  readonly noRouteChange: boolean;
+  select(lang: string): void;
+}
+let langSwitch: LangSwitchStub | null = null;
+
+const MapoDetailLangSwitch: Component = {
+  name: "MapoDetailLangSwitch",
+  props: { modelValue: String, langs: Array, noRouteChange: Boolean },
+  emits: ["update:modelValue"],
+  setup(
+    props: { modelValue?: string; langs?: string[]; noRouteChange?: boolean },
+    { emit }: SetupContext<["update:modelValue"]>,
+  ) {
+    langSwitch = {
+      get langs() {
+        return props.langs ?? [];
+      },
+      get value() {
+        return props.modelValue ?? "";
+      },
+      get noRouteChange() {
+        return props.noRouteChange ?? false;
+      },
+      select: (lang) => emit("update:modelValue", lang),
+    };
+    onUnmounted(() => {
+      langSwitch = null;
+    });
+    return () => h("div");
+  },
+};
+
 const stubs: Record<string, Component> = {
   UButton,
   UFormField,
   USlideover,
   UInput: inputComponent("UInput"),
   UTextarea: inputComponent("UTextarea"),
-  UFieldGroup: passthrough("UFieldGroup"),
+  MapoDetailLangSwitch,
   MapoMediaPreview: passthrough("MapoMediaPreview"),
   MapoMediaFileChanger: passthrough("MapoMediaFileChanger"),
 };
@@ -237,11 +274,38 @@ describe("MapoMediaEditor", () => {
   it("offers one tab per language and no untranslated one", async () => {
     await openEditor();
 
-    expect(button("IT")).toBeDefined();
-    expect(button("EN")).toBeDefined();
+    expect(langSwitch?.langs).toEqual(["it", "en"]);
+    expect(langSwitch?.value).toBe("it");
     expect(buttons.map((stub) => stub.label)).not.toContain(
       "mapo.mediaEditor.defaultLang",
     );
+  });
+
+  // The shared switch, so an app that replaces it (MapoOverride) replaces it
+  // in the media editor too; the drawer must leave the page's URL alone.
+  it("uses the shared language switch without touching the route", async () => {
+    await openEditor();
+
+    expect(langSwitch?.noRouteChange).toBe(true);
+    langSwitch?.select("en");
+    await settle();
+    expect(input("mapo.altTag").value).toBe("A photo");
+  });
+
+  it("shows no switch for a single language, and still writes it", async () => {
+    crud.options.mockResolvedValue({
+      lang_info: { translatable: true, languages: ["it"] },
+    });
+    await openEditor();
+
+    expect(langSwitch).toBeNull();
+    input("mapo.title").type("Solo italiano");
+    button("mapo.save")?.click();
+    await settle();
+
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, {
+      translations: { it: { title: "Solo italiano" } },
+    });
   });
 
   it("saves the edit as a translation, sending only what changed", async () => {
@@ -279,7 +343,7 @@ describe("MapoMediaEditor", () => {
     crud.options.mockResolvedValue({ lang_info: { translatable: false } });
     await openEditor();
 
-    expect(button("IT")).toBeUndefined();
+    expect(langSwitch).toBeNull();
     input("mapo.title").type("New title");
     button("mapo.save")?.click();
     await settle();

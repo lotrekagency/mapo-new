@@ -19,7 +19,10 @@ import type { MediaItem } from "../types/media.js";
 const props = defineProps<{
   /** Overrides the languages read from the endpoint. Rarely needed. */
   languages?: string[];
-  /** Language the editor opens on, when it is among the languages. Default: the first one. */
+  /**
+   * Language the editor opens on, when it is among the languages. Default: the
+   * first one. A `?lang=` in the page URL wins, as in `MapoDetail`.
+   */
   defaultLang?: string;
 }>();
 
@@ -318,18 +321,15 @@ function formatDate(dateStr: string): string {
 
           <!-- Edit form (shown when editing) -->
           <div v-if="editing" class="space-y-4 px-4 py-3">
-            <!-- Lang switch -->
-            <UFieldGroup v-if="activeLangs.length > 1" size="xs">
-              <UButton
-                v-for="lang in activeLangs"
-                :key="lang"
-                :variant="currentLang === lang ? 'solid' : 'outline'"
-                color="neutral"
-                @click="currentLang = lang"
-              >
-                {{ lang.toUpperCase() }}
-              </UButton>
-            </UFieldGroup>
+            <!-- Lang switch: the one MapoDetail and the menu manager use, so
+                 an app that replaces it (MapoOverride) replaces it here too.
+                 The drawer has no route of its own: the URL stays as it is. -->
+            <MapoDetailLangSwitch
+              v-if="activeLangs.length > 1"
+              v-model="currentLang"
+              :langs="activeLangs"
+              no-route-change
+            />
 
             <!-- Field inputs -->
             <div class="space-y-3">
