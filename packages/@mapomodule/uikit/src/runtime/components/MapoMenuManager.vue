@@ -134,6 +134,10 @@ const isNew = computed(() => String(props.identifier) === "new");
 const translationsActive = computed(
   () => props.translatable && activeLangs.value.length > 0,
 );
+// The switch only picks between languages: with a single one it stays hidden,
+// as in MapoDetail, while the tree still lives under that language's
+// `translations` entry (`translationsActive` decides where the nodes are).
+const hasSeveralLanguages = computed(() => activeLangs.value.length > 1);
 
 // ─── Permissions ─────────────────────────────────────────────────────────────
 
@@ -362,7 +366,7 @@ const treeview = ref<InstanceType<typeof MapoMenuTreeview> | null>(null);
         :readonly="effectiveReadonly"
         :loading="isLoading"
       >
-        <template v-if="translationsActive" #top>
+        <template v-if="translationsActive && hasSeveralLanguages" #top>
           <div class="border-b border-default px-2 pt-2">
             <MapoDetailLangSwitch
               v-model="currentLang"

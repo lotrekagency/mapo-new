@@ -178,7 +178,9 @@ For a completely custom editor, take over the `editor-form` slot:
 With `languages` set and `translatable` on (the default), each language gets its
 own tree under `translations.<code>.nodes` and a language switcher appears above
 the tree. Switching language clears the selection, since a node only exists
-inside one language's tree.
+inside one language's tree. With a single language there is nothing to switch:
+the switcher stays hidden, as in `MapoDetail`, and the tree still lives under
+that language's `translations` entry.
 
 Left empty, `languages` is derived from an `OPTIONS` call on `endpoint`, reading
 `lang_info.languages`: a menu model not registered for translation reports none,
