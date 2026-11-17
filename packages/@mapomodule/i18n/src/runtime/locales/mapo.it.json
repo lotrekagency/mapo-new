@@ -239,6 +239,13 @@
       "deleteTitle": "Elimina cartella",
       "confirmDelete": "Eliminare la cartella \"{name}\" e tutto quello che contiene, sottocartelle e media?"
     },
+    "mediaMove": {
+      "moveTo": "Sposta in…",
+      "title": "Sposta nella cartella",
+      "confirm": "Sposta qui",
+      "moved": "Media spostati: {number}",
+      "failed": "Media non spostati: {number}"
+    },
     "mediaGallery": {
       "noMediaFound": "Nessun media trovato",
       "uploadHere": "Carica qui",

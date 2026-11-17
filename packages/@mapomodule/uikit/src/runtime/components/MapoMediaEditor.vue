@@ -16,7 +16,7 @@ import { pickLanguage, restrictLanguages } from "../utils/langInfo.js";
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { describeMediaErrors, pickMetadata } from "../utils/mediaMetadata.js";
 import { mediaFileUrl } from "../utils/mediaUrl.js";
-import type { MediaItem } from "../types/media.js";
+import type { MediaFolder, MediaItem } from "../types/media.js";
 
 const props = defineProps<{
   /** Overrides the languages read from the endpoint. Rarely needed. */
@@ -174,6 +174,15 @@ function cancelEditing() {
   editSnapshot = null;
   editing.value = false;
   newFile.value = null;
+}
+
+// Moving the media: it leaves the folder on screen, so the drawer closes.
+const movePickerOpen = ref(false);
+
+async function moveTo(folder: MediaFolder | null) {
+  if (!media.value) return;
+  const moved = await store.moveMedia([media.value.id], folder?.id ?? null);
+  if (moved.length) store.closeEditor();
 }
 
 // Field labels for the error toast, keyed like the backend reports the fields.
@@ -377,21 +386,38 @@ function formatDate(dateStr: string): string {
           </div>
         </div>
 
+        <!-- Destination picker for "Move to": teleported, mounted when open -->
+        <MapoMediaFolderPicker
+          v-model:open="movePickerOpen"
+          @confirm="moveTo"
+        />
+
         <!-- Footer -->
         <div
           class="flex items-center justify-between gap-2 border-t border-default px-4 py-3"
         >
-          <UButton
-            v-if="canRemove"
-            icon="i-lucide-trash-2"
-            size="sm"
-            variant="soft"
-            color="error"
-            @click="store.deleteMedia(media)"
-          >
-            {{ t("mapo.delete") }}
-          </UButton>
-          <span v-else />
+          <div class="flex gap-2">
+            <UButton
+              v-if="canRemove"
+              icon="i-lucide-trash-2"
+              size="sm"
+              variant="soft"
+              color="error"
+              @click="store.deleteMedia(media)"
+            >
+              {{ t("mapo.delete") }}
+            </UButton>
+            <UButton
+              v-if="canEdit && !editing"
+              icon="i-lucide-folder-input"
+              size="sm"
+              variant="soft"
+              color="neutral"
+              @click="movePickerOpen = true"
+            >
+              {{ t("mapo.mediaMove.moveTo") }}
+            </UButton>
+          </div>
 
           <div class="flex gap-2">
             <UButton

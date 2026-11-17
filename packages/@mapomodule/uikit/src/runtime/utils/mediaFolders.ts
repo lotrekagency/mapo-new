@@ -27,11 +27,16 @@ export interface FolderNode extends TreeItem {
  * folders. A branch not loaded yet holds one placeholder child, so it shows as
  * expandable; a loaded branch with no subfolders is a leaf. A folder met twice
  * on the same path (a cycle in the backend's data) is not expanded again.
+ *
+ * `exclude` leaves out folders and everything under them, as a destination
+ * picker needs when a folder cannot go inside itself.
  */
 export function buildFolderTree(
   folderChildren: Record<string, MediaFolder[]>,
   labels: { root: string; loading: string },
+  options: { exclude?: ReadonlySet<number> } = {},
 ): FolderNode[] {
+  const excluded = options.exclude ?? new Set<number>();
   const branch = (
     parentKey: string,
     seen: Set<string>,
@@ -46,8 +51,9 @@ export function buildFolderTree(
       };
       return [placeholder];
     }
-    if (!loaded.length) return undefined;
-    return loaded.map((folder) => {
+    const shown = loaded.filter((folder) => !excluded.has(folder.id));
+    if (!shown.length) return undefined;
+    return shown.map((folder) => {
       const key = folderKey(folder.id);
       const isRepeated = seen.has(key);
       const children = isRepeated
@@ -77,4 +83,11 @@ export function findFolderNode(
     if (inner) return inner;
   }
   return undefined;
+}
+
+/** Icon of a tree node: a spinner while loading, an open folder when it shows children. */
+export function folderNodeIcon(node: FolderNode, isOpen: boolean): string {
+  if (node.pending) return "i-lucide-loader-circle";
+  const showsChildren = isOpen && !!node.children?.length;
+  return showsChildren ? "i-lucide-folder-open" : "i-lucide-folder";
 }

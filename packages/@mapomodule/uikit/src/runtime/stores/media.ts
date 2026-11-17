@@ -371,6 +371,42 @@ export const useMediaStore = defineStore("mapo-media", () => {
     return updated;
   }
 
+  /**
+   * Move media to folder `folderId` (the root when `null`), one PATCH each
+   * through the adapter. Reports how many moved and how many did not, drops
+   * the moved ones from the bulk selection and refreshes the folder on
+   * screen. Returns the ids that moved.
+   */
+  async function moveMedia(
+    ids: number[],
+    folderId: number | null,
+  ): Promise<number[]> {
+    const a = adapter();
+    const payload = (
+      a.buildMoveMediaPayload ?? defaultMediaAdapter.buildMoveMediaPayload
+    )(folderId);
+    const results = await Promise.allSettled(
+      ids.map((id) => mediaCrud().partialUpdate(id, payload as never)),
+    );
+    const moved = ids.filter((_, i) => results[i]?.status === "fulfilled");
+    const notMoved = ids.length - moved.length;
+
+    const t = useMapoT();
+    const snack = useSnackStore();
+    if (moved.length) {
+      snack.show(
+        t("mapo.mediaMove.moved", { number: moved.length }),
+        "success",
+      );
+    }
+    if (notMoved) {
+      snack.show(t("mapo.mediaMove.failed", { number: notMoved }), "error");
+    }
+    editList.value = editList.value.filter((id) => !moved.includes(id));
+    await getRoot();
+    return moved;
+  }
+
   async function updateOrCreateFolder(
     folder: Partial<MediaFolder>,
   ): Promise<void> {
@@ -626,6 +662,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     setLanguages,
     updateMedia,
     replaceFile,
+    moveMedia,
     updateOrCreateFolder,
     deleteFolder,
     deleteMedia,

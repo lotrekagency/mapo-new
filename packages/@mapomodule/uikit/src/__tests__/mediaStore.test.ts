@@ -287,3 +287,49 @@ describe("media store — upload hand-over", () => {
     expect(store.takeQueuedUploads()).toEqual([]);
   });
 });
+
+describe("media store — moveMedia", () => {
+  const explorer = {
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders: [],
+    parent_folder: null,
+  };
+
+  it("moves each media through the adapter, then refreshes", async () => {
+    crud.partialUpdate.mockResolvedValue({});
+    crud.list.mockResolvedValue(explorer);
+    const store = useMediaStore();
+    store.editList = [7, 8, 9];
+
+    const moved = await store.moveMedia([7, 8], 3);
+
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, { folder: 3 });
+    expect(crud.partialUpdate).toHaveBeenCalledWith(8, { folder: 3 });
+    expect(moved).toEqual([7, 8]);
+    expect(store.editList).toEqual([9]);
+    expect(snack.show).toHaveBeenCalledWith("mapo.mediaMove.moved", "success");
+    expect(crud.list).toHaveBeenCalled();
+  });
+
+  it("moves to the root with a null folder", async () => {
+    crud.partialUpdate.mockResolvedValue({});
+    crud.list.mockResolvedValue(explorer);
+    await useMediaStore().moveMedia([7], null);
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, { folder: null });
+  });
+
+  it("reports the media that did not move and keeps them selected", async () => {
+    crud.partialUpdate
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("403"));
+    crud.list.mockResolvedValue(explorer);
+    const store = useMediaStore();
+    store.editList = [7, 8];
+
+    const moved = await store.moveMedia([7, 8], 3);
+
+    expect(moved).toEqual([7]);
+    expect(store.editList).toEqual([8]);
+    expect(snack.show).toHaveBeenCalledWith("mapo.mediaMove.failed", "error");
+  });
+});

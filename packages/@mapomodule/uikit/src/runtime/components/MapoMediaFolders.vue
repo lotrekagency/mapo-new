@@ -7,6 +7,7 @@ import {
   buildFolderTree,
   findFolderNode,
   folderKey,
+  folderNodeIcon,
   type FolderNode,
 } from "../utils/mediaFolders.js";
 import type { MediaFolder } from "../types/media.js";
@@ -166,12 +167,6 @@ function isRenaming(node: FolderNode): boolean {
   const renamingId = editingFolder.value?.id;
   return renamingId != null && node.folder?.id === renamingId;
 }
-
-function nodeIcon(node: FolderNode, isOpen: boolean): string {
-  if (node.pending) return "i-lucide-loader-circle";
-  const showsChildren = isOpen && !!node.children?.length;
-  return showsChildren ? "i-lucide-folder-open" : "i-lucide-folder";
-}
 </script>
 
 <template>
@@ -255,7 +250,7 @@ function nodeIcon(node: FolderNode, isOpen: boolean): string {
         <template #item-wrapper="{ item, expanded: isOpen, selected, ui }">
           <div :class="ui.link({ selected, disabled: !!item.pending })">
             <UIcon
-              :name="nodeIcon(item, isOpen)"
+              :name="folderNodeIcon(item, isOpen)"
               :class="[ui.linkLeadingIcon(), item.pending && 'animate-spin']"
             />
 

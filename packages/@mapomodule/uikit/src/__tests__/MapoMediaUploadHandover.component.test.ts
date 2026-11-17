@@ -163,6 +163,7 @@ const stubs: Record<string, Component> = {
   UProgress: passthrough("UProgress"),
   UBadge: passthrough("UBadge"),
   MapoMediaPreview: passthrough("MapoMediaPreview"),
+  MapoMediaFolderPicker: passthrough("MapoMediaFolderPicker"),
 };
 
 let app: App<HeadlessNode> | undefined;

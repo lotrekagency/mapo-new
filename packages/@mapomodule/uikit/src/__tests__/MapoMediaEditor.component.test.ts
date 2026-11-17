@@ -200,7 +200,35 @@ const MapoDetailLangSwitch: Component = {
   },
 };
 
+// `MapoMediaFolderPicker`: `open` in, `confirm` out with the picked folder.
+let picker: { readonly open: boolean; pick(folder: unknown): void } | null =
+  null;
+const MapoMediaFolderPicker: Component = {
+  name: "MapoMediaFolderPicker",
+  props: { open: Boolean },
+  emits: ["confirm", "update:open"],
+  setup(
+    props: { open?: boolean },
+    { emit }: SetupContext<["confirm", "update:open"]>,
+  ) {
+    picker = {
+      get open() {
+        return props.open ?? false;
+      },
+      pick(folder) {
+        emit("confirm", folder);
+        emit("update:open", false);
+      },
+    };
+    onUnmounted(() => {
+      picker = null;
+    });
+    return () => h("div");
+  },
+};
+
 const stubs: Record<string, Component> = {
+  MapoMediaFolderPicker,
   UButton,
   UFormField,
   USlideover,
@@ -240,13 +268,17 @@ const stored: MediaItem = {
 let app: App<HeadlessNode> | undefined;
 let pinia: Pinia;
 
-async function openEditor(props: Record<string, unknown> = {}) {
+async function mountEditor(props: Record<string, unknown> = {}) {
   app = createApp({ render: () => h(MapoMediaEditor as Component, props) });
   app.use(pinia);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
   app.mount(headlessNode());
   useMediaStore().editMedia = structuredClone(stored);
   await settle();
+}
+
+async function openEditor(props: Record<string, unknown> = {}) {
+  await mountEditor(props);
   button("mapo.edit")?.click();
   await settle();
 }
@@ -396,5 +428,20 @@ describe("MapoMediaEditor", () => {
     expect(crud.partialUpdate).toHaveBeenCalledWith(7, {
       translations: { en: { title: "New photo" } },
     });
+  });
+
+  it("moves the media to the folder picked, then closes the drawer", async () => {
+    await mountEditor();
+    const store = useMediaStore();
+
+    button("mapo.mediaMove.moveTo")?.click();
+    await settle();
+    expect(picker?.open).toBe(true);
+
+    picker?.pick({ id: 3, name: "Archive", parent: null });
+    await settle();
+
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, { folder: 3 });
+    expect(store.editMedia).toBeNull();
   });
 });

@@ -206,6 +206,7 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoDropArea",
       "MapoMediaBreadcrumbs",
       "MapoMediaFolders",
+      "MapoMediaFolderPicker",
       "MapoMediaGallery",
       "MapoMediaFileChanger",
       "MapoMediaEditor",

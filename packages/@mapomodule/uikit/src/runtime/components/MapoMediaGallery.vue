@@ -2,8 +2,10 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
+import { useRuntimeConfig } from "#app";
+import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useMediaStore } from "../stores/media.js";
-import type { MediaItem } from "../types/media.js";
+import type { MediaFolder, MediaItem } from "../types/media.js";
 
 const emit = defineEmits<{
   /**
@@ -25,6 +27,21 @@ const folderLabel = computed(
 function queueForUpload(files: File[]) {
   store.queueUploads(files);
   emit("upload");
+}
+
+// Moving media needs the change permission on the media model, as editing
+// them does.
+const runtimeConfig = useRuntimeConfig();
+const permissionsModel =
+  ((runtimeConfig.public.mapoMedia ?? {}) as { permissionsModel?: string })
+    .permissionsModel ?? "media";
+const { canChange } = usePermissions();
+const canMove = computed(() => canChange(permissionsModel));
+
+const movePickerOpen = ref(false);
+
+function moveSelected(folder: MediaFolder | null) {
+  return store.moveMedia([...store.editList], folder?.id ?? null);
 }
 
 const isPickerMode = computed(
@@ -160,6 +177,16 @@ function onDragEnd() {
           </span>
           <div class="flex-1" />
           <UButton
+            v-if="canMove"
+            icon="i-lucide-folder-input"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            @click="movePickerOpen = true"
+          >
+            {{ t("mapo.mediaMove.moveTo") }}
+          </UButton>
+          <UButton
             icon="i-lucide-trash-2"
             size="xs"
             color="error"
@@ -284,6 +311,11 @@ function onDragEnd() {
           />
         </div>
       </div>
+
+      <MapoMediaFolderPicker
+        v-model:open="movePickerOpen"
+        @confirm="moveSelected"
+      />
     </template>
   </MapoDropArea>
 </template>

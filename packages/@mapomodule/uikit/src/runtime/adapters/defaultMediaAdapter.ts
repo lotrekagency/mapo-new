@@ -54,6 +54,10 @@ export const defaultMediaAdapter: Required<MediaAdapter> = {
     };
   },
 
+  buildMoveMediaPayload(folderId: number | null): Record<string, unknown> {
+    return { folder: folderId };
+  },
+
   buildReplaceFilePayload(
     file: File,
     maintainUrl: boolean,

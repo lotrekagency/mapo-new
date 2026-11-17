@@ -54,9 +54,10 @@ useMediaStore (Pinia)
     ├── MapoMediaManager          ← orchestrator shell
     │     ├── MapoMediaFolders    ← folder tree + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
-    │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination,
+    │     ├── MapoMediaGallery    ← CSS grid + bulk ops (move, delete) + pagination,
     │     │                          Upload here + file drop
-    │     ├── MapoMediaEditor     ← side drawer for metadata
+    │     ├── MapoMediaEditor     ← side drawer for metadata, move
+    │     ├── MapoMediaFolderPicker ← folder tree dialog (move destination)
     │     └── MapoMediaUploader   ← drop area + per-file title, alt text,
     │                                description, folder + progress
     │
@@ -176,6 +177,8 @@ interface MediaAdapter {
     previous?: MediaItem,
   ): Record<string, unknown>;
   /** Build the multipart PATCH payload for a file replacement (default REST: { file, maintain_url }). */
+  /** Build the PATCH payload that moves a media to a folder (`null` = root). Default: `{ folder }`. */
+  buildMoveMediaPayload?(folderId: number | null): Record<string, unknown>;
   buildReplaceFilePayload?(
     file: File,
     maintainUrl: boolean,
@@ -324,6 +327,7 @@ store.setLanguages(['it', 'en'])                       // impose the metadata la
 
 await store.updateMedia(media, previous?)              // previous: the pre-edit copy, to send only the changes
 await store.replaceFile(mediaId, file, maintainUrl?)
+await store.moveMedia(ids, folderId | null)          // one PATCH each; toasts, refresh; returns the ids moved
 await store.deleteMedia(media)
 
 await store.updateOrCreateFolder({ id?, name, parent? })
@@ -376,6 +380,19 @@ In `multi` mode the gallery shows a **selection strip** above the grid: click a 
 The grid of the folder on screen, with the selection strip (pickers), the bulk bar and pagination. Its first row tells where uploads land, the folder on screen, and has **Upload here**, which opens the file picker; files dragged in from the computer can be dropped anywhere on the gallery. Either way the files wait in `store.queuedUploads` and the gallery emits `upload`. The manager then opens the Upload tab, which queues them for the folder on screen, with title, alt text and description to fill in before uploading.
 
 Emits: `upload` (no payload). No props.
+
+### `<MapoMediaFolderPicker>`
+
+Dialog to pick a folder, the root included, from the same tree as the sidebar: it shares the store's folder cache and loads the branches it opens. **Move to…** opens it from the gallery's bulk bar, for the selected media, and from the editor, for the media open; the editor closes once the media has moved out of the folder on screen. Moving goes through `store.moveMedia`, one PATCH per media built by the adapter's `buildMoveMediaPayload` (default `{ folder }`, which Camomilla takes as it is), with a toast for the media moved and one for those that were not. Both buttons need the `change` permission.
+
+| Prop           | Type       | Default          | Description                                                                     |
+| -------------- | ---------- | ---------------- | ------------------------------------------------------------------------------- |
+| `open`         | `boolean`  | —                | Whether the dialog is open (`v-model:open`)                                     |
+| `title`        | `string`   | "Move to folder" | Dialog title                                                                    |
+| `confirmLabel` | `string`   | "Move here"      | Label of the confirm button                                                     |
+| `exclude`      | `number[]` | `[]`             | Folder ids hidden with everything under them (a folder cannot go inside itself) |
+
+Emits `update:open` and `confirm` with the folder picked (`MediaFolder`, or `null` for the root). The dialog mounts when it opens, so it stacks above a drawer opened before it.
 
 ### `<MapoMediaFolders>`
 
@@ -565,7 +582,7 @@ Saving sends only what changed, `translations` included: the default adapter dif
 
 ## How to: gate editing with permissions
 
-The editor's **Edit** and **Delete** buttons check the `change` / `delete` Django permissions on the configured model (default `"media"`), via `usePermissions()`. Point it at your model if it differs:
+The editor's **Edit**, **Move to** and **Delete** buttons, and **Move to** in the gallery's bulk bar, check the `change` / `delete` Django permissions on the configured model (default `"media"`), via `usePermissions()`. Point it at your model if it differs:
 
 ```ts
 // nuxt.config.ts

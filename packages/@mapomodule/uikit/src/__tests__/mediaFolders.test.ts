@@ -5,6 +5,7 @@ import {
   buildFolderTree,
   findFolderNode,
   folderKey,
+  folderNodeIcon,
 } from "../runtime/utils/mediaFolders";
 import type { MediaFolder } from "../runtime/types/media";
 
@@ -76,5 +77,31 @@ describe("findFolderNode", () => {
     expect(findFolderNode(tree, "2")?.label).toBe("B");
     expect(findFolderNode(tree, ROOT_FOLDER_KEY)?.label).toBe("Media");
     expect(findFolderNode(tree, "9")).toBeUndefined();
+  });
+});
+
+describe("buildFolderTree exclude", () => {
+  // A destination picker hides a folder with everything under it.
+  it("leaves out excluded folders and their subtrees", () => {
+    const tree = buildFolderTree(
+      {
+        root: [folder(1, "A"), folder(2, "B")],
+        1: [folder(3, "A1", 1)],
+      },
+      labels,
+      { exclude: new Set([1]) },
+    );
+    expect(tree[0]?.children?.map((node) => node.label)).toEqual(["B"]);
+    expect(findFolderNode(tree, "3")).toBeUndefined();
+  });
+});
+
+describe("folderNodeIcon", () => {
+  it("shows a spinner while loading and an open folder with children", () => {
+    const [root] = buildFolderTree({ root: [folder(1, "A")] }, labels);
+    expect(folderNodeIcon(root!, true)).toBe("i-lucide-folder-open");
+    expect(folderNodeIcon(root!, false)).toBe("i-lucide-folder");
+    const pending = root!.children![0]!.children![0]!;
+    expect(folderNodeIcon(pending, false)).toBe("i-lucide-loader-circle");
   });
 });

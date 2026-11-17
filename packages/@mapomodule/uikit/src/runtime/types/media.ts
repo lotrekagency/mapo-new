@@ -123,6 +123,12 @@ export interface MediaAdapter {
     previous?: MediaItem,
   ): Record<string, unknown>;
   /**
+   * Build the PATCH payload that moves a media to folder `folderId` (`null`
+   * is the root). Default: `{ folder: folderId }`, which Camomilla takes as
+   * it is.
+   */
+  buildMoveMediaPayload?(folderId: number | null): Record<string, unknown>;
+  /**
    * Build the multipart PATCH payload for a file replacement.
    * @example
    * // Default REST: { file, maintain_url } — Camomilla: { file, same_url }

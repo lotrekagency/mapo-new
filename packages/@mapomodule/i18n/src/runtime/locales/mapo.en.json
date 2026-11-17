@@ -239,6 +239,13 @@
       "deleteTitle": "Delete folder",
       "confirmDelete": "Delete folder \"{name}\" and everything it contains, subfolders and media?"
     },
+    "mediaMove": {
+      "moveTo": "Move to…",
+      "title": "Move to folder",
+      "confirm": "Move here",
+      "moved": "Media moved: {number}",
+      "failed": "Media not moved: {number}"
+    },
     "mediaGallery": {
       "noMediaFound": "No media found",
       "uploadHere": "Upload here",
