@@ -102,6 +102,8 @@ Explorer payload shape:
 }
 ```
 
+A `parent_folder` without an `id` counts as the root too: Camomilla answers the root with an empty folder (`{ "title": "", "updir": null }`) instead of `null`.
+
 ### Media endpoint (default `/api/media`)
 
 Single-media CRUD:

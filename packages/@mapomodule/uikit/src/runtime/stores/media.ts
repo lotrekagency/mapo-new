@@ -186,7 +186,12 @@ export const useMediaStore = defineStore("mapo-media", () => {
   // Driven by the response's `parent_folder` (matches the legacy contract):
   // push when entering a new folder, slice when navigating back up.
   function applyParentFolder(pf: MediaFolder | null): void {
-    if (!pf) {
+    // A folder without an id is the root too. Camomilla answers the root with
+    // an empty folder (`{ title: "", updir: null }`, DRF's serialization of no
+    // instance) rather than null; kept, it became a nameless breadcrumb and a
+    // "back to root" button on the root itself.
+    const isRoot = pf?.id == null;
+    if (isRoot) {
       parentFolders.value = [];
       return;
     }

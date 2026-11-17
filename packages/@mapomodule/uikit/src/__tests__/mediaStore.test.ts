@@ -157,3 +157,38 @@ describe("media store — updateMedia", () => {
     expect(snack.show).not.toHaveBeenCalled();
   });
 });
+
+describe("media store — breadcrumbs", () => {
+  const explorer = (parentFolder: unknown) => ({
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders: [],
+    parent_folder: parentFolder,
+  });
+
+  // Camomilla serializes "no folder" as an empty one; once the adapter has
+  // normalized it, it still has no id.
+  it("treats a parent folder without id as the root", async () => {
+    crud.list.mockResolvedValue(
+      explorer({ title: "", updir: null, name: "", parent: null }),
+    );
+    const store = useMediaStore();
+
+    await store.getRoot({ page: 1 });
+
+    expect(store.parentFolders).toEqual([]);
+    expect(store.parentFolder).toBeNull();
+  });
+
+  it("enters a real folder and leaves it for the root", async () => {
+    const folder = { id: 3, name: "Foto", parent: null, path: "/foto" };
+    crud.detail.mockResolvedValue(explorer(folder));
+    crud.list.mockResolvedValue(explorer({ title: "", updir: null }));
+    const store = useMediaStore();
+
+    await store.navigateToFolder(folder);
+    expect(store.parentFolders).toEqual([folder]);
+
+    await store.navigateToFolder(null);
+    expect(store.parentFolders).toEqual([]);
+  });
+});
