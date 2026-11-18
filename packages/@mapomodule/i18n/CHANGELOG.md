@@ -1,3 +1,16 @@
+# @mapomodule/i18n [2.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.5...@mapomodule/i18n@2.0.0-beta.6) (2026-11-18)
+
+### Bug Fixes
+
+- **uikit:** save media metadata as translations and report save errors ([f67588c](https://github.com/lotrekagency/mapo-new/commit/f67588ca2048b901a10ff1d33b66b68b160d6c66))
+
+### Features
+
+- **uikit:** move media between folders ([fce77a6](https://github.com/lotrekagency/mapo-new/commit/fce77a6ce182594055b1b2cdbdd2a6de072032bf))
+- **uikit:** move media folders ([0cb8f7d](https://github.com/lotrekagency/mapo-new/commit/0cb8f7de506c9343b883a7685302dca92e02d76a))
+- **uikit:** show media folders as a tree ([f7c9bce](https://github.com/lotrekagency/mapo-new/commit/f7c9bce57a422b6b3ee237f499047b171866d404))
+- **uikit:** upload into the current folder from the gallery ([84125b0](https://github.com/lotrekagency/mapo-new/commit/84125b0bc6e92d828c7a1a646a77d041c40101a7))
+
 # @mapomodule/i18n [2.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.4...@mapomodule/i18n@2.0.0-beta.5) (2026-10-29)
 
 ### Bug Fixes
