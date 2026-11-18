@@ -12,7 +12,7 @@ Run them from the repository root. All of them must pass, with no new errors and
 | `pnpm lint`            | ESLint over every package's `src/`.                                                       |
 | `pnpm typecheck`       | `tsc --noEmit` for TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`.        |
 | `pnpm test`            | Vitest in the packages that declare a `test` script: `utils`, `form`, `mcp`.              |
-| `pnpm exec vitest run` | Every test file in the repository, including `core`, `store` and `uikit`.                 |
+| `pnpm exec vitest run` | Every test file, including `core`, `store`, `uikit` and the component tests of `form`.    |
 | `pnpm docs:build`      | The VitePress site builds. Broken markup fails it; dead links do not (`ignoreDeadLinks`). |
 
 `pnpm test` runs after a build (`turbo` makes `test` depend on `build`), because the MCP tests read the generated knowledge base.
@@ -29,7 +29,7 @@ Any other warning is new: fix it or explain it in the hand-over.
 
 ### Known gap
 
-`core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them. lint-staged still runs them on commit (`vitest related`), and `pnpm exec vitest run` from the root runs them on demand. Run it whenever you touch those packages.
+`core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them. The same holds for the component tests of `form`: its own `vitest.config.ts` has neither the Vue plugin nor the client transform these tests need, so it leaves `*.component.test.ts` to the root config. lint-staged still runs them on commit (`vitest related`), and `pnpm exec vitest run` from the root runs them on demand. Run it whenever you touch those packages.
 
 ## Unit tests
 
@@ -41,7 +41,7 @@ Any other warning is new: fix it or explain it in the hand-over.
 Run a subset while you work:
 
 ```bash
-pnpm --filter @mapomodule/form test                 # one package
+pnpm --filter @mapomodule/form test                 # one package (for form, not its *.component.test.ts)
 pnpm exec vitest run packages/@mapomodule/store      # one folder, from the root
 pnpm --filter @mapomodule/utils exec vitest          # watch mode
 ```

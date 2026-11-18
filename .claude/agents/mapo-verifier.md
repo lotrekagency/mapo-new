@@ -20,7 +20,7 @@ From the repository root, in this order, continuing after a failure so the repor
 2. `pnpm lint`
 3. `pnpm typecheck`
 4. `pnpm test`
-5. `pnpm exec vitest run` (it also covers `core`, `store` and `uikit`)
+5. `pnpm exec vitest run` (it also covers `core`, `store`, `uikit` and the component tests of `form`)
 6. `pnpm docs:build`, when anything under `docs/` changed
 7. `pnpm --filter @mapomodule/mcp test` after the build, when docs, recipes or MCP sources changed
 

@@ -36,9 +36,9 @@ Descriptor typing guidance:
 
 ### Slots
 
-| Slot          | Description                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `field.{key}` | Override the rendering of a specific field. Receives `{ field: FieldDescriptor, model: T \| undefined, currentLang: string }`. |
+| Slot          | Description                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `field.{key}` | Override the rendering of a specific field. Receives `{ field: FieldDescriptor, model: T \| undefined, currentLang: string }`. The field's `visible` and `show` still apply to the grid cell the slot fills. |
 
 ### Exposed Methods
 
@@ -78,30 +78,31 @@ Low-level wrapper that resolves a `FieldDescriptor` to its registered component,
 
 ## MapoFormGroup
 
-Collapsible section that groups related fields under a heading.
+Collapsible card that groups related fields under a heading, with an optional sub-tab bar. The card shows only while one of its fields does (→ [Tab and group layout](./index.md#tab-and-group-layout)).
 
 ### Props
 
-| Prop              | Type                | Default        | Description                        |
-| ----------------- | ------------------- | -------------- | ---------------------------------- |
-| `name`            | `string`            | — **required** | Group identifier.                  |
-| `label`           | `string`            | —              | Group heading label.               |
-| `fields`          | `FieldDescriptor[]` | — **required** | Fields belonging to this group.    |
-| `initialExpanded` | `boolean`           | —              | Whether the group starts expanded. |
+| Prop              | Type                                | Default                  | Description                                                                                                                                           |
+| ----------------- | ----------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `string`                            | — **required**           | Group identifier.                                                                                                                                     |
+| `label`           | `string`                            | —                        | Group heading label.                                                                                                                                  |
+| `fields`          | `AnyFieldDescriptor[]`              | — **required**           | Fields of the group outside any sub-tab, in a 12-column grid above the sub-tab bar.                                                                   |
+| `subtabs`         | `Map<string, AnyFieldDescriptor[]>` | —                        | Sub-tab name → its fields, shown as a tab bar inside the card (`MapoForm` builds it from `subtab`). A sub-tab with no field to show leaves the bar.   |
+| `initialExpanded` | `boolean`                           | module `groups.expanded` | Whether the group starts expanded. When omitted, the module option [`groups.expanded`](./index.md#tab-and-group-layout) decides (defaults to `true`). |
 
 ---
 
 ## MapoFormFlatSection
 
-Flat grid layout for fields that belong to no group. Renders fields in a 12-column responsive grid and provides the same field-expand overlay as `MapoFormGroup` — without a collapsible heading.
+Flat grid layout for fields that belong to no group. Renders fields in a 12-column grid and provides the same field-expand overlay as `MapoFormGroup` — without a collapsible heading. A field hidden by `visible` or `show` takes its grid cell with it; with no field to show, the grid goes too.
 
-Used internally by `MapoForm` for fields that have no `group` or `tab` set.
+Used internally by `MapoForm` and `MapoFormTabs` for the fields that have no `group`, one grid per tab.
 
 ### Props
 
-| Prop     | Type                | Default        | Description                   |
-| -------- | ------------------- | -------------- | ----------------------------- |
-| `fields` | `FieldDescriptor[]` | — **required** | Fields to render in the grid. |
+| Prop     | Type                   | Default        | Description                   |
+| -------- | ---------------------- | -------------- | ----------------------------- |
+| `fields` | `AnyFieldDescriptor[]` | — **required** | Fields to render in the grid. |
 
 ### Slots
 
@@ -346,7 +347,7 @@ Modal gallery used by `MapoRepeater` to choose a template when adding an item. I
 
 ## MapoRepeaterItem
 
-Single item inside a `MapoRepeater`. Handles both full-form and mini-card views.
+Single item inside a `MapoRepeater`. Handles both full-form and mini-card views. A field hidden by `visible` or `show` takes its grid cell with it; with no field to show, the item keeps only its header.
 
 ### Props
 

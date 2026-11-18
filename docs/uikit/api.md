@@ -54,7 +54,7 @@ Full-page CRUD detail view with sidebar, language switcher, and save/delete acti
 
 ## MapoDetailLangSwitch
 
-Language tab bar used inside `MapoDetail`. Can also be used standalone.
+Language tab bar used inside `MapoDetail`, `MapoMenuManager` and the media editor (`MapoMediaEditor`). Can also be used standalone. Replacing it with [MapoOverride](./mapoverride.md) changes it in all three.
 
 ### Props
 

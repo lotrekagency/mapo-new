@@ -56,6 +56,8 @@ const fields: FieldDescriptor<Article>[] = [
 ];
 ```
 
+Fields that share a `group` render inside a collapsible card. Groups start expanded. To start them all collapsed, set the module option `groups.expanded` to `false` in `nuxt.config.ts`. `mapoForm.groups.expanded` works in every setup. `mapo.form.groups.expanded` works only when the `mapomodule` meta-module installs the form engine: when the app lists `@mapomodule/form` in `modules` itself, as [Your first form](#your-first-form) does, the meta-module ignores `mapo.form`. The option applies to every group: a field descriptor cannot set it for one group. In a custom layout built on `useMapoForm()`, a `MapoFormGroup` you render yourself takes `initialExpanded`, which wins over the option (→ [API](/uikit/form/api#mapoformgroup)).
+
 If more than one `tab` is present, tab navigation is rendered with a red badge on tabs that contain errors. Tab bars wrap onto additional lines when their tabs no longer fit horizontally.
 
 Fields without a `tab` go to a tab of their own, labelled **General** (`mapo.form.defaultTab`), as soon as another field has a `tab`. To rename it, override that key in the app's catalog, or give those fields a `tab`.
@@ -81,6 +83,8 @@ Use `subtab` to place a tab bar _inside_ a group card instead:
 ```
 
 `subtab` and `tab` are orthogonal — `subtab` organises fields within a group card; `tab` organises fields into top-level (or nested) tab panels.
+
+A field hidden by `visible` or `show` takes its grid cell with it, so it leaves no empty row and no gap in a row of `cols` fields. In the same way, a group card, a sub-tab and the grid of the fields without a group show only while one of their fields does. A sub-tab with nothing to show leaves the sub-tab bar, and while the sub-tab the user picked is hidden, the first shown one is open. What `visible` removes is not rendered; what `show` hides stays mounted, hidden, and keeps its state (→ [Progressive Disclosure](./progressive-disclosure.md#how-to-choose-between-visible-and-show)).
 
 ## Responsive columns
 

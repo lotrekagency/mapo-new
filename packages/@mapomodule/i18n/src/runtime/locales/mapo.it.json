@@ -218,7 +218,6 @@
     },
     "mediaEditor": {
       "details": "Dettagli",
-      "defaultLang": "Predefinita",
       "openInNewTab": "Apri in una nuova scheda",
       "confirmDelete": "Vuoi veramente eliminare \"{name}\"?"
     },
@@ -229,7 +228,6 @@
     },
     "mediaFolders": {
       "folders": "Cartelle",
-      "goBack": "Torna alla radice",
       "noFolders": "Non sono presenti cartelle... Creane una!",
       "newFolder": "Nuova cartella",
       "folderName": "Nome cartella",
@@ -239,10 +237,22 @@
       "audioFolder": "Audio",
       "docFolder": "Documenti",
       "deleteTitle": "Elimina cartella",
-      "confirmDelete": "Eliminare la cartella \"{name}\"? I media al suo interno non verranno eliminati."
+      "confirmDelete": "Eliminare la cartella \"{name}\" e tutto quello che contiene, sottocartelle e media?"
+    },
+    "mediaMove": {
+      "moveTo": "Sposta in…",
+      "title": "Sposta nella cartella",
+      "confirm": "Sposta qui",
+      "moved": "Media spostati: {number}",
+      "failed": "Media non spostati: {number}",
+      "folderTitle": "Sposta la cartella \"{name}\" in",
+      "folderMoved": "Cartella \"{name}\" spostata",
+      "folderFailed": "Cartella \"{name}\" non spostata"
     },
     "mediaGallery": {
       "noMediaFound": "Nessun media trovato",
+      "uploadHere": "Carica qui",
+      "dropHint": "Trascina qui i file per caricarli in {folder}",
       "selectAll": "Seleziona pagina",
       "deselectAll": "Deseleziona pagina",
       "nSelected": "{number} selezionati",

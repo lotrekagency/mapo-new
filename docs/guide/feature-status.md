@@ -90,11 +90,12 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 | Full slot system                                                        | `field.<key>`, `field.<key>.label`, `.append`, `.prepend`, `.hint`, `.before`, `.after`                                                                                  |
 | `MapoFocusPortal` + `useFocusMode()`                                    | Focus / expand mode for repeater items, editors, maps                                                                                                                    |
 | `useFormDraft()` / `useUnsavedChangesGuard()`                           | Local-storage draft autosave + `beforeunload` + `onBeforeRouteLeave` guard                                                                                               |
-| `useProgressiveDisclosure()`                                            | Show/hide fields based on `visible()` / `show()` predicates with smooth transitions                                                                                      |
+| Progressive disclosure (`when`, `matchesField`, …)                      | `visible()` / `show()` predicates; a hidden field leaves no gap, and a group card, sub-tab, tab or repeater item body with no field to show leaves the layout            |
 | `useFormFromSchema(schema, options)`                                    | JSON Schema → `FieldDescriptor[]` (Pydantic / DRF), `if/then/else` → `visible()`, `readOnly` → `readonly`, `format: textarea`, `exclude`, `overrides`, cycle-safe `$ref` |
 | Devtools panel                                                          | `/_mapo/devtools/forms` inside Nuxt DevTools — registry inventory & live form inspector                                                                                  |
 | `<MapoDetail>` shell                                                    | Two-column layout, `useCrud` lifecycle, differential PATCH, unsaved-changes guard, 400 → field errors, integrated snack/confirm                                          |
 | `<MapoDetailLangSwitch>`                                                | Language tabs with per-language error badge — syncs the `?lang=` query param                                                                                             |
+| `mapo.uikit.contentLanguages`                                           | App-wide content languages: narrows and orders the languages of detail, quick edit, menu and media editor; one left hides the tabs                                       |
 
 ### Form fields library (`@mapomodule/form`)
 
@@ -115,17 +116,18 @@ Current implementation status of all Mapo v2 features relative to the legacy v1 
 
 File upload, gallery browsing, folder management, and a picker dialog. Full port of the v1 MediaManager. See [Media Manager](/uikit/media).
 
-| Feature                                               | Status | Notes                                                                                           |
-| ----------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| `useMediaStore`                                       | ✅     | Pinia store: gallery items, folders, breadcrumb, pagination, selection, bulk edit, MIME lock    |
-| `MapoMediaManager` / `MapoMediaManagerDialog`         | ✅     | Orchestrator shell + `UModal` picker (single/multi), pre-seedable selection                     |
-| Gallery (`MapoMediaGallery`)                          | ✅     | CSS-grid, picker selection, bulk select-all/delete, pagination                                  |
-| Folders (`MapoMediaFolders` / `MapoMediaBreadcrumbs`) | ✅     | MIME filters, inline create/rename/delete, breadcrumb navigation                                |
-| Editor (`MapoMediaEditor`)                            | ✅     | Slideover: info, linked models, open-in-new-tab, i18n metadata, file replace, permission gating |
-| Uploader (`MapoMediaUploader`)                        | ✅     | Drop area + queue, per-file progress (XHR), inline metadata, destination folder                 |
-| `MapoDropArea`                                        | ✅     | Generic drag-and-drop zone (reusable outside media)                                             |
-| Backend adapter (`$mapoMediaAdapter`)                 | ✅     | Pluggable request/response/payload transforms; Camomilla ships its own                          |
-| WYG image insertion                                   | ✅     | Tiptap toolbar "Insert image" via the media picker                                              |
+| Feature                                               | Status | Notes                                                                                                               |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `useMediaStore`                                       | ✅     | Pinia store: gallery items, folders, breadcrumb, pagination, selection, bulk edit, MIME lock                        |
+| `MapoMediaManager` / `MapoMediaManagerDialog`         | ✅     | Orchestrator shell + `UModal` picker (single/multi), pre-seedable selection                                         |
+| Gallery (`MapoMediaGallery`)                          | ✅     | CSS-grid, picker selection, bulk select-all/delete, pagination, Upload here + file drop, cards dragged to the tree  |
+| Folders (`MapoMediaFolders` / `MapoMediaBreadcrumbs`) | ✅     | Folder tree loaded branch by branch, MIME filters, inline create/rename/delete, move and drag and drop, breadcrumbs |
+| Editor (`MapoMediaEditor`)                            | ✅     | Slideover: info, linked models, open-in-new-tab, i18n metadata, file replace, permission gating                     |
+| Uploader (`MapoMediaUploader`)                        | ✅     | Drop area + queue, per-file progress (XHR), inline metadata, destination folder                                     |
+| Move (`MapoMediaFolderPicker`)                        | ✅     | Move to… for media (bulk bar, editor) and folders (tree row), folder tree dialog, adapter payloads                  |
+| `MapoDropArea`                                        | ✅     | Generic drop zone for files from the computer (reusable outside media)                                              |
+| Backend adapter (`$mapoMediaAdapter`)                 | ✅     | Pluggable request/response/payload transforms; Camomilla ships its own                                              |
+| WYG image insertion                                   | ✅     | Tiptap toolbar "Insert image" via the media picker                                                                  |
 
 ---
 

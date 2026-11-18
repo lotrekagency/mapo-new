@@ -82,9 +82,17 @@ interface FieldBase<T> {
   required?: boolean;
   /** Renders the field in read-only mode (no user input allowed). */
   readonly?: boolean;
-  /** `v-if` predicate — removes the field from the DOM entirely when `false`. */
+  /**
+   * `v-if` predicate — when `false`, removes the field from the DOM. Its grid
+   * cell in a form section, group, sub-tab or repeater item goes with it, so it
+   * leaves no gap. Inside a repeater item, `model` is the item.
+   */
   visible?: (ctx: { model: T }) => boolean;
-  /** `v-show` predicate — hides the field while keeping it in the DOM. */
+  /**
+   * `v-show` predicate — when `false`, hides the field and its grid cell in a
+   * form section, group, sub-tab or repeater item; the field stays mounted and
+   * keeps its state. Inside a repeater item, `model` is the item.
+   */
   show?: (ctx: { model: T }) => boolean;
   /** Callback fired after the field value changes. */
   onChange?: (ctx: { model: T; val: unknown }) => void;

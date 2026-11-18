@@ -10,6 +10,7 @@
  *   ✅ interpolation and pluralization
  *   ✅ `useMapoT()` — the translator for non-component contexts (auto-imported)
  *   ✅ live proof that UIKit components follow the locale
+ *   ✅ `mapo.uikit.contentLanguages` — the content languages editors switch between
  */
 definePageMeta({
   layout: "mapo-default",
@@ -26,6 +27,25 @@ const confirm = useConfirmStore();
 const tOutside = useMapoT();
 
 const itemCount = ref(1);
+
+// `mapo.uikit.contentLanguages`, as the app received it (an environment
+// variable can set it: see nuxt.config.ts).
+const runtimeConfig = useRuntimeConfig();
+const contentLanguages = computed(
+  () =>
+    (
+      runtimeConfig.public.mapoUikit as
+        | { contentLanguages?: string[] }
+        | undefined
+    )?.contentLanguages ?? [],
+);
+
+// Pages whose language tabs follow the option.
+const contentLanguagePages = [
+  { to: "/form/article/1", label: "Articolo (MapoDetail)" },
+  { to: "/menu/1", label: "Menu (MapoMenuManager)" },
+  { to: "/media/gallery", label: "Media (editor)" },
+];
 
 const builtinKeys = [
   "mapo.save",
@@ -233,6 +253,37 @@ async function askConfirm() {
           <MapoMenuTreeview :nodes="[]" title="Treeview" />
         </div>
       </div>
+    </UCard>
+
+    <!-- Content languages: not the UI language, the languages of the data -->
+    <UCard>
+      <template #header>
+        <p class="font-medium">Lingue dei contenuti</p>
+      </template>
+
+      <p class="mb-3 text-sm text-gray-500">
+        Diverse dalla lingua dell'interfaccia: sono le lingue in cui si
+        traducono i dati. <code>mapo.uikit.contentLanguages</code> tiene solo
+        quelle elencate, nel suo ordine, tra quelle che il backend o la pagina
+        dichiarano; con una lingua sola i tab spariscono. Per provarla, avvia il
+        dev server con
+        <code>NUXT_PUBLIC_MAPO_UIKIT_CONTENT_LANGUAGES='["it"]'</code>.
+      </p>
+
+      <UBadge variant="subtle" color="primary" data-testid="content-languages">
+        contentLanguages =
+        {{
+          contentLanguages.length ? contentLanguages.join(", ") : "[] (tutte)"
+        }}
+      </UBadge>
+
+      <ul class="mt-3 list-disc pl-5 text-sm">
+        <li v-for="page in contentLanguagePages" :key="page.to">
+          <NuxtLink :to="page.to" class="text-primary hover:underline">
+            {{ page.label }}
+          </NuxtLink>
+        </li>
+      </ul>
     </UCard>
   </div>
 </template>
