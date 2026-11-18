@@ -1,3 +1,13 @@
+# @mapomodule/mcp [1.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.3...@mapomodule/mcp@1.0.0-beta.4) (2026-11-18)
+
+### Bug Fixes
+
+- **form:** leave no empty cell, group or sub-tab for hidden fields ([bb58ab5](https://github.com/lotrekagency/mapo-new/commit/bb58ab5f6241816a73fd0b2ff989deaaf596a551))
+
+### Features
+
+- **uikit:** limit the editable languages with contentLanguages ([07fc848](https://github.com/lotrekagency/mapo-new/commit/07fc84801fe5b4f0b14d311f541523b840e1b0c2))
+
 # @mapomodule/mcp [1.0.0-beta.3](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.2...@mapomodule/mcp@1.0.0-beta.3) (2026-10-27)
 
 ### Features
