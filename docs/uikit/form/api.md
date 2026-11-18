@@ -231,14 +231,22 @@ When `modelValue` is a URL string ending in an image extension (`.jpg`, `.png`, 
 
 ### MapoWygEditor
 
-WYSIWYG rich-text editor powered by TipTap. Output is sanitized HTML.
+WYSIWYG rich-text editor powered by Tiptap v2. Its value is the editor's HTML; the HTML it receives is sanitized before the editor loads it.
 
 | Prop         | Type               | Description          |
 | ------------ | ------------------ | -------------------- |
 | `modelValue` | `unknown`          | HTML string.         |
 | `descriptor` | `EditorDescriptor` | Field configuration. |
 
-The toolbar includes a disabled **Insert Image** button (placeholder for Phase 6 — Media Manager). It becomes active once `MapoMediaManagerDialog` is available.
+The **Insert image** button opens `MapoMediaManagerDialog` when `@mapomodule/uikit` is installed, and is disabled otherwise. A read-only or disabled field disables the toolbar and the editing; the source toggle stays active.
+
+#### `descriptor.attrs`
+
+| Key          | Type                  | Default | Description                                                                                                                                                             |
+| ------------ | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `extensions` | `unknown[]`           | `[]`    | Tiptap v2 extensions loaded after the built-in ones (StarterKit, Link, Underline, Image).                                                                               |
+| `source`     | `boolean`             | `false` | Adds an HTML source toggle at the end of the toolbar; what the source view saves is sanitized and normalized. See [HTML source view](./add-fields.md#html-source-view). |
+| `toolbar`    | `EditorToolbarItem[]` | `[]`    | Buttons after the built-in ones, past a separator. See [Custom toolbar buttons](./add-fields.md#custom-toolbar-buttons).                                                |
 
 ---
 

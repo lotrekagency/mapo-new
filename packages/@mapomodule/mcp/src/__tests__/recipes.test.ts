@@ -37,6 +37,11 @@ describe("matchRecipes", () => {
     ["set up the camomilla session cookie", "camomilla"],
     ["limit the content languages to italian", "content-languages"],
     ["hide the language tabs on a single language site", "content-languages"],
+    [
+      "let editors see and edit the html source of the editor",
+      "rich-text-editor",
+    ],
+    ["add an insert table button to the wysiwyg toolbar", "rich-text-editor"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });
