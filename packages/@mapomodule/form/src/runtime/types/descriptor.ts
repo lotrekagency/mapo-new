@@ -84,12 +84,14 @@ interface FieldBase<T> {
   readonly?: boolean;
   /**
    * `v-if` predicate — when `false`, removes the field from the DOM. Its grid
-   * cell in a form section, group or sub-tab goes with it, so it leaves no gap.
+   * cell in a form section, group, sub-tab or repeater item goes with it, so it
+   * leaves no gap. Inside a repeater item, `model` is the item.
    */
   visible?: (ctx: { model: T }) => boolean;
   /**
    * `v-show` predicate — when `false`, hides the field and its grid cell in a
-   * form section, group or sub-tab; the field stays mounted and keeps its state.
+   * form section, group, sub-tab or repeater item; the field stays mounted and
+   * keeps its state. Inside a repeater item, `model` is the item.
    */
   show?: (ctx: { model: T }) => boolean;
   /** Callback fired after the field value changes. */

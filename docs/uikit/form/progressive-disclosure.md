@@ -114,7 +114,7 @@ Neither predicate changes the model: a hidden field keeps its value, and a save 
 
 Both predicates act on the field's grid cell, so a hidden field leaves no empty row and no gap in a row of `cols` fields: `visible` removes the cell with the field, `show` hides the cell and keeps the field mounted, with its state. The same holds when a [`field.<key>` slot](./slots.md#how-to-replace-an-entire-field-with-a-custom-block) replaces the field.
 
-A group card, a sub-tab or the grid of the fields without a group shows only while one of its fields does: it is not rendered while `visible` removes all its fields, and it is hidden while `show` hides the ones left. In a form with tabs, a tab whose fields are all hidden by either predicate leaves the tab bar until one of them shows: see [Tab and group layout](./index.md#tab-and-group-layout).
+A group card, a sub-tab, the grid of the fields without a group or the body of a repeater item shows only while one of its fields does: it is not rendered while `visible` removes all its fields, and it is hidden while `show` hides the ones left. Inside a repeater item, the predicates receive the item as `model`. In a form with tabs, a tab whose fields are all hidden by either predicate leaves the tab bar until one of them shows: see [Tab and group layout](./index.md#tab-and-group-layout).
 
 ```ts
 {
@@ -145,4 +145,3 @@ The DSL is meant for _most_ cases — drop to a regular function any time it is 
 - **Closures over stale values** — never read from `useState` / module-level refs inside a predicate. Always reach into `ctx` so the form re-evaluates correctly.
 - **Conditional + `required`** — a hidden `required` field still fails `validateClient()` if the rule is not gated. Combine: `required: !someCondition()` or move the `required` check into a manual `validate`.
 - **Path strings are not type-checked** — `matchesField('typoed_key', …)` compiles. Use a `keyof Model` constant when the cost is worth it.
-- **Repeater items** — a repeater item lays out its sub-fields in its own grid, where a sub-field hidden by `visible` or `show` still leaves its empty cell.

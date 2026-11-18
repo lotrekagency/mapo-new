@@ -347,7 +347,7 @@ Modal gallery used by `MapoRepeater` to choose a template when adding an item. I
 
 ## MapoRepeaterItem
 
-Single item inside a `MapoRepeater`. Handles both full-form and mini-card views.
+Single item inside a `MapoRepeater`. Handles both full-form and mini-card views. A field hidden by `visible` or `show` takes its grid cell with it; with no field to show, the item keeps only its header.
 
 ### Props
 

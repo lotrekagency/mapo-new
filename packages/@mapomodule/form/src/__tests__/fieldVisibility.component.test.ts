@@ -4,10 +4,12 @@ import type { App, Component, Ref } from "vue";
 
 import MapoFormFlatSection from "../runtime/components/MapoFormFlatSection.vue";
 import MapoFormGroup from "../runtime/components/MapoFormGroup.vue";
+import MapoRepeaterItem from "../runtime/components/fields/MapoRepeaterItem.vue";
 import type { AnyFieldDescriptor } from "../runtime/types/index.js";
 
 // A field hidden by `visible` or `show` takes its grid cell with it, and a flat
-// section, a group or a sub-tab with no field to show goes as well.
+// section, a group, a sub-tab or a repeater item body with no field to show goes
+// as well.
 
 const form = vi.hoisted(() => ({
   context: undefined as
@@ -25,9 +27,21 @@ vi.mock("#app", () => ({
     public: { mapoForm: { groups: { expanded: true } } },
   }),
 }));
-vi.mock("../runtime/composables/useMapoForm.js", () => ({
-  injectMapoForm: () => form.context,
+vi.mock("../runtime/composables/useMapoForm.js", async () => {
+  const { ref } = await import("vue");
+  return {
+    injectMapoForm: () => form.context,
+    // A repeater item builds a form of its own; its fields are stubs here.
+    useMapoForm: () => ({
+      readonly: ref(false),
+      ctx: { submitted: ref(false) },
+    }),
+  };
+});
+vi.mock("../runtime/composables/useFocusMode.js", () => ({
+  useFocusMode: () => ({ enter: () => {} }),
 }));
+vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("../runtime/components/MapoFormField.vue", async () => {
   const { h, onUnmounted } = await import("vue");
   return {
@@ -96,7 +110,9 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
   querySelector: () => body,
 });
 
-const UIcon: Component = { name: "UIcon", render: () => null };
+// Nuxt UI components the layouts use, rendered as nothing.
+const nuxtUiStub: Component = { render: () => null };
+const nuxtUiComponents = ["UIcon", "UBadge", "UButton", "UCheckbox", "UInput"];
 
 const all = (node: HeadlessNode): HeadlessNode[] => [
   node,
@@ -141,15 +157,17 @@ function isDisplayed(node: HeadlessNode | undefined): boolean {
   return true;
 }
 
+/** Mounts a component; props given as a function are read again on each render. */
 function mount(
   component: Component,
-  props: Record<string, unknown>,
+  props: Record<string, unknown> | (() => Record<string, unknown>),
   slots: Record<string, () => unknown> = {},
 ) {
   root = headlessNode("root");
-  const host: Component = { render: () => h(component, props, slots) };
+  const propsNow = typeof props === "function" ? props : () => props;
+  const host: Component = { render: () => h(component, propsNow(), slots) };
   app = createApp(host);
-  app.component("UIcon", UIcon);
+  for (const name of nuxtUiComponents) app.component(name, nuxtUiStub);
   app.mount(root);
 }
 
@@ -458,5 +476,71 @@ describe("MapoFormGroup sub-tabs", () => {
     });
 
     expect(findByClass("mapo-form-group")).toBeUndefined();
+  });
+});
+
+describe("MapoRepeaterItem cells", () => {
+  // The props a repeater gives each of its items.
+  const itemProps = (
+    item: Record<string, unknown>,
+    fields: AnyFieldDescriptor[],
+  ) => ({
+    item,
+    fields,
+    index: 0,
+    errorPrefix: "blocks.0",
+    parentErrors: {},
+    languages: [],
+    currentLang: "",
+    readonly: false,
+    registry: {},
+    defaultExpanded: true,
+  });
+
+  beforeEach(() => {
+    // An item's predicates read the item's own model, not the root form's.
+    form.context = undefined;
+  });
+
+  it("lays out the item's cells like a form section, following the item's model", async () => {
+    const item = ref<Record<string, unknown>>({ template: "home" });
+    const fields = [
+      field("title"),
+      field("cta_label", { cols: 6, visible: isLanding }),
+      field("hero_title", { cols: 6, visible: isHome }),
+      field("cta_url", { show: isLanding }),
+    ];
+    mount(MapoRepeaterItem, () => itemProps(item.value, fields));
+    expect(cellKeys()).toEqual(["title", "hero_title", "cta_url"]);
+    expect(isDisplayed(cellOf("cta_url"))).toBe(false);
+    expect(mountedFields.has("cta_url")).toBe(true);
+
+    item.value = { template: "landing" };
+    await nextTick();
+
+    expect(cellKeys()).toEqual(["title", "cta_label", "cta_url"]);
+    expect(isDisplayed(cellOf("cta_url"))).toBe(true);
+    expect(fieldMounts.filter((key) => key === "cta_url")).toHaveLength(1);
+  });
+
+  it("renders no body while `visible` removes every field", () => {
+    mount(
+      MapoRepeaterItem,
+      itemProps({ template: "home" }, [
+        field("cta_label", { visible: isLanding }),
+      ]),
+    );
+
+    expect(findByClass("grid")).toBeUndefined();
+  });
+
+  it("hides the body while `show` hides every field, keeping the fields mounted", () => {
+    mount(
+      MapoRepeaterItem,
+      itemProps({ template: "home" }, [field("cta_url", { show: isLanding })]),
+    );
+
+    expect(isDisplayed(findByClass("grid"))).toBe(false);
+    expect(mountedFields.has("cta_url")).toBe(true);
   });
 });
