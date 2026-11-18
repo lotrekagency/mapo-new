@@ -1,3 +1,15 @@
+# @mapomodule/form [2.0.0-beta.15](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.14...@mapomodule/form@2.0.0-beta.15) (2026-11-18)
+
+### Bug Fixes
+
+- **form:** honour groups.expanded when a group gets no initialExpanded ([1889553](https://github.com/lotrekagency/mapo-new/commit/18895532b4ba6989923862391beb02b5269817f9))
+- **form:** leave no empty cell in a repeater item for hidden fields ([14d178f](https://github.com/lotrekagency/mapo-new/commit/14d178ff24464fb173e3ac0d6f78b697e9e76611))
+- **form:** leave no empty cell, group or sub-tab for hidden fields ([bb58ab5](https://github.com/lotrekagency/mapo-new/commit/bb58ab5f6241816a73fd0b2ff989deaaf596a551))
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.6
+
 # @mapomodule/form [2.0.0-beta.14](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.13...@mapomodule/form@2.0.0-beta.14) (2026-11-09)
 
 ### Features
