@@ -29,7 +29,7 @@ Any other warning is new: fix it or explain it in the hand-over.
 
 ### Known gap
 
-`core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them. lint-staged still runs them on commit (`vitest related`), and `pnpm exec vitest run` from the root runs them on demand. Run it whenever you touch those packages.
+`core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them. The same holds for the component tests of `form`: its own `vitest.config.ts` has no Vue plugin, so it leaves `*.component.test.ts` to the root config. lint-staged still runs them on commit (`vitest related`), and `pnpm exec vitest run` from the root runs them on demand. Run it whenever you touch those packages.
 
 ## Unit tests
 

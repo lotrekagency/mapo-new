@@ -227,7 +227,7 @@ What exists: [`docs/guide/feature-status.md`](docs/guide/feature-status.md). Kno
 
 ### Testing and CI
 
-1. `core`, `store` and `uikit` have tests but no `test` script, so `pnpm test` and CI skip them.
+1. `core`, `store` and `uikit` have tests but no `test` script, and `form` leaves its `*.component.test.ts` files to the root config, so `pnpm test` and CI skip them.
 2. The apps have no `typecheck` script, so `pnpm typecheck` and CI cover the packages only; type-check an app by hand ([apps manual](apps/AGENTS.md)).
 3. There is no browser end-to-end suite; `apps/example-e2e` is shaped as its target.
 4. CI runs on pull requests to `main` only; the push trigger is commented out in `.github/workflows/ci.yml`.

@@ -56,6 +56,8 @@ const fields: FieldDescriptor<Article>[] = [
 ];
 ```
 
+Fields that share a `group` render inside a collapsible card. Groups start expanded. To start them all collapsed, set the module option `groups.expanded` to `false` in `nuxt.config.ts`: `mapo.form.groups.expanded` with the `mapomodule` meta-module, `mapoForm.groups.expanded` when `@mapomodule/form` is installed on its own. The option applies to every group: a field descriptor cannot set it for one group. In a custom layout built on `useMapoForm()`, a `MapoFormGroup` you render yourself takes `initialExpanded`, which wins over the option (→ [API](/uikit/form/api#mapoformgroup)).
+
 If more than one `tab` is present, tab navigation is rendered with a red badge on tabs that contain errors. Tab bars wrap onto additional lines when their tabs no longer fit horizontally.
 
 Fields without a `tab` go to a tab of their own, labelled **General** (`mapo.form.defaultTab`), as soon as another field has a `tab`. To rename it, override that key in the app's catalog, or give those fields a `tab`.

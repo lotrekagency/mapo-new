@@ -15,13 +15,23 @@ import type {
 import { injectMapoForm } from "../composables/useMapoForm.js";
 import MapoFormField from "./MapoFormField.vue";
 
-const props = defineProps<{
-  name: string;
-  label?: string;
-  fields: AnyFieldDescriptor[];
-  subtabs?: Map<string, AnyFieldDescriptor[]>;
-  initialExpanded?: boolean;
-}>();
+// Vue reads an absent Boolean prop as `false` unless the prop declares a
+// default. The `undefined` default keeps "not passed" apart from `false`, so the
+// module option `groups.expanded` decides when no caller sets `initialExpanded`.
+const props = withDefaults(
+  defineProps<{
+    name: string;
+    label?: string;
+    fields: AnyFieldDescriptor[];
+    subtabs?: Map<string, AnyFieldDescriptor[]>;
+    /**
+     * Whether the group starts expanded. When omitted, the module option
+     * `groups.expanded` decides (`true` unless configured).
+     */
+    initialExpanded?: boolean;
+  }>(),
+  { label: undefined, subtabs: undefined, initialExpanded: undefined },
+);
 
 const globalExpanded: boolean =
   (useRuntimeConfig().public.mapoForm as MapoFormRuntimeConfig | undefined)

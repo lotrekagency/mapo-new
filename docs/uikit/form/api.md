@@ -82,12 +82,12 @@ Collapsible section that groups related fields under a heading.
 
 ### Props
 
-| Prop              | Type                | Default        | Description                        |
-| ----------------- | ------------------- | -------------- | ---------------------------------- |
-| `name`            | `string`            | — **required** | Group identifier.                  |
-| `label`           | `string`            | —              | Group heading label.               |
-| `fields`          | `FieldDescriptor[]` | — **required** | Fields belonging to this group.    |
-| `initialExpanded` | `boolean`           | —              | Whether the group starts expanded. |
+| Prop              | Type                | Default                  | Description                                                                                                                                           |
+| ----------------- | ------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `string`            | — **required**           | Group identifier.                                                                                                                                     |
+| `label`           | `string`            | —                        | Group heading label.                                                                                                                                  |
+| `fields`          | `FieldDescriptor[]` | — **required**           | Fields belonging to this group.                                                                                                                       |
+| `initialExpanded` | `boolean`           | module `groups.expanded` | Whether the group starts expanded. When omitted, the module option `groups.expanded` decides (`mapo.form.groups.expanded`, `true` unless configured). |
 
 ---
 
