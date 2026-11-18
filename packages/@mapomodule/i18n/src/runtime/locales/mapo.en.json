@@ -156,7 +156,9 @@
     },
     "wygEditor": {
       "insertImage": "Insert image",
-      "requiresUikit": "Requires {'@'}mapomodule/uikit"
+      "requiresUikit": "Requires {'@'}mapomodule/uikit",
+      "source": "HTML source",
+      "sourceHint": "Tags and attributes the editor does not support are removed."
     },
     "listActions": {
       "bulkActions": "Bulk actions...",

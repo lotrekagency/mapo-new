@@ -86,15 +86,82 @@ The endpoint must accept `?search=<query>` for filtering. Django REST Framework 
 { key: 'body', type: 'editor' }
 ```
 
-Backed by Tiptap v2 with Bold, Italic, Underline, H2/H3, lists, Link, and undo/redo. The `Link` extension is configured with a strict protocol allowlist (`http`, `https`, `mailto`) and a URL validator that rejects `javascript:` payloads. Inbound HTML is sanitized before being passed to `setContent`.
+Backed by Tiptap v2. The toolbar has bold, italic, underline, H2/H3, bullet and numbered lists, undo/redo and **Insert image**, which opens the media manager and needs `@mapomodule/uikit`. The rest of StarterKit (quotes, code blocks, horizontal rules) is kept when it is loaded or pasted, without a button. Links accept relative URLs and the `http`, `https`, `mailto` and `tel` protocols, so a `javascript:` link is rejected. The HTML the field receives is sanitized (`script` and `style` elements, `on*` handlers and unsafe URLs are removed) before the editor loads it, and the field's value is the editor's HTML.
 
-You can add extensions:
+`attrs.extensions` adds Tiptap v2 extensions, installed by the app, after the built-in ones (StarterKit, Link, Underline, Image). Tables need the four official table extensions:
 
 ```ts
-import { Image } from '@tiptap/extension-image'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
 
-{ key: 'body', type: 'editor', attrs: { extensions: [Image] } }
+{
+  key: 'body',
+  type: 'editor',
+  attrs: {
+    extensions: [Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
+  },
+}
 ```
+
+The editor then keeps the tables it loads or receives by pasting. The toolbar gets no button for them: add yours with [`attrs.toolbar`](#custom-toolbar-buttons).
+
+### HTML source view
+
+`attrs.source: true` adds a toggle at the end of the toolbar that shows the field's HTML in a textarea, one block per line, indented by nesting:
+
+```ts
+{ key: 'body', type: 'editor', attrs: { source: true } }
+```
+
+- What is typed reaches the editor after a short pause, or as soon as the textarea loses the focus. The editor sanitizes it and parses it with its schema, and the field's value becomes the editor's HTML: the value is sanitized and normalized even when the form is saved from the source view.
+- Tags and attributes that no extension supports are removed, and a note under the textarea says so. A `<div>` becomes a paragraph, a `<span>` and a `style` attribute go, an `<iframe>` is dropped, and a table comes out as Tiptap writes it: with `colgroup`, `tbody`, a `<p>` in each cell and `colspan`/`rowspan`.
+- The other toolbar buttons are disabled while the source is shown. The editor stays mounted behind the textarea, so undo steps back through the changes made in the source.
+- A read-only field shows its source without letting it change. A value set from outside, such as a reset after saving or a restored draft, replaces what the textarea holds.
+
+### Custom toolbar buttons
+
+`attrs.toolbar` adds buttons after the built-in ones, past a separator, with the same look. Each item is an `EditorToolbarItem`:
+
+| Key          | Type                  | Description                                                                                  |
+| ------------ | --------------------- | -------------------------------------------------------------------------------------------- |
+| `key`        | `string`              | Unique among the custom buttons.                                                             |
+| `label`      | `string`              | Tooltip and accessible name; the button's text when it has no `icon`.                        |
+| `icon`       | `string`              | Icon name, e.g. `i-lucide-table`.                                                            |
+| `action`     | `(editor) => void`    | Runs on click.                                                                               |
+| `isActive`   | `(editor) => boolean` | Shows the button as active, like the built-in ones on bold text or a heading.                |
+| `isDisabled` | `(editor) => boolean` | Disables the button. It is also disabled when the field is read-only and in the source view. |
+
+`editor` is the field's Tiptap editor, typed as `EditorToolbarEditor` with the members a button needs (`chain()`, `can()`, `commands`, `isActive()`); cast it to Tiptap's `Editor` for the rest of its API. A predicate that throws, for example because the field does not load the extension of its command, leaves the button inactive and disabled. Buttons for the table extensions above:
+
+```ts
+{
+  key: 'body',
+  type: 'editor',
+  attrs: {
+    source: true,
+    extensions: [Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
+    toolbar: [
+      {
+        key: 'table',
+        icon: 'i-lucide-table',
+        label: 'Insert table',
+        action: e => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+      },
+      {
+        key: 'row',
+        icon: 'i-lucide-between-horizontal-end',
+        label: 'Add row',
+        action: e => e.chain().focus().addRowAfter().run(),
+        isDisabled: e => !e.can().addRowAfter(),
+      },
+    ],
+  },
+}
+```
+
+The labels are the app's own: in a multilingual backoffice, take them from the app's translations.
 
 ## SEO preview
 

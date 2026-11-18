@@ -133,6 +133,28 @@ export const RECIPES: Recipe[] = [
       "Every built-in field type, the component behind it and its attrs.",
   },
   {
+    id: "rich-text-editor",
+    // No "editor" here: the word already points at the menu and block editors.
+    task: "Customize a rich text (WYSIWYG) field: Tiptap extensions, HTML source view, toolbar buttons",
+    keywords: [
+      "wysiwyg",
+      "rich text",
+      "tiptap",
+      "extensions",
+      "html source",
+      "source view",
+      "edit html",
+      "toolbar button",
+      "insert table",
+      "table",
+    ],
+    doc: "uikit/form/add-fields.md",
+    heading: "WYSIWYG editor",
+    seeAlso: ["uikit/form/api.md"],
+    summary:
+      "type: 'editor' with attrs.extensions (Tiptap v2), attrs.source (an HTML source view whose value is sanitized and normalized) and attrs.toolbar (buttons for the extensions' commands).",
+  },
+  {
     id: "block-editor",
     task: "Build a block editor with a block picker (repeater with templates)",
     keywords: [
