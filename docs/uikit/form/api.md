@@ -88,7 +88,7 @@ Collapsible card that groups related fields under a heading, with an optional su
 | `label`           | `string`                            | —                        | Group heading label.                                                                                                                                  |
 | `fields`          | `AnyFieldDescriptor[]`              | — **required**           | Fields of the group outside any sub-tab, in a 12-column grid above the sub-tab bar.                                                                   |
 | `subtabs`         | `Map<string, AnyFieldDescriptor[]>` | —                        | Sub-tab name → its fields, shown as a tab bar inside the card (`MapoForm` builds it from `subtab`). A sub-tab with no field to show leaves the bar.   |
-| `initialExpanded` | `boolean`                           | module `groups.expanded` | Whether the group starts expanded. When omitted, the module option `groups.expanded` decides (`mapo.form.groups.expanded`, `true` unless configured). |
+| `initialExpanded` | `boolean`                           | module `groups.expanded` | Whether the group starts expanded. When omitted, the module option [`groups.expanded`](./index.md#tab-and-group-layout) decides (defaults to `true`). |
 
 ---
 

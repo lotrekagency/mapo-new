@@ -130,7 +130,7 @@ Run from the repository root; all must pass with no new errors or warnings:
 
 ```bash
 pnpm build && pnpm lint && pnpm typecheck && pnpm test
-pnpm exec vitest run        # also runs the core, store and uikit tests that `pnpm test` skips
+pnpm exec vitest run        # also runs what `pnpm test` skips: the core, store and uikit tests, form's component tests
 pnpm docs:build             # when docs or the sidebar changed
 ```
 
