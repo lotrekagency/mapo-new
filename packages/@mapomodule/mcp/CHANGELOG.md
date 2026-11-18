@@ -1,3 +1,9 @@
+# @mapomodule/mcp [1.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.4...@mapomodule/mcp@1.0.0-beta.5) (2026-11-18)
+
+### Features
+
+- **form:** add an HTML source view and custom toolbar buttons to the editor field ([cdb113c](https://github.com/lotrekagency/mapo-new/commit/cdb113cb14b5b48c6d1e737c8608ff8a5ae1325c))
+
 # @mapomodule/mcp [1.0.0-beta.4](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.3...@mapomodule/mcp@1.0.0-beta.4) (2026-11-18)
 
 ### Bug Fixes
