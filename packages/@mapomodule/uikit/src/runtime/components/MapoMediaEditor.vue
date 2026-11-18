@@ -9,17 +9,28 @@ import {
   setNestedValue,
 } from "@mapomodule/utils";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
+import { useSnackStore } from "@mapomodule/store/runtime/stores/snack";
+import { getErrorData } from "@mapomodule/core/runtime/utils/fetchError";
 import { useMediaStore } from "../stores/media.js";
-import type { MediaItem } from "../types/media.js";
+import { pickLanguage, restrictLanguages } from "../utils/langInfo.js";
+import { useContentLanguages } from "../utils/contentLanguages.js";
+import { describeMediaErrors, pickMetadata } from "../utils/mediaMetadata.js";
+import { mediaFileUrl } from "../utils/mediaUrl.js";
+import type { MediaFolder, MediaItem } from "../types/media.js";
 
 const props = defineProps<{
   /** Overrides the languages read from the endpoint. Rarely needed. */
   languages?: string[];
+  /**
+   * Language the editor opens on, when it is among the languages. Default: the
+   * first one. A `?lang=` in the page URL wins, as in `MapoDetail`.
+   */
   defaultLang?: string;
 }>();
 
 const { t } = useI18n();
 const store = useMediaStore();
+const snack = useSnackStore();
 
 // Model-permission gating (legacy parity): edit/delete only with the
 // change/delete permission on the configured media model.
@@ -35,14 +46,38 @@ const editing = ref(false);
 const saving = ref(false);
 const newFile = ref<File | null>(null);
 const maintainUrl = ref(false);
-const currentLang = ref("");
+// Remounts the file changer, clearing the file it shows, once that file is stored.
+const fileChangerKey = ref(0);
 
-// The languages actually offered. An explicit prop wins; otherwise they come
-// from the media endpoint's own OPTIONS metadata, so a host page never has to
-// restate what the backend already knows — and a media model nobody registered
-// for translation shows no switcher rather than tabs whose values it discards.
+// The languages actually offered. An explicit prop wins; otherwise the store's
+// list: the manager's own, or the media endpoint's OPTIONS metadata, so a host
+// page never has to restate what the backend already knows — and a media model
+// nobody registered for translation shows no switcher rather than tabs whose
+// values it discards. Either is narrowed to the app's content languages: the
+// store's list already is, the prop is here.
+const contentLanguages = useContentLanguages();
 const activeLangs = computed(() =>
-  props.languages?.length ? props.languages : store.languages,
+  props.languages?.length
+    ? restrictLanguages(props.languages, contentLanguages)
+    : store.activeLanguages,
+);
+
+// The language being edited, `""` when media are not translated. There is no
+// "untranslated" tab next to the languages: on a backend that translates media
+// the plain fields are the active language's columns under another name, and
+// Camomilla drops them on write, so every edit goes to a translation.
+const currentLang = ref("");
+watch(
+  activeLangs,
+  (langs) => {
+    const isOffered = langs.includes(currentLang.value);
+    if (isOffered) return;
+    currentLang.value = pickLanguage(
+      langs,
+      props.defaultLang ?? store.initialLanguage,
+    );
+  },
+  { immediate: true },
 );
 
 onMounted(() => {
@@ -70,7 +105,13 @@ watch(
   },
 );
 
-const metaRows = computed(() => {
+// Links open the versioned URL, so a file replaced at the same URL shows its new
+// content; the text stays the real URL, the one worth copying.
+const fileUrl = computed(() => (media.value ? mediaFileUrl(media.value) : ""));
+
+const metaRows = computed<
+  { label: string; value: string; isUrl: boolean; href?: string }[]
+>(() => {
   if (!media.value) return [];
   const m = media.value;
   return [
@@ -86,7 +127,7 @@ const metaRows = computed(() => {
       isUrl: false,
     },
     { label: t("mapo.created"), value: formatDate(m.created), isUrl: false },
-    { label: t("mapo.url"), value: m.file, isUrl: true },
+    { label: t("mapo.url"), value: m.file, isUrl: true, href: fileUrl.value },
   ];
 });
 
@@ -135,22 +176,57 @@ function cancelEditing() {
   newFile.value = null;
 }
 
+// Moving the media: it leaves the folder on screen, so the drawer closes.
+const movePickerOpen = ref(false);
+
+async function moveTo(folder: MediaFolder | null) {
+  if (!media.value) return;
+  const moved = await store.moveMedia([media.value.id], folder?.id ?? null);
+  if (moved.length) store.closeEditor();
+}
+
+// Field labels for the error toast, keyed like the backend reports the fields.
+const errorLabels = computed(() => ({
+  title: t("mapo.title"),
+  alt_text: t("mapo.altTag"),
+  description: t("mapo.description"),
+  file: t("mapo.file"),
+}));
+
+function notifySaveError(error: unknown) {
+  const lines = describeMediaErrors(getErrorData(error), errorLabels.value);
+  snack.show(lines.join("\n") || t("mapo.genericError"), "error");
+}
+
 async function save() {
   if (!media.value) return;
   saving.value = true;
+  // Snapshot the edited metadata BEFORE replacing the file: replaceFile
+  // syncs editMedia with the server response, which would otherwise
+  // silently discard the user's unsaved title/alt/description edits.
+  const edited = { ...media.value };
   try {
-    // Snapshot the edited metadata BEFORE replacing the file: replaceFile
-    // syncs editMedia with the server response, which would otherwise
-    // silently discard the user's unsaved title/alt/description edits.
-    const edited = { ...media.value };
     if (newFile.value) {
-      await store.replaceFile(edited.id, newFile.value, maintainUrl.value);
+      const replaced = await store.replaceFile(
+        edited.id,
+        newFile.value,
+        maintainUrl.value,
+      );
+      // The file is stored: a retry after a failed metadata save must not
+      // upload it again, and the form keeps the edits over the server copy.
+      newFile.value = null;
+      maintainUrl.value = false;
+      fileChangerKey.value++;
+      store.editMedia = { ...replaced, ...pickMetadata(edited) };
     }
-    await store.updateMedia(edited);
+    await store.updateMedia(edited, editSnapshot ?? undefined);
     editSnapshot = null;
     editing.value = false;
     newFile.value = null;
     maintainUrl.value = false;
+  } catch (error) {
+    // Stay in edit mode with the edits on screen, so they can be fixed.
+    notifySaveError(error);
   } finally {
     saving.value = false;
   }
@@ -204,7 +280,7 @@ function formatDate(dateStr: string): string {
             size="xs"
             variant="ghost"
             color="neutral"
-            :href="media.file"
+            :href="fileUrl"
             target="_blank"
             :title="t('mapo.mediaEditor.openInNewTab')"
           />
@@ -235,7 +311,7 @@ function formatDate(dateStr: string): string {
                 <dd class="flex-1 truncate font-mono text-default">
                   <a
                     v-if="row.isUrl"
-                    :href="row.value"
+                    :href="row.href ?? row.value"
                     target="_blank"
                     rel="noopener"
                     class="text-primary hover:underline"
@@ -266,25 +342,15 @@ function formatDate(dateStr: string): string {
 
           <!-- Edit form (shown when editing) -->
           <div v-if="editing" class="space-y-4 px-4 py-3">
-            <!-- Lang switch -->
-            <UFieldGroup v-if="activeLangs.length > 1" size="xs">
-              <UButton
-                :variant="currentLang === '' ? 'solid' : 'outline'"
-                color="neutral"
-                @click="currentLang = ''"
-              >
-                {{ t("mapo.mediaEditor.defaultLang") }}
-              </UButton>
-              <UButton
-                v-for="lang in activeLangs"
-                :key="lang"
-                :variant="currentLang === lang ? 'solid' : 'outline'"
-                color="neutral"
-                @click="currentLang = lang"
-              >
-                {{ lang.toUpperCase() }}
-              </UButton>
-            </UFieldGroup>
+            <!-- Lang switch: the one MapoDetail and the menu manager use, so
+                 an app that replaces it (MapoOverride) replaces it here too.
+                 The drawer has no route of its own: the URL stays as it is. -->
+            <MapoDetailLangSwitch
+              v-if="activeLangs.length > 1"
+              v-model="currentLang"
+              :langs="activeLangs"
+              no-route-change
+            />
 
             <!-- Field inputs -->
             <div class="space-y-3">
@@ -312,6 +378,7 @@ function formatDate(dateStr: string): string {
 
             <!-- File replace -->
             <MapoMediaFileChanger
+              :key="fileChangerKey"
               :media="media"
               @update:file="newFile = $event"
               @update:maintain-url="maintainUrl = $event"
@@ -319,21 +386,38 @@ function formatDate(dateStr: string): string {
           </div>
         </div>
 
+        <!-- Destination picker for "Move to": teleported, mounted when open -->
+        <MapoMediaFolderPicker
+          v-model:open="movePickerOpen"
+          @confirm="moveTo"
+        />
+
         <!-- Footer -->
         <div
           class="flex items-center justify-between gap-2 border-t border-default px-4 py-3"
         >
-          <UButton
-            v-if="canRemove"
-            icon="i-lucide-trash-2"
-            size="sm"
-            variant="soft"
-            color="error"
-            @click="store.deleteMedia(media)"
-          >
-            {{ t("mapo.delete") }}
-          </UButton>
-          <span v-else />
+          <div class="flex gap-2">
+            <UButton
+              v-if="canRemove"
+              icon="i-lucide-trash-2"
+              size="sm"
+              variant="soft"
+              color="error"
+              @click="store.deleteMedia(media)"
+            >
+              {{ t("mapo.delete") }}
+            </UButton>
+            <UButton
+              v-if="canEdit && !editing"
+              icon="i-lucide-folder-input"
+              size="sm"
+              variant="soft"
+              color="neutral"
+              @click="movePickerOpen = true"
+            >
+              {{ t("mapo.mediaMove.moveTo") }}
+            </UButton>
+          </div>
 
           <div class="flex gap-2">
             <UButton

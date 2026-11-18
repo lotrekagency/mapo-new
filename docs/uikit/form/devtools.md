@@ -36,7 +36,7 @@ The left column reports the module configuration as read from `runtimeConfig.pub
 | Field             | Description                                                              |
 | ----------------- | ------------------------------------------------------------------------ |
 | `debounce`        | Global debounce in ms (default: 300 ms)                                  |
-| `groups.expanded` | Whether groups open expanded by default                                  |
+| `groups.expanded` | Whether groups open expanded by default (default: `true`)                |
 | `custom types`    | Number of types added by the user via `defineFormField` or `nuxt.config` |
 
 ### Registered custom fields

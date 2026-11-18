@@ -36,7 +36,7 @@
 | `MapoMediaManager`       | ✅            | Full media library: folders, gallery, upload     |
 | `MapoMediaManagerDialog` | ✅            | Modal wrapper of the manager, used as picker     |
 | `MapoMediaGallery`       | ✅            | Media grid with single / multi selection         |
-| `MapoMediaFolders`       | ✅            | Folder list with MIME filters and folder editing |
+| `MapoMediaFolders`       | ✅            | Folder tree with MIME filters and folder editing |
 | `MapoMediaBreadcrumbs`   | ✅            | Breadcrumb trail of the current folder path      |
 | `MapoMediaUploader`      | ✅            | Multi-file upload queue with per-file progress   |
 | `MapoMediaEditor`        | ✅            | Media metadata editor, permission gated          |

@@ -105,12 +105,16 @@ const fields = [
 
 ## How to: choose between `visible` and `show`
 
-| Prop      | Renders as | Use when…                                                   |
-| --------- | ---------- | ----------------------------------------------------------- |
-| `visible` | `v-if`     | the field must NOT be sent if the user cannot see it        |
-| `show`    | `v-show`   | you only want to hide UI; the value should still be tracked |
+| Prop      | Renders as | Use when…                                           |
+| --------- | ---------- | --------------------------------------------------- |
+| `visible` | `v-if`     | the field does not apply: its component unmounts    |
+| `show`    | `v-show`   | it toggles often, or its widget must keep its state |
 
-In a form with tabs, a tab whose fields are all hidden by either predicate leaves the tab bar until one of them shows: see [Tab and group layout](./index.md#tab-and-group-layout).
+Neither predicate changes the model: a hidden field keeps its value, and a save sends it like any other.
+
+Both predicates act on the field's grid cell, so a hidden field leaves no empty row and no gap in a row of `cols` fields: `visible` removes the cell with the field, `show` hides the cell and keeps the field mounted, with its state. The same holds when a [`field.<key>` slot](./slots.md#how-to-replace-an-entire-field-with-a-custom-block) replaces the field.
+
+A group card, a sub-tab, the grid of the fields without a group or the body of a repeater item shows only while one of its fields does: it is not rendered while `visible` removes all its fields, and it is hidden while `show` hides the ones left. Inside a repeater item, the predicates receive the item as `model`. In a form with tabs, a tab whose fields are all hidden by either predicate leaves the tab bar until one of them shows: see [Tab and group layout](./index.md#tab-and-group-layout).
 
 ```ts
 {

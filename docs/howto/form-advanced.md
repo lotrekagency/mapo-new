@@ -70,6 +70,8 @@ When used inside `<MapoDetail>`, both `field.*` and `group.*` slots are forwarde
 
 A repeater renders a list of items, each with their own nested fields. Items can be reordered via drag-and-drop.
 
+Nested fields take `visible` and `show` as top-level fields do, with the item as `model`. A hidden field leaves no gap in the item, and an item with no field to show keeps only its header (→ [Progressive Disclosure](/uikit/form/progressive-disclosure#how-to-choose-between-visible-and-show)).
+
 ### Simple repeater (single type)
 
 ```ts

@@ -2,11 +2,48 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
+import { useRuntimeConfig } from "#app";
+import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useMediaStore } from "../stores/media.js";
-import type { MediaItem } from "../types/media.js";
+import { startMediaDrag, type MediaDrag } from "../utils/mediaDrag.js";
+import type { MediaFolder, MediaItem } from "../types/media.js";
+
+const emit = defineEmits<{
+  /**
+   * Files were dropped on the gallery or picked with "Upload here", and wait
+   * in the store (`queueUploads`): the manager opens the Upload tab, which
+   * queues them for the folder on screen.
+   */
+  upload: [];
+}>();
 
 const { t } = useI18n();
 const store = useMediaStore();
+
+// Where an upload started from here lands: the folder on screen.
+const folderLabel = computed(
+  () => store.parentFolder?.name || t("mapo.mediaManager.root"),
+);
+
+function queueForUpload(files: File[]) {
+  store.queueUploads(files);
+  emit("upload");
+}
+
+// Moving media needs the change permission on the media model, as editing
+// them does.
+const runtimeConfig = useRuntimeConfig();
+const permissionsModel =
+  ((runtimeConfig.public.mapoMedia ?? {}) as { permissionsModel?: string })
+    .permissionsModel ?? "media";
+const { canChange } = usePermissions();
+const canMove = computed(() => canChange(permissionsModel));
+
+const movePickerOpen = ref(false);
+
+function moveSelected(folder: MediaFolder | null) {
+  return store.moveMedia([...store.editList], folder?.id ?? null);
+}
 
 const isPickerMode = computed(
   () => store.selectMode === "single" || store.selectMode === "multi",
@@ -59,181 +96,255 @@ function onDragOverItem(index: number) {
 function onDragEnd() {
   dragIndex.value = null;
 }
+
+// A card dropped on a folder of the tree moves there (`MapoMediaFolders` takes
+// the drop); a card of the bulk selection takes the whole selection with it.
+// Same rule as "Move to…": managing, with the change permission.
+const canDragCards = computed(() => !isPickerMode.value && canMove.value);
+
+function onCardDragStart(event: DragEvent, media: MediaItem) {
+  // The card's image is draggable on its own, even where the card is not.
+  if (!canDragCards.value) return;
+  const isSelected = store.editListSet.has(media.id);
+  const ids = isSelected ? [...store.editList] : [media.id];
+  const drag: MediaDrag = { kind: "media", ids };
+  startMediaDrag(event, drag);
+  store.dragged = drag;
+}
+
+function onCardDragEnd() {
+  store.dragged = null;
+}
+
+function isDragged(media: MediaItem): boolean {
+  const drag = store.dragged;
+  return drag?.kind === "media" && drag.ids.includes(media.id);
+}
 </script>
 
 <template>
-  <div class="mapo-media-gallery flex flex-col gap-3">
-    <!-- Multi-picker selection strip: click to deselect, drag to reorder -->
-    <div
-      v-if="multiSelection.length > 0"
-      class="flex items-center gap-2 overflow-x-auto rounded-lg bg-elevated p-2"
-    >
-      <div
-        v-for="(media, i) in multiSelection"
-        :key="media.id"
-        class="group relative shrink-0 cursor-grab"
-        :class="{ 'opacity-50': dragIndex === i }"
-        draggable="true"
-        @dragstart="onDragStart(i)"
-        @dragover.prevent="onDragOverItem(i)"
-        @dragend="onDragEnd"
-        @click.stop="store.select(media)"
-      >
-        <MapoMediaPreview :media="media" size="xs" />
-        <div
-          class="absolute inset-0 hidden items-center justify-center rounded bg-black/50 text-white group-hover:flex"
-        >
-          <UIcon name="i-lucide-x" class="size-4" />
-        </div>
-      </div>
-      <span class="ml-auto shrink-0 pl-2 text-xs text-muted">
-        {{
-          t("mapo.mediaGallery.nSelected", { number: multiSelection.length })
-        }}
-      </span>
-    </div>
-
-    <!-- Bulk actions bar -->
-    <div
-      v-if="!isPickerMode && store.editList.length > 0"
-      class="flex items-center gap-2 rounded-lg bg-elevated px-3 py-2"
-    >
-      <UCheckbox
-        :model-value="
-          store.editListState.indeterminate
-            ? 'indeterminate'
-            : store.editListState.value
-        "
-        :label="
-          store.editListState.value
-            ? t('mapo.mediaGallery.deselectAll')
-            : t('mapo.mediaGallery.selectAll')
-        "
-        @update:model-value="store.editSelectAll()"
-      />
-      <span class="text-sm text-muted">
-        {{
-          t("mapo.mediaGallery.nSelected", { number: store.editList.length })
-        }}
-      </span>
-      <div class="flex-1" />
-      <UButton
-        icon="i-lucide-trash-2"
-        size="xs"
-        color="error"
-        variant="soft"
-        @click="store.deleteSelected()"
-      >
-        {{ t("mapo.mediaGallery.deleteSelectedLabel") }}
-      </UButton>
-      <UButton
-        icon="i-lucide-x"
-        size="xs"
-        variant="ghost"
-        color="neutral"
-        @click="store.editList = []"
-      />
-    </div>
-
-    <!-- Loading skeleton -->
-    <div
-      v-if="store.loading"
-      class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3"
-    >
-      <USkeleton v-for="n in 12" :key="n" class="aspect-square rounded-lg" />
-    </div>
-
-    <!-- Empty state -->
-    <div
-      v-else-if="store.medias.length === 0"
-      class="flex flex-col items-center gap-3 py-16 text-center"
-    >
-      <UIcon name="i-lucide-image-off" class="size-12 text-dimmed" />
-      <p class="text-sm text-muted">
-        {{ t("mapo.mediaGallery.noMediaFound") }}
-      </p>
-    </div>
-
-    <!-- Grid -->
-    <div
-      v-else
-      class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3"
-    >
-      <div
-        v-for="media in store.medias"
-        :key="media.id"
-        class="group relative cursor-pointer overflow-hidden rounded-lg bg-elevated"
-        :class="{
-          'ring-2 ring-primary': isInSelection(media),
-          'ring-2 ring-primary ring-offset-1': store.editListSet.has(media.id),
-        }"
-        @click="onClickItem(media)"
-      >
-        <!-- Preview -->
-        <div class="aspect-square">
-          <MapoMediaPreview :media="media" size="lg" class="size-full" />
-        </div>
-
-        <!-- Hover overlay with filename -->
-        <div
-          class="absolute inset-x-0 bottom-0 translate-y-full bg-black/60 px-1.5 py-1 transition-transform group-hover:translate-y-0"
-        >
-          <p class="truncate text-[10px] text-white">
-            {{ media.title || media.file?.split("/").pop() }}
+  <!-- The whole gallery takes files dragged in from the computer. -->
+  <MapoDropArea class="mapo-media-gallery min-h-full" @files="queueForUpload">
+    <template #default="{ triggerPick }">
+      <div class="flex flex-col gap-3">
+        <!-- Upload here: into the folder on screen, through the Upload tab -->
+        <div class="flex items-center gap-2">
+          <p class="min-w-0 flex-1 truncate text-xs text-dimmed">
+            {{ t("mapo.mediaGallery.dropHint", { folder: folderLabel }) }}
           </p>
-          <p class="text-[9px] text-white/60">
-            {{ humanFileSize(media.size) }}
-          </p>
+          <UButton
+            icon="i-lucide-upload"
+            size="xs"
+            variant="soft"
+            color="neutral"
+            @click="triggerPick"
+          >
+            {{ t("mapo.mediaGallery.uploadHere") }}
+          </UButton>
         </div>
 
-        <!-- Selection checkmark (picker mode) -->
+        <!-- Multi-picker selection strip: click to deselect, drag to reorder -->
         <div
-          v-if="isPickerMode && isInSelection(media)"
-          class="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-inverted"
+          v-if="multiSelection.length > 0"
+          class="flex items-center gap-2 overflow-x-auto rounded-lg bg-elevated p-2"
         >
-          <UIcon name="i-lucide-check" class="size-3" />
+          <div
+            v-for="(media, i) in multiSelection"
+            :key="media.id"
+            class="group relative shrink-0 cursor-grab"
+            :class="{ 'opacity-50': dragIndex === i }"
+            draggable="true"
+            @dragstart="onDragStart(i)"
+            @dragover.prevent="onDragOverItem(i)"
+            @dragend="onDragEnd"
+            @click.stop="store.select(media)"
+          >
+            <MapoMediaPreview :media="media" size="xs" />
+            <div
+              class="absolute inset-0 hidden items-center justify-center rounded bg-black/50 text-white group-hover:flex"
+            >
+              <UIcon name="i-lucide-x" class="size-4" />
+            </div>
+          </div>
+          <span class="ml-auto shrink-0 pl-2 text-xs text-muted">
+            {{
+              t("mapo.mediaGallery.nSelected", {
+                number: multiSelection.length,
+              })
+            }}
+          </span>
         </div>
 
-        <!-- Bulk checkbox (gallery mode, no selection) -->
+        <!-- Bulk actions bar -->
         <div
-          v-if="!isPickerMode"
-          class="absolute left-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100"
-          :class="{ '!opacity-100': store.editListSet.has(media.id) }"
-          @click.stop
+          v-if="!isPickerMode && store.editList.length > 0"
+          class="flex items-center gap-2 rounded-lg bg-elevated px-3 py-2"
         >
           <UCheckbox
-            :model-value="store.editListSet.has(media.id)"
-            @update:model-value="store.editSelect(media.id)"
+            :model-value="
+              store.editListState.indeterminate
+                ? 'indeterminate'
+                : store.editListState.value
+            "
+            :label="
+              store.editListState.value
+                ? t('mapo.mediaGallery.deselectAll')
+                : t('mapo.mediaGallery.selectAll')
+            "
+            @update:model-value="store.editSelectAll()"
+          />
+          <span class="text-sm text-muted">
+            {{
+              t("mapo.mediaGallery.nSelected", {
+                number: store.editList.length,
+              })
+            }}
+          </span>
+          <div class="flex-1" />
+          <UButton
+            v-if="canMove"
+            icon="i-lucide-folder-input"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            @click="movePickerOpen = true"
+          >
+            {{ t("mapo.mediaMove.moveTo") }}
+          </UButton>
+          <UButton
+            icon="i-lucide-trash-2"
+            size="xs"
+            color="error"
+            variant="soft"
+            @click="store.deleteSelected()"
+          >
+            {{ t("mapo.mediaGallery.deleteSelectedLabel") }}
+          </UButton>
+          <UButton
+            icon="i-lucide-x"
+            size="xs"
+            variant="ghost"
+            color="neutral"
+            @click="store.editList = []"
           />
         </div>
 
-        <!-- Edit button (gallery mode, visible on hover) -->
+        <!-- Loading skeleton -->
         <div
-          v-if="!isPickerMode"
-          class="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+          v-if="store.loading"
+          class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3"
         >
-          <UButton
-            icon="i-lucide-pencil"
-            size="xs"
-            variant="solid"
-            color="neutral"
-            class="shadow"
-            @click.stop="store.openEditor(media)"
+          <USkeleton
+            v-for="n in 12"
+            :key="n"
+            class="aspect-square rounded-lg"
+          />
+        </div>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="store.medias.length === 0"
+          class="flex flex-col items-center gap-3 py-16 text-center"
+        >
+          <UIcon name="i-lucide-image-off" class="size-12 text-dimmed" />
+          <p class="text-sm text-muted">
+            {{ t("mapo.mediaGallery.noMediaFound") }}
+          </p>
+        </div>
+
+        <!-- Grid -->
+        <div
+          v-else
+          class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3"
+        >
+          <div
+            v-for="media in store.medias"
+            :key="media.id"
+            class="group relative cursor-pointer overflow-hidden rounded-lg bg-elevated"
+            :class="{
+              'ring-2 ring-primary': isInSelection(media),
+              'ring-2 ring-primary ring-offset-1': store.editListSet.has(
+                media.id,
+              ),
+              'opacity-50': isDragged(media),
+            }"
+            :draggable="canDragCards"
+            @click="onClickItem(media)"
+            @dragstart="onCardDragStart($event, media)"
+            @dragend="onCardDragEnd"
+          >
+            <!-- Preview -->
+            <div class="aspect-square">
+              <MapoMediaPreview :media="media" size="lg" class="size-full" />
+            </div>
+
+            <!-- Hover overlay with filename -->
+            <div
+              class="absolute inset-x-0 bottom-0 translate-y-full bg-black/60 px-1.5 py-1 transition-transform group-hover:translate-y-0"
+            >
+              <p class="truncate text-[10px] text-white">
+                {{ media.title || media.file?.split("/").pop() }}
+              </p>
+              <p class="text-[9px] text-white/60">
+                {{ humanFileSize(media.size) }}
+              </p>
+            </div>
+
+            <!-- Selection checkmark (picker mode) -->
+            <div
+              v-if="isPickerMode && isInSelection(media)"
+              class="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-inverted"
+            >
+              <UIcon name="i-lucide-check" class="size-3" />
+            </div>
+
+            <!-- Bulk checkbox (gallery mode, no selection) -->
+            <div
+              v-if="!isPickerMode"
+              class="absolute left-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+              :class="{ '!opacity-100': store.editListSet.has(media.id) }"
+              @click.stop
+            >
+              <UCheckbox
+                :model-value="store.editListSet.has(media.id)"
+                @update:model-value="store.editSelect(media.id)"
+              />
+            </div>
+
+            <!-- Edit button (gallery mode, visible on hover) -->
+            <div
+              v-if="!isPickerMode"
+              class="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <UButton
+                icon="i-lucide-pencil"
+                size="xs"
+                variant="solid"
+                color="neutral"
+                class="shadow"
+                @click.stop="store.openEditor(media)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="store.pages > 1" class="flex justify-center pt-2">
+          <!-- The backend paginator only exposes page/pages (no item count), so the
+           page count is mapped 1:1 with items-per-page=1. -->
+          <UPagination
+            :page="store.page"
+            :total="store.pages"
+            :items-per-page="1"
+            @update:page="store.getRoot({ page: $event })"
           />
         </div>
       </div>
-    </div>
 
-    <!-- Pagination -->
-    <div v-if="store.pages > 1" class="flex justify-center pt-2">
-      <!-- The backend paginator only exposes page/pages (no item count), so the
-           page count is mapped 1:1 with items-per-page=1. -->
-      <UPagination
-        :page="store.page"
-        :total="store.pages"
-        :items-per-page="1"
-        @update:page="store.getRoot({ page: $event })"
+      <MapoMediaFolderPicker
+        v-model:open="movePickerOpen"
+        @confirm="moveSelected"
       />
-    </div>
-  </div>
+    </template>
+  </MapoDropArea>
 </template>

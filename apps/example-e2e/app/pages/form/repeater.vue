@@ -2,7 +2,8 @@
 // Tests: MapoRepeater — add/remove/reorder/duplicate items, single template, multi-template,
 // miniCard contextual scaling, bulk selection (select all, shift-click, delete/duplicate bulk),
 // expand/collapse all, undo stack, minItems/maxItems guards, confirmDelete dialog,
-// readonly mode, integration with form isDirty/getPatch.
+// readonly mode, integration with form isDirty/getPatch, item fields with
+// `visible`/`show` that read the item (fixture F).
 // E2E plan: e2e/form/fields/repeater.md (sections 1–19)
 import type {
   FieldDescriptor,
@@ -191,6 +192,64 @@ const repeaterE: RepeaterDescriptor<PickerModel> = {
   },
 };
 
+// ── Fixture F: fields that depend on the item ─────────────────────────────────
+// `visible` and `show` read the item: the field of the other kind leaves no
+// gap, so "URL" sits next to "Kind" where "Page path" was.
+interface LinkModel {
+  links: Array<{
+    kind: string;
+    page?: string;
+    url?: string;
+    new_tab?: boolean;
+  }>;
+}
+const modelF = ref<LinkModel>({
+  links: [
+    { kind: "page", page: "/about" },
+    { kind: "url", url: "https://example.com", new_tab: true },
+  ],
+});
+const repeaterF: RepeaterDescriptor<LinkModel> = {
+  key: "links",
+  type: "repeater",
+  label: "Links (fields that depend on the item)",
+  fields: [
+    {
+      key: "kind",
+      type: "select",
+      label: "Kind",
+      cols: 4,
+      attrs: {
+        items: [
+          { label: "Page", value: "page" },
+          { label: "URL", value: "url" },
+        ],
+      },
+    },
+    {
+      key: "page",
+      type: "text",
+      label: "Page path",
+      cols: 8,
+      visible: ({ model }) => model.kind === "page",
+    },
+    {
+      key: "url",
+      type: "url",
+      label: "URL",
+      cols: 8,
+      visible: ({ model }) => model.kind === "url",
+    },
+    {
+      key: "new_tab",
+      type: "switch",
+      label: "Open in a new tab",
+      show: ({ model }) => model.kind === "url",
+    },
+  ],
+  attrs: { defaultExpanded: true, confirmDelete: false },
+};
+
 // ── Dirty tracking integration ────────────────────────────────────────────────
 const formA = useMapoForm({
   model: modelA,
@@ -314,6 +373,26 @@ const formA = useMapoForm({
       <MapoForm
         v-model="modelE"
         :fields="[repeaterE]"
+        :errors="{}"
+        :registry="$mapoFormRegistry"
+      />
+    </UCard>
+
+    <!-- Fixture F: fields that depend on the item -->
+    <UCard>
+      <template #header>
+        <span class="font-semibold text-sm text-highlighted"
+          >F — Fields that depend on the item</span
+        >
+      </template>
+      <p class="text-xs text-muted mb-3">
+        <code>visible</code> and <code>show</code> receive the item as
+        <code>model</code>. Switch an item's kind: the field of the other kind
+        leaves no gap, and "Open in a new tab" shows for URLs only.
+      </p>
+      <MapoForm
+        v-model="modelF"
+        :fields="[repeaterF]"
         :errors="{}"
         :registry="$mapoFormRegistry"
       />

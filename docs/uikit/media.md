@@ -23,7 +23,7 @@ definePageMeta({
 </template>
 ```
 
-That renders the folder sidebar with MIME filters, breadcrumbs, a searchable paginated gallery with bulk delete, an upload tab with per-file progress, and a metadata editor drawer — all backed by `useMediaStore`.
+That renders a folder tree with MIME filters, breadcrumbs, a searchable paginated gallery with bulk delete, an upload tab with per-file progress, and a metadata editor drawer — all backed by `useMediaStore`.
 
 Inside a form, media are regular field descriptors — no imports, the types are injected by `@mapomodule/uikit`:
 
@@ -52,10 +52,13 @@ const fields: FieldDescriptor[] = [
 useMediaStore (Pinia)
     │
     ├── MapoMediaManager          ← orchestrator shell
-    │     ├── MapoMediaFolders    ← folder sidebar + MIME filters
+    │     ├── MapoMediaFolders    ← folder tree (create, rename, move, delete,
+    │     │                          drop target) + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
-    │     ├── MapoMediaGallery    ← CSS grid + bulk ops + pagination
-    │     ├── MapoMediaEditor     ← side drawer for metadata
+    │     ├── MapoMediaGallery    ← CSS grid + bulk ops (move, delete) + pagination,
+    │     │                          Upload here + file drop, cards dragged to the tree
+    │     ├── MapoMediaEditor     ← side drawer for metadata, move
+    │     ├── MapoMediaFolderPicker ← folder tree dialog (move destination)
     │     └── MapoMediaUploader   ← drop area + per-file title, alt text,
     │                                description, folder + progress
     │
@@ -89,7 +92,7 @@ Drives navigation. **Both list and detail return the explorer payload** — this
 | `GET /api/media-folders/`        | Root explorer: `{ media, folders, parent_folder: null }` |
 | `GET /api/media-folders/:id/`    | Folder explorer: `{ media, folders, parent_folder }`     |
 | `POST /api/media-folders/`       | Create folder                                            |
-| `PATCH /api/media-folders/:id/`  | Rename / move folder                                     |
+| `PUT /api/media-folders/:id/`    | Rename (`updateOrCreateFolder`), move (`moveFolder`)     |
 | `DELETE /api/media-folders/:id/` | Delete folder                                            |
 
 Explorer payload shape:
@@ -101,6 +104,12 @@ Explorer payload shape:
   "parent_folder": MediaFolder | null
 }
 ```
+
+A `parent_folder` without an `id` counts as the root too: Camomilla answers the root with an empty folder (`{ "title": "", "updir": null }`) instead of `null`.
+
+A folder's `parent` is an id. A parent given as an object is read by its `id`: Camomilla serializes `updir` as the whole parent folder, and an adapter may pass it on as it is.
+
+Moving a folder sends its new `parent` through the same PUT. The backend should refuse a parent that is the folder itself or one of its subfolders. Camomilla does not check it, and its `update_childs` recurses on such a move, so the manager never offers those folders as a destination, and `moveFolder` refuses them as far as the folder cache knows the tree.
 
 ### Media endpoint (default `/api/media`)
 
@@ -162,8 +171,18 @@ interface MediaAdapter {
   buildDetailParams?(ctx: { lang?: string }): Record<string, unknown>;
   /** Map a canonical folder ({ name, parent }) to the backend's create/update payload. */
   buildFolderPayload?(folder: Partial<MediaFolder>): Record<string, unknown>;
-  /** Build the PATCH payload for a metadata update (default: title/alt_text/description/translations). */
-  buildMediaPatchPayload?(media: MediaItem): Record<string, unknown>;
+  /**
+   * Build the PATCH payload for a metadata update. `previous` is the media as it was
+   * when editing started (the editor always passes it): the default then sends only
+   * the changed fields, `translations` narrowed to the changed languages and fields.
+   * Without it: title/alt_text/description/translations. `{}` skips the request.
+   */
+  buildMediaPatchPayload?(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Record<string, unknown>;
+  /** Build the PATCH payload that moves a media to a folder (`null` = root). Default: `{ folder }`. */
+  buildMoveMediaPayload?(folderId: number | null): Record<string, unknown>;
   /** Build the multipart PATCH payload for a file replacement (default REST: { file, maintain_url }). */
   buildReplaceFilePayload?(
     file: File,
@@ -181,7 +200,7 @@ Every method is optional; the default adapter applies plain REST semantics.
 - mime filter → `fltr=mime_type=<value>`
 - detail params → `language_code`
 - folder create/update payload → `{ title, slug, updir }` (instead of `{ name, parent }`)
-- folder reads normalized back to the canonical `{ name, parent, path }`
+- folder reads normalized back to the canonical `{ name, parent, path }` (the store reads a nested `parent` by its id)
 - file replace flag → `same_url` (instead of `maintain_url`)
 
 Opt out with `camomilla: { mediaAdapter: false }` to keep the default REST adapter.
@@ -272,27 +291,33 @@ Auto-imported Pinia store available throughout the app.
 
 ### State
 
-| Property         | Type                               | Description                                                              |
-| ---------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                         |
-| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                         |
-| `parentFolders`  | `MediaFolder[]`                    | Breadcrumb path from root                                                |
-| `page` / `pages` | `number`                           | Pagination                                                               |
-| `mimeType`       | `string \| null`                   | Active MIME filter                                                       |
-| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it |
-| `loading`        | `boolean`                          | Fetch in progress                                                        |
-| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                 |
-| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                 |
-| `editList`       | `number[]`                         | IDs flagged for bulk operations                                          |
-| `selectMode`     | `SelectMode`                       | Selection mode                                                           |
+| Property         | Type                               | Description                                                                                    |
+| ---------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                                               |
+| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                                               |
+| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree                                 |
+| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache                         |
+| `page` / `pages` | `number`                           | Pagination                                                                                     |
+| `mimeType`       | `string \| null`                   | Active MIME filter                                                                             |
+| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it                       |
+| `loading`        | `boolean`                          | Fetch in progress                                                                              |
+| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                                       |
+| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                                       |
+| `editList`       | `number[]`                         | IDs flagged for bulk operations                                                                |
+| `selectMode`     | `SelectMode`                       | Selection mode                                                                                 |
+| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens                              |
+| `movingFolderId` | `number \| null`                   | Folder `moveFolder` is moving; the tree disables its row actions meanwhile                     |
+| `dragged`        | `MediaDrag \| null`                | What is being dragged in the manager: `{ kind: "media", ids }` or `{ kind: "folder", folder }` |
 
 ### Getters
 
-| Getter          | Description                                                     |
-| --------------- | --------------------------------------------------------------- |
-| `parentFolder`  | Last entry of `parentFolders`                                   |
-| `editListSet`   | `editList` as a `Set` for O(1) lookup                           |
-| `editListState` | `{ value, indeterminate, outside }` for the select-all checkbox |
+| Getter            | Description                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| `parentFolder`    | Last entry of `parentFolders`                                                                  |
+| `editListSet`     | `editList` as a `Set` for O(1) lookup                                                          |
+| `editListState`   | `{ value, indeterminate, outside }` for the select-all checkbox                                |
+| `activeLanguages` | Languages of the metadata: the ones set with `setLanguages`, else the endpoint's (`lang_info`) |
+| `initialLanguage` | Language the editor opens on and uploads write into; `""` when media are not translated        |
 
 ### Actions
 
@@ -301,18 +326,24 @@ const store = useMediaStore()
 
 await store.getRoot({ page?, search?, mime?, all? })  // fetch current folder
 await store.navigateToFolder(folder | null)           // null = root; uses detail(folderId)
+await store.loadFolderChildren(folderId | null)       // load a tree branch without navigating
 await store.openEditor(media)                          // fetch detail + open drawer
 store.closeEditor()
-store.setLang('it')                                    // language for detail metadata
+store.setLang('it')                                    // preferred language: detail metadata, editor, uploads
+store.setLanguages(['it', 'en'])                       // impose the metadata languages; [] reads them from OPTIONS
 
-await store.updateMedia(media)
+await store.updateMedia(media, previous?)              // previous: the pre-edit copy, to send only the changes
 await store.replaceFile(mediaId, file, maintainUrl?)
+await store.moveMedia(ids, folderId | null)          // one PATCH each; toasts, refresh; returns the ids moved
 await store.deleteMedia(media)
 
 await store.updateOrCreateFolder({ id?, name, parent? })
+await store.moveFolder(folder, parentId | null)      // PUT via buildFolderPayload; one at a time; toasts; reloads both branches and the screen; false if refused or failed
 await store.deleteFolder(folder)
 
-const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void
+const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void; translated media get the metadata as the initialLanguage translation
+store.queueUploads(files)       // hand files to the uploader (the gallery does it on drop and Upload here)
+store.takeQueuedUploads()       // take them, emptying the hand-over (the uploader does it when it opens)
 
 store.setSelectionMode('none' | 'single' | 'multi')
 store.setSelection(value)
@@ -342,8 +373,8 @@ Main shell. Mounts the store and calls `reset()` on `onUnmounted`.
 | `selectionMode`    | `SelectMode`                       | `'none'` | Selection mode                                                 |
 | `mime`             | `string \| null`                   | `null`   | Initial MIME filter                                            |
 | `noFolders`        | `boolean`                          | `false`  | Hide the folder sidebar                                        |
-| `languages`        | `string[]`                         | —        | Languages for editor metadata form                             |
-| `defaultLang`      | `string`                           | —        | Default editor language                                        |
+| `languages`        | `string[]`                         | —        | Metadata languages (default: the endpoint's `lang_info`)       |
+| `defaultLang`      | `string`                           | —        | Language the editor opens on and uploads write into            |
 | `initialSelection` | `MediaItem \| MediaItem[] \| null` | `null`   | Pre-seed the picker selection (e.g. the field's current value) |
 
 Emits `update:selection` with `MediaItem | MediaItem[] | null` in picker mode. When `mime` is set it is treated as a **hard lock** (`lockMimeType`): the folders panel only offers the matching filter. When `defaultLang` is set, media detail fetches send it as `language_code`.
@@ -351,6 +382,37 @@ Emits `update:selection` with `MediaItem | MediaItem[] | null` in picker mode. W
 Slots: `actions` — custom buttons rendered in a footer bar below the content (v1 parity).
 
 In `multi` mode the gallery shows a **selection strip** above the grid: click a thumbnail to deselect it, drag to reorder (the order is preserved in the emitted value).
+
+### `<MapoMediaGallery>`
+
+The grid of the folder on screen, with the selection strip (pickers), the bulk bar and pagination. Its first row tells where uploads land, the folder on screen, and has **Upload here**, which opens the file picker; files dragged in from the computer can be dropped anywhere on the gallery. Either way the files wait in `store.queuedUploads` and the gallery emits `upload`. The manager then opens the Upload tab, which queues them for the folder on screen, with title, alt text and description to fill in before uploading.
+
+A card dragged onto a folder of the tree, the root included, moves there through `store.moveMedia`, as **Move to…** does; a card of the bulk selection takes the whole selection with it, and the dragged cards are dimmed while the drag lasts. Cards drag under the same rule as **Move to…**: in the manager (not in a picker), with the `change` permission.
+
+Emits: `upload` (no payload). No props.
+
+### `<MapoMediaFolderPicker>`
+
+Dialog to pick a folder, the root included, from the same tree as the sidebar: it shares the store's folder cache and loads the branches it opens. **Move to…** opens it from the gallery's bulk bar, for the selected media, and from the editor, for the media open; the editor closes once the media has moved out of the folder on screen. Moving goes through `store.moveMedia`, one PATCH per media built by the adapter's `buildMoveMediaPayload` (default `{ folder }`, which Camomilla takes as it is), with a toast for the media moved and one for those that were not. Both buttons need the `change` permission.
+
+**Move to…** on a folder's row in the tree opens it for that folder, with `exclude` hiding the folder and its subfolders. The move goes through `store.moveFolder`: the adapter's `buildFolderPayload` with the new `parent` (Camomilla: `updir`), saved like a rename. The folder on screen follows the move, breadcrumbs included. The folder leaves every cached branch as soon as the backend accepts the move, and until the branches reload the row actions are disabled: a second move picked from a tree that still shows the old place could close a cycle.
+
+| Prop           | Type       | Default          | Description                                                                     |
+| -------------- | ---------- | ---------------- | ------------------------------------------------------------------------------- |
+| `open`         | `boolean`  | —                | Whether the dialog is open (`v-model:open`)                                     |
+| `title`        | `string`   | "Move to folder" | Dialog title                                                                    |
+| `confirmLabel` | `string`   | "Move here"      | Label of the confirm button                                                     |
+| `exclude`      | `number[]` | `[]`             | Folder ids hidden with everything under them (a folder cannot go inside itself) |
+
+Emits `update:open` and `confirm` with the folder picked (`MediaFolder`, or `null` for the root). The dialog mounts when it opens, so it stacks above a drawer opened before it.
+
+### `<MapoMediaFolders>`
+
+The folder panel of the manager: the MIME filters, then the folders as a tree (Nuxt UI `UTree`) under a root node. A branch loads its subfolders when it opens (`store.loadFolderChildren`), through the same explorer endpoint as navigation; the folder on screen is selected and the path to it stays open. Clicking a folder opens it in the gallery; rename, move and delete sit on its row, and a new folder is created in the folder on screen. No props.
+
+The tree is also where drags land. A folder dragged by its row and dropped on another moves there through `store.moveFolder`; gallery cards dropped on a row move into that folder. The row a drop would land on is highlighted, and a closed branch opens when a drag rests on it, to reach its subfolders. A folder is not taken by itself, its subfolders or the folder it is already in, and nothing is taken while a folder moves. **Move to…** stays the way to move from the keyboard. Drags inside the manager carry the `MEDIA_DRAG_TYPE` data type, and the dragged item sits in `store.dragged` until the drag ends, since a drag's data is not readable before the drop.
+
+Deleting a folder asks for confirmation and warns that its subfolders and media go with it: Camomilla deletes them (`on_delete=CASCADE` on both relations), so the message does not promise otherwise. A backend that keeps them only makes the warning stricter than needed.
 
 ### `<MapoMediaManagerDialog>`
 
@@ -393,7 +455,7 @@ Standalone drag-and-drop area, reusable outside the media manager.
 </MapoDropArea>
 ```
 
-Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`.
+Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`. It reacts only to files dragged in from the computer: an element dragged inside the page (a gallery card, a selection being reordered) shows no overlay and is not prevented. Chrome reports an image dragged from the page as `Files` too, so a drag the media manager starts, which carries its own data type, is ignored even then.
 
 ### `<MapoMediaPreview>`
 
@@ -407,6 +469,8 @@ MIME-aware renderer: `image` → `<img>`, `video` → `<video>`, otherwise a fil
   :show-filename="false"
 />
 ```
+
+The file loads with `?v=<modified, else created>` appended, and so do the editor's links to it: a file replaced with **Keep current URL** has the same URL, and without the version the browser would keep showing the cached old one. A URL that already has a query string (a signed one) and `data:` or `blob:` URLs are left as they are, and the stored `file` never changes. Camomilla updates `created` on every save, a replacement included. Outside the backoffice, how long browsers keep the old file at that URL depends on the server's cache headers.
 
 ---
 
@@ -516,17 +580,23 @@ Families (`image/*`, `video/*`, `audio/*`, `application/*`) and exact types (`ap
 
 ## How to: handle multilingual media metadata
 
-Pass the language list to the manager — the editor drawer shows a language switch and writes per-language values into `media.translations[lang]`:
+The manager reads the metadata languages from the media endpoint's OPTIONS (`lang_info`, as Camomilla publishes it), so most apps pass nothing. The app's [`mapo.uikit.contentLanguages`](/uikit/form/i18n#how-to-limit-the-content-languages) narrows them, here as in the detail pages. Pass a list to impose one:
 
 ```vue
 <MapoMediaManager :languages="['it', 'en']" default-lang="it" />
 ```
 
-`defaultLang` is also sent as `language_code` on detail fetches (the Camomilla adapter maps it). The "Default" tab edits the untranslated base fields.
+With languages, the editor shows one tab per language (the switch appears from two languages up) and reads and writes `media.translations[lang]`. The tabs are `MapoDetailLangSwitch`, the same as `MapoDetail`: an app that replaces it with MapoOverride changes the media editor too. There is no tab for the untranslated fields: on a backend that translates media they are the active language's values under another name, and Camomilla ignores them on write.
+
+The editor opens on `defaultLang` when it is among the languages, otherwise on the first one. The tabs never change the page's URL, but they follow a `?lang=` already in it: a media edited from a detail page open in English opens in English. Uploads put title, alt text and description in the translation of `defaultLang`, or of the first language. Without languages, the editor and the uploader use the plain fields.
+
+Saving sends only what changed, `translations` included: the default adapter diffs against the copy taken when editing started. A failed save shows the backend's errors in an error toast, and the editor stays open with the edits.
+
+`defaultLang` is also sent as `language_code` on detail fetches (the Camomilla adapter maps it).
 
 ## How to: gate editing with permissions
 
-The editor's **Edit** and **Delete** buttons check the `change` / `delete` Django permissions on the configured model (default `"media"`), via `usePermissions()`. Point it at your model if it differs:
+The editor's **Edit**, **Move to** and **Delete** buttons, and **Move to** in the gallery's bulk bar, check the `change` / `delete` Django permissions on the configured model (default `"media"`), via `usePermissions()`. Point it at your model if it differs:
 
 ```ts
 // nuxt.config.ts

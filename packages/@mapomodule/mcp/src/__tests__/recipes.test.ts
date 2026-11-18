@@ -23,6 +23,7 @@ describe("matchRecipes", () => {
     ["protect the dashboard route with permissions", "auth-permissions"],
     ["how do the packages fit together", "concepts"],
     ["show a field only when another field is checked", "conditional-fields"],
+    ["a hidden field leaves an empty gap in the form", "conditional-fields"],
     ["autosave a draft while the user edits", "form-draft"],
     ["generate the fields from a json schema", "schema-to-form"],
     ["put a hint below one form field with a slot", "form-slots"],
@@ -34,6 +35,8 @@ describe("matchRecipes", () => {
     ["TS2307 cannot find module mapomodule/types", "imports"],
     ["connect claude code or copilot through mcp", "ai-assistant"],
     ["set up the camomilla session cookie", "camomilla"],
+    ["limit the content languages to italian", "content-languages"],
+    ["hide the language tabs on a single language site", "content-languages"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

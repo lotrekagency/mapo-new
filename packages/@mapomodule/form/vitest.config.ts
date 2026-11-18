@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 /** Local Vitest config for the `@mapomodule/form` package tests. */
@@ -13,5 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // `*.component.test.ts` files mount `.vue` components: they need the Vue
+    // plugin and the client transform of the root config, which runs them.
+    exclude: [...configDefaults.exclude, "**/*.component.test.ts"],
   },
 });
