@@ -1,3 +1,29 @@
+# @mapomodule/uikit [2.0.0-beta.18](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.17...@mapomodule/uikit@2.0.0-beta.18) (2026-11-18)
+
+### Bug Fixes
+
+- **uikit:** hide the menu language switch with a single language ([d7646ed](https://github.com/lotrekagency/mapo-new/commit/d7646ed5ee74e13eb6a9c7a25128e999bb63d099))
+- **uikit:** read a media folder's parent given as an object ([18ac3e0](https://github.com/lotrekagency/mapo-new/commit/18ac3e040f42aa716c7fced5eae1d96e09a3d18c))
+- **uikit:** rebuild the media breadcrumbs from the folder tree ([d92822f](https://github.com/lotrekagency/mapo-new/commit/d92822f89f764cc7c054607fa8aa74e0da5d9b9a))
+- **uikit:** refresh media previews when the file changes ([43d6ba9](https://github.com/lotrekagency/mapo-new/commit/43d6ba975e8167ff8bf8629550c7e04a71a67762))
+- **uikit:** save media metadata as translations and report save errors ([f67588c](https://github.com/lotrekagency/mapo-new/commit/f67588ca2048b901a10ff1d33b66b68b160d6c66))
+- **uikit:** treat a parent folder without id as the media root ([09ea884](https://github.com/lotrekagency/mapo-new/commit/09ea8845412ec33acf53077b51a810300a6a6302))
+- **uikit:** use the shared language switch in the media editor ([fd2876b](https://github.com/lotrekagency/mapo-new/commit/fd2876bbcd80c1b6aee91ca71a631ed983be9109))
+
+### Features
+
+- **uikit:** drag media and folders onto the folder tree ([6a0e0b8](https://github.com/lotrekagency/mapo-new/commit/6a0e0b86bd64da612bf0d765a01289f71502e3f3))
+- **uikit:** limit the editable languages with contentLanguages ([07fc848](https://github.com/lotrekagency/mapo-new/commit/07fc84801fe5b4f0b14d311f541523b840e1b0c2))
+- **uikit:** move media between folders ([fce77a6](https://github.com/lotrekagency/mapo-new/commit/fce77a6ce182594055b1b2cdbdd2a6de072032bf))
+- **uikit:** move media folders ([0cb8f7d](https://github.com/lotrekagency/mapo-new/commit/0cb8f7de506c9343b883a7685302dca92e02d76a))
+- **uikit:** show media folders as a tree ([f7c9bce](https://github.com/lotrekagency/mapo-new/commit/f7c9bce57a422b6b3ee237f499047b171866d404))
+- **uikit:** upload into the current folder from the gallery ([84125b0](https://github.com/lotrekagency/mapo-new/commit/84125b0bc6e92d828c7a1a646a77d041c40101a7))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.15
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.6
+
 # @mapomodule/uikit [2.0.0-beta.17](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.16...@mapomodule/uikit@2.0.0-beta.17) (2026-11-09)
 
 ### Dependencies
