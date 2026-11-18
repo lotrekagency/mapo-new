@@ -284,12 +284,74 @@ export interface FileDescriptor<
   attrs?: { accept?: string; maxSize?: number };
 }
 
+/**
+ * The Tiptap editor a toolbar button acts on, described by the members a button
+ * needs so that the descriptor types do not depend on Tiptap. At runtime it is
+ * the field's Tiptap `Editor`: cast it for the rest of its API. The command
+ * builders are untyped because the commands available depend on the extensions
+ * the field loads (`attrs.extensions`).
+ */
+export interface EditorToolbarEditor {
+  /** Starts a command chain, as in `editor.chain().focus().toggleBold().run()`. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  chain(): any;
+  /** Dry-runs commands: `editor.can().addRowAfter()` is `true` when the command would apply. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  can(): any;
+  /** Runs one command, as in `editor.commands.setHorizontalRule()`. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly commands: any;
+  /** Whether a mark or a node is active at the selection, as in `editor.isActive('table')`. */
+  isActive(name: string, attributes?: Record<string, unknown>): boolean;
+}
+
+/**
+ * A button that `attrs.toolbar` adds to an editor field, after the built-in
+ * buttons. Methods, not function properties: a function typed with Tiptap's own
+ * `Editor` fits them too.
+ */
+export interface EditorToolbarItem {
+  /** Identifies the button among the custom ones; unique within the toolbar. */
+  key: string;
+  /** Tooltip and accessible name of the button; its text when it has no `icon`. */
+  label: string;
+  /** Icon name, as `UButton` takes it (e.g. `i-lucide-table`). */
+  icon?: string;
+  /** Runs on click, as in `(editor) => editor.chain().focus().insertTable().run()`. */
+  action(editor: EditorToolbarEditor): void;
+  /** Shows the button as active, like the built-in ones on bold text or a heading. */
+  isActive?(editor: EditorToolbarEditor): boolean;
+  /**
+   * Disables the button, as in `(editor) => !editor.can().addRowAfter()`. The
+   * button is also disabled when the field is read-only and in the source view.
+   */
+  isDisabled?(editor: EditorToolbarEditor): boolean;
+}
+
 /** Descriptor for a Tiptap rich-text editor. */
 export interface EditorDescriptor<
   T = Record<string, unknown>,
 > extends FieldBase<T> {
   type: `${KnownFieldType.Editor}`;
-  attrs?: { extensions?: unknown[] };
+  attrs?: {
+    /** Tiptap v2 extensions loaded after the built-in ones (StarterKit, Link, Underline, Image). */
+    extensions?: unknown[];
+    /**
+     * Adds an HTML source toggle at the end of the toolbar. The source view
+     * edits the HTML in a textarea; what it saves goes through the editor, so it
+     * is sanitized, and the tags and attributes no extension supports are
+     * dropped. A read-only field shows the source without letting it change.
+     * Default: `false`.
+     */
+    source?: boolean;
+    /**
+     * Buttons added after the built-in ones, past a separator: typically the
+     * commands of the `extensions` the field loads. Each item is
+     * `{ key, label, icon?, action(editor), isActive?(editor), isDisabled?(editor) }`.
+     * Disabled when the field is read-only and in the source view.
+     */
+    toolbar?: EditorToolbarItem[];
+  };
 }
 
 /** Descriptor for the SEO preview field (title + description + live SERP preview). */

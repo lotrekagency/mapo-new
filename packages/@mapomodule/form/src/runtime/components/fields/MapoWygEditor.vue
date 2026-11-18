@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, resolveComponent } from "vue";
+import {
+  computed,
+  ref,
+  watch,
+  onBeforeUnmount,
+  resolveComponent,
+  useId,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { AnyExtension } from "@tiptap/vue-3";
@@ -7,7 +14,18 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
-import type { EditorDescriptor } from "../../types/index.js";
+import { debounce } from "@mapomodule/utils";
+import type {
+  EditorDescriptor,
+  EditorToolbarEditor,
+  EditorToolbarItem,
+} from "../../types/index.js";
+import { formatHtml } from "../../utils/formatHtml.js";
+import {
+  ALLOWED_LINK_PROTOCOLS,
+  isSafeUrl,
+  sanitizeHtml,
+} from "../../utils/sanitizeHtml.js";
 
 const props = defineProps<{
   modelValue: unknown;
@@ -23,60 +41,6 @@ const { t } = useI18n();
 
 const extraExtensions =
   (props.descriptor.attrs?.extensions as AnyExtension[] | undefined) ?? [];
-
-// Protocol allowlist for user-entered links. Without this,
-// `<a href="javascript:...">` would be accepted, leading to XSS when content is
-// rendered elsewhere (preview, server-side, other editors).
-const ALLOWED_LINK_PROTOCOLS = ["http", "https", "mailto", "tel"];
-
-function isSafeUrl(url: string): boolean {
-  try {
-    // URL relativi (es. "/page") non hanno protocol — li accettiamo.
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) return true;
-    const proto = new URL(url, "https://placeholder.local").protocol
-      .replace(":", "")
-      .toLowerCase();
-    return ALLOWED_LINK_PROTOCOLS.includes(proto);
-  } catch {
-    return false;
-  }
-}
-
-// Sanitise incoming HTML from external sources (initial set, server sync)
-// by removing <script>, inline handlers (on*), and href: javascript:. This is
-// intentionally minimal (no DOMPurify) to avoid a heavy dependency: it covers the
-// most common vectors; for truly untrusted HTML the consumer should use DOMPurify
-// at the app level.
-function sanitizeHtml(html: string): string {
-  if (typeof window === "undefined" || !html) return html;
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html;
-  const walker = document.createTreeWalker(
-    tpl.content,
-    NodeFilter.SHOW_ELEMENT,
-  );
-  const toRemove: Element[] = [];
-  let node = walker.nextNode() as Element | null;
-  while (node) {
-    if (node.tagName === "SCRIPT" || node.tagName === "STYLE") {
-      toRemove.push(node);
-    } else {
-      for (const attr of Array.from(node.attributes)) {
-        const name = attr.name.toLowerCase();
-        if (name.startsWith("on")) node.removeAttribute(attr.name);
-        if (
-          (name === "href" || name === "src" || name === "xlink:href") &&
-          !isSafeUrl(attr.value)
-        ) {
-          node.removeAttribute(attr.name);
-        }
-      }
-    }
-    node = walker.nextNode() as Element | null;
-  }
-  toRemove.forEach((el) => el.remove());
-  return tpl.innerHTML;
-}
 
 const editor = useEditor({
   content: sanitizeHtml((props.modelValue as string) ?? ""),
@@ -103,7 +67,65 @@ watch(
   ([ro, dis]) => editor.value?.setEditable(!ro && !dis),
 );
 
-// Sync modelValue esterno → editor (es. reset dopo save)
+// ─── HTML source view (`attrs.source`) ────────────────────────────────────
+// The textarea edits a copy of the HTML. After each pause in the typing the
+// copy goes through the editor (sanitizer, then schema), and the editor's HTML
+// is what the field emits: the saved value is sanitized and normalized even
+// when the form is saved from the source view. The editor stays mounted behind
+// the textarea (`v-show`), so its history survives the switch.
+const SOURCE_SYNC_DELAY_MS = 250;
+
+const hasSourceView = props.descriptor.attrs?.source === true;
+const sourceMode = ref(false);
+const sourceHtml = ref("");
+const sourceHintId = useId();
+// Whether the textarea holds typing the editor has not received yet.
+let sourcePending = false;
+
+const isLocked = computed(() => props.readonly || props.disabled);
+const isToolbarDisabled = computed(() => isLocked.value || sourceMode.value);
+
+/** Writes the textarea's typing into the editor and emits the result. */
+function flushSource() {
+  syncSource.cancel();
+  const current = editor.value;
+  if (!current) return;
+  if (!sourcePending) return;
+  sourcePending = false;
+  const before = current.getHTML();
+  current.commands.setContent(sanitizeHtml(sourceHtml.value), false);
+  const after = current.getHTML();
+  // Like the visual editor, emit only when the document changed: typing that
+  // the schema drops, or whitespace, leaves the value as it is.
+  const documentChanged = after !== before;
+  if (documentChanged) emit("update:modelValue", after);
+}
+
+const syncSource = debounce(flushSource, SOURCE_SYNC_DELAY_MS);
+
+function onSourceInput(value: unknown) {
+  if (isLocked.value) return;
+  sourceHtml.value = String(value ?? "");
+  sourcePending = true;
+  syncSource();
+}
+
+function toggleSource() {
+  const current = editor.value;
+  if (!current) return;
+  if (sourceMode.value) {
+    // The editor is up to date once the last typing is in.
+    flushSource();
+    sourceMode.value = false;
+    return;
+  }
+  sourceHtml.value = formatHtml(current.getHTML());
+  sourceMode.value = true;
+}
+
+// Sync modelValue esterno → editor (es. reset dopo save). The field's own
+// emits come back here as the editor's HTML and are skipped, so the textarea
+// is never rewritten under the cursor.
 watch(
   () => props.modelValue,
   (val) => {
@@ -112,11 +134,56 @@ watch(
         sanitizeHtml((val as string) ?? ""),
         false,
       );
+      if (!sourceMode.value) return;
+      // A value from outside (a reset, a draft) replaces the typing.
+      syncSource.cancel();
+      sourcePending = false;
+      sourceHtml.value = formatHtml(editor.value.getHTML());
     }
   },
 );
 
-onBeforeUnmount(() => editor.value?.destroy());
+onBeforeUnmount(() => {
+  // Typing still waiting for the pause is not lost when the field goes away.
+  flushSource();
+  editor.value?.destroy();
+});
+
+// ─── Custom toolbar buttons (`attrs.toolbar`) ─────────────────────────────
+const toolbarItems: EditorToolbarItem[] = props.descriptor.attrs?.toolbar ?? [];
+
+/**
+ * Asks an item's predicate about the editor; no predicate means `false`. One
+ * that throws (a command whose extension the field does not load) gives
+ * `fallback` instead of breaking the toolbar.
+ */
+function askItem(
+  question: (editor: EditorToolbarEditor) => boolean | undefined,
+  fallback: boolean,
+): boolean {
+  const current = editor.value;
+  if (!current) return fallback;
+  try {
+    return question(current) ?? false;
+  } catch {
+    return fallback;
+  }
+}
+
+function isItemDisabled(item: EditorToolbarItem): boolean {
+  if (isToolbarDisabled.value) return true;
+  return askItem((current) => item.isDisabled?.(current), true);
+}
+
+function isItemActive(item: EditorToolbarItem): boolean {
+  return askItem((current) => item.isActive?.(current), false);
+}
+
+function runItem(item: EditorToolbarItem) {
+  const current = editor.value;
+  if (!current) return;
+  item.action(current);
+}
 
 // ─── Image insertion ──────────────────────────────────────────────────────
 // MapoMediaManagerDialog is globally registered by @mapomodule/uikit.
@@ -161,7 +228,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('bold') }"
         @click="editor.chain().focus().toggleBold().run()"
       >
@@ -171,7 +238,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('italic') }"
         @click="editor.chain().focus().toggleItalic().run()"
       >
@@ -181,7 +248,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('underline') }"
         @click="editor.chain().focus().toggleUnderline().run()"
       >
@@ -194,7 +261,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('heading', { level: 2 }) }"
         @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
       >
@@ -204,7 +271,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('heading', { level: 3 }) }"
         @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
       >
@@ -217,7 +284,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('bulletList') }"
         icon="i-lucide-list"
         @click="editor.chain().focus().toggleBulletList().run()"
@@ -226,7 +293,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         :class="{ 'bg-gray-200': editor.isActive('orderedList') }"
         icon="i-lucide-list-ordered"
         @click="editor.chain().focus().toggleOrderedList().run()"
@@ -238,7 +305,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         icon="i-lucide-undo"
         @click="editor.chain().focus().undo().run()"
       />
@@ -246,7 +313,7 @@ function onImageConfirm(
         size="xs"
         variant="ghost"
         color="neutral"
-        :disabled="readonly || disabled"
+        :disabled="isToolbarDisabled"
         icon="i-lucide-redo"
         @click="editor.chain().focus().redo().run()"
       />
@@ -267,17 +334,80 @@ function onImageConfirm(
           variant="ghost"
           color="neutral"
           icon="i-lucide-image"
-          :disabled="readonly || disabled || !hasMediaManager"
+          :disabled="isToolbarDisabled || !hasMediaManager"
           @click="imagePickerOpen = true"
         />
       </UTooltip>
+
+      <!-- Custom buttons (`attrs.toolbar`), after the built-in ones -->
+      <template v-if="toolbarItems.length">
+        <USeparator orientation="vertical" class="mx-1 h-5" />
+        <UTooltip
+          v-for="item in toolbarItems"
+          :key="item.key"
+          :text="item.label"
+          :delay-duration="300"
+        >
+          <UButton
+            size="xs"
+            variant="ghost"
+            color="neutral"
+            :icon="item.icon"
+            :label="item.icon ? undefined : item.label"
+            :aria-label="item.label"
+            :disabled="isItemDisabled(item)"
+            :class="{ 'bg-gray-200': isItemActive(item) }"
+            @click="runItem(item)"
+          />
+        </UTooltip>
+      </template>
+
+      <!-- HTML source toggle (`attrs.source`): stays active in the source
+           view, and on a read-only field, which can show its source. -->
+      <template v-if="hasSourceView">
+        <USeparator orientation="vertical" class="mx-1 h-5" />
+        <UTooltip :text="t('mapo.wygEditor.source')" :delay-duration="300">
+          <UButton
+            size="xs"
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-code-xml"
+            :aria-label="t('mapo.wygEditor.source')"
+            :aria-pressed="sourceMode"
+            :class="{ 'bg-gray-200': sourceMode }"
+            @click="toggleSource"
+          />
+        </UTooltip>
+      </template>
     </div>
 
-    <!-- Editor content -->
+    <!-- Editor content: hidden, not unmounted, in the source view -->
     <EditorContent
+      v-show="!sourceMode"
       :editor="editor"
       class="prose prose-sm max-w-none px-3 py-2 focus-within:outline-none"
     />
+
+    <div v-if="sourceMode" class="px-3 py-2">
+      <UTextarea
+        :model-value="sourceHtml"
+        autoresize
+        :rows="6"
+        :readonly="isLocked"
+        spellcheck="false"
+        autocapitalize="off"
+        autocomplete="off"
+        :aria-label="t('mapo.wygEditor.source')"
+        :aria-describedby="sourceHintId"
+        :ui="{ base: 'font-mono text-xs' }"
+        class="w-full"
+        @update:model-value="onSourceInput"
+        @blur="flushSource"
+      />
+      <p :id="sourceHintId" class="mt-1 text-xs text-muted">
+        {{ t("mapo.wygEditor.sourceHint") }}
+      </p>
+    </div>
 
     <p
       v-for="err in errors"

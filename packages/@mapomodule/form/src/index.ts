@@ -38,6 +38,8 @@ export type {
   ColorDescriptor,
   FileDescriptor,
   EditorDescriptor,
+  EditorToolbarItem,
+  EditorToolbarEditor,
   SeoDescriptor,
   MapDescriptor,
   RepeaterDescriptor,
