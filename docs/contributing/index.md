@@ -77,7 +77,7 @@ Every change, from a one-line fix to a new feature, goes through the same steps:
 ### Definition of done
 
 - [ ] `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm docs:build` pass, with no new errors or warnings.
-- [ ] New logic has tests; root `pnpm exec vitest run` passes too (it also covers core, store and uikit).
+- [ ] New logic has tests; root `pnpm exec vitest run` passes too (it also covers core, store, uikit and form's component tests).
 - [ ] The docs describe the new behaviour: narrative page, API reference, sidebar entry.
 - [ ] Public APIs are reflected in the MCP server: recipes, and a rebuilt knowledge base whose tests pass.
 - [ ] UI or runtime changes are checked in `apps/example-e2e`, or the check is listed for the reviewer.

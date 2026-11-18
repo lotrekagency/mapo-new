@@ -2,15 +2,42 @@
 import { ref, computed, provide, onMounted, onUnmounted } from "vue";
 import type { AnyFieldDescriptor } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { isFieldRemoved, isFieldShown } from "../utils/tabVisibility.js";
 import MapoFormField from "./MapoFormField.vue";
 
-const props = defineProps<{ fields: AnyFieldDescriptor[] }>();
+const props = defineProps<{
+  /** Fields to lay out in the 12-column grid. */
+  fields: AnyFieldDescriptor[];
+}>();
 
 defineSlots<Record<string, unknown>>();
 
-const form = injectMapoForm();
+const form = injectMapoForm<Record<string, unknown>>();
 const model = computed(() => form?.model.value);
 const currentLang = computed(() => form?.currentLang.value ?? "");
+
+// ─── Visibility ──────────────────────────────────────────────────────────────
+
+// Each field sits in a grid cell, and the cell follows the field: `visible`
+// removes it with the field, so it leaves no gap in its row; `show` hides it
+// and keeps the field mounted, with its state. This holds for a cell filled by
+// the `field.<key>` slot too.
+const predicateModel = computed<Record<string, unknown>>(
+  () => model.value ?? {},
+);
+
+const keptFields = computed(() =>
+  props.fields.filter((field) => !isFieldRemoved(field, predicateModel.value)),
+);
+
+function isShown(field: AnyFieldDescriptor): boolean {
+  return isFieldShown(field, predicateModel.value);
+}
+
+// With no field to show, the grid goes as well: empty, it would still add its
+// spacing to the form.
+const hasKeptFields = computed(() => keptFields.value.length > 0);
+const hasShownFields = computed(() => keptFields.value.some(isShown));
 
 // ─── Field expand ────────────────────────────────────────────────────────────
 
@@ -139,10 +166,16 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
     </Transition>
   </Teleport>
 
-  <!-- Flat grid -->
-  <div class="grid grid-cols-12 gap-5">
+  <!-- Flat grid: not rendered while `visible` removes every field, hidden while
+       none of the others shows. -->
+  <div
+    v-if="hasKeptFields"
+    v-show="hasShownFields"
+    class="grid grid-cols-12 gap-5"
+  >
     <div
-      v-for="field in fields"
+      v-for="field in keptFields"
+      v-show="isShown(field)"
       :key="field.key as string"
       :class="colClass(field.cols)"
     >

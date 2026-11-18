@@ -13,8 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    // Component tests mount `.vue` files compiled for the client: they run from
-    // the root config, which has the Vue plugin and that environment.
+    // `*.component.test.ts` files mount `.vue` components: they need the Vue
+    // plugin and the client transform of the root config, which runs them.
     exclude: [...configDefaults.exclude, "**/*.component.test.ts"],
   },
 });

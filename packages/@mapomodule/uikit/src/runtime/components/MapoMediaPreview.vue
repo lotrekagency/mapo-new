@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { mediaFileUrl } from "../utils/mediaUrl.js";
 import type { MediaItem } from "../types/media.js";
 
 const props = withDefaults(
@@ -19,6 +20,10 @@ const props = withDefaults(
     videoAutoplay: false,
   },
 );
+
+// Versioned by the media's date, so a file replaced at the same URL is loaded
+// again rather than taken from the browser cache.
+const fileUrl = computed(() => mediaFileUrl(props.media));
 
 const isImage = computed(() => props.media.mime_type?.startsWith("image/"));
 const isVideo = computed(() => props.media.mime_type?.startsWith("video/"));
@@ -60,7 +65,7 @@ const displayName = computed(
       <!-- Image -->
       <img
         v-if="isImage"
-        :src="media.file"
+        :src="fileUrl"
         :alt="media.alt_text || displayName"
         class="size-full"
         :class="contain ? 'object-contain' : 'object-cover'"
@@ -71,7 +76,7 @@ const displayName = computed(
       <!-- Video -->
       <video
         v-else-if="isVideo"
-        :src="media.file"
+        :src="fileUrl"
         class="size-full object-cover"
         :controls="videoControls"
         :autoplay="videoAutoplay"
@@ -85,7 +90,7 @@ const displayName = computed(
         class="flex flex-col items-center gap-1 p-2 text-center"
       >
         <UIcon :name="iconName" class="size-8 text-dimmed" />
-        <audio v-if="videoControls" :src="media.file" controls class="w-full" />
+        <audio v-if="videoControls" :src="fileUrl" controls class="w-full" />
       </div>
 
       <!-- Generic file icon -->

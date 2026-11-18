@@ -43,12 +43,18 @@ const leaveGuards = vi.hoisted(() => [] as LeaveGuard[]);
 // One app instance for every call, as in an app: the extensions live on it.
 const nuxtApp = vi.hoisted(() => ({ $mapoFormRegistry: {} }));
 
+// The app's `mapo.uikit` runtime config, changed by the content-language tests.
+const runtimeConfig = vi.hoisted(() => ({
+  public: { mapoUikit: { contentLanguages: [] as string[] } },
+}));
+
 vi.mock("#app", () => ({
   useRouter: () => router,
   onBeforeRouteLeave: (guard: LeaveGuard) => {
     leaveGuards.push(guard);
   },
   useNuxtApp: () => nuxtApp,
+  useRuntimeConfig: () => runtimeConfig,
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 vi.mock("@mapomodule/core/runtime/api/crud", () => ({ useCrud: () => crud }));
@@ -197,6 +203,10 @@ const MapoForm: Component = {
   },
 };
 
+// The language switch the detail renders, with what it was given.
+let langSwitch: { readonly langs: string[]; readonly value: string } | null =
+  null;
+
 const stubs: Record<string, Component> = {
   UButton,
   UCard: passthrough("UCard"),
@@ -204,7 +214,24 @@ const stubs: Record<string, Component> = {
   UIcon: passthrough("UIcon"),
   UModal: passthrough("UModal"),
   MapoForm,
-  MapoDetailLangSwitch: passthrough("MapoDetailLangSwitch"),
+  MapoDetailLangSwitch: {
+    name: "MapoDetailLangSwitch",
+    props: { modelValue: String, langs: Array },
+    setup(props: { modelValue?: string; langs?: string[] }) {
+      langSwitch = {
+        get langs() {
+          return props.langs ?? [];
+        },
+        get value() {
+          return props.modelValue ?? "";
+        },
+      };
+      onUnmounted(() => {
+        langSwitch = null;
+      });
+      return () => h("div");
+    },
+  },
   MapoDetailExtensions,
 };
 
@@ -248,6 +275,7 @@ const finishNavigation = (failure?: Error) => {
 const record = { id: 5, title: "News" };
 
 beforeEach(() => {
+  runtimeConfig.public.mapoUikit.contentLanguages = [];
   router.back.mockReset();
   router.replace.mockReset();
   router.afterEach.mockReset();
@@ -1103,5 +1131,40 @@ describe("MapoDetail draft parts", () => {
     draft.touch();
     await autosave();
     expect(stored.size).toBe(0);
+  });
+});
+
+describe("MapoDetail content languages", () => {
+  it("keeps only the app's content languages, and hides a single one", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["it"];
+    mountDetail({}, { languages: ["it", "en"] });
+    await settle();
+
+    expect(langSwitch).toBeNull();
+  });
+
+  it("follows the app's order, so its first language is the starting one", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["en", "it"];
+    mountDetail({}, { languages: ["it", "en"] });
+    await settle();
+
+    expect(langSwitch?.langs).toEqual(["en", "it"]);
+    expect(langSwitch?.value).toBe("en");
+  });
+
+  it("never adds a language the page does not declare", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["it", "de"];
+    mountDetail({}, { languages: ["it", "en"] });
+    await settle();
+
+    expect(langSwitch).toBeNull();
+  });
+
+  it("lets forceLanguages bypass it", async () => {
+    runtimeConfig.public.mapoUikit.contentLanguages = ["it"];
+    mountDetail({}, { languages: ["it", "en"], forceLanguages: ["it", "en"] });
+    await settle();
+
+    expect(langSwitch?.langs).toEqual(["it", "en"]);
   });
 });

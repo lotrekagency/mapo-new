@@ -107,9 +107,17 @@ interface FieldBase<T> extends FieldExtensions {
   required?: boolean;
   /** Renders the field in read-only mode (no user input allowed). */
   readonly?: boolean;
-  /** `v-if` predicate — removes the field from the DOM entirely when `false`. */
+  /**
+   * `v-if` predicate — when `false`, removes the field from the DOM. Its grid
+   * cell in a form section, group, sub-tab or repeater item goes with it, so it
+   * leaves no gap. Inside a repeater item, `model` is the item.
+   */
   visible?: (ctx: { model: T }) => boolean;
-  /** `v-show` predicate — hides the field while keeping it in the DOM. */
+  /**
+   * `v-show` predicate — when `false`, hides the field and its grid cell in a
+   * form section, group, sub-tab or repeater item; the field stays mounted and
+   * keeps its state. Inside a repeater item, `model` is the item.
+   */
   show?: (ctx: { model: T }) => boolean;
   /** Callback fired after the field value changes. */
   onChange?: (ctx: { model: T; val: unknown }) => void;
@@ -332,6 +340,17 @@ export interface MapDescriptor<
 }
 
 /**
+ * How a template's preview `image` fits its picker card: the CSS `object-fit` values.
+ * `contain` shows the whole image, `cover` fills the card and crops the edges.
+ */
+export type RepeaterImageFit =
+  | "contain"
+  | "cover"
+  | "fill"
+  | "none"
+  | "scale-down";
+
+/**
  * A repeater block template with presentation metadata.
  * Use it instead of a bare field array to describe the block in the picker.
  */
@@ -346,6 +365,11 @@ export interface RepeaterTemplate {
   icon?: string;
   /** Preview image URL, shown in the picker card. Takes precedence over `wireframe` and `icon`. */
   image?: string;
+  /**
+   * How `image` fits the picker card (CSS `object-fit`). Default: the repeater's
+   * `attrs.templateImageFit`, else `contain`, which shows the whole image.
+   */
+  imageFit?: RepeaterImageFit;
   /** Draw a schematic preview generated from the template fields (used when there is no `image`). */
   wireframe?: boolean;
   /** Group name: the picker shows one filter chip per category. */
@@ -355,10 +379,11 @@ export interface RepeaterTemplate {
 /** A {@link RepeaterTemplate} normalized for display, with its key and defaults applied. @internal */
 export interface NormalizedRepeaterTemplate extends Omit<
   RepeaterTemplate,
-  "label"
+  "label" | "imageFit"
 > {
   key: string;
   label: string;
+  imageFit: RepeaterImageFit;
 }
 
 /** Descriptor for a drag-and-drop repeater with nested field descriptors. */
@@ -384,6 +409,11 @@ export interface RepeaterDescriptor<
      * modal when there are more than 3 templates.
      */
     picker?: "auto" | "select" | "modal";
+    /**
+     * How the templates' preview images fit the picker cards (CSS `object-fit`).
+     * A template's own `imageFit` wins. Default: `contain`.
+     */
+    templateImageFit?: RepeaterImageFit;
     /** Label shown when an item is collapsed. Receives the item and its index. */
     previewLabel?: (item: unknown, index: number) => string;
     confirmDelete?: boolean;

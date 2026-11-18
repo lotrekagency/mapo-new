@@ -8,6 +8,7 @@ import {
   resolveFieldAccessor,
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { isFieldRemoved, isFieldShown } from "../utils/tabVisibility.js";
 import { toFieldComponent } from "../utils/fieldComponent.js";
 import { valuePath } from "../utils/annotations.js";
 import { focusFieldControl } from "../utils/fieldFocus.js";
@@ -30,20 +31,13 @@ const model = form.model;
 
 // ─── Visibility ──────────────────────────────────────────────────────────────
 
-const isVisible = computed(() => {
-  if (
-    props.descriptor.visible &&
-    !props.descriptor.visible({ model: model.value })
-  )
-    return false;
-  return true;
-});
+// The same checks as the grid cell around the field, so a predicate that
+// throws hides the field instead of breaking the render.
+const isVisible = computed(
+  () => !isFieldRemoved(props.descriptor, model.value),
+);
 
-const showField = computed(() => {
-  if (props.descriptor.show && !props.descriptor.show({ model: model.value }))
-    return false;
-  return true;
-});
+const showField = computed(() => isFieldShown(props.descriptor, model.value));
 
 // ─── Value ───────────────────────────────────────────────────────────────────
 

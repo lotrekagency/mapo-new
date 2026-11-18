@@ -38,7 +38,8 @@ import type {
   UseFormFromSchemaOptions,
 } from "@mapomodule/form/types";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
-import { languagesFromMetadata } from "../utils/langInfo";
+import { languagesFromMetadata, restrictLanguages } from "../utils/langInfo";
+import { useContentLanguages } from "../utils/contentLanguages";
 import { holdsFormValue } from "../utils/formValues";
 import { DETAIL_KEY } from "../composables/useMapoDetail";
 import type { MapoDetailContext, MapoDetailDraftPart } from "../types/detail";
@@ -149,9 +150,9 @@ const props = withDefaults(
      */
     previewField?: string;
     /**
-     * Override the language list regardless of what `lang_info.site_languages`
-     * returns from the backend. Takes precedence over both `languages` prop and
-     * the auto-derived list.
+     * Override the language list regardless of what the backend declares
+     * (`lang_info.languages`). Takes precedence over the `languages` prop, the
+     * auto-derived list and the app's `mapo.uikit.contentLanguages`.
      */
     forceLanguages?: string[];
     /**
@@ -289,7 +290,10 @@ const isSaving = computed(() => {
   return savingAndLeaving || savingAndStaying;
 });
 const isDeleting = computed(() => pendingAction.value === "delete");
-const currentLang = ref(props.languages[0] ?? "");
+// Set by the `activeLangs` watcher below, to the first language actually
+// offered: `languages[0]` can be one `mapo.uikit.contentLanguages` hides or
+// puts later.
+const currentLang = ref("");
 const draftBanner = ref<{
   savedAt: Date;
   restore: () => void;
@@ -323,17 +327,25 @@ const mainCols = computed(() => 12 - props.sidebarCols);
 // metadata, so the host page doesn't hard-code a language list — and a model
 // that is not registered for translation shows no switcher at all, rather than
 // tabs whose extra values the backend would drop.
-// forceLanguages > props.languages > derived.
+// forceLanguages > (props.languages > derived), narrowed to the app's
+// `mapo.uikit.contentLanguages`.
 const derivedLangs = ref<string[]>([]);
+const contentLanguages = useContentLanguages();
 const activeLangs = computed<string[]>(() => {
   if (props.forceLanguages?.length) return props.forceLanguages;
-  if (props.languages.length) return props.languages;
-  return derivedLangs.value;
+  const declared = props.languages.length
+    ? props.languages
+    : derivedLangs.value;
+  return restrictLanguages(declared, contentLanguages);
 });
+// Start on the first language, and move there when the current one is not
+// offered (any more): the first of `languages` can be one the app hides.
 watch(
   activeLangs,
   (langs) => {
-    if (!currentLang.value && langs.length) currentLang.value = langs[0]!;
+    const isOffered = langs.includes(currentLang.value);
+    if (isOffered || !langs.length) return;
+    currentLang.value = langs[0]!;
   },
   { immediate: true },
 );

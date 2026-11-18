@@ -98,6 +98,15 @@ export default defineNuxtConfig({
       ...(isDevelopment ? { web: { allow: ["localhost:3000"] } } : {}),
     },
 
+    uikit: {
+      // Content languages editors may switch between, in order. Empty: every
+      // page keeps the languages it declares (it and en here). For a backoffice
+      // in one language, start the dev server with
+      // NUXT_PUBLIC_MAPO_UIKIT_CONTENT_LANGUAGES='["it"]': the language tabs of
+      // the articles, the menus and the media editor go away (see /i18n).
+      contentLanguages: [],
+    },
+
     i18n: {
       defaultLocale: "en",
       // `file` points at i18n/locales/<file>: those messages are deep-merged on

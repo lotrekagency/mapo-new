@@ -154,6 +154,8 @@ Use them to wire interactive UI without re-implementing state tracking:
 
 `#field.<key>` (no suffix) overrides the field component itself. Use it as a last resort — `descriptor.is` is usually cleaner because it preserves error/label rendering automatically.
 
+The field's `visible` and `show` predicates still apply: the slot fills the field's grid cell, which `visible` removes and `show` hides together with the slot content.
+
 ```vue
 <template #field.location="{ model }">
   <div class="rounded border p-4">
@@ -197,7 +199,7 @@ For every named group (set via `field.group`), two surrounding slots are availab
 </template>
 ```
 
-> `group.*` slots are forwarded from `MapoForm → MapoFormTabs` but are **not** passed into `MapoFormGroup` itself — they wrap the group from the outside.
+> `group.*` slots are forwarded from `MapoForm → MapoFormTabs` but are **not** passed into `MapoFormGroup` itself — they wrap the group from the outside, and they still render while the card does not (every field of the group hidden by `visible` or `show`).
 
 ## Per-tab slots
 

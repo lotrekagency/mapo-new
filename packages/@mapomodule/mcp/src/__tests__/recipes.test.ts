@@ -23,6 +23,7 @@ describe("matchRecipes", () => {
     ["protect the dashboard route with permissions", "auth-permissions"],
     ["how do the packages fit together", "concepts"],
     ["show a field only when another field is checked", "conditional-fields"],
+    ["a hidden field leaves an empty gap in the form", "conditional-fields"],
     ["autosave a draft while the user edits", "form-draft"],
     ["generate the fields from a json schema", "schema-to-form"],
     ["describe my form as a json schema", "form-to-schema"],
@@ -106,6 +107,8 @@ describe("matchRecipes", () => {
     ],
     ["how much does the AI cost per user this month", "ai-usage"],
     ["show the tokens used by each model", "ai-usage"],
+    ["limit the content languages to italian", "content-languages"],
+    ["hide the language tabs on a single language site", "content-languages"],
   ])("maps %j to the %j recipe", (query, expectedId) => {
     expect(matchRecipes(query)[0]?.id).toBe(expectedId);
   });

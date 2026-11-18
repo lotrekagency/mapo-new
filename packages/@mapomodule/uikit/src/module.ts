@@ -43,6 +43,23 @@ export interface MapoUikitOptions {
    * forwarded to `runtimeConfig.public.mapoMedia` and read by `useMediaStore`.
    */
   media?: MapoMediaOptions;
+
+  /**
+   * Content languages editors may switch between, in order: the language
+   * switches of `MapoDetail` (quick edit included), `MapoMenuManager` and the
+   * media editor keep only these, and start on the first. A language the
+   * backend or the page does not declare is never added; with a single
+   * language left, no switch is shown. `MapoDetail`'s `forceLanguages`
+   * bypasses it. Default: no restriction.
+   *
+   * Forwarded to `runtimeConfig.public.mapoUikit.contentLanguages`, so
+   * `NUXT_PUBLIC_MAPO_UIKIT_CONTENT_LANGUAGES` can set it per environment.
+   *
+   * @example
+   * // The backend translates into it and en; editors only see Italian.
+   * mapo: { uikit: { contentLanguages: ["it"] } }
+   */
+  contentLanguages?: string[];
 }
 
 export interface MapoMediaOptions {
@@ -137,6 +154,13 @@ export default defineNuxtModule<MapoUikitOptions>({
       nuxt.options.ui = { ...options.ui, ...(nuxt.options.ui ?? {}) };
     }
 
+    // Content languages → runtimeConfig.public.mapoUikit (read through
+    // useContentLanguages by the detail, the quick edit, the menu manager and
+    // the media store), so an environment variable can override them.
+    nuxt.options.runtimeConfig.public.mapoUikit = {
+      contentLanguages: options.contentLanguages ?? [],
+    };
+
     // Media config → runtimeConfig.public.mapoMedia (read by useMediaStore + uploader).
     // Only serializable values; the adapter functions go through the plugin below.
     const media = options.media ?? {};
@@ -183,6 +207,7 @@ export default defineNuxtModule<MapoUikitOptions>({
       "MapoDropArea",
       "MapoMediaBreadcrumbs",
       "MapoMediaFolders",
+      "MapoMediaFolderPicker",
       "MapoMediaGallery",
       "MapoMediaFileChanger",
       "MapoMediaEditor",

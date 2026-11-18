@@ -23,6 +23,7 @@ export type {
   MapDescriptor,
   RepeaterDescriptor,
   RepeaterTemplate,
+  RepeaterImageFit,
   MediaDescriptor,
   MediaM2mDescriptor,
   EnhancedMediaDescriptor,

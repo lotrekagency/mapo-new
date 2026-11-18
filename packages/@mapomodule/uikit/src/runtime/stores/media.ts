@@ -8,7 +8,20 @@ import { useMapoT } from "@mapomodule/i18n/runtime/composables/useMapoT";
 import { applyMultipartPolicy } from "@mapomodule/core/runtime/api/multipart";
 import { useNuxtApp, useRuntimeConfig } from "#app";
 import { defaultMediaAdapter } from "../adapters/defaultMediaAdapter.js";
-import { languagesFromMetadata } from "../utils/langInfo.js";
+import {
+  languagesFromMetadata,
+  pickLanguage,
+  restrictLanguages,
+} from "../utils/langInfo.js";
+import { useContentLanguages } from "../utils/contentLanguages.js";
+import { buildUploadBody } from "../utils/mediaMetadata.js";
+import {
+  canonicalFolder,
+  folderKey,
+  folderParentId,
+  folderPath,
+} from "../utils/mediaFolders.js";
+import type { MediaDrag } from "../utils/mediaDrag.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -62,6 +75,12 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const medias = ref<MediaItem[]>([]);
   const folders = ref<MediaFolder[]>([]);
   const parentFolders = ref<MediaFolder[]>([]);
+  /**
+   * Subfolders of every folder seen so far, keyed by `folderKey` (the folder
+   * id, `"root"` for the top level). The folder tree reads it: a branch shows
+   * what is cached and loads the rest when it opens.
+   */
+  const folderChildren = ref<Record<string, MediaFolder[]>>({});
   const page = ref(1);
   const pages = ref(1);
   const mimeType = ref<string | null>(null);
@@ -76,6 +95,24 @@ export const useMediaStore = defineStore("mapo-media", () => {
   const selection = shallowRef<MediaItem | MediaItem[] | null>(null);
   const editList = ref<number[]>([]);
   const selectMode = ref<SelectMode>("none");
+  /**
+   * Files handed to the uploader from outside it (dropped on the gallery,
+   * picked with "Upload here"): it queues them, for the folder on screen,
+   * when it opens.
+   */
+  const queuedUploads = shallowRef<File[]>([]);
+  /**
+   * Id of the folder `moveFolder` is moving, `null` when none: the folder
+   * tree disables its row actions meanwhile.
+   */
+  const movingFolderId = ref<number | null>(null);
+  /**
+   * What is being dragged in the manager (gallery cards or a folder of the
+   * tree), set by the drag source while the drag lasts: drop targets read it
+   * to tell whether they take it, as a drag's data is not readable before
+   * the drop.
+   */
+  const dragged = shallowRef<MediaDrag | null>(null);
 
   // ─── Internal navigation context ────────────────────────────────────────
   const _currentFolderId = ref<number | null>(null);
@@ -93,8 +130,34 @@ export const useMediaStore = defineStore("mapo-media", () => {
   // it a hardcoded list.
   const languages = ref<string[]>([]);
   let languagesPromise: Promise<void> | null = null;
+  // The host's own list (the manager's `languages` prop). Kept here, not in
+  // the editor, so the editor and the uploader always work on the same list.
+  const languageOverride = ref<string[]>([]);
+
+  // The app's `mapo.uikit.contentLanguages`, read once with the config.
+  const contentLanguages = useContentLanguages();
 
   // ─── Getters ──────────────────────────────────────────────────────────────
+  /**
+   * Languages the metadata is edited and uploaded in: the host's list, else
+   * the endpoint's, narrowed to the app's content languages.
+   */
+  const activeLanguages = computed(() =>
+    restrictLanguages(
+      languageOverride.value.length ? languageOverride.value : languages.value,
+      contentLanguages,
+    ),
+  );
+
+  /**
+   * Language the editor opens on and uploads write into: the preferred one
+   * (`setLang`) when offered, else the first. `""` when media are not
+   * translated.
+   */
+  const initialLanguage = computed(() =>
+    pickLanguage(activeLanguages.value, _currentLang.value),
+  );
+
   const parentFolder = computed(
     () => parentFolders.value[parentFolders.value.length - 1] ?? null,
   );
@@ -150,12 +213,43 @@ export const useMediaStore = defineStore("mapo-media", () => {
     return languagesPromise;
   }
 
+  /**
+   * An explorer response (the root or a folder) in the canonical shape: the
+   * adapter's `parseRootResponse`, then every folder with its parent as an id
+   * (`canonicalFolder`), whatever shape the adapter left it in.
+   */
+  function parseExplorer(raw: unknown): MediaApiResponse {
+    const a = adapter();
+    const data = (a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse)(
+      raw,
+    ) as MediaApiResponse;
+    const parentFolder = data.parent_folder;
+    return {
+      ...data,
+      folders: (data.folders ?? []).map(canonicalFolder),
+      parent_folder: parentFolder ? canonicalFolder(parentFolder) : null,
+    };
+  }
+
   // ─── Breadcrumb maintenance ─────────────────────────────────────────────
-  // Driven by the response's `parent_folder` (matches the legacy contract):
-  // push when entering a new folder, slice when navigating back up.
+  // Driven by the response's `parent_folder` (matches the legacy contract).
+  // The folder tree lets the user jump to any folder, so the path is read from
+  // the folder cache the tree fills; only a folder the cache cannot place
+  // falls back to the legacy rule: push when entering, slice when going back.
   function applyParentFolder(pf: MediaFolder | null): void {
-    if (!pf) {
+    // A folder without an id is the root too. Camomilla answers the root with
+    // an empty folder (`{ title: "", updir: null }`, DRF's serialization of no
+    // instance) rather than null; kept, it became a nameless breadcrumb and a
+    // "back to root" button on the root itself.
+    const isRoot = pf?.id == null;
+    if (isRoot) {
       parentFolders.value = [];
+      return;
+    }
+    const cachedPath = folderPath(folderChildren.value, pf.id);
+    if (cachedPath) {
+      // The response's copy of the folder itself is the fresh one.
+      parentFolders.value = [...cachedPath.slice(0, -1), pf];
       return;
     }
     const key = pf.path ?? pf.id;
@@ -200,18 +294,43 @@ export const useMediaStore = defineStore("mapo-media", () => {
           ? await crud.detail(folderId, { params: listParams })
           : await crud.list(listParams as never);
 
-      const data = (
-        a.parseRootResponse ?? defaultMediaAdapter.parseRootResponse
-      )(raw) as MediaApiResponse;
+      const data = parseExplorer(raw);
 
       medias.value = data.media.items;
       page.value = data.media.paginator.page;
       pages.value = data.media.paginator.pages;
       folders.value = data.folders;
+      // A library-wide view (search, mime filter) lists no folder's children.
+      if (!all) setFolderChildren(folderId, data.folders);
       applyParentFolder(data.parent_folder);
     } finally {
       loading.value = false;
     }
+  }
+
+  function setFolderChildren(id: number | null, children: MediaFolder[]) {
+    folderChildren.value = {
+      ...folderChildren.value,
+      [folderKey(id)]: children,
+    };
+  }
+
+  /**
+   * Load the subfolders of folder `id` (the root when `null`) into
+   * `folderChildren`, for the folder tree. It reads the same explorer
+   * endpoint as navigation, without changing the folder on screen.
+   */
+  async function loadFolderChildren(id: number | null): Promise<void> {
+    const a = adapter();
+    const params = (a.buildListParams ?? defaultMediaAdapter.buildListParams)({
+      page: 1,
+    });
+    const crud = folderCrud();
+    const raw =
+      id != null
+        ? await crud.detail(id, { params })
+        : await crud.list(params as never);
+    setFolderChildren(id, parseExplorer(raw).folders);
   }
 
   async function navigateToFolder(folder: MediaFolder | null): Promise<void> {
@@ -242,14 +361,31 @@ export const useMediaStore = defineStore("mapo-media", () => {
     _currentLang.value = lang;
   }
 
-  async function updateMedia(media: MediaItem): Promise<MediaItem> {
+  /** Impose the metadata languages instead of reading them from the endpoint; empty clears it. */
+  function setLanguages(langs: string[] | undefined): void {
+    languageOverride.value = langs ?? [];
+  }
+
+  /**
+   * Save the metadata of `media`. With `previous`, the media as it was when
+   * editing started, the default adapter sends only what changed; when nothing
+   * did, no request is made.
+   */
+  async function updateMedia(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Promise<MediaItem> {
     const a = adapter();
     const payload = (
       a.buildMediaPatchPayload ?? defaultMediaAdapter.buildMediaPatchPayload
-    )(media);
-    const updated = await mediaCrud().partialUpdate(media.id, payload as never);
-    // Keep the open editor in sync with the server response (legacy behavior).
-    if (editMedia.value?.id === media.id) editMedia.value = updated;
+    )(media, previous);
+    let updated = media;
+    const hasChanges = Object.keys(payload).length > 0;
+    if (hasChanges) {
+      updated = await mediaCrud().partialUpdate(media.id, payload as never);
+      // Keep the open editor in sync with the server response (legacy behavior).
+      if (editMedia.value?.id === media.id) editMedia.value = updated;
+    }
     useSnackStore().show(useMapoT()("mapo.mediaManager.fileInfo"), "success");
     await getRoot();
     return updated;
@@ -274,18 +410,150 @@ export const useMediaStore = defineStore("mapo-media", () => {
     return updated;
   }
 
+  /**
+   * Move media to folder `folderId` (the root when `null`), one PATCH each
+   * through the adapter. Reports how many moved and how many did not, drops
+   * the moved ones from the bulk selection and refreshes the folder on
+   * screen. Returns the ids that moved.
+   */
+  async function moveMedia(
+    ids: number[],
+    folderId: number | null,
+  ): Promise<number[]> {
+    const a = adapter();
+    const payload = (
+      a.buildMoveMediaPayload ?? defaultMediaAdapter.buildMoveMediaPayload
+    )(folderId);
+    const results = await Promise.allSettled(
+      ids.map((id) => mediaCrud().partialUpdate(id, payload as never)),
+    );
+    const moved = ids.filter((_, i) => results[i]?.status === "fulfilled");
+    const notMoved = ids.length - moved.length;
+
+    const t = useMapoT();
+    const snack = useSnackStore();
+    if (moved.length) {
+      snack.show(
+        t("mapo.mediaMove.moved", { number: moved.length }),
+        "success",
+      );
+    }
+    if (notMoved) {
+      snack.show(t("mapo.mediaMove.failed", { number: notMoved }), "error");
+    }
+    editList.value = editList.value.filter((id) => !moved.includes(id));
+    await getRoot();
+    return moved;
+  }
+
   async function updateOrCreateFolder(
     folder: Partial<MediaFolder>,
   ): Promise<void> {
     const a = adapter();
+    const target = { parent: _currentFolderId.value, ...folder };
     const payload = (
       a.buildFolderPayload ?? defaultMediaAdapter.buildFolderPayload
-    )({
-      parent: _currentFolderId.value,
-      ...folder,
-    });
+    )(target);
     await folderCrud().updateOrCreate(payload as never);
     await getRoot();
+    // The tree can rename a folder outside the one on screen: refresh the
+    // branch it lives in too.
+    const parentId = target.parent ?? null;
+    const isElsewhere = parentId !== _currentFolderId.value;
+    if (isElsewhere) await loadFolderChildren(parentId);
+  }
+
+  /**
+   * Move `folder` into folder `parentId` (the root when `null`), saving it
+   * with the adapter's folder payload (Camomilla: `updir`). A folder cannot go
+   * inside itself or one of its subfolders, and Camomilla does not check it
+   * (it would recurse): the picker never offers them, and this refuses them
+   * as far as the folder cache knows the tree. One move runs at a time
+   * (`movingFolderId`); another one asked meanwhile is refused. Refreshes the
+   * branch the folder left, the one it joined and the folder on screen, whose
+   * path may run through it. Returns whether it moved; rejects only when the
+   * final refresh of the folder on screen fails.
+   */
+  async function moveFolder(
+    folder: MediaFolder,
+    parentId: number | null,
+  ): Promise<boolean> {
+    // One move at a time: until the tree reloads, it still shows the folder
+    // in its old place, and a second move picked from it could close a cycle.
+    const isBusy = movingFolderId.value !== null;
+    if (isBusy) return false;
+    const fromId = folderParentId(folderChildren.value, folder);
+    const staysPut = fromId === parentId;
+    if (staysPut) return false;
+
+    const t = useMapoT();
+    const snack = useSnackStore();
+    const notMoved = () =>
+      snack.show(
+        t("mapo.mediaMove.folderFailed", { name: folder.name }),
+        "error",
+      );
+    // The picker already hides these; callers outside it are checked here.
+    const isSelf = parentId === folder.id;
+    const targetPath =
+      parentId == null
+        ? []
+        : (folderPath(folderChildren.value, parentId) ?? []);
+    const isInside = targetPath.some((f) => f.id === folder.id);
+    if (isSelf || isInside) {
+      notMoved();
+      return false;
+    }
+
+    movingFolderId.value = folder.id;
+    try {
+      const a = adapter();
+      const payload = (
+        a.buildFolderPayload ?? defaultMediaAdapter.buildFolderPayload
+      )({ ...folder, parent: parentId });
+      try {
+        await folderCrud().updateOrCreate(payload as never);
+      } catch {
+        notMoved();
+        return false;
+      }
+      snack.show(
+        t("mapo.mediaMove.folderMoved", { name: folder.name }),
+        "success",
+      );
+      // Out of every cached branch at once, whatever the reloads do: a stale
+      // branch must not offer the folder, or its subfolders, as a destination.
+      detachFolder(folder.id);
+      // The folder on screen reloads with `getRoot` below.
+      const isOnScreen = (id: number | null) =>
+        !_currentAll.value && id === _currentFolderId.value;
+      const [, joined] = await Promise.allSettled([
+        isOnScreen(fromId) ? null : loadFolderChildren(fromId),
+        isOnScreen(parentId) ? null : loadFolderChildren(parentId),
+      ]);
+      // Unknown again rather than wrong: the branch reloads when opened.
+      if (joined.status === "rejected") forgetFolderChildren(parentId);
+      await getRoot();
+      return true;
+    } finally {
+      movingFolderId.value = null;
+    }
+  }
+
+  /** Remove folder `id` from every cached branch. */
+  function detachFolder(id: number): void {
+    const next: Record<string, MediaFolder[]> = {};
+    for (const [key, children] of Object.entries(folderChildren.value)) {
+      next[key] = children.filter((child) => child.id !== id);
+    }
+    folderChildren.value = next;
+  }
+
+  /** Drop the cached subfolders of folder `id`: the tree loads them again. */
+  function forgetFolderChildren(id: number | null): void {
+    const rest = { ...folderChildren.value };
+    delete rest[folderKey(id)];
+    folderChildren.value = rest;
   }
 
   async function deleteFolder(folder: MediaFolder): Promise<void> {
@@ -297,8 +565,23 @@ export const useMediaStore = defineStore("mapo-media", () => {
       dangerous: true,
     });
     if (!confirmed) return;
+    const parentId = folderParentId(folderChildren.value, folder);
     await folderCrud().delete(folder.id);
+
+    const remaining = { ...folderChildren.value };
+    delete remaining[folderKey(folder.id)];
+    folderChildren.value = remaining;
+    // The folder on screen, or one above it, is gone: show its parent.
+    const isOnPath = parentFolders.value.some((f) => f.id === folder.id);
+    if (isOnPath) {
+      await navigateToFolder(
+        parentId == null ? null : { id: parentId, name: "" },
+      );
+      return;
+    }
     await getRoot();
+    const isElsewhere = parentId !== _currentFolderId.value;
+    if (isElsewhere) await loadFolderChildren(parentId);
   }
 
   async function deleteMedia(media: MediaItem): Promise<void> {
@@ -389,15 +672,14 @@ export const useMediaStore = defineStore("mapo-media", () => {
     payload: MediaUploadPayload,
     onProgress?: (percent: number) => void,
   ): Promise<MediaItem> {
+    // Translated media take their metadata as a translation, and only the
+    // endpoint's OPTIONS says whether they are: wait for that answer.
+    await deriveLanguages();
+    const body = buildUploadBody(payload, initialLanguage.value || undefined);
     // Build the body through the same multipart pipeline every other write uses
     // (`data` JSON envelope + files at their dot-path). Hand-rolling a flat
     // FormData here made uploads the only write that spoke a different wire
     // format, which backends parsing the envelope reject.
-    const body: Record<string, unknown> = { file: payload.file };
-    if (payload.title) body.title = payload.title;
-    if (payload.alt_text) body.alt_text = payload.alt_text;
-    if (payload.description) body.description = payload.description;
-    if (payload.folder != null) body.folder = payload.folder;
     const formData = applyMultipartPolicy(body, "force") as FormData;
 
     // ofetch has no upload-progress hook, so uploads go through XHR.
@@ -433,6 +715,18 @@ export const useMediaStore = defineStore("mapo-media", () => {
     });
   }
 
+  /** Hand files to the uploader, which queues them when it opens. */
+  function queueUploads(files: File[]): void {
+    queuedUploads.value = [...queuedUploads.value, ...files];
+  }
+
+  /** The files handed to the uploader, emptying the hand-over. */
+  function takeQueuedUploads(): File[] {
+    const files = queuedUploads.value;
+    queuedUploads.value = [];
+    return files;
+  }
+
   function setMimeType(mime: string | null): void {
     // A locked picker can narrow the filter but never widen it past the lock.
     mimeType.value = mime ?? lockedMime.value;
@@ -447,6 +741,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     medias.value = [];
     folders.value = [];
     parentFolders.value = [];
+    folderChildren.value = {};
     page.value = 1;
     pages.value = 1;
     mimeType.value = null;
@@ -456,9 +751,16 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection.value = null;
     editList.value = [];
     selectMode.value = "none";
+    queuedUploads.value = [];
+    dragged.value = null;
+    // `movingFolderId` is left to the move still running, if any: a manager
+    // opened meanwhile must not offer a second one before it lands.
     _currentFolderId.value = null;
     _currentSearch.value = "";
     _currentAll.value = false;
+    // Both come from the manager's props: the next manager sets its own.
+    _currentLang.value = undefined;
+    languageOverride.value = [];
   }
 
   return {
@@ -466,6 +768,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     medias,
     folders,
     parentFolders,
+    folderChildren,
     page,
     pages,
     mimeType,
@@ -475,8 +778,13 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selection,
     editList,
     selectMode,
+    queuedUploads,
+    movingFolderId,
+    dragged,
     languages,
     // getters
+    activeLanguages,
+    initialLanguage,
     parentFolder,
     editListSet,
     editListState,
@@ -484,12 +792,16 @@ export const useMediaStore = defineStore("mapo-media", () => {
     getRoot,
     deriveLanguages,
     navigateToFolder,
+    loadFolderChildren,
     openEditor,
     closeEditor,
     setLang,
+    setLanguages,
     updateMedia,
     replaceFile,
+    moveMedia,
     updateOrCreateFolder,
+    moveFolder,
     deleteFolder,
     deleteMedia,
     select,
@@ -499,6 +811,8 @@ export const useMediaStore = defineStore("mapo-media", () => {
     editSelectAll,
     deleteSelected,
     uploadMedia,
+    queueUploads,
+    takeQueuedUploads,
     setMimeType,
     lockMimeType,
     reset,

@@ -108,15 +108,15 @@ Workflow, options and caveats: [Testing changes in a consumer app](docs/contribu
 
 ### Build, checks and tests
 
-| Script                              | What it does                                                                                                                  |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm build`                        | Builds every workspace package through Turborepo, in dependency order: the packages, the apps and the docs site               |
-| `pnpm lint`                         | ESLint over every package's `src/`, and `ai`'s `eval/`                                                                        |
-| `pnpm typecheck`                    | `tsc --noEmit` for the TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`; the apps are checked by hand           |
-| `pnpm test`                         | Vitest in the packages that declare a `test` script: `utils`, `form` (without its component tests), `mcp` and `ai`            |
-| `pnpm exec vitest run`              | Every test file in the repository, including `core`, `store`, `uikit` and the component tests                                 |
+| Script | What it does |
+| --- | --- |
+| `pnpm build` | Builds every workspace package through Turborepo, in dependency order: the packages, the apps and the docs site |
+| `pnpm lint` | ESLint over every package's `src/`, and `ai`'s `eval/` |
+| `pnpm typecheck` | `tsc --noEmit` for the TypeScript packages, `vue-tsc --noEmit` for `form` and `uikit`; the apps are checked by hand |
+| `pnpm test` | Vitest in the packages that declare a `test` script: `utils`, `form`, `mcp` and `ai`, without the component tests |
+| `pnpm exec vitest run` | Every test file in the repository, including `core`, `store`, `uikit` and the component tests of `form` and `ai` |
 | `pnpm --filter @mapomodule/ai eval` | The AI module's evaluation set against a real model (opt-in; a cloud model costs money; with the mock it runs in `pnpm test`) |
-| `pnpm docs:build`                   | The documentation site                                                                                                        |
+| `pnpm docs:build` | The documentation site |
 
 Type declarations: `core`, `store`, `i18n` and `ai` emit them with `tsc -p tsconfig.build-types.json`, and `utils` with plain `tsc`. `form` and `uikit` use `vue-tsc`, then `scripts/clean-empty-vue-dts.mjs` deletes the empty `.vue.d.ts` stubs that would collapse app types to `any`. `mcp` gets its own from `nuxt-module-build` alone; its build also generates the knowledge base from `docs/` and the `uikit` and `form` sources.
 

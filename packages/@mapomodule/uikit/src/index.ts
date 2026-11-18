@@ -16,6 +16,7 @@ export type {
   MediaUploadPayload,
   SelectMode,
 } from "./runtime/types/media.js";
+export type { MediaDrag } from "./runtime/utils/mediaDrag.js";
 export type {
   MapoDetailContext,
   MapoDetailDraft,

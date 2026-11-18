@@ -66,7 +66,7 @@ Mapo follows Django REST Framework conventions. Any backend works if it speaks t
 | Lists        | `GET <endpoint>?page=&search=&ordering=` (plus your filters) returns `{ count, results }`.                                                                                                                     |
 | Details      | `GET <endpoint>/<id>/`, `POST` to create, `PATCH` with only the changed fields to update, `DELETE`. A 400 response keyed by field is shown on those fields.                                                    |
 | Permissions  | Django-style codenames such as `view_article` and `change_article`.                                                                                                                                            |
-| Translations | Translatable fields read and write `translations[<lang>].<field>` on the record.                                                                                                                               |
+| Translations | Translatable fields read and write `translations[<lang>].<field>` on the record; the languages come from `lang_info` on OPTIONS, narrowed by `mapo.uikit.contentLanguages`.                                    |
 | Media        | The media manager talks to media and folder endpoints through a replaceable adapter.                                                                                                                           |
 
 The details are in [Custom backend integration](/howto/backend-integration) and in [Auth & permissions](/howto/auth-permissions).

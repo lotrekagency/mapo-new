@@ -10,23 +10,33 @@ import type { FieldRevealRequest } from "../runtime/utils/reveal.js";
 import { createApp, findAll, headlessNode } from "./headlessRenderer.js";
 import type { HeadlessNode } from "./headlessRenderer.js";
 
+// The group reads whether groups start open from the app's config.
+const runtimeConfig = vi.hoisted(() => ({
+  public: { mapoForm: { groups: { expanded: true } } },
+}));
+
+// Keys of the fields the group renders: its body renders them only while the
+// group is expanded.
+const renderedFields = vi.hoisted(() => [] as string[]);
+
 // `useMapoForm.ts` pulls in `nuxt/app` through `useMapoT`, which cannot resolve
 // outside a Nuxt build. The group only injects the form context.
 vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
   useMapoT: () => (key: string) => key,
 }));
-// The group reads whether groups start open from the app's config.
-vi.mock("#app", () => ({ useRuntimeConfig: () => ({ public: {} }) }));
+vi.mock("#app", () => ({ useRuntimeConfig: () => runtimeConfig }));
 // The fields are out of scope: each renders its key, so a test sees which
-// ones the group shows.
+// ones the group shows, and notes it when it renders.
 vi.mock("../runtime/components/MapoFormField.vue", async () => {
   const { h: render } = await import("vue");
   return {
     default: {
       name: "MapoFormField",
       props: { descriptor: { type: Object, required: true } },
-      setup: (props: { descriptor: AnyFieldDescriptor }) => () =>
-        render("div", { "data-field": props.descriptor.key }),
+      setup(props: { descriptor: { key: string } }) {
+        renderedFields.push(props.descriptor.key);
+        return () => render("div", { "data-field": props.descriptor.key });
+      },
     },
   };
 });
@@ -35,13 +45,28 @@ const UIcon: Component = { render: () => h("i") };
 
 let app: App<HeadlessNode> | undefined;
 
+/** Mounts a group with one field; `initialExpanded` is passed only when given. */
+function mountGroup(props: { initialExpanded?: boolean } = {}) {
+  const root: Component = {
+    render: () =>
+      h(MapoFormGroup as Component, {
+        name: "seo",
+        fields: [{ key: "meta_title", type: "text" }],
+        ...props,
+      }),
+  };
+  app = createApp(root);
+  app.component("UIcon", UIcon);
+  app.mount(headlessNode());
+}
+
 interface GroupProps {
   fields: AnyFieldDescriptor[];
   subtabs?: Map<string, AnyFieldDescriptor[]>;
 }
 
 /** Mounts a closed group in a form whose `reveal` the test sets. */
-function mountGroup(
+function mountClosedGroup(
   reveal: Ref<FieldRevealRequest | undefined>,
   props: GroupProps,
 ) {
@@ -86,8 +111,10 @@ const request = (key: string): FieldRevealRequest => ({
 
 const field = (key: string): AnyFieldDescriptor => ({ key, type: "text" });
 
-// The group listens for Escape on the page, which the headless renderer has not.
 beforeEach(() => {
+  renderedFields.length = 0;
+  runtimeConfig.public.mapoForm.groups.expanded = true;
+  // The group listens for Escape on the page, which Node does not have.
   vi.stubGlobal("document", {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
@@ -101,10 +128,39 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("MapoFormGroup initial state", () => {
+  it("starts expanded when the prop is absent and groups.expanded is true", () => {
+    runtimeConfig.public.mapoForm.groups.expanded = true;
+    mountGroup();
+
+    expect(renderedFields).toEqual(["meta_title"]);
+  });
+
+  it("starts collapsed when the prop is absent and groups.expanded is false", () => {
+    runtimeConfig.public.mapoForm.groups.expanded = false;
+    mountGroup();
+
+    expect(renderedFields).toEqual([]);
+  });
+
+  it.each([
+    { initialExpanded: false, configExpanded: true, fields: [] },
+    { initialExpanded: true, configExpanded: false, fields: ["meta_title"] },
+  ])(
+    "an explicit initialExpanded $initialExpanded wins over groups.expanded $configExpanded",
+    ({ initialExpanded, configExpanded, fields }) => {
+      runtimeConfig.public.mapoForm.groups.expanded = configExpanded;
+      mountGroup({ initialExpanded });
+
+      expect(renderedFields).toEqual(fields);
+    },
+  );
+});
+
 describe("MapoFormGroup reveal", () => {
   it("opens when the form reveals one of its fields", async () => {
     const reveal = ref<FieldRevealRequest | undefined>();
-    const root = mountGroup(reveal, {
+    const root = mountClosedGroup(reveal, {
       fields: [field("title"), field("slug")],
     });
     expect(shownFields(root)).toEqual([]);
@@ -121,7 +177,7 @@ describe("MapoFormGroup reveal", () => {
       ["Basics", [field("name")]],
       ["More", [field("notes")]],
     ]);
-    const root = mountGroup(reveal, { fields: [], subtabs });
+    const root = mountClosedGroup(reveal, { fields: [], subtabs });
 
     reveal.value = request("notes");
     await nextTick();
@@ -131,7 +187,7 @@ describe("MapoFormGroup reveal", () => {
 
   it("stays closed for a field of another group", async () => {
     const reveal = ref<FieldRevealRequest | undefined>();
-    const root = mountGroup(reveal, { fields: [field("title")] });
+    const root = mountClosedGroup(reveal, { fields: [field("title")] });
 
     reveal.value = request("seo_title");
     await nextTick();

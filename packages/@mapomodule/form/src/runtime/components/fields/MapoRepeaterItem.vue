@@ -11,6 +11,7 @@ import { useMapoForm, injectMapoForm } from "../../composables/useMapoForm.js";
 import { useFocusMode } from "../../composables/useFocusMode.js";
 import { annotationGroups, entriesUnder } from "../../utils/annotations.js";
 import MapoFormAnnotationBadges from "../MapoFormAnnotationBadges.vue";
+import { isFieldRemoved, isFieldShown } from "../../utils/tabVisibility.js";
 import MapoFormField from "../MapoFormField.vue";
 
 const { t } = useI18n();
@@ -160,6 +161,25 @@ const itemAnnotationGroups = computed(() =>
   ),
 );
 
+// ─── Visibility ──────────────────────────────────────────────────────────────
+
+// Each field of the item sits in a grid cell, and the cell follows the field as
+// it does in a form section: `visible` removes it with the field, so it leaves
+// no gap in its row; `show` hides it and keeps the field mounted, with its
+// state. The predicates read the item's model, like the fields inside.
+const keptFields = computed(() =>
+  props.fields.filter((field) => !isFieldRemoved(field, localModel.value)),
+);
+
+function isShown(field: AnyFieldDescriptor): boolean {
+  return isFieldShown(field, localModel.value);
+}
+
+// With no field to show, the item body goes as well: empty, its padding would
+// still open a blank strip under the header.
+const hasKeptFields = computed(() => keptFields.value.length > 0);
+const hasShownFields = computed(() => keptFields.value.some(isShown));
+
 // ─── Preview label ────────────────────────────────────────────────────────────
 
 const label = computed(
@@ -178,6 +198,11 @@ const isCompressed = computed(() => {
   const hasMiniCard = !!miniCardAttrs.value?.miniCard;
   return hasMiniCard && (props.totalItems ?? 0) >= threshold;
 });
+
+// The item body renders while the item is open, not shrunk to its mini-card,
+// and `visible` keeps one of its fields.
+const isOpen = computed(() => expanded.value && !isCompressed.value);
+const rendersBody = computed(() => isOpen.value && hasKeptFields.value);
 
 const miniCard = computed(() =>
   miniCardAttrs.value?.miniCard?.(localModel.value, props.index),
@@ -437,9 +462,14 @@ function enterFocusMode() {
 
     <!-- ── Item body (fields) ──────────────────────────────────────────────── -->
     <!-- COL_SPAN: Tailwind v4 requires static classes — do not use dynamic template literals. -->
-    <div v-if="expanded && !isCompressed" class="grid grid-cols-12 gap-5 p-4">
+    <div
+      v-if="rendersBody"
+      v-show="hasShownFields"
+      class="grid grid-cols-12 gap-5 p-4"
+    >
       <div
-        v-for="field in fields"
+        v-for="field in keptFields"
+        v-show="isShown(field)"
         :key="field.key as string"
         :class="{
           'col-span-1': field.cols === 1,

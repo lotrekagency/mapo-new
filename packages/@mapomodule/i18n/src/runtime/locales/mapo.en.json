@@ -219,7 +219,6 @@
     },
     "mediaEditor": {
       "details": "Details",
-      "defaultLang": "Default",
       "openInNewTab": "Open in new tab",
       "confirmDelete": "Are you sure you want to delete \"{name}\"?"
     },
@@ -230,7 +229,6 @@
     },
     "mediaFolders": {
       "folders": "Folders",
-      "goBack": "Back to root",
       "noFolders": "No folders here... Create a new one!",
       "newFolder": "New folder",
       "folderName": "Folder name",
@@ -240,10 +238,22 @@
       "audioFolder": "Audio",
       "docFolder": "Documents",
       "deleteTitle": "Delete folder",
-      "confirmDelete": "Delete folder \"{name}\"? Media inside it will not be deleted."
+      "confirmDelete": "Delete folder \"{name}\" and everything it contains, subfolders and media?"
+    },
+    "mediaMove": {
+      "moveTo": "Move to…",
+      "title": "Move to folder",
+      "confirm": "Move here",
+      "moved": "Media moved: {number}",
+      "failed": "Media not moved: {number}",
+      "folderTitle": "Move folder \"{name}\" to",
+      "folderMoved": "Folder \"{name}\" moved",
+      "folderFailed": "Folder \"{name}\" not moved"
     },
     "mediaGallery": {
       "noMediaFound": "No media found",
+      "uploadHere": "Upload here",
+      "dropHint": "Drop files here to upload them to {folder}",
       "selectAll": "Select page",
       "deselectAll": "Deselect page",
       "nSelected": "{number} selected",

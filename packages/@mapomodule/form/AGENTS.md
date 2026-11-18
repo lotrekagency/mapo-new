@@ -54,8 +54,8 @@ src/
 ## Verify
 
 ```bash
-pnpm --filter @mapomodule/form test
-pnpm exec vitest run packages/@mapomodule/form   # from the root: also the *.component.test.ts files
+pnpm --filter @mapomodule/form test           # skips *.component.test.ts (no Vue plugin here)
+pnpm exec vitest run packages/@mapomodule/form # from the root: the component tests too
 pnpm --filter @mapomodule/form typecheck      # vue-tsc: templates are part of the gate
 pnpm --filter @mapomodule/form lint
 ```

@@ -234,6 +234,24 @@ export const RECIPES: Recipe[] = [
       "translatable descriptors, per-language models and the detail language switcher.",
   },
   {
+    id: "content-languages",
+    task: "Limit the content languages to a subset",
+    keywords: [
+      "contentLanguages",
+      "content languages",
+      "single language",
+      "italian",
+      "hide language tabs",
+      "lang_info",
+      "forceLanguages",
+    ],
+    doc: "uikit/form/i18n.md",
+    heading: "How to: limit the content languages",
+    seeAlso: ["uikit/detail.md", "uikit/menu-manager.md", "uikit/media.md"],
+    summary:
+      "mapo.uikit.contentLanguages narrows the languages of MapoDetail, the menu manager and the media editor; one left means no switch.",
+  },
+  {
     id: "media-manager",
     task: "Use the media manager and media fields",
     keywords: [
@@ -385,11 +403,12 @@ export const RECIPES: Recipe[] = [
       "matchesField",
       "depends on",
       "progressive disclosure",
+      "hidden",
     ],
     doc: "uikit/form/progressive-disclosure.md",
-    seeAlso: ["howto/form-advanced.md"],
+    seeAlso: ["howto/form-advanced.md", "uikit/form/index.md"],
     summary:
-      "visible and show predicates built with the when/matchesField matcher helpers.",
+      "visible and show predicates built with the when/matchesField matcher helpers; a group card, sub-tab or tab with no field to show leaves the layout.",
   },
   {
     id: "form-draft",

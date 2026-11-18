@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { humanFileSize } from "@mapomodule/utils";
 import { useMediaStore } from "../stores/media.js";
@@ -169,6 +169,13 @@ function clearAll() {
   });
   entries.value = [];
 }
+
+// Files dropped on the gallery or picked with "Upload here" wait in the store
+// until the uploader opens: queue them, for the folder on screen.
+onMounted(() => {
+  const queued = store.takeQueuedUploads();
+  if (queued.length) onFiles(queued);
+});
 
 onUnmounted(clearAll);
 </script>

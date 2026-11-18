@@ -15,6 +15,10 @@ import type { MediaItem } from "@mapomodule/form/types";
 export interface MediaFolder {
   id: number;
   name: string;
+  /**
+   * Id of the parent folder, `null` at the top level. The store reads a
+   * parent given as an object (Camomilla's nested `updir`) by its `id`.
+   */
   parent?: number | null;
   /**
    * Materialized path of the folder (e.g. "root/images/hero").
@@ -111,9 +115,23 @@ export interface MediaAdapter {
   buildFolderPayload?(folder: Partial<MediaFolder>): Record<string, unknown>;
   /**
    * Build the PATCH payload for a media metadata update.
-   * Default: `{ title, alt_text, description, translations }`.
+   *
+   * `previous` is the media as it was when editing started; the editor always
+   * passes it. Default: with `previous`, only the fields that changed, with
+   * `translations` narrowed to the changed languages and fields; without it,
+   * `{ title, alt_text, description, translations }`. An empty object skips
+   * the request.
    */
-  buildMediaPatchPayload?(media: MediaItem): Record<string, unknown>;
+  buildMediaPatchPayload?(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Record<string, unknown>;
+  /**
+   * Build the PATCH payload that moves a media to folder `folderId` (`null`
+   * is the root). Default: `{ folder: folderId }`, which Camomilla takes as
+   * it is.
+   */
+  buildMoveMediaPayload?(folderId: number | null): Record<string, unknown>;
   /**
    * Build the multipart PATCH payload for a file replacement.
    * @example

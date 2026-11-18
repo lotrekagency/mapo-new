@@ -5,6 +5,7 @@ import type {
   MediaItem,
   MediaListParamsContext,
 } from "../types/media.js";
+import { mediaMetadataPatch } from "../utils/mediaMetadata.js";
 
 /**
  * Default media adapter — plain REST semantics.
@@ -13,6 +14,7 @@ import type {
  * - Response: assumes the backend already returns the canonical
  *   `{ media: { items, paginator }, folders, parent_folder }` shape.
  * - Detail params: passes `language_code` when a language is active.
+ * - Metadata PATCH: only the edited fields when the pre-edit copy is known.
  *
  * Integrations override any subset of these via their own `$mapoMediaAdapter`
  * plugin (see `@mapomodule/mapo-integrations-camomilla`).
@@ -39,13 +41,21 @@ export const defaultMediaAdapter: Required<MediaAdapter> = {
     return { ...folder };
   },
 
-  buildMediaPatchPayload(media: MediaItem): Record<string, unknown> {
+  buildMediaPatchPayload(
+    media: MediaItem,
+    previous?: MediaItem,
+  ): Record<string, unknown> {
+    if (previous) return mediaMetadataPatch(media, previous);
     return {
       title: media.title,
       alt_text: media.alt_text,
       description: media.description,
       translations: media.translations,
     };
+  },
+
+  buildMoveMediaPayload(folderId: number | null): Record<string, unknown> {
+    return { folder: folderId };
   },
 
   buildReplaceFilePayload(

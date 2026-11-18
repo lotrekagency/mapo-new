@@ -140,3 +140,5 @@ export default defineNuxtConfig({
   },
 });
 ```
+
+The same block takes the options that are not about theming: `media` ([Media Manager](/uikit/media#configuration)) and `contentLanguages` ([content languages](/uikit/form/i18n#how-to-limit-the-content-languages)).
