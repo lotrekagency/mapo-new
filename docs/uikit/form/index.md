@@ -84,6 +84,8 @@ Use `subtab` to place a tab bar _inside_ a group card instead:
 
 `subtab` and `tab` are orthogonal — `subtab` organises fields within a group card; `tab` organises fields into top-level (or nested) tab panels.
 
+A field hidden by `visible` or `show` takes its grid cell with it, so it leaves no empty row and no gap in a row of `cols` fields. In the same way, a group card, a sub-tab and the grid of the fields without a group show only while one of their fields does. A sub-tab with nothing to show leaves the sub-tab bar, and while the sub-tab the user picked is hidden, the first shown one is open. What `visible` removes is not rendered; what `show` hides stays mounted, hidden, and keeps its state (→ [Progressive Disclosure](./progressive-disclosure.md#how-to-choose-between-visible-and-show)).
+
 ## Responsive columns
 
 Every field accepts a `cols` prop (1–12, on a 12-column grid):

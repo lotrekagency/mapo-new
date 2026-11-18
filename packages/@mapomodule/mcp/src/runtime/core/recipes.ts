@@ -367,11 +367,12 @@ export const RECIPES: Recipe[] = [
       "matchesField",
       "depends on",
       "progressive disclosure",
+      "hidden",
     ],
     doc: "uikit/form/progressive-disclosure.md",
-    seeAlso: ["howto/form-advanced.md"],
+    seeAlso: ["howto/form-advanced.md", "uikit/form/index.md"],
     summary:
-      "visible and show predicates built with the when/matchesField matcher helpers.",
+      "visible and show predicates built with the when/matchesField matcher helpers; a group card, sub-tab or tab with no field to show leaves the layout.",
   },
   {
     id: "form-draft",

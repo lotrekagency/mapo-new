@@ -28,14 +28,19 @@ vi.mock("../runtime/components/MapoFormField.vue", () => ({
 }));
 
 // Tests run in Node without a DOM. A renderer whose nodes are plain objects is
-// enough to mount the component; `querySelector` gives the field-expand
-// `Teleport` a target.
+// enough to mount the component; `style` takes what `v-show` writes, and
+// `querySelector` gives the field-expand `Teleport` a target.
 interface HeadlessNode {
   parent: HeadlessNode | null;
   children: HeadlessNode[];
+  style: Record<string, string>;
 }
 
-const headlessNode = (): HeadlessNode => ({ parent: null, children: [] });
+const headlessNode = (): HeadlessNode => ({
+  parent: null,
+  children: [],
+  style: {},
+});
 const body = headlessNode();
 
 const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({

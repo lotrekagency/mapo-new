@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  provide,
-  watchEffect,
-  onMounted,
-  onUnmounted,
-} from "vue";
+import { ref, computed, provide, onMounted, onUnmounted } from "vue";
 import { useRuntimeConfig } from "#app";
 import type {
   AnyFieldDescriptor,
   MapoFormRuntimeConfig,
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import {
+  isFieldRemoved,
+  isFieldShown,
+  pickActiveTab,
+} from "../utils/tabVisibility.js";
 import MapoFormField from "./MapoFormField.vue";
 
 // Vue reads an absent Boolean prop as `false` unless the prop declares a
@@ -20,9 +18,16 @@ import MapoFormField from "./MapoFormField.vue";
 // module option `groups.expanded` decides when no caller sets `initialExpanded`.
 const props = withDefaults(
   defineProps<{
+    /** Group identifier; the heading shows it when `label` is not set. */
     name: string;
+    /** Heading of the group card. */
     label?: string;
+    /** Fields of the group outside any sub-tab, in a 12-column grid. */
     fields: AnyFieldDescriptor[];
+    /**
+     * Sub-tab name → its fields, shown as a tab bar inside the card. A sub-tab
+     * with no field to show leaves the bar.
+     */
     subtabs?: Map<string, AnyFieldDescriptor[]>;
     /**
      * Whether the group starts expanded. When omitted, the module option
@@ -37,16 +42,6 @@ const globalExpanded: boolean =
   (useRuntimeConfig().public.mapoForm as MapoFormRuntimeConfig | undefined)
     ?.groups?.expanded ?? true;
 const expanded = ref(props.initialExpanded ?? globalExpanded);
-
-// ─── Sub-tabs inside the group ────────────────────────────────────────────────
-
-const activeSubtab = ref<string>("");
-// Initialise to first subtab when subtabs are provided.
-watchEffect(() => {
-  if (props.subtabs && props.subtabs.size > 0 && !activeSubtab.value) {
-    activeSubtab.value = [...props.subtabs.keys()][0] ?? "";
-  }
-});
 
 // ─── Field expand ────────────────────────────────────────────────────────────
 
@@ -74,9 +69,64 @@ onUnmounted(() => {
 
 provide("mapoGroupExpand", { expandField, collapseField, expandedFieldKey });
 
-const form = injectMapoForm();
+const form = injectMapoForm<Record<string, unknown>>();
 const model = computed(() => form?.model.value);
 const currentLang = computed(() => form?.currentLang.value ?? "");
+
+// ─── Visibility ──────────────────────────────────────────────────────────────
+
+// Each field sits in a grid cell, and the cell follows the field: `visible`
+// removes it with the field, so it leaves no gap in its row; `show` hides it
+// and keeps the field mounted, with its state. This holds for a cell filled by
+// the `field.<key>` slot too.
+const predicateModel = computed<Record<string, unknown>>(
+  () => model.value ?? {},
+);
+
+function keptOf(fields: AnyFieldDescriptor[]): AnyFieldDescriptor[] {
+  return fields.filter((field) => !isFieldRemoved(field, predicateModel.value));
+}
+
+function isShown(field: AnyFieldDescriptor): boolean {
+  return isFieldShown(field, predicateModel.value);
+}
+
+const keptFields = computed(() => keptOf(props.fields));
+
+// A sub-tab whose fields `visible` removes has no panel.
+const keptSubtabs = computed(() =>
+  [...(props.subtabs?.entries() ?? [])]
+    .map(([name, fields]) => ({ name, fields: keptOf(fields) }))
+    .filter((subtab) => subtab.fields.length > 0),
+);
+
+// Like the form's tabs, a sub-tab with no field to show leaves the sub-tab bar.
+const shownSubtabs = computed(() =>
+  keptSubtabs.value.filter((subtab) => subtab.fields.some(isShown)),
+);
+
+const hasKeptFlatFields = computed(() => keptFields.value.length > 0);
+const hasKeptSubtabs = computed(() => keptSubtabs.value.length > 0);
+const hasShownFlatFields = computed(() => keptFields.value.some(isShown));
+const hasShownSubtabs = computed(() => shownSubtabs.value.length > 0);
+
+// The card follows its fields the way a cell does: not rendered while `visible`
+// removes them all, hidden while none of the others shows.
+const hasKeptFields = computed(
+  () => hasKeptFlatFields.value || hasKeptSubtabs.value,
+);
+const hasShownFields = computed(
+  () => hasShownFlatFields.value || hasShownSubtabs.value,
+);
+
+// ─── Sub-tabs inside the group ────────────────────────────────────────────────
+
+// The sub-tab the user clicked; until then, or while it is hidden, the first
+// shown sub-tab is open.
+const pickedSubtab = ref<string | null>(null);
+const activeSubtab = computed(() =>
+  pickActiveTab(shownSubtabs.value, pickedSubtab.value),
+);
 
 // ─── Col-span lookup ─────────────────────────────────────────────────────────
 
@@ -177,8 +227,11 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
     </Transition>
   </Teleport>
 
-  <!-- Regular group (kept in the DOM so the provide stays active) -->
+  <!-- Regular group: not rendered while `visible` removes all its fields,
+       hidden while none of the others shows. -->
   <div
+    v-if="hasKeptFields"
+    v-show="hasShownFields"
     class="mapo-form-group relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
   >
     <!-- Collapsible heading -->
@@ -198,14 +251,17 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
 
     <!-- Body -->
     <div v-if="expanded">
-      <!-- Flat fields (no subtab) -->
+      <!-- Flat fields (no subtab); the sub-tab area below brings its own top
+           padding. -->
       <div
-        v-if="fields.length"
-        class="grid grid-cols-12 gap-5 px-5 pb-5 pt-4"
-        :class="{ 'pb-0': subtabs && subtabs.size > 0 }"
+        v-if="hasKeptFlatFields"
+        v-show="hasShownFlatFields"
+        class="grid grid-cols-12 gap-5 px-5 pt-4"
+        :class="hasShownSubtabs ? 'pb-0' : 'pb-5'"
       >
         <div
-          v-for="field in fields"
+          v-for="field in keptFields"
+          v-show="isShown(field)"
           :key="field.key as string"
           :class="colClass(field.cols)"
         >
@@ -225,34 +281,41 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
       </div>
 
       <!-- Sub-tab bar + content (when subtabs are present) -->
-      <div v-if="subtabs && subtabs.size > 0" class="px-5 pb-5 pt-4">
+      <div
+        v-if="hasKeptSubtabs"
+        v-show="hasShownSubtabs"
+        class="px-5 pb-5 pt-4"
+      >
         <!-- Sub-tab bar -->
-        <div class="mb-4 flex flex-wrap gap-1 border-b border-gray-200">
+        <div
+          class="mapo-form-subtab-bar mb-4 flex flex-wrap gap-1 border-b border-gray-200"
+        >
           <button
-            v-for="[subtabName] of subtabs"
-            :key="subtabName"
+            v-for="subtab in shownSubtabs"
+            :key="subtab.name"
             type="button"
             class="relative max-w-full px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none"
             :class="[
-              activeSubtab === subtabName
+              activeSubtab === subtab.name
                 ? 'text-primary-600 border-b-2 border-primary-600 -mb-px'
                 : 'text-gray-500 hover:text-gray-700',
             ]"
-            @click="activeSubtab = subtabName"
+            @click="pickedSubtab = subtab.name"
           >
-            {{ subtabName }}
+            {{ subtab.name }}
           </button>
         </div>
 
         <!-- Sub-tab fields -->
         <div
-          v-for="[subtabName, subtabFields] of subtabs"
-          v-show="activeSubtab === subtabName"
-          :key="subtabName"
+          v-for="subtab in keptSubtabs"
+          v-show="activeSubtab === subtab.name"
+          :key="subtab.name"
           class="grid grid-cols-12 gap-5"
         >
           <div
-            v-for="field in subtabFields"
+            v-for="field in subtab.fields"
+            v-show="isShown(field)"
             :key="field.key as string"
             :class="colClass(field.cols)"
           >

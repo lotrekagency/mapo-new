@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AnyFieldDescriptor } from "../runtime/types/index.js";
 import type { TabEntry } from "../runtime/types/layout.js";
 import {
+  isFieldRemoved,
   isFieldShown,
   pickActiveTab,
   tabHasShownFields,
@@ -27,6 +28,19 @@ const tab = (
 const hasTemplate = ({ model }: { model: Record<string, unknown> }) =>
   Boolean(model.template);
 
+describe("isFieldRemoved", () => {
+  it("removes a field only through `visible`", () => {
+    expect(isFieldRemoved(field("title"), {})).toBe(false);
+    expect(
+      isFieldRemoved(field("body", { visible: hasTemplate }), { template: "" }),
+    ).toBe(true);
+    // `show` hides the field but keeps it in the form.
+    expect(
+      isFieldRemoved(field("body", { show: hasTemplate }), { template: "" }),
+    ).toBe(false);
+  });
+});
+
 describe("isFieldShown", () => {
   it("shows a field without predicates", () => {
     expect(isFieldShown(field("title"), {})).toBe(true);
@@ -41,6 +55,19 @@ describe("isFieldShown", () => {
   it("hides a field that `show` hides", () => {
     const body = field("body", { show: hasTemplate });
     expect(isFieldShown(body, { template: "" })).toBe(false);
+  });
+
+  it("hides a field whose predicate throws, without throwing itself", () => {
+    // Reads a nested value the model does not have yet, as on a new record.
+    const seoEnabled = ({ model }: { model: Record<string, unknown> }) =>
+      (model.seo as { enabled: boolean }).enabled;
+    const removed = field("seo_title", { visible: seoEnabled });
+    const hidden = field("seo_title", { show: seoEnabled });
+
+    expect(isFieldRemoved(removed, { seo: null })).toBe(true);
+    expect(isFieldShown(removed, { seo: null })).toBe(false);
+    expect(isFieldRemoved(hidden, { seo: null })).toBe(false);
+    expect(isFieldShown(hidden, { seo: null })).toBe(false);
   });
 });
 

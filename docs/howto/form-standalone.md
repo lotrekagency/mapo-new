@@ -366,7 +366,7 @@ Override or extend any field's rendering:
 
 | Slot                   | Description                                                 |
 | ---------------------- | ----------------------------------------------------------- |
-| `#field.{key}`         | Replace the entire field cell                               |
+| `#field.{key}`         | Replace the field cell; `visible` and `show` still apply    |
 | `#field.{key}.before`  | Content injected before the field widget, within its column |
 | `#field.{key}.after`   | Content injected after the field widget, within its column  |
 | `#field.{key}.label`   | Replace just the label                                      |
