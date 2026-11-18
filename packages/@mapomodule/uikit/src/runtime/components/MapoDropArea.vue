@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { isMediaDrag } from "../utils/mediaDrag.js";
 
 const { t } = useI18n();
 
@@ -28,8 +29,11 @@ let dragCounter = 0;
 // Only files dragged in from the computer are drops for this area: an element
 // dragged inside the page (a gallery card, a selection being reordered) is
 // left to whatever handles it, with no overlay and no default prevented.
+// Chrome reports an image dragged from the page as "Files" too, so a drag the
+// media manager started is told apart by its own data type.
 function carriesFiles(e: DragEvent): boolean {
-  return Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  const hasFiles = Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  return hasFiles && !isMediaDrag(e);
 }
 
 function onDragEnter(e: DragEvent) {

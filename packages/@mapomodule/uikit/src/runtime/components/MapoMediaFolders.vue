@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useMediaStore } from "../stores/media.js";
 import {
   ROOT_FOLDER_KEY,
   buildFolderTree,
+  canMoveFolderTo,
   findFolderNode,
   folderKey,
   folderNodeIcon,
   type FolderNode,
 } from "../utils/mediaFolders.js";
+import { startMediaDrag, type MediaDrag } from "../utils/mediaDrag.js";
 import type { MediaFolder } from "../types/media.js";
 
 const { t } = useI18n();
@@ -192,6 +194,97 @@ function onMoveConfirm(target: MediaFolder | null) {
   if (!folder) return;
   return store.moveFolder(folder, target?.id ?? null);
 }
+
+// ─── Dragging onto the tree ──────────────────────────────────────────────────
+
+// Gallery cards and folders dropped on a row move into that folder, by the
+// same store actions as "Move to…". A folder is not taken by itself, its
+// subfolders or the folder it is in, nor while another folder moves.
+const dropKey = ref<string | null>(null);
+// A closed branch opens when a drag rests on it, to reach its subfolders.
+const OPEN_ON_HOVER_MS = 700;
+let openTimer: ReturnType<typeof setTimeout> | undefined;
+
+function canDragRow(node: FolderNode): boolean {
+  return !!node.folder && !isRenaming(node) && !isMoving.value;
+}
+
+function canDropOn(node: FolderNode): boolean {
+  const drag = store.dragged;
+  if (!drag || node.pending) return false;
+  if (drag.kind === "media") return true;
+  if (isMoving.value) return false;
+  const targetId = node.folder?.id ?? null;
+  return canMoveFolderTo(store.folderChildren, drag.folder, targetId);
+}
+
+function onRowDragStart(event: DragEvent, node: FolderNode) {
+  if (!node.folder || !canDragRow(node)) return;
+  const drag: MediaDrag = { kind: "folder", folder: node.folder };
+  startMediaDrag(event, drag);
+  store.dragged = drag;
+}
+
+// For dragenter and dragover alike: a drop target cancels both.
+function onRowDragOver(event: DragEvent, node: FolderNode) {
+  if (!canDropOn(node)) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  if (dropKey.value === node.key) return;
+  dropKey.value = node.key;
+  openWhenResting(node);
+}
+
+function onRowDragLeave(event: DragEvent, node: FolderNode) {
+  // Passing from the row's icon to its label is no leave.
+  const row = event.currentTarget as HTMLElement | null;
+  const into = event.relatedTarget as HTMLElement | null;
+  if (row && into && row.contains(into)) return;
+  if (dropKey.value !== node.key) return;
+  dropKey.value = null;
+  clearTimeout(openTimer);
+}
+
+// Returns the move so Vue's error handling sees a failure.
+function onRowDrop(event: DragEvent, node: FolderNode) {
+  const drag = store.dragged;
+  if (!drag || !canDropOn(node)) return;
+  event.preventDefault();
+  store.dragged = null;
+  const targetId = node.folder?.id ?? null;
+  if (drag.kind === "media") return store.moveMedia(drag.ids, targetId);
+  return store.moveFolder(drag.folder, targetId);
+}
+
+// Ends a drag started on a row, dropped or not.
+function onRowDragEnd() {
+  store.dragged = null;
+}
+
+function openWhenResting(node: FolderNode) {
+  clearTimeout(openTimer);
+  const isOpen = expanded.value.includes(node.key);
+  const hasBranch = !!node.children?.length;
+  if (isOpen || !hasBranch) return;
+  openTimer = setTimeout(() => {
+    expanded.value = [...expanded.value, node.key];
+    const isLoaded = store.folderChildren[node.key] !== undefined;
+    if (isLoaded) return;
+    store.loadFolderChildren(node.folder?.id ?? null).catch(() => {});
+  }, OPEN_ON_HOVER_MS);
+}
+
+// However a drag ends (dropped, cancelled, from the gallery or a row), the
+// highlight and a pending branch opening go with it.
+watch(
+  () => store.dragged,
+  (drag) => {
+    if (drag) return;
+    dropKey.value = null;
+    clearTimeout(openTimer);
+  },
+);
+onBeforeUnmount(() => clearTimeout(openTimer));
 </script>
 
 <template>
@@ -271,9 +364,24 @@ function onMoveConfirm(target: MediaFolder | null) {
         @toggle="onToggleNode"
       >
         <!-- The whole row is the tree item, so the rename and delete buttons
-             sit next to the label instead of inside another button. -->
+             sit next to the label instead of inside another button. The row
+             is also where folders are dragged from and media and folders are
+             dropped. -->
         <template #item-wrapper="{ item, expanded: isOpen, selected, ui }">
-          <div :class="ui.link({ selected, disabled: !!item.pending })">
+          <div
+            :class="[
+              ui.link({ selected, disabled: !!item.pending }),
+              dropKey === item.key &&
+                'bg-primary/10 ring-1 ring-inset ring-primary',
+            ]"
+            :draggable="canDragRow(item)"
+            @dragstart="onRowDragStart($event, item)"
+            @dragend="onRowDragEnd"
+            @dragenter="onRowDragOver($event, item)"
+            @dragover="onRowDragOver($event, item)"
+            @dragleave="onRowDragLeave($event, item)"
+            @drop="onRowDrop($event, item)"
+          >
             <UIcon
               :name="folderNodeIcon(item, isOpen)"
               :class="[ui.linkLeadingIcon(), item.pending && 'animate-spin']"

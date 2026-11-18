@@ -16,11 +16,12 @@ import {
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
 import {
-  ROOT_FOLDER_KEY,
   canonicalFolder,
   folderKey,
+  folderParentId,
   folderPath,
 } from "../utils/mediaFolders.js";
+import type { MediaDrag } from "../utils/mediaDrag.js";
 import type {
   MediaItem,
   MediaFolder,
@@ -105,6 +106,13 @@ export const useMediaStore = defineStore("mapo-media", () => {
    * tree disables its row actions meanwhile.
    */
   const movingFolderId = ref<number | null>(null);
+  /**
+   * What is being dragged in the manager (gallery cards or a folder of the
+   * tree), set by the drag source while the drag lasts: drop targets read it
+   * to tell whether they take it, as a drag's data is not readable before
+   * the drop.
+   */
+  const dragged = shallowRef<MediaDrag | null>(null);
 
   // ─── Internal navigation context ────────────────────────────────────────
   const _currentFolderId = ref<number | null>(null);
@@ -474,7 +482,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     // in its old place, and a second move picked from it could close a cycle.
     const isBusy = movingFolderId.value !== null;
     if (isBusy) return false;
-    const fromId = cachedParentId(folder);
+    const fromId = folderParentId(folderChildren.value, folder);
     const staysPut = fromId === parentId;
     if (staysPut) return false;
 
@@ -532,20 +540,6 @@ export const useMediaStore = defineStore("mapo-media", () => {
     }
   }
 
-  /**
-   * The parent of `folder` as the tree shows it: the cached branch that lists
-   * it, else its `parent`, which a backend may leave out.
-   */
-  function cachedParentId(folder: MediaFolder): number | null {
-    const entries = Object.entries(folderChildren.value);
-    const branch = entries.find(([, children]) =>
-      children.some((child) => child.id === folder.id),
-    );
-    if (!branch) return folder.parent ?? null;
-    const isRoot = branch[0] === ROOT_FOLDER_KEY;
-    return isRoot ? null : Number(branch[0]);
-  }
-
   /** Remove folder `id` from every cached branch. */
   function detachFolder(id: number): void {
     const next: Record<string, MediaFolder[]> = {};
@@ -571,7 +565,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
       dangerous: true,
     });
     if (!confirmed) return;
-    const parentId = cachedParentId(folder);
+    const parentId = folderParentId(folderChildren.value, folder);
     await folderCrud().delete(folder.id);
 
     const remaining = { ...folderChildren.value };
@@ -758,6 +752,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     editList.value = [];
     selectMode.value = "none";
     queuedUploads.value = [];
+    dragged.value = null;
     // `movingFolderId` is left to the move still running, if any: a manager
     // opened meanwhile must not offer a second one before it lands.
     _currentFolderId.value = null;
@@ -785,6 +780,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     selectMode,
     queuedUploads,
     movingFolderId,
+    dragged,
     languages,
     // getters
     activeLanguages,

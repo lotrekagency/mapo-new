@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   ROOT_FOLDER_KEY,
   buildFolderTree,
+  canMoveFolderTo,
   canonicalFolder,
   findFolderNode,
   folderKey,
   folderNodeIcon,
+  folderParentId,
   folderPath,
 } from "../runtime/utils/mediaFolders";
 import type { MediaFolder } from "../runtime/types/media";
@@ -156,5 +158,47 @@ describe("canonicalFolder", () => {
     const child = folder(3, "Hero", 1);
     expect(canonicalFolder(top)).toBe(top);
     expect(canonicalFolder(child)).toBe(child);
+  });
+});
+
+describe("folderParentId", () => {
+  const cache = { root: [folder(1, "Photos")], 1: [folder(3, "Hero")] };
+
+  it("reads the parent from the branch that lists the folder", () => {
+    expect(folderParentId(cache, folder(3, "Hero"))).toBe(1);
+    expect(folderParentId(cache, folder(1, "Photos", 9))).toBeNull();
+  });
+
+  it("falls back to the folder's own parent when no branch lists it", () => {
+    expect(folderParentId(cache, folder(5, "Elsewhere", 2))).toBe(2);
+    expect(folderParentId(cache, folder(5, "Elsewhere"))).toBeNull();
+  });
+});
+
+describe("canMoveFolderTo", () => {
+  // Root: Photos (1) > Hero (3) > Night (4); Videos (2).
+  const cache = {
+    root: [folder(1, "Photos"), folder(2, "Videos")],
+    1: [folder(3, "Hero", 1)],
+    3: [folder(4, "Night", 3)],
+  };
+  const photos = folder(1, "Photos");
+  const hero = folder(3, "Hero", 1);
+
+  it("refuses the folder itself and every folder under it", () => {
+    expect(canMoveFolderTo(cache, photos, 1)).toBe(false);
+    expect(canMoveFolderTo(cache, photos, 3)).toBe(false);
+    expect(canMoveFolderTo(cache, photos, 4)).toBe(false);
+  });
+
+  it("refuses the folder it is already in", () => {
+    expect(canMoveFolderTo(cache, photos, null)).toBe(false);
+    expect(canMoveFolderTo(cache, hero, 1)).toBe(false);
+  });
+
+  it("takes any other folder, the root included", () => {
+    expect(canMoveFolderTo(cache, photos, 2)).toBe(true);
+    expect(canMoveFolderTo(cache, hero, null)).toBe(true);
+    expect(canMoveFolderTo(cache, hero, 2)).toBe(true);
   });
 });

@@ -5,6 +5,7 @@ import { humanFileSize } from "@mapomodule/utils";
 import { useRuntimeConfig } from "#app";
 import { usePermissions } from "@mapomodule/store/runtime/composables/usePermissions";
 import { useMediaStore } from "../stores/media.js";
+import { startMediaDrag, type MediaDrag } from "../utils/mediaDrag.js";
 import type { MediaFolder, MediaItem } from "../types/media.js";
 
 const emit = defineEmits<{
@@ -94,6 +95,30 @@ function onDragOverItem(index: number) {
 
 function onDragEnd() {
   dragIndex.value = null;
+}
+
+// A card dropped on a folder of the tree moves there (`MapoMediaFolders` takes
+// the drop); a card of the bulk selection takes the whole selection with it.
+// Same rule as "Move to…": managing, with the change permission.
+const canDragCards = computed(() => !isPickerMode.value && canMove.value);
+
+function onCardDragStart(event: DragEvent, media: MediaItem) {
+  // The card's image is draggable on its own, even where the card is not.
+  if (!canDragCards.value) return;
+  const isSelected = store.editListSet.has(media.id);
+  const ids = isSelected ? [...store.editList] : [media.id];
+  const drag: MediaDrag = { kind: "media", ids };
+  startMediaDrag(event, drag);
+  store.dragged = drag;
+}
+
+function onCardDragEnd() {
+  store.dragged = null;
+}
+
+function isDragged(media: MediaItem): boolean {
+  const drag = store.dragged;
+  return drag?.kind === "media" && drag.ids.includes(media.id);
 }
 </script>
 
@@ -241,8 +266,12 @@ function onDragEnd() {
               'ring-2 ring-primary ring-offset-1': store.editListSet.has(
                 media.id,
               ),
+              'opacity-50': isDragged(media),
             }"
+            :draggable="canDragCards"
             @click="onClickItem(media)"
+            @dragstart="onCardDragStart($event, media)"
+            @dragend="onCardDragEnd"
           >
             <!-- Preview -->
             <div class="aspect-square">

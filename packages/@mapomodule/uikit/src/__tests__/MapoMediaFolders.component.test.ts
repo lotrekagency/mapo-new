@@ -7,6 +7,7 @@ import type { Pinia } from "pinia";
 import MapoMediaFolders from "../runtime/components/MapoMediaFolders.vue";
 import { useMediaStore } from "../runtime/stores/media";
 import { findFolderNode, type FolderNode } from "../runtime/utils/mediaFolders";
+import { MEDIA_DRAG_TYPE } from "../runtime/utils/mediaDrag";
 import type { MediaFolder } from "../runtime/types/media";
 
 const crud = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const crud = vi.hoisted(() => ({
   list: vi.fn(),
   detail: vi.fn(),
   updateOrCreate: vi.fn(),
+  partialUpdate: vi.fn(),
 }));
 
 vi.mock("#app", () => ({
@@ -33,13 +35,19 @@ vi.mock("@mapomodule/i18n/runtime/composables/useMapoT", () => ({
 }));
 
 // Tests run in Node without a DOM. A renderer whose nodes are plain objects is
-// enough to mount the component with real reactivity, watchers and events.
+// enough to mount the component with real reactivity, watchers and events;
+// each element keeps its props, so the tests can call its listeners.
 interface HeadlessNode {
   parent: HeadlessNode | null;
   children: HeadlessNode[];
+  props: Record<string, unknown>;
 }
 
-const headlessNode = (): HeadlessNode => ({ parent: null, children: [] });
+const headlessNode = (): HeadlessNode => ({
+  parent: null,
+  children: [],
+  props: {},
+});
 
 const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
   createElement: headlessNode,
@@ -47,7 +55,9 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
   createComment: headlessNode,
   setText: () => {},
   setElementText: () => {},
-  patchProp: () => {},
+  patchProp(node, key, _previous, next) {
+    node.props[key] = next;
+  },
   insert(child, parent, anchor) {
     child.parent = parent;
     const at = anchor ? parent.children.indexOf(anchor) : -1;
@@ -69,7 +79,7 @@ const Row: Component = {
   props: { rowKey: String },
   setup(props: { rowKey?: string }, { slots }: SetupContext) {
     provide(ROW_KEY, props.rowKey);
-    return () => h("div", null, slots.default?.());
+    return () => h("div", { "data-row": props.rowKey }, slots.default?.());
   },
 };
 const flatten = (nodes: FolderNode[]): FolderNode[] =>
@@ -282,14 +292,49 @@ const rowButton = (row: string, label: string) =>
 
 let app: App<HeadlessNode> | undefined;
 let pinia: Pinia;
+let root: HeadlessNode;
 
 async function mountFolders() {
   await useMediaStore().getRoot({ page: 1 });
+  root = headlessNode();
   app = createApp({ render: () => h(MapoMediaFolders as Component) });
   app.use(pinia);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
-  app.mount(headlessNode());
+  app.mount(root);
   await settle();
+}
+
+const all = (node: HeadlessNode): HeadlessNode[] => [
+  node,
+  ...node.children.flatMap(all),
+];
+// The element of a row: what the `#item-wrapper` slot renders for that node.
+const rowElement = (key: string) =>
+  all(root).find((node) => node.props["data-row"] === key)?.children[0];
+
+// A drag event over a row; `accepted` tells whether the row took it.
+function dragOn(
+  key: string,
+  listener: "onDragover" | "onDrop" | "onDragstart",
+) {
+  let accepted = false;
+  const data: Record<string, string> = {};
+  const event = {
+    preventDefault: () => (accepted = true),
+    currentTarget: null,
+    relatedTarget: null,
+    dataTransfer: {
+      types: [MEDIA_DRAG_TYPE],
+      dropEffect: "none",
+      effectAllowed: "all",
+      setData: (type: string, value: string) => (data[type] = value),
+    },
+  };
+  const handler = rowElement(key)?.props[listener] as
+    | ((e: unknown) => unknown)
+    | undefined;
+  const result = handler?.(event);
+  return { accepted, data, result };
 }
 
 beforeEach(() => {
@@ -405,5 +450,70 @@ describe("MapoMediaFolders moving a folder", () => {
     accept({ ...photos, parent: 2 });
     await settle();
     expect(rowButton("2", "mapo.mediaMove.moveTo")?.disabled).toBe(false);
+  });
+});
+
+describe("MapoMediaFolders dropping on the tree", () => {
+  const hero: MediaFolder = { id: 3, name: "Hero", parent: 1 };
+
+  it("moves dragged media into the folder dropped on, root included", async () => {
+    crud.partialUpdate.mockResolvedValue({});
+    await mountFolders();
+    const store = useMediaStore();
+    store.dragged = { kind: "media", ids: [7, 8] };
+
+    expect(dragOn("root", "onDragover").accepted).toBe(true);
+    await dragOn("2", "onDrop").result;
+
+    expect(crud.partialUpdate).toHaveBeenCalledWith(7, { folder: 2 });
+    expect(crud.partialUpdate).toHaveBeenCalledWith(8, { folder: 2 });
+    expect(store.dragged).toBeNull();
+  });
+
+  it("drags a folder from its row and moves it where it is dropped", async () => {
+    crud.updateOrCreate.mockResolvedValue({ ...photos, parent: 2 });
+    crud.detail.mockResolvedValue(explorer([], videos));
+    await mountFolders();
+    const store = useMediaStore();
+
+    const start = dragOn("1", "onDragstart");
+    expect(start.data[MEDIA_DRAG_TYPE]).toBeDefined();
+    expect(store.dragged).toEqual({ kind: "folder", folder: photos });
+    await dragOn("2", "onDrop").result;
+
+    expect(crud.updateOrCreate).toHaveBeenCalledWith({ ...photos, parent: 2 });
+  });
+
+  // Camomilla does not check a move inside the folder itself, and recurses.
+  it("takes no folder on itself, its subfolders or where it already is", async () => {
+    await mountFolders();
+    const store = useMediaStore();
+    store.folderChildren = { ...store.folderChildren, 1: [hero] };
+    await settle();
+    store.dragged = { kind: "folder", folder: photos };
+
+    const taken = ["1", "3", "root", "2"].map(
+      (key) => dragOn(key, "onDragover").accepted,
+    );
+    await dragOn("3", "onDrop").result;
+
+    expect(taken).toEqual([false, false, false, true]);
+    expect(crud.updateOrCreate).not.toHaveBeenCalled();
+  });
+
+  it("highlights the row a drop would land on, until the drag ends", async () => {
+    await mountFolders();
+    const store = useMediaStore();
+    store.dragged = { kind: "media", ids: [7] };
+    const highlighted = () =>
+      String(rowElement("2")?.props.class).includes("ring-primary");
+
+    dragOn("2", "onDragover");
+    await settle();
+    expect(highlighted()).toBe(true);
+
+    store.dragged = null;
+    await settle();
+    expect(highlighted()).toBe(false);
   });
 });

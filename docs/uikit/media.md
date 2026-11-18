@@ -52,11 +52,11 @@ const fields: FieldDescriptor[] = [
 useMediaStore (Pinia)
     │
     ├── MapoMediaManager          ← orchestrator shell
-    │     ├── MapoMediaFolders    ← folder tree (create, rename, move, delete)
-    │     │                          + MIME filters
+    │     ├── MapoMediaFolders    ← folder tree (create, rename, move, delete,
+    │     │                          drop target) + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
     │     ├── MapoMediaGallery    ← CSS grid + bulk ops (move, delete) + pagination,
-    │     │                          Upload here + file drop
+    │     │                          Upload here + file drop, cards dragged to the tree
     │     ├── MapoMediaEditor     ← side drawer for metadata, move
     │     ├── MapoMediaFolderPicker ← folder tree dialog (move destination)
     │     └── MapoMediaUploader   ← drop area + per-file title, alt text,
@@ -291,22 +291,23 @@ Auto-imported Pinia store available throughout the app.
 
 ### State
 
-| Property         | Type                               | Description                                                                |
-| ---------------- | ---------------------------------- | -------------------------------------------------------------------------- |
-| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                           |
-| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                           |
-| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree             |
-| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache     |
-| `page` / `pages` | `number`                           | Pagination                                                                 |
-| `mimeType`       | `string \| null`                   | Active MIME filter                                                         |
-| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it   |
-| `loading`        | `boolean`                          | Fetch in progress                                                          |
-| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                   |
-| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                   |
-| `editList`       | `number[]`                         | IDs flagged for bulk operations                                            |
-| `selectMode`     | `SelectMode`                       | Selection mode                                                             |
-| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens          |
-| `movingFolderId` | `number \| null`                   | Folder `moveFolder` is moving; the tree disables its row actions meanwhile |
+| Property         | Type                               | Description                                                                                    |
+| ---------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                                               |
+| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                                               |
+| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree                                 |
+| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache                         |
+| `page` / `pages` | `number`                           | Pagination                                                                                     |
+| `mimeType`       | `string \| null`                   | Active MIME filter                                                                             |
+| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it                       |
+| `loading`        | `boolean`                          | Fetch in progress                                                                              |
+| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                                       |
+| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                                       |
+| `editList`       | `number[]`                         | IDs flagged for bulk operations                                                                |
+| `selectMode`     | `SelectMode`                       | Selection mode                                                                                 |
+| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens                              |
+| `movingFolderId` | `number \| null`                   | Folder `moveFolder` is moving; the tree disables its row actions meanwhile                     |
+| `dragged`        | `MediaDrag \| null`                | What is being dragged in the manager: `{ kind: "media", ids }` or `{ kind: "folder", folder }` |
 
 ### Getters
 
@@ -386,6 +387,8 @@ In `multi` mode the gallery shows a **selection strip** above the grid: click a 
 
 The grid of the folder on screen, with the selection strip (pickers), the bulk bar and pagination. Its first row tells where uploads land, the folder on screen, and has **Upload here**, which opens the file picker; files dragged in from the computer can be dropped anywhere on the gallery. Either way the files wait in `store.queuedUploads` and the gallery emits `upload`. The manager then opens the Upload tab, which queues them for the folder on screen, with title, alt text and description to fill in before uploading.
 
+A card dragged onto a folder of the tree, the root included, moves there through `store.moveMedia`, as **Move to…** does; a card of the bulk selection takes the whole selection with it, and the dragged cards are dimmed while the drag lasts. Cards drag under the same rule as **Move to…**: in the manager (not in a picker), with the `change` permission.
+
 Emits: `upload` (no payload). No props.
 
 ### `<MapoMediaFolderPicker>`
@@ -406,6 +409,8 @@ Emits `update:open` and `confirm` with the folder picked (`MediaFolder`, or `nul
 ### `<MapoMediaFolders>`
 
 The folder panel of the manager: the MIME filters, then the folders as a tree (Nuxt UI `UTree`) under a root node. A branch loads its subfolders when it opens (`store.loadFolderChildren`), through the same explorer endpoint as navigation; the folder on screen is selected and the path to it stays open. Clicking a folder opens it in the gallery; rename, move and delete sit on its row, and a new folder is created in the folder on screen. No props.
+
+The tree is also where drags land. A folder dragged by its row and dropped on another moves there through `store.moveFolder`; gallery cards dropped on a row move into that folder. The row a drop would land on is highlighted, and a closed branch opens when a drag rests on it, to reach its subfolders. A folder is not taken by itself, its subfolders or the folder it is already in, and nothing is taken while a folder moves. **Move to…** stays the way to move from the keyboard. Drags inside the manager carry the `MEDIA_DRAG_TYPE` data type, and the dragged item sits in `store.dragged` until the drag ends, since a drag's data is not readable before the drop.
 
 Deleting a folder asks for confirmation and warns that its subfolders and media go with it: Camomilla deletes them (`on_delete=CASCADE` on both relations), so the message does not promise otherwise. A backend that keeps them only makes the warning stricter than needed.
 
@@ -450,7 +455,7 @@ Standalone drag-and-drop area, reusable outside the media manager.
 </MapoDropArea>
 ```
 
-Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`. It reacts only to files dragged in from the computer: an element dragged inside the page (a gallery card, a selection being reordered) shows no overlay and is not prevented.
+Props: `accept` (default `*/*`), `multiple` (default `true`), `disabled`. Emits `files` (`File[]`). Slot `default` receives `{ triggerPick, isDragging }`. It reacts only to files dragged in from the computer: an element dragged inside the page (a gallery card, a selection being reordered) shows no overlay and is not prevented. Chrome reports an image dragged from the page as `Files` too, so a drag the media manager starts, which carries its own data type, is ignored even then.
 
 ### `<MapoMediaPreview>`
 

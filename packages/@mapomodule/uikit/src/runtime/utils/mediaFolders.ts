@@ -108,6 +108,43 @@ export function folderNodeIcon(node: FolderNode, isOpen: boolean): string {
 }
 
 /**
+ * The parent of `folder` as the tree shows it: the cached branch that lists
+ * it, else its `parent`, which a backend may leave out.
+ */
+export function folderParentId(
+  folderChildren: Record<string, MediaFolder[]>,
+  folder: MediaFolder,
+): number | null {
+  const entries = Object.entries(folderChildren);
+  const branch = entries.find(([, children]) =>
+    children.some((child) => child.id === folder.id),
+  );
+  if (!branch) return folder.parent ?? null;
+  const isRoot = branch[0] === ROOT_FOLDER_KEY;
+  return isRoot ? null : Number(branch[0]);
+}
+
+/**
+ * Whether `folder` can move into folder `targetId` (the root when `null`):
+ * not into itself or one of its subfolders, as far as the cache knows the
+ * tree, and not where it already is.
+ */
+export function canMoveFolderTo(
+  folderChildren: Record<string, MediaFolder[]>,
+  folder: MediaFolder,
+  targetId: number | null,
+): boolean {
+  const isSelf = targetId === folder.id;
+  if (isSelf) return false;
+  const targetPath =
+    targetId == null ? [] : (folderPath(folderChildren, targetId) ?? []);
+  const isInside = targetPath.some((f) => f.id === folder.id);
+  if (isInside) return false;
+  const staysPut = folderParentId(folderChildren, folder) === targetId;
+  return !staysPut;
+}
+
+/**
  * The path to folder `id` read from the `folderChildren` cache: its ancestors
  * from the top level down, then the folder itself. `undefined` when the cache
  * cannot place it, or one of its ancestors, or meets a cycle.
