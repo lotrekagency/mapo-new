@@ -167,6 +167,31 @@ function isRenaming(node: FolderNode): boolean {
   const renamingId = editingFolder.value?.id;
   return renamingId != null && node.folder?.id === renamingId;
 }
+
+// ─── Moving a folder ─────────────────────────────────────────────────────────
+
+const movingFolder = ref<MediaFolder | null>(null);
+const pickerOpen = ref(false);
+// While a move runs the tree still shows the folder in its old place: the row
+// actions wait for it (the store refuses a second move anyway).
+const isMoving = computed(() => store.movingFolderId !== null);
+// The picker hides the folder with everything under it: a folder cannot go
+// inside itself or one of its subfolders.
+const pickerExclude = computed(() =>
+  movingFolder.value ? [movingFolder.value.id] : [],
+);
+
+function startMove(folder: MediaFolder) {
+  movingFolder.value = folder;
+  pickerOpen.value = true;
+}
+
+// Returns the move so Vue's error handling sees a failure.
+function onMoveConfirm(target: MediaFolder | null) {
+  const folder = movingFolder.value;
+  if (!folder) return;
+  return store.moveFolder(folder, target?.id ?? null);
+}
 </script>
 
 <template>
@@ -301,7 +326,18 @@ function isRenaming(node: FolderNode): boolean {
                 variant="ghost"
                 color="neutral"
                 :aria-label="t('mapo.edit')"
+                :disabled="isMoving"
                 @click.stop="startEdit(item.folder)"
+              />
+              <UButton
+                icon="i-lucide-folder-input"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :aria-label="t('mapo.mediaMove.moveTo')"
+                :disabled="isMoving"
+                :loading="store.movingFolderId === item.folder.id"
+                @click.stop="startMove(item.folder)"
               />
               <UButton
                 icon="i-lucide-trash-2"
@@ -309,6 +345,7 @@ function isRenaming(node: FolderNode): boolean {
                 variant="ghost"
                 color="error"
                 :aria-label="t('mapo.delete')"
+                :disabled="isMoving"
                 @click.stop="store.deleteFolder(item.folder)"
               />
             </span>
@@ -322,5 +359,12 @@ function isRenaming(node: FolderNode): boolean {
         </p>
       </template>
     </div>
+
+    <MapoMediaFolderPicker
+      v-model:open="pickerOpen"
+      :title="t('mapo.mediaMove.folderTitle', { name: movingFolder?.name })"
+      :exclude="pickerExclude"
+      @confirm="onMoveConfirm"
+    />
   </div>
 </template>

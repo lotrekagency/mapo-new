@@ -370,25 +370,75 @@ export function deleteMediaItem(id: number): boolean {
   return true;
 }
 
+// A folder's path is its parent's path and its own slug, as in Camomilla.
+function folderPathOf(folder: MockFolder): string {
+  const slug = folder.name.toLowerCase().replace(/\s+/g, "-");
+  const parent = mockFolders.find((f) => f.id === folder.parent);
+  return parent ? `${parent.path}/${slug}` : slug;
+}
+
+// Recomputes the path of `folder` and of everything under it.
+function refreshFolderPaths(folder: MockFolder): void {
+  folder.path = folderPathOf(folder);
+  for (const child of mockFolders.filter((f) => f.parent === folder.id)) {
+    refreshFolderPaths(child);
+  }
+}
+
 export function addFolder(data: Partial<MockFolder>): MockFolder {
-  const name = data.name ?? "New folder";
   const folder: MockFolder = {
     id: ++folderIdSeq,
-    name,
+    name: data.name ?? "New folder",
     parent: data.parent ?? null,
-    path: name.toLowerCase().replace(/\s+/g, "-"),
+    path: "",
   };
+  folder.path = folderPathOf(folder);
   mockFolders.push(folder);
   return folder;
 }
 
+/**
+ * Why a write to folder `id` must be refused, or null. The new parent must
+ * exist and must not be the folder itself or one of its subfolders: a real
+ * backend has to refuse that move (Camomilla does not, and recurses).
+ */
+export function folderWriteError(
+  id: number,
+  data: Partial<MockFolder>,
+): string | null {
+  // An unknown folder is the handler's 404, as DRF looks it up first.
+  const exists = mockFolders.some((f) => f.id === id);
+  if (!exists) return null;
+  if (data.parent == null) return null;
+  const parentId = Number(data.parent);
+  const parentExists = mockFolders.some((f) => f.id === parentId);
+  if (!parentExists) return "The parent folder does not exist.";
+  // Walk up from the new parent: meeting the folder means a cycle.
+  let current: number | null = parentId;
+  while (current != null) {
+    if (current === id) {
+      return "A folder cannot go inside itself or one of its subfolders.";
+    }
+    const above: MockFolder | undefined = mockFolders.find(
+      (f) => f.id === current,
+    );
+    current = above?.parent ?? null;
+  }
+  return null;
+}
+
+/** Renames or moves a folder: only `name` and `parent` are written. */
 export function updateFolder(
   id: number,
   data: Partial<MockFolder>,
 ): MockFolder | null {
   const existing = mockFolders.find((f) => f.id === id);
   if (!existing) return null;
-  Object.assign(existing, data);
+  if (data.name !== undefined) existing.name = data.name;
+  if (data.parent !== undefined) {
+    existing.parent = data.parent == null ? null : Number(data.parent);
+  }
+  refreshFolderPaths(existing);
   return existing;
 }
 

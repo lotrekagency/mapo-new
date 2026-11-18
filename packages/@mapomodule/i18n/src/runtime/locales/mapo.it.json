@@ -244,7 +244,10 @@
       "title": "Sposta nella cartella",
       "confirm": "Sposta qui",
       "moved": "Media spostati: {number}",
-      "failed": "Media non spostati: {number}"
+      "failed": "Media non spostati: {number}",
+      "folderTitle": "Sposta la cartella \"{name}\" in",
+      "folderMoved": "Cartella \"{name}\" spostata",
+      "folderFailed": "Cartella \"{name}\" non spostata"
     },
     "mediaGallery": {
       "noMediaFound": "Nessun media trovato",

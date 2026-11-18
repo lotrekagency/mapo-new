@@ -428,3 +428,142 @@ describe("media store — a parent folder given as an object", () => {
     expect(crud.detail).toHaveBeenLastCalledWith(1, { params: { page: 1 } });
   });
 });
+
+describe("media store — moveFolder", () => {
+  const explorer = (folders: MediaFolder[], parentFolder: unknown = null) => ({
+    media: { items: [], paginator: { page: 1, pages: 1 } },
+    folders,
+    parent_folder: parentFolder,
+  });
+  const photos: MediaFolder = { id: 1, name: "Photos", parent: null };
+  const videos: MediaFolder = { id: 2, name: "Videos", parent: null };
+  const hero: MediaFolder = { id: 3, name: "Hero", parent: 1 };
+  const moved: MediaFolder = { ...hero, parent: 2 };
+  // The folders endpoint once Hero has moved under Videos.
+  const afterMove: Record<number, unknown> = {
+    1: explorer([], photos),
+    2: explorer([moved], videos),
+    3: explorer([], moved),
+  };
+  const backendAfterMove = (id: number) => Promise.resolve(afterMove[id]);
+
+  it("saves the folder under its new parent, then reloads both branches", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    crud.updateOrCreate.mockResolvedValue(moved);
+    crud.detail.mockImplementation(backendAfterMove);
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+
+    const ok = await store.moveFolder(hero, 2);
+
+    expect(ok).toBe(true);
+    expect(crud.updateOrCreate).toHaveBeenCalledWith(moved);
+    expect(store.folderChildren[1]).toEqual([]);
+    expect(store.folderChildren[2]).toEqual([moved]);
+    expect(snack.show).toHaveBeenCalledWith(
+      "mapo.mediaMove.folderMoved",
+      "success",
+    );
+  });
+
+  it("follows the folder on screen to its new place", async () => {
+    crud.list.mockResolvedValue(explorer([photos, videos]));
+    crud.detail
+      .mockResolvedValueOnce(explorer([hero], photos))
+      .mockResolvedValueOnce(explorer([], hero));
+    const store = useMediaStore();
+    await store.getRoot({ page: 1 });
+    await store.navigateToFolder(photos);
+    await store.navigateToFolder(hero);
+    crud.updateOrCreate.mockResolvedValue(moved);
+    crud.detail.mockImplementation(backendAfterMove);
+
+    await store.moveFolder(hero, 2);
+
+    expect(store.parentFolders.map((f) => f.name)).toEqual(["Videos", "Hero"]);
+  });
+
+  it("makes no request for a folder that stays where it is", async () => {
+    const ok = await useMediaStore().moveFolder(hero, 1);
+
+    expect(ok).toBe(false);
+    expect(crud.updateOrCreate).not.toHaveBeenCalled();
+  });
+
+  it("reports a folder the backend refused, and reloads nothing", async () => {
+    crud.updateOrCreate.mockRejectedValue(new Error("400"));
+
+    const ok = await useMediaStore().moveFolder(hero, 2);
+
+    expect(ok).toBe(false);
+    expect(snack.show).toHaveBeenCalledWith(
+      "mapo.mediaMove.folderFailed",
+      "error",
+    );
+    expect(crud.detail).not.toHaveBeenCalled();
+    expect(crud.list).not.toHaveBeenCalled();
+  });
+
+  // Camomilla does not check it, and recurses: the store refuses it even
+  // from a caller that skips the picker.
+  it("refuses to move a folder into itself or one of its subfolders", async () => {
+    const store = useMediaStore();
+    store.folderChildren = { root: [photos, videos], 1: [hero] };
+
+    expect(await store.moveFolder(photos, 1)).toBe(false);
+    expect(await store.moveFolder(photos, 3)).toBe(false);
+
+    expect(crud.updateOrCreate).not.toHaveBeenCalled();
+    expect(snack.show).toHaveBeenCalledWith(
+      "mapo.mediaMove.folderFailed",
+      "error",
+    );
+  });
+
+  // Until the branches reload, the tree shows the folder in its old place:
+  // a second move picked from it could close a cycle.
+  it("moves one folder at a time", async () => {
+    let accept: (value: unknown) => void = () => {};
+    crud.updateOrCreate.mockReturnValueOnce(
+      new Promise((resolve) => (accept = resolve)),
+    );
+    crud.detail.mockImplementation(backendAfterMove);
+    const store = useMediaStore();
+    store.folderChildren = { root: [photos, videos], 1: [hero] };
+
+    const first = store.moveFolder(hero, 2);
+    expect(store.movingFolderId).toBe(3);
+    expect(await store.moveFolder(videos, 1)).toBe(false);
+    accept(moved);
+
+    expect(await first).toBe(true);
+    expect(crud.updateOrCreate).toHaveBeenCalledTimes(1);
+    expect(store.movingFolderId).toBeNull();
+  });
+
+  it("takes the old parent from the tree when the folder has none", async () => {
+    const bare: MediaFolder = { id: 3, name: "Hero" };
+    crud.updateOrCreate.mockResolvedValue(moved);
+    crud.detail.mockImplementation(backendAfterMove);
+    const store = useMediaStore();
+    store.folderChildren = { root: [photos, videos], 1: [bare] };
+
+    await store.moveFolder(bare, 2);
+
+    expect(crud.detail).toHaveBeenCalledWith(1, { params: { page: 1 } });
+    expect(crud.detail).toHaveBeenCalledWith(2, { params: { page: 1 } });
+  });
+
+  it("leaves no branch showing the folder in its old place", async () => {
+    crud.updateOrCreate.mockResolvedValue(moved);
+    crud.detail.mockRejectedValue(new Error("network"));
+    const store = useMediaStore();
+    store.folderChildren = { root: [photos, videos], 1: [hero], 2: [] };
+
+    expect(await store.moveFolder(hero, 2)).toBe(true);
+
+    // The old branch drops it; the new one, not reloaded, loads again later.
+    expect(store.folderChildren[1]).toEqual([]);
+    expect(store.folderChildren[2]).toBeUndefined();
+  });
+});

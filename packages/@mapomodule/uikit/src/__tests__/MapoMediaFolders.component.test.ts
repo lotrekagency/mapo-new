@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRenderer, h, onUnmounted } from "vue";
+import { createRenderer, h, inject, onUnmounted, provide } from "vue";
 import type { App, Component, SetupContext } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import type { Pinia } from "pinia";
@@ -13,6 +13,7 @@ const crud = vi.hoisted(() => ({
   options: vi.fn(),
   list: vi.fn(),
   detail: vi.fn(),
+  updateOrCreate: vi.fn(),
 }));
 
 vi.mock("#app", () => ({
@@ -61,9 +62,25 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
     node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
 });
 
+// The row a button is drawn in, provided by the `UTree` stub.
+const ROW_KEY = Symbol("row");
+const Row: Component = {
+  name: "Row",
+  props: { rowKey: String },
+  setup(props: { rowKey?: string }, { slots }: SetupContext) {
+    provide(ROW_KEY, props.rowKey);
+    return () => h("div", null, slots.default?.());
+  },
+};
+const flatten = (nodes: FolderNode[]): FolderNode[] =>
+  nodes.flatMap((node) => [node, ...flatten(node.children ?? [])]);
+// The tree's class getters (`ui.link()`, …): no classes in a headless render.
+const treeUi = new Proxy({}, { get: () => () => "" });
+
 // `UTree` declares the contract the folders panel binds: `items`,
 // `modelValue` and `expanded` in, `onSelect` / `onToggle` called with Reka's
-// event and the node. A click in Reka selects, then toggles.
+// event and the node. A click in Reka selects, then toggles. Every node is
+// drawn through `#item-wrapper`, so its row buttons exist.
 interface TreeStub {
   readonly items: FolderNode[];
   readonly selectedKey: string | undefined;
@@ -84,16 +101,19 @@ const UTree: Component = {
     onSelect: Function,
     onToggle: Function,
   },
-  setup(props: {
-    items?: FolderNode[];
-    modelValue?: FolderNode;
-    expanded?: string[];
-    onSelect?: (e: { preventDefault(): void }, node: FolderNode) => void;
-    onToggle?: (
-      e: { detail: { isExpanded: boolean } },
-      node: FolderNode,
-    ) => void;
-  }) {
+  setup(
+    props: {
+      items?: FolderNode[];
+      modelValue?: FolderNode;
+      expanded?: string[];
+      onSelect?: (e: { preventDefault(): void }, node: FolderNode) => void;
+      onToggle?: (
+        e: { detail: { isExpanded: boolean } },
+        node: FolderNode,
+      ) => void;
+    },
+    { slots }: SetupContext,
+  ) {
     const node = (key: string) => {
       const found = findFolderNode(props.items, key);
       if (!found) throw new Error(`no node ${key}`);
@@ -135,6 +155,86 @@ const UTree: Component = {
     onUnmounted(() => {
       tree = null;
     });
+    return () =>
+      h(
+        "div",
+        null,
+        flatten(props.items ?? []).map((item) =>
+          h(Row, { key: item.key, rowKey: item.key }, () =>
+            slots["item-wrapper"]?.({
+              item,
+              expanded: false,
+              selected: false,
+              ui: treeUi,
+            }),
+          ),
+        ),
+      );
+  },
+};
+
+// `UButton`: its `aria-label`, the row it sits in, whether it is disabled,
+// and its click (with the event `.stop` needs).
+const buttons: {
+  row?: string;
+  label: string;
+  disabled: boolean;
+  click(): void;
+}[] = [];
+const UButton: Component = {
+  name: "UButton",
+  inheritAttrs: false,
+  setup(_props: unknown, { attrs, slots }: SetupContext) {
+    const stub = {
+      row: inject<string | undefined>(ROW_KEY, undefined),
+      get label() {
+        return String(attrs["aria-label"] ?? "");
+      },
+      get disabled() {
+        return Boolean(attrs.disabled);
+      },
+      click() {
+        const onClick = attrs.onClick as ((event: unknown) => void) | undefined;
+        onClick?.({ stopPropagation: () => {} });
+      },
+    };
+    buttons.push(stub);
+    onUnmounted(() => {
+      buttons.splice(buttons.indexOf(stub), 1);
+    });
+    return () => h("div", null, slots.default?.());
+  },
+};
+
+// `MapoMediaFolderPicker`: `open` and `exclude` in, `confirm` out.
+let picker: {
+  readonly open: boolean;
+  readonly exclude: number[];
+  pick(folder: MediaFolder | null): void;
+} | null = null;
+const MapoMediaFolderPicker: Component = {
+  name: "MapoMediaFolderPicker",
+  props: { open: Boolean, exclude: Array },
+  emits: ["confirm", "update:open"],
+  setup(
+    props: { open?: boolean; exclude?: number[] },
+    { emit }: SetupContext<["confirm", "update:open"]>,
+  ) {
+    picker = {
+      get open() {
+        return props.open ?? false;
+      },
+      get exclude() {
+        return props.exclude ?? [];
+      },
+      pick(folder) {
+        emit("confirm", folder);
+        emit("update:open", false);
+      },
+    };
+    onUnmounted(() => {
+      picker = null;
+    });
     return () => h("div");
   },
 };
@@ -149,7 +249,8 @@ const passthrough = (name: string): Component => ({
 
 const stubs: Record<string, Component> = {
   UTree,
-  UButton: passthrough("UButton"),
+  UButton,
+  MapoMediaFolderPicker,
   UInput: passthrough("UInput"),
   USeparator: passthrough("USeparator"),
   UIcon: passthrough("UIcon"),
@@ -175,6 +276,9 @@ const videos: MediaFolder = {
 
 // Runs the pending CRUD promises and the renders they trigger.
 const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+const rowButton = (row: string, label: string) =>
+  buttons.find((stub) => stub.row === row && stub.label === label);
 
 let app: App<HeadlessNode> | undefined;
 let pinia: Pinia;
@@ -248,5 +352,58 @@ describe("MapoMediaFolders tree", () => {
     await settle();
 
     expect(crud.detail).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapoMediaFolders moving a folder", () => {
+  // The picker hides the folder with its subtree: a move inside itself would
+  // loop on Camomilla.
+  it("opens the picker without the folder, then moves it there", async () => {
+    crud.updateOrCreate.mockResolvedValue({ ...photos, parent: 2 });
+    crud.detail.mockResolvedValue(explorer([], videos));
+    await mountFolders();
+
+    rowButton("1", "mapo.mediaMove.moveTo")?.click();
+    await settle();
+    expect(picker?.open).toBe(true);
+    expect(picker?.exclude).toEqual([1]);
+
+    picker?.pick(videos);
+    await settle();
+
+    expect(crud.updateOrCreate).toHaveBeenCalledWith({ ...photos, parent: 2 });
+    expect(picker?.open).toBe(false);
+  });
+
+  it("offers no move on the root", async () => {
+    await mountFolders();
+
+    expect(rowButton("root", "mapo.mediaMove.moveTo")).toBeUndefined();
+    expect(rowButton("2", "mapo.mediaMove.moveTo")).toBeDefined();
+  });
+
+  // The tree shows the folder in its old place until the branches reload.
+  it("disables the row actions while a folder moves", async () => {
+    let accept: (value: unknown) => void = () => {};
+    crud.updateOrCreate.mockReturnValueOnce(
+      new Promise((resolve) => (accept = resolve)),
+    );
+    crud.detail.mockResolvedValue(explorer([], videos));
+    await mountFolders();
+
+    rowButton("1", "mapo.mediaMove.moveTo")?.click();
+    await settle();
+    picker?.pick(videos);
+    await settle();
+    const actions = ["mapo.edit", "mapo.mediaMove.moveTo", "mapo.delete"];
+    expect(actions.map((label) => rowButton("2", label)?.disabled)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+
+    accept({ ...photos, parent: 2 });
+    await settle();
+    expect(rowButton("2", "mapo.mediaMove.moveTo")?.disabled).toBe(false);
   });
 });

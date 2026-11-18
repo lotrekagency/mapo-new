@@ -16,6 +16,7 @@ import {
 import { useContentLanguages } from "../utils/contentLanguages.js";
 import { buildUploadBody } from "../utils/mediaMetadata.js";
 import {
+  ROOT_FOLDER_KEY,
   canonicalFolder,
   folderKey,
   folderPath,
@@ -99,6 +100,11 @@ export const useMediaStore = defineStore("mapo-media", () => {
    * when it opens.
    */
   const queuedUploads = shallowRef<File[]>([]);
+  /**
+   * Id of the folder `moveFolder` is moving, `null` when none: the folder
+   * tree disables its row actions meanwhile.
+   */
+  const movingFolderId = ref<number | null>(null);
 
   // ─── Internal navigation context ────────────────────────────────────────
   const _currentFolderId = ref<number | null>(null);
@@ -449,6 +455,113 @@ export const useMediaStore = defineStore("mapo-media", () => {
     if (isElsewhere) await loadFolderChildren(parentId);
   }
 
+  /**
+   * Move `folder` into folder `parentId` (the root when `null`), saving it
+   * with the adapter's folder payload (Camomilla: `updir`). A folder cannot go
+   * inside itself or one of its subfolders, and Camomilla does not check it
+   * (it would recurse): the picker never offers them, and this refuses them
+   * as far as the folder cache knows the tree. One move runs at a time
+   * (`movingFolderId`); another one asked meanwhile is refused. Refreshes the
+   * branch the folder left, the one it joined and the folder on screen, whose
+   * path may run through it. Returns whether it moved; rejects only when the
+   * final refresh of the folder on screen fails.
+   */
+  async function moveFolder(
+    folder: MediaFolder,
+    parentId: number | null,
+  ): Promise<boolean> {
+    // One move at a time: until the tree reloads, it still shows the folder
+    // in its old place, and a second move picked from it could close a cycle.
+    const isBusy = movingFolderId.value !== null;
+    if (isBusy) return false;
+    const fromId = cachedParentId(folder);
+    const staysPut = fromId === parentId;
+    if (staysPut) return false;
+
+    const t = useMapoT();
+    const snack = useSnackStore();
+    const notMoved = () =>
+      snack.show(
+        t("mapo.mediaMove.folderFailed", { name: folder.name }),
+        "error",
+      );
+    // The picker already hides these; callers outside it are checked here.
+    const isSelf = parentId === folder.id;
+    const targetPath =
+      parentId == null
+        ? []
+        : (folderPath(folderChildren.value, parentId) ?? []);
+    const isInside = targetPath.some((f) => f.id === folder.id);
+    if (isSelf || isInside) {
+      notMoved();
+      return false;
+    }
+
+    movingFolderId.value = folder.id;
+    try {
+      const a = adapter();
+      const payload = (
+        a.buildFolderPayload ?? defaultMediaAdapter.buildFolderPayload
+      )({ ...folder, parent: parentId });
+      try {
+        await folderCrud().updateOrCreate(payload as never);
+      } catch {
+        notMoved();
+        return false;
+      }
+      snack.show(
+        t("mapo.mediaMove.folderMoved", { name: folder.name }),
+        "success",
+      );
+      // Out of every cached branch at once, whatever the reloads do: a stale
+      // branch must not offer the folder, or its subfolders, as a destination.
+      detachFolder(folder.id);
+      // The folder on screen reloads with `getRoot` below.
+      const isOnScreen = (id: number | null) =>
+        !_currentAll.value && id === _currentFolderId.value;
+      const [, joined] = await Promise.allSettled([
+        isOnScreen(fromId) ? null : loadFolderChildren(fromId),
+        isOnScreen(parentId) ? null : loadFolderChildren(parentId),
+      ]);
+      // Unknown again rather than wrong: the branch reloads when opened.
+      if (joined.status === "rejected") forgetFolderChildren(parentId);
+      await getRoot();
+      return true;
+    } finally {
+      movingFolderId.value = null;
+    }
+  }
+
+  /**
+   * The parent of `folder` as the tree shows it: the cached branch that lists
+   * it, else its `parent`, which a backend may leave out.
+   */
+  function cachedParentId(folder: MediaFolder): number | null {
+    const entries = Object.entries(folderChildren.value);
+    const branch = entries.find(([, children]) =>
+      children.some((child) => child.id === folder.id),
+    );
+    if (!branch) return folder.parent ?? null;
+    const isRoot = branch[0] === ROOT_FOLDER_KEY;
+    return isRoot ? null : Number(branch[0]);
+  }
+
+  /** Remove folder `id` from every cached branch. */
+  function detachFolder(id: number): void {
+    const next: Record<string, MediaFolder[]> = {};
+    for (const [key, children] of Object.entries(folderChildren.value)) {
+      next[key] = children.filter((child) => child.id !== id);
+    }
+    folderChildren.value = next;
+  }
+
+  /** Drop the cached subfolders of folder `id`: the tree loads them again. */
+  function forgetFolderChildren(id: number | null): void {
+    const rest = { ...folderChildren.value };
+    delete rest[folderKey(id)];
+    folderChildren.value = rest;
+  }
+
   async function deleteFolder(folder: MediaFolder): Promise<void> {
     const t = useMapoT();
     const confirmed = await useConfirmStore().ask({
@@ -458,9 +571,9 @@ export const useMediaStore = defineStore("mapo-media", () => {
       dangerous: true,
     });
     if (!confirmed) return;
+    const parentId = cachedParentId(folder);
     await folderCrud().delete(folder.id);
 
-    const parentId = folder.parent ?? null;
     const remaining = { ...folderChildren.value };
     delete remaining[folderKey(folder.id)];
     folderChildren.value = remaining;
@@ -645,6 +758,8 @@ export const useMediaStore = defineStore("mapo-media", () => {
     editList.value = [];
     selectMode.value = "none";
     queuedUploads.value = [];
+    // `movingFolderId` is left to the move still running, if any: a manager
+    // opened meanwhile must not offer a second one before it lands.
     _currentFolderId.value = null;
     _currentSearch.value = "";
     _currentAll.value = false;
@@ -669,6 +784,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     editList,
     selectMode,
     queuedUploads,
+    movingFolderId,
     languages,
     // getters
     activeLanguages,
@@ -689,6 +805,7 @@ export const useMediaStore = defineStore("mapo-media", () => {
     replaceFile,
     moveMedia,
     updateOrCreateFolder,
+    moveFolder,
     deleteFolder,
     deleteMedia,
     select,

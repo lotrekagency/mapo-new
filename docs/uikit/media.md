@@ -52,7 +52,8 @@ const fields: FieldDescriptor[] = [
 useMediaStore (Pinia)
     │
     ├── MapoMediaManager          ← orchestrator shell
-    │     ├── MapoMediaFolders    ← folder tree + MIME filters
+    │     ├── MapoMediaFolders    ← folder tree (create, rename, move, delete)
+    │     │                          + MIME filters
     │     ├── MapoMediaBreadcrumbs← path navigation
     │     ├── MapoMediaGallery    ← CSS grid + bulk ops (move, delete) + pagination,
     │     │                          Upload here + file drop
@@ -91,7 +92,7 @@ Drives navigation. **Both list and detail return the explorer payload** — this
 | `GET /api/media-folders/`        | Root explorer: `{ media, folders, parent_folder: null }` |
 | `GET /api/media-folders/:id/`    | Folder explorer: `{ media, folders, parent_folder }`     |
 | `POST /api/media-folders/`       | Create folder                                            |
-| `PUT /api/media-folders/:id/`    | Rename / move folder (`updateOrCreateFolder`)            |
+| `PUT /api/media-folders/:id/`    | Rename (`updateOrCreateFolder`), move (`moveFolder`)     |
 | `DELETE /api/media-folders/:id/` | Delete folder                                            |
 
 Explorer payload shape:
@@ -107,6 +108,8 @@ Explorer payload shape:
 A `parent_folder` without an `id` counts as the root too: Camomilla answers the root with an empty folder (`{ "title": "", "updir": null }`) instead of `null`.
 
 A folder's `parent` is an id. A parent given as an object is read by its `id`: Camomilla serializes `updir` as the whole parent folder, and an adapter may pass it on as it is.
+
+Moving a folder sends its new `parent` through the same PUT. The backend should refuse a parent that is the folder itself or one of its subfolders. Camomilla does not check it, and its `update_childs` recurses on such a move, so the manager never offers those folders as a destination, and `moveFolder` refuses them as far as the folder cache knows the tree.
 
 ### Media endpoint (default `/api/media`)
 
@@ -288,21 +291,22 @@ Auto-imported Pinia store available throughout the app.
 
 ### State
 
-| Property         | Type                               | Description                                                              |
-| ---------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                         |
-| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                         |
-| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree           |
-| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache   |
-| `page` / `pages` | `number`                           | Pagination                                                               |
-| `mimeType`       | `string \| null`                   | Active MIME filter                                                       |
-| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it |
-| `loading`        | `boolean`                          | Fetch in progress                                                        |
-| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                 |
-| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                 |
-| `editList`       | `number[]`                         | IDs flagged for bulk operations                                          |
-| `selectMode`     | `SelectMode`                       | Selection mode                                                           |
-| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens        |
+| Property         | Type                               | Description                                                                |
+| ---------------- | ---------------------------------- | -------------------------------------------------------------------------- |
+| `medias`         | `MediaItem[]`                      | Media in the current folder/page                                           |
+| `folders`        | `MediaFolder[]`                    | Folders in the current directory                                           |
+| `folderChildren` | `Record<string, MediaFolder[]>`    | Subfolders seen so far, by folder id (`root` on top): the tree             |
+| `parentFolders`  | `MediaFolder[]`                    | Path from the root to the folder on screen, read from the folder cache     |
+| `page` / `pages` | `number`                           | Pagination                                                                 |
+| `mimeType`       | `string \| null`                   | Active MIME filter                                                         |
+| `lockedMime`     | `string \| null`                   | MIME constraint imposed by a picker — `setMimeType` cannot widen past it   |
+| `loading`        | `boolean`                          | Fetch in progress                                                          |
+| `editMedia`      | `MediaItem \| null`                | Media open in the editor                                                   |
+| `selection`      | `MediaItem \| MediaItem[] \| null` | Current picker selection                                                   |
+| `editList`       | `number[]`                         | IDs flagged for bulk operations                                            |
+| `selectMode`     | `SelectMode`                       | Selection mode                                                             |
+| `queuedUploads`  | `File[]`                           | Files handed to the uploader by the gallery, queued when it opens          |
+| `movingFolderId` | `number \| null`                   | Folder `moveFolder` is moving; the tree disables its row actions meanwhile |
 
 ### Getters
 
@@ -333,6 +337,7 @@ await store.moveMedia(ids, folderId | null)          // one PATCH each; toasts, 
 await store.deleteMedia(media)
 
 await store.updateOrCreateFolder({ id?, name, parent? })
+await store.moveFolder(folder, parentId | null)      // PUT via buildFolderPayload; one at a time; toasts; reloads both branches and the screen; false if refused or failed
 await store.deleteFolder(folder)
 
 const item = await store.uploadMedia(payload, onProgress?)  // onProgress: (pct: number) => void; translated media get the metadata as the initialLanguage translation
@@ -387,6 +392,8 @@ Emits: `upload` (no payload). No props.
 
 Dialog to pick a folder, the root included, from the same tree as the sidebar: it shares the store's folder cache and loads the branches it opens. **Move to…** opens it from the gallery's bulk bar, for the selected media, and from the editor, for the media open; the editor closes once the media has moved out of the folder on screen. Moving goes through `store.moveMedia`, one PATCH per media built by the adapter's `buildMoveMediaPayload` (default `{ folder }`, which Camomilla takes as it is), with a toast for the media moved and one for those that were not. Both buttons need the `change` permission.
 
+**Move to…** on a folder's row in the tree opens it for that folder, with `exclude` hiding the folder and its subfolders. The move goes through `store.moveFolder`: the adapter's `buildFolderPayload` with the new `parent` (Camomilla: `updir`), saved like a rename. The folder on screen follows the move, breadcrumbs included. The folder leaves every cached branch as soon as the backend accepts the move, and until the branches reload the row actions are disabled: a second move picked from a tree that still shows the old place could close a cycle.
+
 | Prop           | Type       | Default          | Description                                                                     |
 | -------------- | ---------- | ---------------- | ------------------------------------------------------------------------------- |
 | `open`         | `boolean`  | —                | Whether the dialog is open (`v-model:open`)                                     |
@@ -398,7 +405,7 @@ Emits `update:open` and `confirm` with the folder picked (`MediaFolder`, or `nul
 
 ### `<MapoMediaFolders>`
 
-The folder panel of the manager: the MIME filters, then the folders as a tree (Nuxt UI `UTree`) under a root node. A branch loads its subfolders when it opens (`store.loadFolderChildren`), through the same explorer endpoint as navigation; the folder on screen is selected and the path to it stays open. Clicking a folder opens it in the gallery; rename and delete sit on its row, and a new folder is created in the folder on screen. No props.
+The folder panel of the manager: the MIME filters, then the folders as a tree (Nuxt UI `UTree`) under a root node. A branch loads its subfolders when it opens (`store.loadFolderChildren`), through the same explorer endpoint as navigation; the folder on screen is selected and the path to it stays open. Clicking a folder opens it in the gallery; rename, move and delete sit on its row, and a new folder is created in the folder on screen. No props.
 
 Deleting a folder asks for confirmation and warns that its subfolders and media go with it: Camomilla deletes them (`on_delete=CASCADE` on both relations), so the message does not promise otherwise. A backend that keeps them only makes the warning stricter than needed.
 

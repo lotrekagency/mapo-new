@@ -244,7 +244,10 @@
       "title": "Move to folder",
       "confirm": "Move here",
       "moved": "Media moved: {number}",
-      "failed": "Media not moved: {number}"
+      "failed": "Media not moved: {number}",
+      "folderTitle": "Move folder \"{name}\" to",
+      "folderMoved": "Folder \"{name}\" moved",
+      "folderFailed": "Folder \"{name}\" not moved"
     },
     "mediaGallery": {
       "noMediaFound": "No media found",
