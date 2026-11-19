@@ -86,9 +86,35 @@ The endpoint must accept `?search=<query>` for filtering. Django REST Framework 
 { key: 'body', type: 'editor' }
 ```
 
-Backed by Tiptap v2. The toolbar has bold, italic, underline, H2/H3, bullet and numbered lists, undo/redo and **Insert image**, which opens the media manager and needs `@mapomodule/uikit`. The rest of StarterKit (quotes, code blocks, horizontal rules) is kept when it is loaded or pasted, without a button. Links accept relative URLs and the `http`, `https`, `mailto` and `tel` protocols, so a `javascript:` link is rejected. The HTML the field receives is sanitized (`script` and `style` elements, `on*` handlers and unsafe URLs are removed) before the editor loads it, and the field's value is the editor's HTML.
+Backed by Tiptap v2. The toolbar has bold, italic, underline, H2/H3, bullet and numbered lists, undo/redo, **Link** and **Insert image**, which opens the media manager and needs `@mapomodule/uikit`. The rest of StarterKit (quotes, code blocks, horizontal rules) is kept when it is loaded or pasted, without a button. The HTML the field receives is sanitized (`script` and `style` elements, `on*` handlers and unsafe URLs are removed) before the editor loads it, and the field's value is the editor's HTML.
 
-`attrs.extensions` adds Tiptap v2 extensions, installed by the app, after the built-in ones (StarterKit, Link, Underline, Image). Tables need the four official table extensions:
+The editor styles its own content: headings, lists, links, quotes, code, images and tables look as they will read, with Nuxt UI's colour tokens, so they follow the theme and the colour mode. The app needs no typography plugin.
+
+### Links
+
+**Link** opens a bar under the toolbar with the address of the link at the selection. **Apply** (or Enter) links the selected text, or the whole link the cursor is in; with nothing selected the address is inserted as linked text. An empty address, or **Remove link**, removes it; Escape closes the bar. Addresses are relative paths or use `http`, `https`, `mailto` or `tel`: anything else, such as a `javascript:` link, is refused with a message. An address that starts with `www.` gets `https://`.
+
+Links keep Tiptap's default attributes: `target="_blank"` and `rel="noopener noreferrer nofollow"`.
+
+### Text alignment
+
+`attrs.textAlign: true` adds left, centre and right buttons for paragraphs and headings, through Tiptap's TextAlign extension. Centre and right are written as `style="text-align: center"` (or `right`); left is the default and writes no style. A field without the option drops the alignment of pasted text. The module option `editor.textAlign` turns the buttons on for every editor field, and a field's `attrs.textAlign` wins over it:
+
+```ts
+// nuxt.config.ts: alignment in every editor field (default: false)
+export default defineNuxtConfig({
+  mapoForm: { editor: { textAlign: true } },
+});
+
+// one field
+{ key: 'body', type: 'editor', attrs: { textAlign: true } }
+```
+
+A field that loads its own TextAlign through `attrs.extensions` keeps that one, with its configuration.
+
+### Extensions
+
+`attrs.extensions` adds Tiptap v2 extensions, installed by the app, after the built-in ones (StarterKit, Link, Underline, Image, and TextAlign with `attrs.textAlign`). Tables need the four official table extensions:
 
 ```ts
 import Table from '@tiptap/extension-table'
@@ -109,11 +135,19 @@ The editor then keeps the tables it loads or receives by pasting. The toolbar ge
 
 ### HTML source view
 
-`attrs.source: true` adds a toggle at the end of the toolbar that shows the field's HTML in a textarea, one block per line, indented by nesting:
+Every editor field has a toggle at the end of the toolbar that shows the field's HTML in a textarea, one block per line, indented by nesting. The module option `editor.source` sets it for the whole app, and `attrs.source` for one field, which wins over the option:
 
 ```ts
+// nuxt.config.ts: no source toggle in the app (default: true)
+export default defineNuxtConfig({
+  mapoForm: { editor: { source: false } },
+});
+
+// a field that differs from the app
 { key: 'body', type: 'editor', attrs: { source: true } }
 ```
+
+With the `mapomodule` meta-module the option is also `mapo.form.editor.source`.
 
 - What is typed reaches the editor after a short pause, or as soon as the textarea loses the focus. The editor sanitizes it and parses it with its schema, and the field's value becomes the editor's HTML: the value is sanitized and normalized even when the form is saved from the source view.
 - Tags and attributes that no extension supports are removed, and a note under the textarea says so. A `<div>` becomes a paragraph, a `<span>` and a `style` attribute go, an `<iframe>` is dropped, and a table comes out as Tiptap writes it: with `colgroup`, `tbody`, a `<p>` in each cell and `colspan`/`rowspan`.
@@ -140,7 +174,6 @@ The editor then keeps the tables it loads or receives by pasting. The toolbar ge
   key: 'body',
   type: 'editor',
   attrs: {
-    source: true,
     extensions: [Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
     toolbar: [
       {

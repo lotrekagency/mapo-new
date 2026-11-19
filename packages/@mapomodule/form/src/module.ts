@@ -16,6 +16,19 @@ export interface MapoFormOptions {
   fields?: PartialFieldRegistry;
   groups?: { expanded?: boolean };
   debounce?: number;
+  /** Defaults for every `editor` field; a field's own `attrs` win. */
+  editor?: {
+    /**
+     * Shows the HTML source toggle in the toolbar of every editor field. A
+     * field sets `attrs.source` to differ from it. Default: `true`.
+     */
+    source?: boolean;
+    /**
+     * Shows the alignment buttons (left, centre, right) in every editor
+     * field. A field sets `attrs.textAlign` to differ from it. Default: `false`.
+     */
+    textAlign?: boolean;
+  };
 }
 
 export default defineNuxtModule<MapoFormOptions>({
@@ -27,6 +40,7 @@ export default defineNuxtModule<MapoFormOptions>({
   defaults: {
     debounce: 300,
     groups: { expanded: true },
+    editor: { source: true, textAlign: false },
   },
 
   async setup(options, nuxt) {
@@ -45,11 +59,15 @@ export default defineNuxtModule<MapoFormOptions>({
     //   export default defineNuxtPlugin(({ $mapoFormRegistry }) => {
     //     $mapoFormRegistry.mapping['my-type'] = () => import('~/components/MyField.vue')
     //   })
-    // `defaults` guarantees groups/debounce at runtime; fall back explicitly
-    // so the assignment type is fully defined.
+    // `defaults` guarantees groups/debounce/editor at runtime; fall back
+    // explicitly so the assignment type is fully defined.
     nuxt.options.runtimeConfig.public.mapoForm = {
       groups: { expanded: options.groups?.expanded ?? true },
       debounce: options.debounce ?? 300,
+      editor: {
+        source: options.editor?.source ?? true,
+        textAlign: options.editor?.textAlign ?? false,
+      },
       // attrs is JSON-serialisable (plain objects) — merged in the plugin
       fields: { attrs: options.fields?.attrs ?? {} },
     };

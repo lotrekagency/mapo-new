@@ -58,10 +58,14 @@ const { createApp } = createRenderer<HeadlessNode, HeadlessNode>({
     node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
 });
 
+// The names of the passthrough stubs mounted since the last test began.
+const mountedStubs: string[] = [];
+
 const passthrough = (name: string): Component => ({
   name,
   inheritAttrs: false,
   setup(_props: unknown, { slots }: SetupContext) {
+    mountedStubs.push(name);
     return () => h("div", null, slots.default?.());
   },
 });
@@ -173,10 +177,13 @@ const stubs: Record<string, Component> = {
 let app: App<HeadlessNode> | undefined;
 
 /** Mounts the table; the returned props stay reactive, so a test can change them. */
-function mountTable(initial: Record<string, unknown>) {
+function mountTable(
+  initial: Record<string, unknown>,
+  slots: Record<string, () => unknown> = {},
+) {
   const props = reactive({ ...initial });
   const root: Component = {
-    render: () => h(MapoListTable as Component, props),
+    render: () => h(MapoListTable as Component, props, slots),
   };
   app = createApp(root);
   for (const [name, stub] of Object.entries(stubs)) app.component(name, stub);
@@ -222,6 +229,7 @@ const listProps = {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   route.query = {};
+  mountedStubs.length = 0;
   router.replace.mockReset();
   crud.list.mockReset();
   crud.list.mockResolvedValue({ results: rows(20), count: 95 });
@@ -500,5 +508,38 @@ describe("MapoListTable empty state and row actions", () => {
       (button) => (button.props as { "aria-label": string })["aria-label"],
     );
     expect(labels).toEqual(["mapo.edit", "mapo.delete"]);
+  });
+});
+
+describe("MapoListTable toolbar", () => {
+  it("shows the search and, after it, the dtable.toolbar content", async () => {
+    const toolbar = vi.fn(() => []);
+    mountTable(
+      { ...listProps, searchable: true },
+      { "dtable.toolbar": toolbar },
+    );
+    await settle();
+
+    expect(mountedStubs).toContain("UInput");
+    expect(toolbar).toHaveBeenCalled();
+  });
+
+  it("shows the dtable.toolbar content without the search", async () => {
+    const toolbar = vi.fn(() => []);
+    mountTable(
+      { ...listProps, searchable: false },
+      { "dtable.toolbar": toolbar },
+    );
+    await settle();
+
+    expect(mountedStubs).not.toContain("UInput");
+    expect(toolbar).toHaveBeenCalled();
+  });
+
+  it("has no toolbar without the search and without content", async () => {
+    mountTable({ ...listProps, searchable: false });
+    await settle();
+
+    expect(mountedStubs).not.toContain("UInput");
   });
 });

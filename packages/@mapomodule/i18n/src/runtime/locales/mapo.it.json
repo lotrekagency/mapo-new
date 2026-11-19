@@ -158,7 +158,17 @@
       "insertImage": "Inserisci immagine",
       "requiresUikit": "Richiede {'@'}mapomodule/uikit",
       "source": "Sorgente HTML",
-      "sourceHint": "I tag e gli attributi che l'editor non supporta vengono rimossi."
+      "sourceHint": "I tag e gli attributi che l'editor non supporta vengono rimossi.",
+      "link": "Link",
+      "linkUrl": "Indirizzo del link",
+      "linkPlaceholder": "https://… oppure /pagina/",
+      "linkApply": "Applica",
+      "linkRemove": "Rimuovi link",
+      "linkCancel": "Chiudi",
+      "linkInvalid": "Indirizzo non valido: usa http, https, mailto, tel o un percorso come /pagina/.",
+      "alignLeft": "Allinea a sinistra",
+      "alignCenter": "Centra",
+      "alignRight": "Allinea a destra"
     },
     "listActions": {
       "bulkActions": "Azioni di gruppo...",

@@ -341,9 +341,18 @@ export interface EditorDescriptor<
      * edits the HTML in a textarea; what it saves goes through the editor, so it
      * is sanitized, and the tags and attributes no extension supports are
      * dropped. A read-only field shows the source without letting it change.
-     * Default: `false`.
+     * Default: the module option `editor.source` (`mapoForm.editor.source` in
+     * `nuxt.config`), which is `true`; `false` hides the toggle on this field.
      */
     source?: boolean;
+    /**
+     * Adds left, centre and right alignment buttons for paragraphs and
+     * headings, and loads Tiptap's TextAlign extension, which writes
+     * `style="text-align: center"` (left writes no style). A field without it
+     * drops the alignment of pasted text. Default: the module option
+     * `editor.textAlign` (`mapoForm.editor.textAlign`), which is `false`.
+     */
+    textAlign?: boolean;
     /**
      * Buttons added after the built-in ones, past a separator: typically the
      * commands of the `extensions` the field loads. Each item is
