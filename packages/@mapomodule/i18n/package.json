@@ -1,6 +1,6 @@
 {
   "name": "@mapomodule/i18n",
-  "version": "1.0.0",
+  "version": "2.0.0-beta.1",
   "description": "Mapo i18n wrapper: @nuxtjs/i18n v9 + base translations",
   "type": "module",
   "license": "MIT",
@@ -40,7 +40,6 @@
   "scripts": {
     "dev": "nuxt-module-build build --stub --watch",
     "build": "nuxt-module-build build && tsc -p tsconfig.build-types.json",
-    "prepare": "nuxt-module-build build --stub",
     "dev:prepare": "nuxt-module-build build --stub",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
