@@ -242,11 +242,11 @@ The **Insert image** button opens `MapoMediaManagerDialog` when `@mapomodule/uik
 
 #### `descriptor.attrs`
 
-| Key          | Type                  | Default | Description                                                                                                                                                             |
-| ------------ | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `extensions` | `unknown[]`           | `[]`    | Tiptap v2 extensions loaded after the built-in ones (StarterKit, Link, Underline, Image).                                                                               |
-| `source`     | `boolean`             | `false` | Adds an HTML source toggle at the end of the toolbar; what the source view saves is sanitized and normalized. See [HTML source view](./add-fields.md#html-source-view). |
-| `toolbar`    | `EditorToolbarItem[]` | `[]`    | Buttons after the built-in ones, past a separator. See [Custom toolbar buttons](./add-fields.md#custom-toolbar-buttons).                                                |
+| Key          | Type                  | Default | Description                                                                                                                                                                                                                       |
+| ------------ | --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `extensions` | `unknown[]`           | `[]`    | Tiptap v2 extensions loaded after the built-in ones (StarterKit, Link, Underline, Image).                                                                                                                                         |
+| `source`     | `boolean`             | `true`  | Adds an HTML source toggle at the end of the toolbar; what the source view saves is sanitized and normalized. The default comes from the module option `editor.source`. See [HTML source view](./add-fields.md#html-source-view). |
+| `toolbar`    | `EditorToolbarItem[]` | `[]`    | Buttons after the built-in ones, past a separator. See [Custom toolbar buttons](./add-fields.md#custom-toolbar-buttons).                                                                                                          |
 
 ---
 

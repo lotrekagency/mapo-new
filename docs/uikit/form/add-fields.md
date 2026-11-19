@@ -109,11 +109,19 @@ The editor then keeps the tables it loads or receives by pasting. The toolbar ge
 
 ### HTML source view
 
-`attrs.source: true` adds a toggle at the end of the toolbar that shows the field's HTML in a textarea, one block per line, indented by nesting:
+Every editor field has a toggle at the end of the toolbar that shows the field's HTML in a textarea, one block per line, indented by nesting. The module option `editor.source` sets it for the whole app, and `attrs.source` for one field, which wins over the option:
 
 ```ts
+// nuxt.config.ts: no source toggle in the app (default: true)
+export default defineNuxtConfig({
+  mapoForm: { editor: { source: false } },
+});
+
+// a field that differs from the app
 { key: 'body', type: 'editor', attrs: { source: true } }
 ```
+
+With the `mapomodule` meta-module the option is also `mapo.form.editor.source`.
 
 - What is typed reaches the editor after a short pause, or as soon as the textarea loses the focus. The editor sanitizes it and parses it with its schema, and the field's value becomes the editor's HTML: the value is sanitized and normalized even when the form is saved from the source view.
 - Tags and attributes that no extension supports are removed, and a note under the textarea says so. A `<div>` becomes a paragraph, a `<span>` and a `style` attribute go, an `<iframe>` is dropped, and a table comes out as Tiptap writes it: with `colgroup`, `tbody`, a `<p>` in each cell and `colspan`/`rowspan`.
@@ -140,7 +148,6 @@ The editor then keeps the tables it loads or receives by pasting. The toolbar ge
   key: 'body',
   type: 'editor',
   attrs: {
-    source: true,
     extensions: [Table.configure({ resizable: false }), TableRow, TableHeader, TableCell],
     toolbar: [
       {

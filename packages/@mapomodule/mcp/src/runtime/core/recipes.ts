@@ -152,7 +152,7 @@ export const RECIPES: Recipe[] = [
     heading: "WYSIWYG editor",
     seeAlso: ["uikit/form/api.md"],
     summary:
-      "type: 'editor' with attrs.extensions (Tiptap v2), attrs.source (an HTML source view whose value is sanitized and normalized) and attrs.toolbar (buttons for the extensions' commands).",
+      "type: 'editor' with attrs.extensions (Tiptap v2), attrs.source (an HTML source view whose value is sanitized and normalized; on by default, app-wide through the module option editor.source) and attrs.toolbar (buttons for the extensions' commands).",
   },
   {
     id: "block-editor",

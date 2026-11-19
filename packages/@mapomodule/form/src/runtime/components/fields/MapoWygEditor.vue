@@ -8,6 +8,7 @@ import {
   useId,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRuntimeConfig } from "#app";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import type { AnyExtension } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
@@ -19,6 +20,7 @@ import type {
   EditorDescriptor,
   EditorToolbarEditor,
   EditorToolbarItem,
+  MapoFormRuntimeConfig,
 } from "../../types/index.js";
 import { formatHtml } from "../../utils/formatHtml.js";
 import {
@@ -75,7 +77,13 @@ watch(
 // the textarea (`v-show`), so its history survives the switch.
 const SOURCE_SYNC_DELAY_MS = 250;
 
-const hasSourceView = props.descriptor.attrs?.source === true;
+// The field's own `attrs.source` wins; otherwise the module option
+// `editor.source`, which the module defaults to `true`.
+const appEditorDefaults = (
+  useRuntimeConfig().public.mapoForm as MapoFormRuntimeConfig | undefined
+)?.editor;
+const hasSourceView =
+  props.descriptor.attrs?.source ?? appEditorDefaults?.source ?? true;
 const sourceMode = ref(false);
 const sourceHtml = ref("");
 const sourceHintId = useId();

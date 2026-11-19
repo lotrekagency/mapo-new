@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Scenario: the editor field's opt-in attrs. `attrs.source` adds an HTML source
-// view; `attrs.toolbar` adds buttons for the commands of the extensions the
+// Scenario: the editor field's toolbar. The HTML source view is on by default
+// (module option `editor.source`); `attrs.source: false` turns it off for one
+// field. `attrs.toolbar` adds buttons for the commands of the extensions the
 // field loads (here StarterKit's, which every editor field has). The last
 // field has neither: its toolbar is the built-in one.
 import type { FieldDescriptor } from "@mapomodule/form/types";
@@ -28,7 +29,7 @@ const draftBody =
 const model = ref<Model>({
   body: savedBody,
   locked: "<p>A read-only field shows its source but does not change it.</p>",
-  plain: "<p>No new attrs: the toolbar is the built-in one.</p>",
+  plain: "<p>attrs.source: false: the toolbar is the built-in one.</p>",
 });
 
 const fields: FieldDescriptor<Model>[] = [
@@ -37,7 +38,6 @@ const fields: FieldDescriptor<Model>[] = [
     type: "editor",
     label: "Source view and custom buttons",
     attrs: {
-      source: true,
       toolbar: [
         {
           key: "quote",
@@ -74,9 +74,13 @@ const fields: FieldDescriptor<Model>[] = [
     type: "editor",
     label: "Read-only, with source view",
     readonly: true,
-    attrs: { source: true },
   },
-  { key: "plain", type: "editor", label: "No new attrs" },
+  {
+    key: "plain",
+    type: "editor",
+    label: "Without source view",
+    attrs: { source: false },
+  },
 ];
 </script>
 

@@ -89,10 +89,12 @@ export function resolveFieldAccessor(
 
 /**
  * Shape of `runtimeConfig.public.mapoForm` as written by the module setup.
- * `groups` and `debounce` are guaranteed by the module `defaults`.
+ * `groups`, `debounce` and `editor` are guaranteed by the module `defaults`.
  */
 export interface MapoFormRuntimeConfig {
   groups: { expanded: boolean };
   debounce: number;
+  /** Defaults for every `editor` field (module option `editor`). */
+  editor: { source: boolean };
   fields: { attrs: Record<string, Record<string, unknown>> };
 }

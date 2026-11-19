@@ -83,6 +83,14 @@ vi.mock("../runtime/utils/sanitizeHtml.js", async (importOriginal) => ({
 
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 
+// The module's runtime config; `beforeEach` restores what the module writes by default.
+const runtimeConfig = vi.hoisted(() => ({
+  public: {
+    mapoForm: undefined as { editor: { source: boolean } } | undefined,
+  },
+}));
+vi.mock("#app", () => ({ useRuntimeConfig: () => runtimeConfig }));
+
 // Nodes are plain objects: each keeps its tag, its props (attributes and
 // listeners included) and its text; `style` takes what `v-show` writes.
 interface HeadlessNode {
@@ -215,6 +223,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   modelValue = ref("<p>Hello <strong>world</strong></p><h2>Title</h2>");
   emitted = [];
+  runtimeConfig.public.mapoForm = { editor: { source: true } };
 });
 
 afterEach(() => {
@@ -223,21 +232,57 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("MapoWygEditor without the new attrs", () => {
-  it("renders the built-in toolbar only, enabled, and the editor", () => {
+describe("MapoWygEditor without attrs", () => {
+  it("renders the built-in toolbar and the source toggle, enabled, and the editor", () => {
     mount();
 
-    expect(buttons()).toHaveLength(10);
+    expect(buttons()).toHaveLength(11);
     expect(buttons().every((node) => !node.props.disabled)).toBe(true);
-    expect(sourceToggle()).toBeUndefined();
+    expect(sourceToggle()).toBeDefined();
     expect(textarea()).toBeUndefined();
     expect(isHidden(editorContent())).toBe(false);
   });
 
-  it("disables the built-in toolbar when read-only", () => {
+  it("renders the built-in toolbar only when the field turns the source view off", () => {
+    mount({ source: false });
+
+    expect(buttons()).toHaveLength(10);
+    expect(sourceToggle()).toBeUndefined();
+  });
+
+  it("disables the built-in toolbar when read-only, not the source toggle", () => {
     mount({}, { readonly: true });
 
-    expect(buttons().every((node) => node.props.disabled)).toBe(true);
+    const builtIn = buttons().filter((node) => node !== sourceToggle());
+    expect(builtIn.every((node) => node.props.disabled)).toBe(true);
+    expect(sourceToggle()!.props.disabled).toBeFalsy();
+  });
+});
+
+describe("MapoWygEditor source toggle default", () => {
+  it("follows the module option when the field does not set attrs.source", () => {
+    runtimeConfig.public.mapoForm = { editor: { source: false } };
+    mount();
+
+    expect(sourceToggle()).toBeUndefined();
+  });
+
+  it("lets the field's attrs.source win over the module option, both ways", () => {
+    runtimeConfig.public.mapoForm = { editor: { source: false } };
+    mount({ source: true });
+    expect(sourceToggle()).toBeDefined();
+    app!.unmount();
+
+    runtimeConfig.public.mapoForm = { editor: { source: true } };
+    mount({ source: false });
+    expect(sourceToggle()).toBeUndefined();
+  });
+
+  it("shows the toggle when the app has no form runtime config", () => {
+    runtimeConfig.public.mapoForm = undefined;
+    mount();
+
+    expect(sourceToggle()).toBeDefined();
   });
 });
 
@@ -441,7 +486,8 @@ describe("MapoWygEditor custom toolbar buttons", () => {
     expect(row[table - 1]!.type).toBe("separator");
     expect(row[table - 2]).toBe(tooltipOf("mapo.wygEditor.insertImage"));
     expect(row[table + 1]).toBe(tooltipOf("Quote"));
-    expect(buttons()).toHaveLength(12);
+    // 10 built-in, 2 custom, the source toggle.
+    expect(buttons()).toHaveLength(13);
 
     expect(buttonOf("Insert table")!.props.icon).toBe("i-lucide-table");
     // A button with no icon shows its label.
@@ -520,6 +566,7 @@ describe("MapoWygEditor custom toolbar buttons", () => {
 
     expect(hasActiveClass(buttonOf("Add row"))).toBe(false);
     expect(buttonOf("Add row")!.props.disabled).toBe(true);
-    expect(buttons()).toHaveLength(11);
+    // 10 built-in, 1 custom, the source toggle.
+    expect(buttons()).toHaveLength(12);
   });
 });
