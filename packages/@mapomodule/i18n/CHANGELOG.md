@@ -1,3 +1,9 @@
+# @mapomodule/i18n [2.0.0-beta.8](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.7...@mapomodule/i18n@2.0.0-beta.8) (2026-11-19)
+
+### Features
+
+- **form:** style the editor's content and add link and text alignment buttons ([9902433](https://github.com/lotrekagency/mapo-new/commit/9902433e4ed5d4544bbce0156d27d86bc844c69e))
+
 # @mapomodule/i18n [2.0.0-beta.7](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/i18n@2.0.0-beta.6...@mapomodule/i18n@2.0.0-beta.7) (2026-11-18)
 
 ### Features
