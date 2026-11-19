@@ -305,6 +305,8 @@ Each filter exposes nested override slots (named by `filter.value`). They mirror
 
 ## How to: add bulk actions
 
+The actions act on the selected rows, so they appear in the table's toolbar, at the end of the row that holds the search and the `#dtable.toolbar` content, as soon as a row is selected. A list without search gets that row only while rows are selected.
+
 ```ts
 const actions: ActionDescriptor<News>[] = [
   {
@@ -487,7 +489,7 @@ A link icon appears on each row pointing at `/news/${row[lookup]}`. Combine with
 | `#filter.<value>`   | `<MapoListFilters>`   | `{ filter, toggleChoice, removeFilter }` |
 | `#qedit.extra`      | `<MapoListQuickEdit>` | `{ model: T }`                           |
 
-All slots are forwarded transparently from `<MapoList>` to its sub-components.
+All slots are forwarded transparently from `<MapoList>` to its sub-components. `#dtable.toolbar` reaches the table with the bulk actions after it.
 
 ## How to: add a per-row action
 

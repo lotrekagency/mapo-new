@@ -217,7 +217,10 @@ defineSlots<
   {
     /** Content rendered inside the list head area (title, breadcrumbs, action buttons). */
     head(): unknown;
-    /** Extra content rendered alongside the search input in the table toolbar. */
+    /**
+     * Extra content in the table's toolbar, after the search input. The bulk
+     * actions follow it, at the end of the row, while rows are selected.
+     */
     "dtable.toolbar"(): unknown;
     /** Override for the empty state displayed when no rows are found. */
     "dtable.empty"(): unknown;
@@ -262,6 +265,18 @@ defineSlots<
 const slots = useSlots();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const forwardedSlotNames = computed(() => Object.keys(slots) as any[]);
+// `dtable.toolbar` reaches the table together with the bulk actions, below.
+const forwardedTableSlotNames = computed(() =>
+  forwardedSlotNames.value.filter((name) => name !== "dtable.toolbar"),
+);
+const hasSelection = computed(
+  () => selection.value === "all" || selection.value.length > 0,
+);
+// The table's toolbar row: with the search, with the app's toolbar content,
+// or for the bulk actions while rows are selected.
+const hasTableToolbar = computed(
+  () => props.searchable || !!slots["dtable.toolbar"] || hasSelection.value,
+);
 
 // Reset selection when the active tab or filters change
 watch([activeTab, activeFilters], () => {
@@ -286,35 +301,20 @@ watch([activeTab, activeFilters], () => {
       @update:model-value="activeTab = $event"
     />
 
-    <!-- Toolbar: filters + actions -->
-    <div class="flex flex-wrap items-center gap-2">
-      <MapoListFilters
-        :filters="filters"
-        :model-value="activeFilters"
-        @update:model-value="activeFilters = $event"
+    <!-- Filters (they render nothing without filters) -->
+    <MapoListFilters
+      :filters="filters"
+      :model-value="activeFilters"
+      @update:model-value="activeFilters = $event"
+    >
+      <template
+        v-for="name in forwardedSlotNames"
+        :key="name"
+        #[name]="slotProps"
       >
-        <template
-          v-for="name in forwardedSlotNames"
-          :key="name"
-          #[name]="slotProps"
-        >
-          <slot :name="name" v-bind="slotProps ?? {}" />
-        </template>
-      </MapoListFilters>
-
-      <div class="ml-auto">
-        <MapoListActions
-          :actions="actions"
-          :selection="selection"
-          :selection-query="selectionQuery"
-          :endpoint="crudEndpoint"
-          :lookup="lookup"
-          :permission-model="permissionModel"
-          :default-actions="defaultActions"
-          @action-completed="refresh"
-        />
-      </div>
-    </div>
+        <slot :name="name" v-bind="slotProps ?? {}" />
+      </template>
+    </MapoListFilters>
 
     <!-- Table -->
     <MapoListTable
@@ -343,11 +343,27 @@ watch([activeTab, activeFilters], () => {
       @update:items="emit('update:items', $event)"
     >
       <template
-        v-for="name in forwardedSlotNames"
+        v-for="name in forwardedTableSlotNames"
         :key="name"
         #[name]="slotProps"
       >
         <slot :name="name" v-bind="slotProps ?? {}" />
+      </template>
+      <!-- The bulk actions act on the selected rows: they sit in the table's
+           toolbar, after the search and the app's toolbar content. -->
+      <template v-if="hasTableToolbar" #[`dtable.toolbar`]>
+        <slot name="dtable.toolbar" />
+        <MapoListActions
+          class="ml-auto"
+          :actions="actions"
+          :selection="selection"
+          :selection-query="selectionQuery"
+          :endpoint="crudEndpoint"
+          :lookup="lookup"
+          :permission-model="permissionModel"
+          :default-actions="defaultActions"
+          @action-completed="refresh"
+        />
       </template>
     </MapoListTable>
   </div>

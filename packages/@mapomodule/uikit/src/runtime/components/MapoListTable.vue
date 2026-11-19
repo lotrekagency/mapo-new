@@ -132,7 +132,10 @@ defineExpose({ refresh });
 
 defineSlots<
   {
-    /** Extra content rendered alongside the search input in the toolbar. */
+    /**
+     * Content of the toolbar row, after the search input; the row shows it
+     * without the search too. `MapoList` puts its bulk actions here.
+     */
     "dtable.toolbar"(): any;
     /** Override for the empty state displayed when no rows are found. */
     "dtable.empty"(): any;
@@ -905,9 +908,14 @@ const sortingOptions = computed(() => ({
 
 <template>
   <div class="mapo-list-table space-y-3">
-    <!-- Search -->
-    <div v-if="searchable" class="flex items-center gap-2">
+    <!-- Toolbar: the search and the `dtable.toolbar` content (in MapoList,
+         the bulk actions), also without the search -->
+    <div
+      v-if="searchable || $slots['dtable.toolbar']"
+      class="flex flex-wrap items-center gap-2"
+    >
       <UInput
+        v-if="searchable"
         :model-value="search"
         :placeholder="t('mapo.search')"
         icon="i-lucide-search"
