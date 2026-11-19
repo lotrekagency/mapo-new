@@ -1,3 +1,14 @@
+# @mapomodule/uikit [2.0.0-beta.20](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.19...@mapomodule/uikit@2.0.0-beta.20) (2026-11-19)
+
+### Features
+
+- **uikit:** show the list's bulk actions next to the search ([13687c5](https://github.com/lotrekagency/mapo-new/commit/13687c5ea888d7dae84a3cbcfbc1132a19162b54))
+
+### Dependencies
+
+- **@mapomodule/form:** upgraded to 2.0.0-beta.17
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.8
+
 # @mapomodule/uikit [2.0.0-beta.19](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/uikit@2.0.0-beta.18...@mapomodule/uikit@2.0.0-beta.19) (2026-11-18)
 
 ### Dependencies
