@@ -1,3 +1,10 @@
+# @mapomodule/mcp [1.0.0-beta.6](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.5...@mapomodule/mcp@1.0.0-beta.6) (2026-11-19)
+
+### Features
+
+- **form:** show the editor's HTML source view by default, with an app-wide option ([a6da853](https://github.com/lotrekagency/mapo-new/commit/a6da853303553724b8aaa18affdad53930049001))
+- **form:** style the editor's content and add link and text alignment buttons ([9902433](https://github.com/lotrekagency/mapo-new/commit/9902433e4ed5d4544bbce0156d27d86bc844c69e))
+
 # @mapomodule/mcp [1.0.0-beta.5](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/mcp@1.0.0-beta.4...@mapomodule/mcp@1.0.0-beta.5) (2026-11-18)
 
 ### Features
