@@ -12,6 +12,7 @@ const { $mapoFormRegistry } = useNuxtApp() as unknown as {
 const config = useRuntimeConfig().public.mapoForm as {
   groups?: { expanded?: boolean };
   debounce?: number;
+  editor?: { source?: boolean; textAlign?: boolean };
 };
 
 /** Sorted list of all registered field types currently available in the runtime registry. */
@@ -48,6 +49,10 @@ const userMappings = computed(() =>
 
 const globalDebounce = computed(() => config?.debounce || 300);
 const globalExpanded = computed(() => config?.groups?.expanded !== false);
+const globalEditorSource = computed(() => config?.editor?.source !== false);
+const globalEditorTextAlign = computed(
+  () => config?.editor?.textAlign === true,
+);
 
 function componentLabel(type: string): string {
   const v = $mapoFormRegistry?.mapping?.[type];
@@ -109,6 +114,24 @@ function isUserType(type: string): boolean {
               :class="globalExpanded ? 'text-green-400' : 'text-red-400'"
             >
               {{ globalExpanded }}
+            </span>
+          </div>
+          <div>
+            <span class="text-gray-500">editor.source</span>
+            <span
+              class="ml-2"
+              :class="globalEditorSource ? 'text-green-400' : 'text-red-400'"
+            >
+              {{ globalEditorSource }}
+            </span>
+          </div>
+          <div>
+            <span class="text-gray-500">editor.textAlign</span>
+            <span
+              class="ml-2"
+              :class="globalEditorTextAlign ? 'text-green-400' : 'text-red-400'"
+            >
+              {{ globalEditorTextAlign }}
             </span>
           </div>
           <div>

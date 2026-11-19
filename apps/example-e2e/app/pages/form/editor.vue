@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// Scenario: the editor field's opt-in attrs. `attrs.source` adds an HTML source
-// view; `attrs.toolbar` adds buttons for the commands of the extensions the
-// field loads (here StarterKit's, which every editor field has). The last
+// Scenario: the editor field's toolbar and content styles. The HTML source
+// view is on by default (module option `editor.source`); `attrs.source: false`
+// turns it off for one field. `attrs.textAlign` adds the alignment buttons.
+// `attrs.toolbar` adds buttons for the commands of the extensions the field
+// loads (here StarterKit's, which every editor field has). The last
 // field has neither: its toolbar is the built-in one.
 import type { FieldDescriptor } from "@mapomodule/form/types";
 
@@ -21,23 +23,23 @@ interface Model {
 }
 
 const savedBody =
-  '<h2>Source view</h2><p>Some <strong>bold</strong> text and a <a href="https://example.com">link</a>.</p><ul><li><p>One</p></li><li><p>Two</p></li></ul>';
+  '<h2>Source view</h2><p>Some <strong>bold</strong> text and a <a href="https://example.com">link</a>.</p><h3>A list</h3><ul><li><p>One</p></li><li><p>Two</p></li></ul><p style="text-align: center">A centred paragraph.</p>';
 const draftBody =
   "<p>A draft restored from outside: the source view shows it at once.</p>";
 
 const model = ref<Model>({
   body: savedBody,
   locked: "<p>A read-only field shows its source but does not change it.</p>",
-  plain: "<p>No new attrs: the toolbar is the built-in one.</p>",
+  plain: "<p>attrs.source: false: the toolbar is the built-in one.</p>",
 });
 
 const fields: FieldDescriptor<Model>[] = [
   {
     key: "body",
     type: "editor",
-    label: "Source view and custom buttons",
+    label: "Source view, alignment and custom buttons",
     attrs: {
-      source: true,
+      textAlign: true,
       toolbar: [
         {
           key: "quote",
@@ -74,9 +76,13 @@ const fields: FieldDescriptor<Model>[] = [
     type: "editor",
     label: "Read-only, with source view",
     readonly: true,
-    attrs: { source: true },
   },
-  { key: "plain", type: "editor", label: "No new attrs" },
+  {
+    key: "plain",
+    type: "editor",
+    label: "Without source view",
+    attrs: { source: false },
+  },
 ];
 </script>
 
@@ -85,7 +91,8 @@ const fields: FieldDescriptor<Model>[] = [
     <div>
       <h1 class="text-2xl font-bold text-highlighted">Editor</h1>
       <p class="text-muted text-sm mt-1">
-        <code>attrs.source</code> and <code>attrs.toolbar</code> on
+        <code>attrs.source</code>, <code>attrs.textAlign</code> and
+        <code>attrs.toolbar</code> on
         <code>type: 'editor'</code>
       </p>
     </div>
