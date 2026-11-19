@@ -135,7 +135,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "rich-text-editor",
     // No "editor" here: the word already points at the menu and block editors.
-    task: "Customize a rich text (WYSIWYG) field: Tiptap extensions, HTML source view, toolbar buttons",
+    task: "Customize a rich text (WYSIWYG) field: Tiptap extensions, text alignment, links, HTML source view, toolbar buttons",
     keywords: [
       "wysiwyg",
       "rich text",
@@ -147,12 +147,15 @@ export const RECIPES: Recipe[] = [
       "toolbar button",
       "insert table",
       "table",
+      "text align",
+      "alignment",
+      "insert link",
     ],
     doc: "uikit/form/add-fields.md",
     heading: "WYSIWYG editor",
     seeAlso: ["uikit/form/api.md"],
     summary:
-      "type: 'editor' with attrs.extensions (Tiptap v2), attrs.source (an HTML source view whose value is sanitized and normalized; on by default, app-wide through the module option editor.source) and attrs.toolbar (buttons for the extensions' commands).",
+      "type: 'editor' with attrs.extensions (Tiptap v2), attrs.source (an HTML source view whose value is sanitized and normalized; on by default, app-wide through the module option editor.source), attrs.textAlign (left/centre/right buttons; off by default, app-wide through editor.textAlign) and attrs.toolbar (buttons for the extensions' commands). The toolbar has a Link button and the content is styled without a typography plugin.",
   },
   {
     id: "block-editor",

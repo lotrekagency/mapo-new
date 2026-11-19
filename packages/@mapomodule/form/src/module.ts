@@ -23,6 +23,11 @@ export interface MapoFormOptions {
      * field sets `attrs.source` to differ from it. Default: `true`.
      */
     source?: boolean;
+    /**
+     * Shows the alignment buttons (left, centre, right) in every editor
+     * field. A field sets `attrs.textAlign` to differ from it. Default: `false`.
+     */
+    textAlign?: boolean;
   };
 }
 
@@ -35,7 +40,7 @@ export default defineNuxtModule<MapoFormOptions>({
   defaults: {
     debounce: 300,
     groups: { expanded: true },
-    editor: { source: true },
+    editor: { source: true, textAlign: false },
   },
 
   async setup(options, nuxt) {
@@ -59,7 +64,10 @@ export default defineNuxtModule<MapoFormOptions>({
     nuxt.options.runtimeConfig.public.mapoForm = {
       groups: { expanded: options.groups?.expanded ?? true },
       debounce: options.debounce ?? 300,
-      editor: { source: options.editor?.source ?? true },
+      editor: {
+        source: options.editor?.source ?? true,
+        textAlign: options.editor?.textAlign ?? false,
+      },
       // attrs is JSON-serialisable (plain objects) — merged in the plugin
       fields: { attrs: options.fields?.attrs ?? {} },
     };

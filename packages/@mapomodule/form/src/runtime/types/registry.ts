@@ -95,6 +95,6 @@ export interface MapoFormRuntimeConfig {
   groups: { expanded: boolean };
   debounce: number;
   /** Defaults for every `editor` field (module option `editor`). */
-  editor: { source: boolean };
+  editor: { source: boolean; textAlign: boolean };
   fields: { attrs: Record<string, Record<string, unknown>> };
 }

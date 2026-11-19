@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRenderer, h, nextTick, ref } from "vue";
 import type { App, Component, Ref } from "vue";
+import TextAlign from "@tiptap/extension-text-align";
 
 import MapoWygEditor from "../runtime/components/fields/MapoWygEditor.vue";
 import type { EditorDescriptor } from "../runtime/types/index.js";
 
-// The editor field with and without the HTML source view (`attrs.source`).
+// The editor field: its toolbar (links, alignment, custom buttons) and the
+// HTML source view (`attrs.source`).
 // Tiptap needs a DOM, which these tests do not have: `@tiptap/vue-3` is
 // replaced by an editor that keeps its document as an HTML string and
 // normalizes what it is given, the way a schema would.
@@ -14,13 +16,20 @@ interface FakeEditor {
   getHTML: () => string;
   commands: { setContent: ReturnType<typeof vi.fn> };
   setEditable: ReturnType<typeof vi.fn>;
-  isActive: () => boolean;
+  isActive: ReturnType<typeof vi.fn>;
+  getAttributes: ReturnType<typeof vi.fn>;
+  state: { selection: { empty: boolean } };
   chain: () => unknown;
   can: () => unknown;
   destroy: ReturnType<typeof vi.fn>;
+  /** The commands run through `chain()`, in order, with their arguments. */
+  calls: [string, ...unknown[]][];
 }
 
-const tiptap = vi.hoisted(() => ({ editor: undefined as unknown }));
+const tiptap = vi.hoisted(() => ({
+  editor: undefined as unknown,
+  options: undefined as { extensions: { name: string }[] } | undefined,
+}));
 
 /**
  * What the fake schema does to HTML: whitespace between tags goes, a `<span>`
@@ -35,9 +44,19 @@ const normalize = (html: string) =>
 
 function createFakeEditor(content: string): FakeEditor {
   let html = normalize(content);
-  // A command chain: any command returns the chain, `run()` applies nothing.
+  const calls: [string, ...unknown[]][] = [];
+  // A command chain: any command returns the chain and is recorded, `run()`
+  // applies nothing. `can()` answers through a chain that records nothing.
   const chain: unknown = new Proxy(() => chain, {
-    get: () => () => chain,
+    get:
+      (_target, name) =>
+      (...args: unknown[]) => {
+        calls.push([String(name), ...args]);
+        return chain;
+      },
+  });
+  const dryRun: unknown = new Proxy(() => dryRun, {
+    get: () => () => dryRun,
   });
   return {
     getHTML: () => html,
@@ -47,17 +66,24 @@ function createFakeEditor(content: string): FakeEditor {
       }),
     },
     setEditable: vi.fn(),
-    isActive: () => false,
+    isActive: vi.fn(() => false),
+    getAttributes: vi.fn(() => ({})),
+    state: { selection: { empty: false } },
     chain: () => chain,
-    can: () => chain,
+    can: () => dryRun,
     destroy: vi.fn(),
+    calls,
   };
 }
 
 vi.mock("@tiptap/vue-3", async () => {
   const { h, shallowRef } = await import("vue");
   return {
-    useEditor: (options: { content: string }) => {
+    useEditor: (options: {
+      content: string;
+      extensions: { name: string }[];
+    }) => {
+      tiptap.options = options;
       tiptap.editor = createFakeEditor(options.content);
       return shallowRef(tiptap.editor);
     },
@@ -86,7 +112,9 @@ vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
 // The module's runtime config; `beforeEach` restores what the module writes by default.
 const runtimeConfig = vi.hoisted(() => ({
   public: {
-    mapoForm: undefined as { editor: { source: boolean } } | undefined,
+    mapoForm: undefined as
+      | { editor: { source: boolean; textAlign?: boolean } }
+      | undefined,
   },
 }));
 vi.mock("#app", () => ({ useRuntimeConfig: () => runtimeConfig }));
@@ -156,6 +184,17 @@ const stubs: Record<string, Component> = {
         h("tooltip", { text: props.text }, slots.default?.()),
   },
   USeparator: { render: () => h("separator") },
+  UInput: {
+    props: { modelValue: { type: String, default: "" } },
+    emits: ["update:modelValue"],
+    setup:
+      (props, { emit }) =>
+      () =>
+        h("input", {
+          value: props.modelValue,
+          onInput: (value: string) => emit("update:modelValue", value),
+        }),
+  },
   UTextarea: {
     props: { modelValue: { type: String, default: "" } },
     emits: ["update:modelValue"],
@@ -236,7 +275,7 @@ describe("MapoWygEditor without attrs", () => {
   it("renders the built-in toolbar and the source toggle, enabled, and the editor", () => {
     mount();
 
-    expect(buttons()).toHaveLength(11);
+    expect(buttons()).toHaveLength(12);
     expect(buttons().every((node) => !node.props.disabled)).toBe(true);
     expect(sourceToggle()).toBeDefined();
     expect(textarea()).toBeUndefined();
@@ -246,7 +285,7 @@ describe("MapoWygEditor without attrs", () => {
   it("renders the built-in toolbar only when the field turns the source view off", () => {
     mount({ source: false });
 
-    expect(buttons()).toHaveLength(10);
+    expect(buttons()).toHaveLength(11);
     expect(sourceToggle()).toBeUndefined();
   });
 
@@ -486,8 +525,8 @@ describe("MapoWygEditor custom toolbar buttons", () => {
     expect(row[table - 1]!.type).toBe("separator");
     expect(row[table - 2]).toBe(tooltipOf("mapo.wygEditor.insertImage"));
     expect(row[table + 1]).toBe(tooltipOf("Quote"));
-    // 10 built-in, 2 custom, the source toggle.
-    expect(buttons()).toHaveLength(13);
+    // 11 built-in, 2 custom, the source toggle.
+    expect(buttons()).toHaveLength(14);
 
     expect(buttonOf("Insert table")!.props.icon).toBe("i-lucide-table");
     // A button with no icon shows its label.
@@ -566,7 +605,282 @@ describe("MapoWygEditor custom toolbar buttons", () => {
 
     expect(hasActiveClass(buttonOf("Add row"))).toBe(false);
     expect(buttonOf("Add row")!.props.disabled).toBe(true);
-    // 10 built-in, 1 custom, the source toggle.
-    expect(buttons()).toHaveLength(12);
+    // 11 built-in, 1 custom, the source toggle.
+    expect(buttons()).toHaveLength(13);
+  });
+});
+
+/** A button by its accessible name, or by its text when it has none. */
+const byLabel = (label: string) =>
+  buttons().find(
+    (node) => node.props["aria-label"] === label || node.props.label === label,
+  );
+
+describe("MapoWygEditor links", () => {
+  const linkButton = () => byLabel("mapo.wygEditor.link");
+  const linkInput = () => all(root).find((node) => node.type === "input");
+  const typeLink = (url: string) =>
+    (linkInput()!.props.onInput as (value: string) => void)(url);
+  const alert = () => all(root).find((node) => node.props.role === "alert");
+  /** Fires the input's keydown listeners, as `@keydown.<key>` binds them. */
+  function press(key: string) {
+    const event = { key, preventDefault: vi.fn() };
+    const handlers = [linkInput()!.props.onKeydown].flat() as Array<
+      (event: unknown) => void
+    >;
+    handlers.forEach((handler) => handler(event));
+    return event;
+  }
+  async function openLink(url?: string) {
+    click(linkButton());
+    await nextTick();
+    if (url !== undefined) {
+      typeLink(url);
+      await nextTick();
+    }
+  }
+
+  it("opens a bar with the address of the link at the selection, and closes it", async () => {
+    mount();
+    fakeEditor().getAttributes.mockReturnValue({ href: "/contatti/" });
+
+    await openLink();
+
+    expect(fakeEditor().getAttributes).toHaveBeenCalledWith("link");
+    expect(linkInput()!.props.value).toBe("/contatti/");
+    expect(linkButton()!.props["aria-expanded"]).toBe(true);
+
+    click(byLabel("mapo.wygEditor.linkCancel"));
+    await nextTick();
+    expect(linkInput()).toBeUndefined();
+  });
+
+  it("links the selection, extending the link already there", async () => {
+    mount();
+    await openLink("https://example.com");
+
+    click(byLabel("mapo.wygEditor.linkApply"));
+    await nextTick();
+
+    expect(fakeEditor().calls).toEqual([
+      ["focus"],
+      ["extendMarkRange", "link"],
+      ["setLink", { href: "https://example.com" }],
+      ["run"],
+    ]);
+    expect(linkInput()).toBeUndefined();
+  });
+
+  it("inserts the address as linked text when nothing is selected", async () => {
+    mount();
+    fakeEditor().state.selection.empty = true;
+    await openLink("/contatti/");
+
+    click(byLabel("mapo.wygEditor.linkApply"));
+
+    expect(fakeEditor().calls).toEqual([
+      ["focus"],
+      [
+        "insertContent",
+        {
+          type: "text",
+          text: "/contatti/",
+          marks: [{ type: "link", attrs: { href: "/contatti/" } }],
+        },
+      ],
+      ["run"],
+    ]);
+  });
+
+  it("adds https:// to an address that starts with www.", async () => {
+    mount();
+    await openLink("www.example.com");
+
+    click(byLabel("mapo.wygEditor.linkApply"));
+
+    expect(fakeEditor().calls).toContainEqual([
+      "setLink",
+      { href: "https://www.example.com" },
+    ]);
+  });
+
+  it("refuses an address outside the allowlist and keeps the bar open with an error", async () => {
+    mount();
+    await openLink("javascript:alert(1)");
+
+    click(byLabel("mapo.wygEditor.linkApply"));
+    await nextTick();
+
+    expect(fakeEditor().calls).toEqual([]);
+    expect(alert()!.text).toContain("mapo.wygEditor.linkInvalid");
+    expect(linkInput()!.props["aria-invalid"]).toBe(true);
+  });
+
+  it("removes the link with its button, or when the address is emptied", async () => {
+    mount();
+    fakeEditor().isActive.mockImplementation((name) => name === "link");
+    await openLink();
+
+    click(byLabel("mapo.wygEditor.linkRemove"));
+    await nextTick();
+    expect(fakeEditor().calls).toEqual([
+      ["focus"],
+      ["extendMarkRange", "link"],
+      ["unsetLink"],
+      ["run"],
+    ]);
+    expect(linkInput()).toBeUndefined();
+
+    fakeEditor().calls.length = 0;
+    await openLink("  ");
+    click(byLabel("mapo.wygEditor.linkApply"));
+    expect(fakeEditor().calls).toEqual([
+      ["focus"],
+      ["extendMarkRange", "link"],
+      ["unsetLink"],
+      ["run"],
+    ]);
+  });
+
+  it("applies with Enter and closes with Escape, keeping the keys from the page's form", async () => {
+    mount();
+    await openLink("/pagina/");
+
+    const enter = press("Enter");
+    expect(enter.preventDefault).toHaveBeenCalled();
+    expect(fakeEditor().calls).toContainEqual([
+      "setLink",
+      { href: "/pagina/" },
+    ]);
+    await nextTick();
+    expect(linkInput()).toBeUndefined();
+
+    await openLink();
+    const escape = press("Escape");
+    expect(escape.preventDefault).toHaveBeenCalled();
+    await nextTick();
+    expect(linkInput()).toBeUndefined();
+  });
+
+  it("closes the bar for the source view and disables the button on a read-only field", async () => {
+    mount();
+    await openLink();
+
+    click(sourceToggle());
+    await nextTick();
+    expect(linkInput()).toBeUndefined();
+    expect(linkButton()!.props.disabled).toBe(true);
+    app!.unmount();
+
+    mount({}, { readonly: true });
+    expect(linkButton()!.props.disabled).toBe(true);
+  });
+});
+
+describe("MapoWygEditor alignment", () => {
+  const alignButtons = () =>
+    ["alignLeft", "alignCenter", "alignRight"].map((key) =>
+      byLabel(`mapo.wygEditor.${key}`),
+    );
+  const loadedTextAlign = () =>
+    tiptap.options!.extensions.filter(
+      (extension) => extension.name === "textAlign",
+    ) as unknown as { options: { types: string[]; alignments: string[] } }[];
+
+  it("has no buttons and loads no TextAlign by default", () => {
+    mount();
+
+    expect(alignButtons().every((node) => node === undefined)).toBe(true);
+    expect(loadedTextAlign()).toHaveLength(0);
+  });
+
+  it("adds left, centre and right with attrs.textAlign, for paragraphs and headings", () => {
+    mount({ textAlign: true });
+
+    expect(alignButtons().map((node) => node?.props.icon)).toEqual([
+      "i-lucide-align-left",
+      "i-lucide-align-center",
+      "i-lucide-align-right",
+    ]);
+    expect(loadedTextAlign()).toHaveLength(1);
+    expect(loadedTextAlign()[0]!.options.types).toEqual([
+      "heading",
+      "paragraph",
+    ]);
+    expect(loadedTextAlign()[0]!.options.alignments).toEqual([
+      "left",
+      "center",
+      "right",
+    ]);
+  });
+
+  it("follows the module option, and the field's attrs.textAlign wins", () => {
+    runtimeConfig.public.mapoForm = {
+      editor: { source: true, textAlign: true },
+    };
+    mount();
+    expect(alignButtons().every((node) => node !== undefined)).toBe(true);
+    app!.unmount();
+
+    mount({ textAlign: false });
+    expect(alignButtons().every((node) => node === undefined)).toBe(true);
+  });
+
+  it("centres and right-aligns with setTextAlign; left removes the alignment", () => {
+    mount({ textAlign: true });
+    const [left, center, right] = alignButtons();
+
+    click(center);
+    click(right);
+    click(left);
+
+    expect(fakeEditor().calls).toEqual([
+      ["focus"],
+      ["setTextAlign", "center"],
+      ["run"],
+      ["focus"],
+      ["setTextAlign", "right"],
+      ["run"],
+      ["focus"],
+      ["unsetTextAlign"],
+      ["run"],
+    ]);
+  });
+
+  it("marks the selection's alignment as pressed, left when none is set", async () => {
+    mount({ textAlign: true });
+    expect(alignButtons().map((node) => node!.props["aria-pressed"])).toEqual([
+      true,
+      false,
+      false,
+    ]);
+
+    fakeEditor().isActive.mockImplementation(
+      (attributes) =>
+        typeof attributes === "object" &&
+        (attributes as { textAlign?: string }).textAlign === "center",
+    );
+    // Opening the link bar re-renders the toolbar with the new selection.
+    click(byLabel("mapo.wygEditor.link"));
+    await nextTick();
+
+    expect(alignButtons().map((node) => node!.props["aria-pressed"])).toEqual([
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  it("keeps a TextAlign the field loads itself, instead of adding its own", () => {
+    const own = TextAlign.configure({ types: ["paragraph"] });
+    mount({ textAlign: true, extensions: [own] });
+
+    expect(loadedTextAlign()).toEqual([own]);
+  });
+
+  it("disables the buttons on a read-only field", () => {
+    mount({ textAlign: true }, { readonly: true });
+
+    expect(alignButtons().every((node) => node!.props.disabled)).toBe(true);
   });
 });

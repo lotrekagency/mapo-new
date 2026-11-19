@@ -33,12 +33,13 @@ The page is a regular Nuxt route, accessible like any other URL during developme
 
 The left column reports the module configuration as read from `runtimeConfig.public.mapoForm`:
 
-| Field             | Description                                                              |
-| ----------------- | ------------------------------------------------------------------------ |
-| `debounce`        | Global debounce in ms (default: 300 ms)                                  |
-| `groups.expanded` | Whether groups open expanded by default (default: `true`)                |
-| `editor.source`   | Whether editor fields show the HTML source toggle (default: `true`)      |
-| `custom types`    | Number of types added by the user via `defineFormField` or `nuxt.config` |
+| Field              | Description                                                              |
+| ------------------ | ------------------------------------------------------------------------ |
+| `debounce`         | Global debounce in ms (default: 300 ms)                                  |
+| `groups.expanded`  | Whether groups open expanded by default (default: `true`)                |
+| `editor.source`    | Whether editor fields show the HTML source toggle (default: `true`)      |
+| `editor.textAlign` | Whether editor fields show the alignment buttons (default: `false`)      |
+| `custom types`     | Number of types added by the user via `defineFormField` or `nuxt.config` |
 
 ### Registered custom fields
 

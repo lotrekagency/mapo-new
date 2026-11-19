@@ -158,7 +158,17 @@
       "insertImage": "Insert image",
       "requiresUikit": "Requires {'@'}mapomodule/uikit",
       "source": "HTML source",
-      "sourceHint": "Tags and attributes the editor does not support are removed."
+      "sourceHint": "Tags and attributes the editor does not support are removed.",
+      "link": "Link",
+      "linkUrl": "Link address",
+      "linkPlaceholder": "https://… or /page/",
+      "linkApply": "Apply",
+      "linkRemove": "Remove link",
+      "linkCancel": "Close",
+      "linkInvalid": "Invalid address: use http, https, mailto, tel or a path such as /page/.",
+      "alignLeft": "Align left",
+      "alignCenter": "Center",
+      "alignRight": "Align right"
     },
     "listActions": {
       "bulkActions": "Bulk actions...",
