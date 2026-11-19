@@ -1,3 +1,14 @@
+# @mapomodule/form [2.0.0-beta.17](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.16...@mapomodule/form@2.0.0-beta.17) (2026-11-19)
+
+### Features
+
+- **form:** show the editor's HTML source view by default, with an app-wide option ([a6da853](https://github.com/lotrekagency/mapo-new/commit/a6da853303553724b8aaa18affdad53930049001))
+- **form:** style the editor's content and add link and text alignment buttons ([9902433](https://github.com/lotrekagency/mapo-new/commit/9902433e4ed5d4544bbce0156d27d86bc844c69e))
+
+### Dependencies
+
+- **@mapomodule/i18n:** upgraded to 2.0.0-beta.8
+
 # @mapomodule/form [2.0.0-beta.16](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.15...@mapomodule/form@2.0.0-beta.16) (2026-11-18)
 
 ### Features
