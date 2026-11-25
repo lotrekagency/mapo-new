@@ -6,7 +6,11 @@ import type {
   MapoFormRuntimeConfig,
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
-import { isTopLayer, useMountedWhileOpen } from "../utils/layers.js";
+import {
+  isTopLayer,
+  usePageScrollLock,
+  useMountedWhileOpen,
+} from "../utils/layers.js";
 import {
   isFieldRemoved,
   isFieldShown,
@@ -50,19 +54,19 @@ const expandedFieldKey = ref<string | null>(null);
 
 function expandField(key: string) {
   expandedFieldKey.value = key;
-  document.body.style.overflow = "hidden";
 }
 
 function collapseField() {
   expandedFieldKey.value = null;
-  document.body.style.overflow = "";
 }
 
 // The expanded panel is a layer with no z-index, mounted when a field expands,
-// so that the menus and modals the field opens show above it (see
-// utils/layers.ts).
+// so that the menus and modals the field opens show above it, and the page
+// does not scroll under it (see utils/layers.ts).
+const isExpanded = computed(() => expandedFieldKey.value !== null);
 const { mounted: panelMounted, onAfterLeave: onPanelAfterLeave } =
-  useMountedWhileOpen(computed(() => expandedFieldKey.value !== null));
+  useMountedWhileOpen(isExpanded);
+usePageScrollLock(isExpanded);
 const panelEl = ref<HTMLElement | null>(null);
 
 // Collapse on ESC when the panel is the top layer: a menu or modal opened from
@@ -73,10 +77,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => document.addEventListener("keydown", onKeydown));
-onUnmounted(() => {
-  document.removeEventListener("keydown", onKeydown);
-  document.body.style.overflow = "";
-});
+onUnmounted(() => document.removeEventListener("keydown", onKeydown));
 
 provide("mapoGroupExpand", { expandField, collapseField, expandedFieldKey });
 

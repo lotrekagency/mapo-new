@@ -1,14 +1,14 @@
 # Field Expand
 
-A field with `expandable: true` can blow up to fill the entire group container. Useful for textareas, rich-text editors, maps — anything that benefits from more vertical space without the user having to leave the form.
+A field with `expandable: true` can open in a full-screen panel, in a group or among the fields with no group. Useful for textareas, rich-text editors, maps — anything that benefits from more vertical space without the user having to leave the form.
 
 ## TL;DR
 
 ```ts
-{ key: 'content', type: 'editor', expandable: true, group: 'Page' }
+{ key: 'content', type: 'editor', expandable: true }
 ```
 
-Click the ↔ icon in the field label → the group becomes a fullscreen overlay; the expanded field takes the entire viewport height.
+Click the ↔ icon in the field label → the field opens in a fullscreen panel and takes the entire viewport height.
 
 ---
 
@@ -50,19 +50,13 @@ When the user clicks the ↔ icon in the field label:
 - A semi-transparent backdrop covers the rest of the page.
 - The other fields in the group are hidden.
 - The expanded field claims all available height (`flex: 1; min-height: 0`).
-- Body scroll is locked.
+- Page scroll is locked until the panel collapses, and until Focus Mode closes too when it was opened from the panel: the lock is counted.
 
-To exit: click the backdrop, press `ESC`, or click the ↙ button in the group header. `ESC` closes the top layer only: while a select menu, popover or modal opened from the field is open, or a repeater item opened from it in Focus Mode, `ESC` closes that one first.
+To exit: click the backdrop, press `ESC`, or click the ↙ button in the panel header. `ESC` closes the top layer only: while a select menu, popover or modal opened from the field is open, or a repeater item opened from it in Focus Mode, `ESC` closes that one first.
 
-## How to: combine with `cols`
+## Grouped and flat fields
 
-`expandable` works on both flat-grid fields and grouped fields. The expand chrome lives in the group header, so the field must declare a `group`. A flat field (no group) does **not** show the expand button by design — the system needs a container to take over.
-
-If you want a single field to expand, give it its own group:
-
-```ts
-{ key: 'description', type: 'textarea', group: 'Description', expandable: true }
-```
+`expandable` works the same on a field with a `group` and on one without: `MapoFormGroup` and `MapoFormFlatSection` (the grid of the fields with no group) both open the panel. A field does not need a group of its own to expand.
 
 ## How to: prevent two fields expanding at once
 
@@ -70,6 +64,5 @@ Only one field can be expanded inside the same group. If you have two `expandabl
 
 ## Pitfalls
 
-- **No `group` ⇒ no button** — without `group: '…'`, the expand icon is hidden. This is intentional: the system expands the group container, not the bare field.
 - **Hover-only icon by default** — the icon is hover-revealed to keep the UI clean. While the field is expanded, the icon stays visible to give a clear exit affordance.
-- **Body-scroll lock interaction** — if you also use Focus Mode in the same form, both compete for `document.body.style.overflow`. The shared scroll-lock counter handles it correctly; do not toggle `overflow` yourself.
+- **Page-scroll lock interaction** — an expanded field and Focus Mode lock the page's scroll with one shared counter (`overflow: hidden` on `<html>`), so the page scrolls again only once both have closed. Do not toggle the `overflow` of `<html>` yourself while one is open.

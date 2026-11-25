@@ -16,6 +16,7 @@ const form = useMapoForm<T>({
   notifyErrors?: boolean,       // default true; false = no toast for server errors
   registry:     FieldRegistry,
   draftKey?:    MaybeRef<string | undefined>,    // enable draft persistence
+  onUpdate?:    (model: T) => void,   // after a field wrote into `model` (in place)
 })
 ```
 

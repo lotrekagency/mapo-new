@@ -48,32 +48,17 @@ export interface FocusModeReturn {
   exit: () => void;
 }
 
-// Fallback for non-Nuxt environments (tests, Storybook): a client-only singleton is
-// acceptable. In Nuxt we use `useState` to guarantee per-request isolation in SSR
-// and avoid cross-tenant state leaks.
-const _clientFallback = shallowRef<FocusTarget | null>(null);
-
-function getStateRef(): Ref<FocusTarget | null> {
-  // `useState` is auto-imported by Nuxt; in vanilla environments we fall back to the singleton.
-  const nuxtUseState = (
-    globalThis as { useState?: <X>(key: string, init: () => X) => Ref<X> }
-  ).useState;
-  if (typeof nuxtUseState === "function") {
-    return nuxtUseState<FocusTarget | null>(
-      "mapo:form:focusTarget",
-      () => null,
-    );
-  }
-  return _clientFallback;
-}
+// The one focus target of the app. It lives in this module, so on the server
+// every request would share it: focus mode opens from a user action, in the
+// browser, and the server never sets it.
+const state = shallowRef<FocusTarget | null>(null);
 
 /**
- * Exposes a shared focus-mode state for nested repeater items.
- * In Nuxt it uses `useState()` for SSR-safe request isolation.
+ * Exposes the app's focus-mode state: the repeater item open in focus mode.
+ * Call `enter()` from a user action: on the server the state is shared by
+ * every request.
  */
 export function useFocusMode(): FocusModeReturn {
-  const state = getStateRef();
-
   function enter(target: FocusTarget): void {
     state.value = target;
   }

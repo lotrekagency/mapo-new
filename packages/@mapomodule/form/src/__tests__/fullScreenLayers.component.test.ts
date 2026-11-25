@@ -39,15 +39,36 @@ vi.mock("../runtime/composables/useMapoForm.js", async () => {
 // The sub-form renders `content`, when a test gives it some.
 const subForm = vi.hoisted(() => ({
   model: undefined as Record<string, unknown> | undefined,
+  errors: undefined as Record<string, string[]> | undefined,
+  notifyErrors: undefined as boolean | undefined,
   content: undefined as (() => VNode) | undefined,
+  /** Emits `update:modelValue`, as MapoForm does after a field wrote. */
+  emit: undefined as ((value: Record<string, unknown>) => void) | undefined,
 }));
 vi.mock("../runtime/components/MapoForm.vue", () => ({
   default: {
     name: "MapoForm",
-    props: { modelValue: { type: Object, required: true } },
-    render(this: { modelValue: Record<string, unknown> }) {
-      subForm.model = this.modelValue;
-      return subForm.content?.() ?? null;
+    props: {
+      modelValue: { type: Object, required: true },
+      errors: { type: Object, default: undefined },
+      notifyErrors: { type: Boolean, default: undefined },
+    },
+    emits: ["update:modelValue"],
+    setup(
+      props: {
+        modelValue: Record<string, unknown>;
+        errors?: Record<string, string[]>;
+        notifyErrors?: boolean;
+      },
+      { emit }: { emit: (event: "update:modelValue", value: unknown) => void },
+    ) {
+      subForm.emit = (value) => emit("update:modelValue", value);
+      return () => {
+        subForm.model = props.modelValue;
+        subForm.errors = props.errors;
+        subForm.notifyErrors = props.notifyErrors;
+        return subForm.content?.() ?? null;
+      };
     },
   },
 }));
@@ -228,6 +249,7 @@ beforeEach(() => {
   fieldExpand.controls = undefined;
   subForm.model = undefined;
   subForm.content = undefined;
+  subForm.emit = undefined;
   const listen = (_type: string, listener: (event: KeyboardEvent) => void) =>
     keydownListeners.add(listener);
   const unlisten = (_type: string, listener: (event: KeyboardEvent) => void) =>
@@ -243,7 +265,8 @@ beforeEach(() => {
   vi.stubGlobal("document", {
     addEventListener: listen,
     removeEventListener: unlisten,
-    body: { style: {} },
+    body: { style: { overflow: "" } },
+    documentElement: { style: { overflow: "" } },
     // What `isTopLayer` selects: the Mapo layers and the Nuxt UI overlays.
     querySelectorAll: () =>
       treeOrder(body).filter(
@@ -607,5 +630,111 @@ describe("Focus mode's edits", () => {
     expect(nestedItems).toHaveLength(1);
     expect(focusModeButtons()).toHaveLength(1);
     expect(treeOrder(root)).toContain(focusModeButtons()[0]);
+  });
+});
+
+describe("Focus mode's sub-form", () => {
+  it("hands each edit to the item once, though MapoForm emits it too", async () => {
+    const onUpdate = vi.fn();
+    mountAll([MapoFocusPortal, {}]);
+    useFocusMode().enter({
+      ...focusTarget(),
+      model: { status: "draft" },
+      onUpdate,
+    });
+    await settle();
+
+    subForm.model!.status = "published";
+    subForm.emit!(subForm.model!);
+    await settle();
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes a new model MapoForm emits as its copy, and hands it to the item", async () => {
+    const onUpdate = vi.fn();
+    mountAll([MapoFocusPortal, {}]);
+    useFocusMode().enter({
+      ...focusTarget(),
+      model: { status: "draft" },
+      onUpdate,
+    });
+    await settle();
+
+    subForm.emit!({ status: "archived" });
+    await settle();
+
+    expect(subForm.model).toEqual({ status: "archived" });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenLastCalledWith({ status: "archived" });
+  });
+
+  it("shows the item's errors, and follows them", async () => {
+    mountAll([MapoFocusPortal, {}]);
+    const errors = ref<Record<string, string[]>>({ title: ["Required."] });
+    useFocusMode().enter({ ...focusTarget(), errors });
+    await settle();
+
+    expect(subForm.errors).toEqual({ title: ["Required."] });
+    // The root form toasts the server errors already.
+    expect(subForm.notifyErrors).toBe(false);
+
+    errors.value = { title: ["Too short."] };
+    await settle();
+
+    expect(subForm.errors).toEqual({ title: ["Too short."] });
+  });
+});
+
+describe("The page's scroll", () => {
+  const overflow = () => document.documentElement.style.overflow;
+
+  it("stays locked until the last layer open over it has closed", async () => {
+    mountAll(group, [MapoFocusPortal, {}]);
+    fieldExpand.controls?.expandField("body");
+    await settle();
+    useFocusMode().enter(focusTarget());
+    await settle();
+
+    expect(overflow()).toBe("hidden");
+
+    useFocusMode().exit();
+    await settle();
+
+    expect(overflow()).toBe("hidden");
+
+    fieldExpand.controls?.collapseField();
+    await settle();
+
+    expect(overflow()).toBe("");
+  });
+
+  it("is released by a layer that goes away while open", async () => {
+    mountAll(flatSection);
+    fieldExpand.controls?.expandField("body");
+    await settle();
+
+    expect(overflow()).toBe("hidden");
+
+    app?.unmount();
+    app = undefined;
+
+    expect(overflow()).toBe("");
+  });
+
+  it("leaves <body> to Nuxt UI modals, which save and restore its overflow", async () => {
+    // A Nuxt UI modal is open: it locked <body>.
+    document.body.style.overflow = "hidden";
+    mountAll(group);
+    fieldExpand.controls?.expandField("body");
+    await settle();
+
+    // The page goes away: the modal releases its lock first, then the field.
+    document.body.style.overflow = "";
+    app?.unmount();
+    app = undefined;
+
+    expect(document.body.style.overflow).toBe("");
+    expect(overflow()).toBe("");
   });
 });

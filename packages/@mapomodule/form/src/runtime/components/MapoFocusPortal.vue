@@ -22,18 +22,23 @@ import { watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFocusMode } from "../composables/useFocusMode.js";
 import type { FocusTarget } from "../composables/useFocusMode.js";
-import { isTopLayer, useMountedWhileOpen } from "../utils/layers.js";
+import {
+  isTopLayer,
+  usePageScrollLock,
+  useMountedWhileOpen,
+} from "../utils/layers.js";
 import MapoForm from "./MapoForm.vue";
 
 const { t } = useI18n();
 const { focusTarget, exit } = useFocusMode();
 
 const isOpen = computed(() => focusTarget.value !== null);
-const canUseDocument = typeof document !== "undefined";
 
 // A layer with no z-index, mounted when focus mode opens, so that the menus
-// and modals of the item's fields show above it (see utils/layers.ts).
+// and modals of the item's fields show above it, and the page does not scroll
+// under it (see utils/layers.ts).
 const { mounted: portalMounted, onAfterLeave } = useMountedWhileOpen(isOpen);
+usePageScrollLock(isOpen);
 const layerEl = ref<HTMLElement | null>(null);
 
 // Close on ESC when the portal is the top layer: a menu or modal opened from
@@ -45,19 +50,19 @@ function onKeyDown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onKeyDown));
 onUnmounted(() => window.removeEventListener("keydown", onKeyDown));
 
-// Lock body scroll while the portal is open.
-watch(isOpen, (open) => {
-  if (!canUseDocument) return;
-  document.body.style.overflow = open ? "hidden" : "";
-});
+// The item's errors. Read through `focusTarget`, which unwraps refs, `errors`
+// comes out as its value: `unref` takes it either way.
+const itemErrors = computed(
+  () => (unref(focusTarget.value?.errors) ?? {}) as Record<string, string[]>,
+);
 
-// The sub-form edits a copy of the item. Its fields write into the copy in
-// place, and MapoForm emits nothing for that (MapoRepeaterItem watches its own
-// model for the same reason), so a watcher on the copy's keys hands each edit
-// to the item. The objects nested in the copy are the item's own: what a field
-// writes inside them (a translation) reaches the item directly. Watching them
-// too would hand the item this copy again whenever the item edits them, long
-// after focus mode has closed, and undo its later edits.
+// The sub-form edits a copy of the item, and its fields write into it in
+// place. A watcher on the copy's keys hands each edit to the item: MapoForm's
+// `update:modelValue` stops once the portal has closed, and a field's
+// debounced write can land after that. The objects nested in the copy are the
+// item's own: what a field writes inside them (a translation) reaches the item
+// directly. Watching them too would hand the item this copy again whenever the
+// item edits them, long after focus mode has closed, and undo its later edits.
 const localModel = ref<Record<string, unknown>>({});
 // The item the copy belongs to. It stays set after exit: a field writes once
 // its debounce has run out, so an edit made just before closing lands after
@@ -91,7 +96,10 @@ watch(
   { deep: 1 },
 );
 
+// MapoForm emits the copy its fields wrote into, which the watcher hands
+// over; only a new object replaces the copy.
 function onUpdate(val: Record<string, unknown>) {
+  if (val === localModel.value) return;
   localModel.value = val;
   target?.onUpdate(val);
 }
@@ -150,7 +158,8 @@ function onUpdate(val: Record<string, unknown>) {
             <MapoForm
               :model-value="localModel"
               :fields="focusTarget.fields as any"
-              :errors="focusTarget.errors.value as any"
+              :errors="itemErrors"
+              :notify-errors="false"
               :languages="focusTarget.languages as any"
               :current-lang="focusTarget.currentLang"
               :registry="focusTarget.registry as any"

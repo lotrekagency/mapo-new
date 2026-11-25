@@ -21,7 +21,7 @@ The `i-lucide-maximize-2` icon now appears on every repeater item header. Click 
 
 ## Setup
 
-Mount `<MapoFocusPortal />` exactly once in the app layout (or in `MapoRootComponents` if you have one). The component is global because the focus state lives in `useState('mapo:form:focusTarget')` — one focus target across the whole app, request-scoped on SSR.
+Mount `<MapoFocusPortal />` exactly once in the app layout (or in `MapoRootComponents` if you have one). The component is global because the focus state is one for the whole app: `useFocusMode()` keeps a single focus target (see **State scope** below).
 
 ```vue
 <!-- layouts/default.vue -->
@@ -106,8 +106,8 @@ If you do not want the maximize icon on every item, check `descriptor.attrs` ins
 
 - **Transition** — `scale(0.98) → scale(1) + opacity` on a 200 ms ease curve.
 - **Stacking** — the portal has no `z-index`. Like Nuxt UI overlays, it stacks by its place in `<body>`: it mounts at the end of `<body>` when it opens, above the page and above an expanded field it was opened from, and the select menus, popovers and modals of its fields mount after it, above it. Do not give it a `z-index` in a theme or an override: it would cover them. An overlay mounted before the portal opened, such as a `UModal` declared in a page or a layout and opened from a custom field, sits before it in `<body>` and shows under it: mount that overlay when it opens, with `v-if` or `useOverlay()`.
-- **Body scroll** — locked while the portal is open via `document.body.style.overflow = 'hidden'`. Cleanup is reference-counted: opening Field Expand and Focus Mode together does not unlock prematurely.
-- **State scope** — `useState` keeps the focus target per-request on SSR, so two concurrent users are not exposed to each other's editing context.
+- **Page scroll** — locked while the portal is open, with `overflow: hidden` on `<html>`. The lock is counted with the one of an expanded field: closing Focus Mode opened from an expanded field keeps the page locked until the field collapses too. Nuxt UI modals lock `<body>` on their own, so the two locks never undo each other.
+- **State scope** — one focus target for the whole app, kept by `useFocusMode()` in its module. Focus mode opens from a user action, in the browser, so the server never holds one: call `enter()` from an event handler, never during server rendering, where every request would share it.
 - **No save step** — the portal is a different _view_ of the same item; updates flow upstream as the user types, exactly like the inline view.
 
 ## Pitfalls

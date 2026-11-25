@@ -71,6 +71,9 @@ const repeater: RepeaterDescriptor<Model> = {
   },
 };
 
+// Server errors, as MapoDetail passes them: Focus Mode shows the item's own.
+const errors = ref<Record<string, string[]>>({});
+
 // useFocusMode state for inspector
 const focusMode = useFocusMode?.();
 </script>
@@ -126,10 +129,29 @@ const focusMode = useFocusMode?.();
       <MapoForm
         v-model="model"
         :fields="[repeater]"
-        :errors="{}"
+        :errors="errors"
         :registry="$mapoFormRegistry"
       />
     </UCard>
+
+    <div class="flex gap-2">
+      <UButton
+        variant="outline"
+        color="error"
+        size="sm"
+        leading-icon="i-lucide-alert-triangle"
+        @click="
+          errors = {
+            'articles.0.title': ['Title already used (server error).'],
+          }
+        "
+      >
+        Inject server error on the first title
+      </UButton>
+      <UButton variant="outline" color="neutral" size="sm" @click="errors = {}">
+        Clear
+      </UButton>
+    </div>
 
     <!-- Live model — verify edits made in focus mode propagate -->
     <UCard>
@@ -157,6 +179,14 @@ const focusMode = useFocusMode?.();
         <li>Background page is not scrollable (test 1.4 — focus trap)</li>
         <li>Edit a field → live model above updates (test 2.1)</li>
         <li>Press Esc → overlay closes, edits kept (test 3.1)</li>
+        <li>
+          Inject the server error, open the first article in Focus Mode: its
+          Title shows the error
+        </li>
+        <li>
+          Expand all, edit both titles one right after the other: the live model
+          keeps both
+        </li>
         <li>
           Open the Status select → its menu shows above the overlay; Esc closes
           the menu only, a second Esc the overlay

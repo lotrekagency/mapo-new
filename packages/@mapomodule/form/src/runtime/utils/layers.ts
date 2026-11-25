@@ -1,4 +1,4 @@
-import { ref, watch } from "vue";
+import { onScopeDispose, ref, watch } from "vue";
 import type { Ref } from "vue";
 
 // Mapo's full-screen layers are focus mode (`MapoFocusPortal`) and an expanded
@@ -34,6 +34,47 @@ export function useMountedWhileOpen(isOpen: Readonly<Ref<boolean>>): {
   }
 
   return { mounted, onAfterLeave };
+}
+
+// Open layers, and the `overflow` of <html> before the first one locked it.
+let scrollLocks = 0;
+let overflowBefore = "";
+
+/**
+ * Locks the page's scroll while `isOpen` is true, and releases it when the
+ * caller's scope ends. Layers open over one another (focus mode from an
+ * expanded field), so the locks are counted: the page scrolls again once the
+ * last layer has closed.
+ *
+ * The lock is `overflow: hidden` on <html>. Nuxt UI modals (Reka UI) lock
+ * <body>, saving its `overflow` and writing it back when they close: two such
+ * locks on one element undo each other when they are released out of order,
+ * as when a page with both open goes away.
+ */
+export function usePageScrollLock(isOpen: Readonly<Ref<boolean>>): void {
+  let locked = false;
+
+  function release() {
+    if (!locked) return;
+    locked = false;
+    if (--scrollLocks === 0)
+      document.documentElement.style.overflow = overflowBefore;
+  }
+
+  watch(
+    isOpen,
+    (open) => {
+      if (!open) return release();
+      if (locked || typeof document === "undefined") return;
+      locked = true;
+      if (scrollLocks++ === 0) {
+        overflowBefore = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = "hidden";
+      }
+    },
+    { immediate: true },
+  );
+  onScopeDispose(release);
 }
 
 /**
