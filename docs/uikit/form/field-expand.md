@@ -46,13 +46,13 @@ Recommended targets:
 
 When the user clicks the ↔ icon in the field label:
 
-- The `MapoFormGroup` becomes a fullscreen overlay (`position: fixed; inset: 1rem; z-index: 50`).
+- The field opens in a fullscreen panel (`position: fixed`, with a `1rem` margin), mounted at the end of `<body>`. It has no `z-index`, like Nuxt UI overlays: the select menus, popovers and modals the field opens, and a repeater item opened in [Focus Mode](./focus-mode), show above it. An overlay mounted before the field expanded, such as a `UModal` declared in the page, shows under it: mount that overlay when it opens, with `v-if` or `useOverlay()`.
 - A semi-transparent backdrop covers the rest of the page.
 - The other fields in the group are hidden.
 - The expanded field claims all available height (`flex: 1; min-height: 0`).
 - Body scroll is locked.
 
-To exit: click the backdrop, press `ESC`, or click the ↙ button in the group header.
+To exit: click the backdrop, press `ESC`, or click the ↙ button in the group header. `ESC` closes the top layer only: while a select menu, popover or modal opened from the field is open, or a repeater item opened from it in Focus Mode, `ESC` closes that one first.
 
 ## How to: combine with `cols`
 

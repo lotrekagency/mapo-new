@@ -6,6 +6,7 @@ import type {
   MapoFormRuntimeConfig,
 } from "../types/index.js";
 import { injectMapoForm } from "../composables/useMapoForm.js";
+import { isTopLayer, useMountedWhileOpen } from "../utils/layers.js";
 import {
   isFieldRemoved,
   isFieldShown,
@@ -57,8 +58,18 @@ function collapseField() {
   document.body.style.overflow = "";
 }
 
+// The expanded panel is a layer with no z-index, mounted when a field expands,
+// so that the menus and modals the field opens show above it (see
+// utils/layers.ts).
+const { mounted: panelMounted, onAfterLeave: onPanelAfterLeave } =
+  useMountedWhileOpen(computed(() => expandedFieldKey.value !== null));
+const panelEl = ref<HTMLElement | null>(null);
+
+// Collapse on ESC when the panel is the top layer: a menu or modal opened from
+// the field, or focus mode opened from it, takes the key first.
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape" && expandedFieldKey.value) collapseField();
+  if (e.key !== "Escape" || !expandedFieldKey.value || !panelEl.value) return;
+  if (isTopLayer(panelEl.value)) collapseField();
 }
 
 onMounted(() => document.addEventListener("keydown", onKeydown));
@@ -151,13 +162,16 @@ function colClass(cols: AnyFieldDescriptor["cols"]): string {
 </script>
 
 <template>
-  <!-- Expanded panel: teleported to body to avoid parent overflow/transform interference. -->
-  <Teleport to="body">
-    <Transition name="mapo-expand">
+  <!-- Expanded panel: teleported to body to avoid parent overflow/transform
+       interference, mounted on expand (see `panelMounted`). -->
+  <Teleport v-if="panelMounted" to="body">
+    <Transition name="mapo-expand" appear @after-leave="onPanelAfterLeave">
       <div
         v-if="expandedFieldKey"
-        class="fixed inset-0 z-50 flex flex-col"
+        ref="panelEl"
+        class="fixed inset-0 flex flex-col"
         style="padding: 1rem"
+        data-mapo-layer
       >
         <!-- Clickable backdrop -->
         <div

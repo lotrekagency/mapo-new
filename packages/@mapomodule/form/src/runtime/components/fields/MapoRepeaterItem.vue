@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, watchEffect } from "vue";
+import { ref, computed, inject, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import type {
   AnyFieldDescriptor,
@@ -191,16 +191,25 @@ const statusColorClass = computed(
 // ─── Focus Mode ──────────────────────────────────────────────────────────────
 
 const focusMode = useFocusMode();
+// An item shown in focus mode gets no focus mode button (see MapoFocusPortal).
+const inFocusMode = inject("mapoInFocusMode", false);
 
 function enterFocusMode() {
+  // What focus mode got, then what it last handed back. It hands back its
+  // whole copy, so only the keys it changed since are applied: a value the
+  // item got meanwhile (an inline write still in its debounce when focus mode
+  // opened) stays. The watcher on `localModel` emits the change.
+  let handed = { ...localModel.value };
   focusMode.enter({
     descriptor: props.repeaterDescriptor as AnyFieldDescriptor,
     fields: props.fields,
-    model: { ...localModel.value },
+    model: handed,
     errors: itemErrors,
     onUpdate: (val) => {
-      localModel.value = { ...val };
-      emit("update:item", localModel.value);
+      for (const key of Object.keys(val)) {
+        if (val[key] !== handed[key]) localModel.value[key] = val[key];
+      }
+      handed = { ...val };
     },
     registry: props.registry,
     languages: props.languages,
@@ -370,6 +379,7 @@ function enterFocusMode() {
 
         <!-- Focus mode -->
         <UButton
+          v-if="!inFocusMode"
           size="xs"
           variant="ghost"
           color="neutral"

@@ -17,6 +17,7 @@ const { $mapoFormRegistry } = useNuxtApp();
 
 interface Article {
   title: string;
+  status: string;
   body: string;
   excerpt: string;
 }
@@ -26,9 +27,15 @@ interface Model {
 
 const model = ref<Model>({
   articles: [
-    { title: "First article", body: "Body of the first article.", excerpt: "" },
+    {
+      title: "First article",
+      status: "draft",
+      body: "Body of the first article.",
+      excerpt: "",
+    },
     {
       title: "Second article",
+      status: "published",
       body: "Body of the second article.",
       excerpt: "",
     },
@@ -43,6 +50,17 @@ const repeater: RepeaterDescriptor<Model> = {
   label: "Articles (click ↗ maximize icon to enter Focus Mode)",
   fields: [
     { key: "title", type: "text", label: "Title", required: true },
+    {
+      key: "status",
+      type: "select",
+      label: "Status",
+      attrs: {
+        items: [
+          { label: "Draft", value: "draft" },
+          { label: "Published", value: "published" },
+        ],
+      },
+    },
     { key: "body", type: "textarea", label: "Body", attrs: { rows: 4 } },
     { key: "excerpt", type: "text", label: "Excerpt" },
   ],
@@ -139,6 +157,10 @@ const focusMode = useFocusMode?.();
         <li>Background page is not scrollable (test 1.4 — focus trap)</li>
         <li>Edit a field → live model above updates (test 2.1)</li>
         <li>Press Esc → overlay closes, edits kept (test 3.1)</li>
+        <li>
+          Open the Status select → its menu shows above the overlay; Esc closes
+          the menu only, a second Esc the overlay
+        </li>
         <li>Tab key stays inside overlay (test 7.1)</li>
         <li>
           <code>role="dialog"</code> and <code>aria-modal="true"</code> present

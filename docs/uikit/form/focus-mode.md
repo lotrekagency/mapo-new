@@ -42,10 +42,12 @@ Every `MapoRepeaterItem` already shows the maximize icon in its header. Clicking
 - Renders the same `MapoFormField`s the inline view does, but with the full viewport
 - Syncs every change back to the parent in real time — no explicit save step
 
+Inside focus mode, the items of a nested repeater have no maximize icon: focus mode shows one item at a time, and they are edited in place.
+
 Exit with:
 
 - The "Close" button in the portal footer
-- Pressing `ESC`
+- Pressing `ESC`. It closes the top layer only: while a select menu, popover or modal opened from the item is open, or a field expanded in it, `ESC` closes that one first.
 
 ## How to: open Focus Mode programmatically
 
@@ -57,10 +59,10 @@ const focusMode = useFocusMode();
 focusMode.enter({
   descriptor: repeaterDescriptor,
   fields: itemFields,
-  model: itemModelRef,
+  model: { ...item },
   errors: itemErrorsRef,
   onUpdate: (val) => {
-    /* update the item in the parent */
+    /* write the keys that changed to the item in the parent */
   },
   registry: formRegistry,
   languages: ["it", "en"],
@@ -103,6 +105,7 @@ If you do not want the maximize icon on every item, check `descriptor.attrs` ins
 ## Behavior details
 
 - **Transition** — `scale(0.98) → scale(1) + opacity` on a 200 ms ease curve.
+- **Stacking** — the portal has no `z-index`. Like Nuxt UI overlays, it stacks by its place in `<body>`: it mounts at the end of `<body>` when it opens, above the page and above an expanded field it was opened from, and the select menus, popovers and modals of its fields mount after it, above it. Do not give it a `z-index` in a theme or an override: it would cover them. An overlay mounted before the portal opened, such as a `UModal` declared in a page or a layout and opened from a custom field, sits before it in `<body>` and shows under it: mount that overlay when it opens, with `v-if` or `useOverlay()`.
 - **Body scroll** — locked while the portal is open via `document.body.style.overflow = 'hidden'`. Cleanup is reference-counted: opening Field Expand and Focus Mode together does not unlock prematurely.
 - **State scope** — `useState` keeps the focus target per-request on SSR, so two concurrent users are not exposed to each other's editing context.
 - **No save step** — the portal is a different _view_ of the same item; updates flow upstream as the user types, exactly like the inline view.
@@ -111,4 +114,4 @@ If you do not want the maximize icon on every item, check `descriptor.attrs` ins
 
 - **Forgetting to mount `<MapoFocusPortal />`** — clicking the maximize icon does nothing. The repeater item assumes the portal exists somewhere up the tree.
 - **Two portals** — mounting the component twice produces double overlays. Keep it in the layout, not in a page.
-- **Manual `focusMode.enter()` outside of a repeater** — works, but you must keep `model` reactive (a `ref`) so two-way updates land back on your parent state. Passing a plain object once will look right but throw away every edit.
+- **Manual `focusMode.enter()` outside of a repeater** — focus mode edits a shallow copy of `model` and hands it to `onUpdate` each time a field changes one of its keys: write the keys that changed to your state there, or the edits stay in the copy. `onUpdate` can still be called just after focus mode closed, by a field whose debounce was running.

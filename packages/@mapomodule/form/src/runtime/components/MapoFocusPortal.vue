@@ -9,10 +9,20 @@
  * // In layouts/default.vue
  * <MapoFocusPortal />
  */
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  ref,
+  onMounted,
+  onUnmounted,
+  provide,
+  toRaw,
+  unref,
+} from "vue";
 import { watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useFocusMode } from "../composables/useFocusMode.js";
+import type { FocusTarget } from "../composables/useFocusMode.js";
+import { isTopLayer, useMountedWhileOpen } from "../utils/layers.js";
 import MapoForm from "./MapoForm.vue";
 
 const { t } = useI18n();
@@ -21,9 +31,16 @@ const { focusTarget, exit } = useFocusMode();
 const isOpen = computed(() => focusTarget.value !== null);
 const canUseDocument = typeof document !== "undefined";
 
-// Close on ESC.
+// A layer with no z-index, mounted when focus mode opens, so that the menus
+// and modals of the item's fields show above it (see utils/layers.ts).
+const { mounted: portalMounted, onAfterLeave } = useMountedWhileOpen(isOpen);
+const layerEl = ref<HTMLElement | null>(null);
+
+// Close on ESC when the portal is the top layer: a menu or modal opened from
+// the item, or a field expanded in it, takes the key first.
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === "Escape" && isOpen.value) exit();
+  if (e.key !== "Escape" || !isOpen.value || !layerEl.value) return;
+  if (isTopLayer(layerEl.value)) exit();
 }
 onMounted(() => window.addEventListener("keydown", onKeyDown));
 onUnmounted(() => window.removeEventListener("keydown", onKeyDown));
@@ -34,31 +51,62 @@ watch(isOpen, (open) => {
   document.body.style.overflow = open ? "hidden" : "";
 });
 
-// Local model for the sub-form, kept in two-way sync with the focus target.
+// The sub-form edits a copy of the item. Its fields write into the copy in
+// place, and MapoForm emits nothing for that (MapoRepeaterItem watches its own
+// model for the same reason), so a watcher on the copy's keys hands each edit
+// to the item. The objects nested in the copy are the item's own: what a field
+// writes inside them (a translation) reaches the item directly. Watching them
+// too would hand the item this copy again whenever the item edits them, long
+// after focus mode has closed, and undo its later edits.
 const localModel = ref<Record<string, unknown>>({});
+// The item the copy belongs to. It stays set after exit: a field writes once
+// its debounce has run out, so an edit made just before closing lands after
+// it, unless focus mode opens again first.
+let target: FocusTarget | null = null;
 
 watch(
-  () => focusTarget.value?.model,
-  (val) => {
-    if (val) localModel.value = { ...val };
+  () => focusTarget.value,
+  (next) => {
+    if (!next) return;
+    // Copy from the raw target: `focusTarget` is read-only all the way down,
+    // and through it the nested objects would come out read-only too. `model`
+    // can be a ref.
+    target = toRaw(next) as FocusTarget;
+    localModel.value = { ...unref(target.model) };
   },
   { immediate: true },
 );
 
+// The items of a repeater inside the item get no focus mode button
+// (MapoRepeaterItem injects this): opening one would put it in this same
+// sub-form, which unmounts the repeater item its edits must reach.
+provide("mapoInFocusMode", true);
+
+watch(
+  localModel,
+  (model, previous) => {
+    // A new copy is another item opening, not an edit.
+    if (model === previous) target?.onUpdate(model);
+  },
+  { deep: 1 },
+);
+
 function onUpdate(val: Record<string, unknown>) {
   localModel.value = val;
-  focusTarget.value?.onUpdate(val);
+  target?.onUpdate(val);
 }
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="mapo-focus-portal">
+  <Teleport v-if="portalMounted" to="body">
+    <Transition name="mapo-focus-portal" appear @after-leave="onAfterLeave">
       <div
         v-if="isOpen && focusTarget"
-        class="mapo-focus-portal fixed inset-0 z-[9999] flex flex-col bg-white"
+        ref="layerEl"
+        class="mapo-focus-portal fixed inset-0 flex flex-col bg-white"
         role="dialog"
         aria-modal="true"
+        data-mapo-layer
       >
         <!-- ── Header ────────────────────────────────────────────────────── -->
         <div
