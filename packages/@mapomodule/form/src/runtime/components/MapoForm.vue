@@ -94,6 +94,8 @@ const form = useMapoForm({
   notifyErrors: props.notifyErrors,
   debounce: globalDebounce,
   registry: injectedRegistry.value,
+  // The fields write into `modelValue` in place: tell the parent each time.
+  onUpdate: (val) => emit("update:modelValue", val),
 });
 
 // Inherit the parent form's submitted state (provided automatically by useMapoForm)

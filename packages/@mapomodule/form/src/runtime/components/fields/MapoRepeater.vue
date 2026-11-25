@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watchEffect } from "vue";
+import { ref, computed, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggable } from "vue-draggable-plus";
 import { useConfirmStore } from "@mapomodule/store/runtime/stores/confirm";
@@ -28,19 +28,38 @@ const { t } = useI18n();
 
 const attrs = computed(() => props.descriptor.attrs ?? {});
 
-// ─── Item list (reactive local copy) ────────────────────────────────────────
+// ─── Item list ───────────────────────────────────────────────────────────────
+
+// The list as the repeater last emitted it. The field writes it into the model
+// once its debounce has run out, and until then `modelValue` is the list from
+// before: the repeater shows and changes this one meanwhile, or a second
+// change (another item's edit, a second "Add") would start from the old list
+// and drop the first. In a `ref`, so its items read as the same proxies
+// `modelValue` gives once the write lands, and keep their keys. Any change to
+// the model's list, a new one or one changed in place, takes over.
+const emitted = ref<Record<string, unknown>[] | null>(null);
+watch(
+  () => props.modelValue,
+  () => {
+    emitted.value = null;
+  },
+  { deep: 1 },
+);
 
 const items = computed<Record<string, unknown>[]>({
   get: () =>
-    (Array.isArray(props.modelValue) ? props.modelValue : []) as Record<
+    emitted.value ??
+    ((Array.isArray(props.modelValue) ? props.modelValue : []) as Record<
       string,
       unknown
-    >[],
-  set: (val) => emit("update:modelValue", val),
+    >[]),
+  set: (val) => emitItems(val),
 });
 
 function emitItems(newItems: Record<string, unknown>[]) {
-  emit("update:modelValue", [...newItems]);
+  const next = [...newItems];
+  emitted.value = next;
+  emit("update:modelValue", next);
 }
 
 // Stable per-item UID: guarantees persistent :key values across reorder/duplicate
@@ -67,7 +86,7 @@ function pushUndo() {
 
 function undo() {
   const prev = undoStack.value.pop();
-  if (prev) emit("update:modelValue", prev);
+  if (prev) emitItems(prev);
 }
 
 // ─── Template selection ──────────────────────────────────────────────────────

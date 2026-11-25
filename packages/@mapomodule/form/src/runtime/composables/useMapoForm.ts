@@ -41,11 +41,19 @@ export interface UseMapoFormOptions<T extends object> {
   registry: FieldRegistry;
   /**
    * When set, enables automatic draft persistence to localStorage.
-   * Key is prefixed with `mapo:draft:`. Drafts expire after 24 h.
+   * Stored under `mapo:draft:<userId>:<key>` (`anonymous` when logged out).
+   * Drafts expire after 24 h.
    * Call the returned `checkDraft()` after the model is populated to offer restore.
-   * Example: `"article:42"` → `mapo:draft:article:42`.
+   * Example: `"article:42"` → `mapo:draft:7:article:42` for the user with id 7.
    */
   draftKey?: MaybeRef<string | undefined>;
+  /**
+   * Called with `model.value` after a field has written its value into it.
+   * Fields write into the model in place, so a caller that does not watch it
+   * deeply learns of an edit here. `MapoForm` emits `update:modelValue` from
+   * it.
+   */
+  onUpdate?: (model: T) => void;
 }
 
 /** State exposed when a pending draft is found in localStorage. */
@@ -118,6 +126,7 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
     debounce: debounceMs = 300,
     notifyErrors = true,
     registry,
+    onUpdate,
   } = options;
 
   const currentLang = useCurrentLang(currentLangProp);
@@ -309,6 +318,8 @@ export function useMapoForm<T extends object>(options: UseMapoFormOptions<T>) {
       delete next[key];
       clientErrors.value = next;
     }
+
+    onUpdate?.(model.value);
   }
 
   function getFieldValue(descriptor: AnyFieldDescriptor<T>): unknown {
