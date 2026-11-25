@@ -186,6 +186,14 @@ describe("getPatch", () => {
     expect(patch).toHaveProperty("title", "New");
     expect(patch).not.toHaveProperty("slug");
   });
+
+  // An emptied number input emits "": sent as is, DRF rejects it on a nullable field.
+  it("sends an emptied number field as null", () => {
+    const { model, form } = makeForm({ count: 1998 });
+    form.setFieldValue("count", "");
+    expect(model.value.count).toBeNull();
+    expect(form.getPatch()).toEqual({ count: null });
+  });
 });
 
 // ─── validateClient ───────────────────────────────────────────────────────────
