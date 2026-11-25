@@ -78,6 +78,12 @@ export const defaultRegistry: FieldRegistry = {
   accessor: {
     // date/time/datetime: conversion handled internally by the Mapo*Field components
     // (ISO string ↔ @internationalized/date CalendarDate/CalendarDateTime).
+    // number: an emptied input emits "" (Nuxt UI keeps the raw string when it does
+    // not parse). Store null instead: DRF accepts null on a nullable numeric field,
+    // while "" fails with "A valid integer is required". 0 is a value and stays 0.
+    number: {
+      set: ({ val }) => (val === "" ? null : val),
+    },
     seo: {
       // v1 used `permalink` key — accept both `permalink` and `url` aliases, normalise to `permalink`
       get: ({ val }) => {

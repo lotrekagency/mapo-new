@@ -92,6 +92,17 @@ describe("resolveFieldAccessor", () => {
     expect(typeof acc.get).toBe("function");
   });
 
+  it("number stores an emptied input as null and keeps numbers, 0 included", () => {
+    const d = { key: "year", type: "number" } as FieldDescriptor;
+    const acc = resolveFieldAccessor(d, defaultRegistry);
+    const set = (val: unknown) => acc.set?.({ model: {}, val, lang: "" });
+    expect(set("")).toBeNull();
+    expect(set(0)).toBe(0);
+    expect(set(1998)).toBe(1998);
+    expect(set(null)).toBeNull();
+    expect(acc.get).toBeUndefined();
+  });
+
   it("descriptor.accessor.get overrides registry", () => {
     const customGet = () => "custom";
     const d = {

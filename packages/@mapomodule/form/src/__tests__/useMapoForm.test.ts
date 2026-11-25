@@ -186,6 +186,14 @@ describe("getPatch", () => {
     expect(patch).toHaveProperty("title", "New");
     expect(patch).not.toHaveProperty("slug");
   });
+
+  // An emptied number input emits "": sent as is, DRF rejects it on a nullable field.
+  it("sends an emptied number field as null", () => {
+    const { model, form } = makeForm({ count: 1998 });
+    form.setFieldValue("count", "");
+    expect(model.value.count).toBeNull();
+    expect(form.getPatch()).toEqual({ count: null });
+  });
 });
 
 // ─── validateClient ───────────────────────────────────────────────────────────
@@ -380,5 +388,24 @@ describe("submit", () => {
       calls.push(data);
     }, true);
     expect(calls[1]).toHaveProperty("slug", "new-slug"); // full model
+  });
+});
+
+describe("useMapoForm — onUpdate", () => {
+  it("is called with the model once a field has written into it", () => {
+    const model = ref({ title: "", translations: {} });
+    const onUpdate = vi.fn();
+    const form = useMapoForm({
+      model,
+      fields: [{ key: "title", type: "text" }],
+      registry: defaultRegistry,
+      onUpdate,
+    });
+
+    form.setFieldValue("title", "Hello");
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith(model.value);
+    expect(model.value.title).toBe("Hello");
   });
 });

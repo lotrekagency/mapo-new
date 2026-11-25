@@ -30,9 +30,9 @@ Descriptor typing guidance:
 
 ### Emits
 
-| Event               | Payload | Description                         |
-| ------------------- | ------- | ----------------------------------- |
-| `update:modelValue` | `T`     | Emitted whenever any field changes. |
+| Event               | Payload | Description                                                                                    |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `update:modelValue` | `T`     | Emitted whenever a field changes, with `modelValue` itself: the fields write into it in place. |
 
 ### Slots
 
@@ -128,7 +128,7 @@ Full-screen overlay for editing a Repeater item in focus mode. Mount once inside
 
 ### Props / Emits / Slots
 
-None — controlled internally by `MapoRepeater` via a shared provide/inject.
+None — it shows the item that `useFocusMode().enter()` opened; each repeater item calls it from its maximize button.
 
 ---
 

@@ -2,7 +2,8 @@
 // Tests: field expand toggle — expandable: true shows an expand icon on the field,
 // clicking it opens the field in a larger modal/full-width view, edits in both compact
 // and expanded views are preserved in the model, validation errors visible in both states,
-// Esc to collapse, aria-expanded attribute present.
+// Esc to collapse, aria-expanded attribute present, menus and Focus Mode opened from
+// an expanded field show above it.
 // E2E plan: e2e/form/field-expand.md
 import type { FieldDescriptor } from "@mapomodule/form/types";
 
@@ -15,12 +16,21 @@ definePageMeta({
 
 const { $mapoFormRegistry } = useNuxtApp();
 
+interface Link {
+  kind: string;
+  address: string;
+}
 interface Model {
   description: string;
   notes: string;
+  links: Link[];
 }
 
-const model = ref<Model>({ description: "", notes: "" });
+const model = ref<Model>({
+  description: "",
+  notes: "",
+  links: [{ kind: "page", address: "/about" }],
+});
 const errors = ref<Record<string, string[]>>({});
 
 // Tests 1.1: expandable: true shows the expand icon
@@ -45,6 +55,30 @@ const fields: FieldDescriptor<Model>[] = [
         "Required field — leave empty then submit to see error in both views",
     },
     validate: (v) => (!v ? "Notes are required." : null),
+  },
+  // Overlays opened from the expanded view (the Kind menu, an item's Focus
+  // Mode) show above it.
+  {
+    key: "links",
+    type: "repeater",
+    label: "Links (expandable repeater — menus and Focus Mode inside)",
+    expandable: true,
+    fields: [
+      {
+        key: "kind",
+        type: "select",
+        label: "Kind",
+        cols: 4,
+        attrs: {
+          items: [
+            { label: "Page", value: "page" },
+            { label: "URL", value: "url" },
+          ],
+        },
+      },
+      { key: "address", type: "text", label: "Address", cols: 8 },
+    ],
+    attrs: { confirmDelete: false },
   },
 ];
 </script>
@@ -128,6 +162,15 @@ const fields: FieldDescriptor<Model>[] = [
           Expand button has <code>aria-expanded</code> attribute (test 4.1)
         </li>
         <li>Esc key collapses the expanded field (test 4.2)</li>
+        <li>
+          Expand "Links", open an item's Kind select: the menu shows above the
+          expanded view, Esc closes the menu only
+        </li>
+        <li>
+          In the expanded "Links", open an item in Focus Mode: it shows above
+          the expanded view, and so does its Kind menu; each Esc closes one
+          layer: the menu, Focus Mode, then the expanded view
+        </li>
       </ul>
     </UCard>
   </div>

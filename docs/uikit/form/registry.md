@@ -164,15 +164,15 @@ defineFormField("price-cents", () => import("~/components/PriceField.vue"), {
 });
 ```
 
-The registry accessor can be overridden per descriptor via `descriptor.accessor`:
+The registry accessor can be overridden per descriptor via `descriptor.accessor`. A descriptor's `get` or `set` replaces the registry's function of the same name and keeps the other one. The built-in `number` accessor turns an emptied input (`""`) into `null`, so a `set` of your own on a `number` field receives the `""` and handles it:
 
 ```ts
 {
   key: 'price',
   type: 'number',
   accessor: {
-    get: ({ val }) => (val as number) / 100,
-    set: ({ val }) => (val as number) * 100,
+    get: ({ val }) => (val != null ? (val as number) / 100 : null),
+    set: ({ val }) => (val === '' || val == null ? null : (val as number) * 100),
   },
 }
 ```
@@ -191,7 +191,7 @@ A `class: 'w-full'` default is applied to **every** field via `attrs.All`.
 | -------------------------------------- | --------------------------------- | --------------------------------------------------------- | -------------------------------------- |
 | `text`                                 | `NuiInput` (`<UInput>`)           | —                                                         | —                                      |
 | `textarea`                             | `NuiTextarea` (`<UTextarea>`)     | —                                                         | —                                      |
-| `number`                               | `NuiInput`                        | `{ type: 'number' }`                                      | —                                      |
+| `number`                               | `NuiInput`                        | `{ type: 'number' }`                                      | stores an emptied input as `null`      |
 | `boolean`                              | `NuiCheckbox` (`<UCheckbox>`)     | —                                                         | —                                      |
 | `switch`                               | `NuiSwitch` (`<USwitch>`)         | —                                                         | —                                      |
 | `slider`                               | `NuiSlider` (`<USlider>`)         | —                                                         | —                                      |

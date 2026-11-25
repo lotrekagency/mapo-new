@@ -422,23 +422,26 @@ Type guards.
 
 Core composable powering `MapoForm`. Provides dirty tracking, validation, and submit flows.
 
-| Option        | Type                             | Default        | Description                             |
-| ------------- | -------------------------------- | -------------- | --------------------------------------- |
-| `model`       | `Ref<T>`                         | — **required** | Reactive form model.                    |
-| `fields`      | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive). |
-| `errors`      | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.          |
-| `languages`   | `string[]`                       | `[]`           | Available language codes.               |
-| `currentLang` | `Ref<string>`                    | `ref('')`      | Active language ref.                    |
-| `immediate`   | `boolean`                        | `false`        | Validate immediately on mount.          |
-| `debounce`    | `number`                         | `300`          | Global validator debounce (ms).         |
-| `registry`    | `FieldRegistry`                  | — **required** | Field component registry.               |
+| Option         | Type                             | Default        | Description                                                                                                       |
+| -------------- | -------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `model`        | `Ref<T>`                         | — **required** | Reactive form model.                                                                                              |
+| `fields`       | `MaybeRef<FieldDescriptor<T>[]>` | — **required** | Field descriptors (static or reactive).                                                                           |
+| `errors`       | `Ref<Record<string, string[]>>`  | `{}`           | Server-side validation errors.                                                                                    |
+| `languages`    | `string[]`                       | `[]`           | Available language codes.                                                                                         |
+| `currentLang`  | `Ref<string>`                    | `ref('')`      | Active language ref.                                                                                              |
+| `immediate`    | `boolean`                        | `false`        | No debounce: fields write at once, and client errors show before a field is touched.                              |
+| `debounce`     | `number`                         | `300`          | Delay (ms) before a field writes its value; `descriptor.debounce` overrides it.                                   |
+| `notifyErrors` | `boolean`                        | `true`         | Toast the server-side field errors; `false` for sub-forms that share the root's errors.                           |
+| `registry`     | `FieldRegistry`                  | — **required** | Field component registry.                                                                                         |
+| `draftKey`     | `MaybeRef<string \| undefined>`  | —              | Enables draft persistence to localStorage under `mapo:draft:<userId>:<key>` (`anonymous` when logged out).        |
+| `onUpdate`     | `(model: T) => void`             | —              | Called with the model after a field has written into it (in place). `MapoForm` emits `update:modelValue` from it. |
 
 **Returns:**
 
 | Member           | Type                                                                             | Description                                                                                                                 |
 | ---------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `isDirty`        | `ComputedRef<boolean>`                                                           | `true` when model differs from the last save baseline.                                                                      |
-| `isLoading`      | `Ref<boolean>`                                                                   | `true` while async validators are running.                                                                                  |
+| `isLoading`      | `Ref<boolean>`                                                                   | `true` while `submit()` is running.                                                                                         |
 | `readonly`       | `Ref<boolean>`                                                                   | Controls read-only mode for all fields.                                                                                     |
 | `currentLang`    | `Ref<string>`                                                                    | Active language.                                                                                                            |
 | `getFieldValue`  | `(key) => unknown`                                                               | Get a field's value by key or descriptor.                                                                                   |

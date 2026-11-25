@@ -18,6 +18,8 @@ Every field has a `type` that decides which component is rendered. Simple types 
 | `file`     | `UInput type="file"`   | attrs: `accept`, `maxSize`                     |
 | `select`   | `USelectMenu`          | requires `attrs` with `items` or `options`     |
 
+An emptied `number` field is stored as `null`, not as the empty string the input emits, so clearing a nullable numeric field saves on a DRF backend.
+
 ```ts
 // select: provide the choices via `items` (Nuxt UI shape)…
 { key: 'status', type: 'select', attrs: {
