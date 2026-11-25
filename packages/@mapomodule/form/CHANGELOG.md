@@ -1,3 +1,11 @@
+# @mapomodule/form [2.0.0-beta.18](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.17...@mapomodule/form@2.0.0-beta.18) (2026-11-25)
+
+### Bug Fixes
+
+- **form:** keep focus mode edits and show menus above full-screen layers ([73b8527](https://github.com/lotrekagency/mapo-new/commit/73b8527f5cddd3bc0fc4a7369c38eca6331d6a64))
+- **form:** show focus mode errors and keep quick repeater changes ([bf64b5b](https://github.com/lotrekagency/mapo-new/commit/bf64b5b34e6c21756cf8db2df5a1584a8ac6b018))
+- **form:** store an emptied number field as null ([92c010e](https://github.com/lotrekagency/mapo-new/commit/92c010e78b203342466ac0ea97d4c70e4bef2ffa))
+
 # @mapomodule/form [2.0.0-beta.17](https://github.com/lotrekagency/mapo-new/compare/@mapomodule/form@2.0.0-beta.16...@mapomodule/form@2.0.0-beta.17) (2026-11-19)
 
 ### Features
